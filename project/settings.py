@@ -33,7 +33,17 @@ SECRET_KEY = "django-insecure-vszkevrb2_f(+1hu1_ioq%mwg!h#w!if#ucg83x6wwq_s(&e5j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["0.0.0.0", ".claude", "127.0.0.1", "localhost"]
+ALLOWED_HOSTS = [
+    "0.0.0.0",
+    ".claude",
+    "127.0.0.1",
+    "localhost",
+    "searchai.popos-sf1.com",
+    "dev.search-ai.io",
+    ".dev.search-ai.io",
+    "search-ai.io",
+    ".search-ai.io",
+]
 
 
 # Application definition
