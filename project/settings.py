@@ -28,27 +28,66 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-vszkevrb2_f(+1hu1_ioq%mwg!h#w!if#ucg83x6wwq_s(&e5j"
+# SECRET_KEY = "django-insecure-vszkevrb2_f(+1hu1_ioq%mwg!h#w!if#ucg83x6wwq_s(&e5j"
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+
+if not SECRET_KEY:
+    raise ValueError("No DJANGO_SECRET_KEY set for Django application. Please set it in your environment variables.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
+# It's recommended to set DEBUG from an environment variable as well, e.g.,
+# DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    "0.0.0.0",
-    ".claude",
+# Define the base list of host specifiers to ensure consistency
+# between ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS.
+# Using dict.fromkeys to ensure all entries are unique.
+_BASE_HOST_SPECIFIERS = list(dict.fromkeys([
+    "0.0.0.0", # Allows all IPv4 addresses; use with caution and ideally be more specific in production.
+    ".claude", # Wildcard for subdomains of claude
     "127.0.0.1",
     "localhost",
     "searchai.popos-sf1.com",
-    "dev.search-ai.io",
-    ".dev.search-ai.io",
+    "dev.search-ai.io", # Specific subdomain
+    ".dev.search-ai.io", # Wildcard for subdomains of dev.search-ai.io
     "search-ai.io",
-    ".search-ai.io",
+    ".search-ai.io", # Wildcard for subdomains of search-ai.io
     "searchai.popos-sf7.com",
-    "https://search-ai.io",
-    "https://prod.search-ai.io",
-    "https://searchai.iocloudhost.net",
-    "https://iocloudhost.net",
-]
+    "prod.search-ai.io", # Specific subdomain
+    "searchai.iocloudhost.net",
+    "iocloudhost.net",
+]))
+
+ALLOWED_HOSTS = _BASE_HOST_SPECIFIERS
+
+# Derive CSRF_TRUSTED_ORIGINS from _BASE_HOST_SPECIFIERS
+# This ensures that if a host is allowed, its corresponding secure origin is trusted for CSRF.
+_generated_csrf_origins = set()
+for specifier in _BASE_HOST_SPECIFIERS:
+    if specifier == "localhost":
+        _generated_csrf_origins.add("http://localhost") # Common for local dev
+        _generated_csrf_origins.add("https://localhost")
+    elif specifier == "127.0.0.1":
+        _generated_csrf_origins.add("http://127.0.0.1") # Common for local dev
+        _generated_csrf_origins.add("https://127.0.0.1")
+    elif specifier == "0.0.0.0":
+        # '0.0.0.0' is not a valid hostname for an Origin header.
+        # It's a listen address for servers.
+        continue
+    elif specifier.startswith("."):
+        # For a wildcard ALLOWED_HOSTS entry like ".example.com",
+        # we trust the base domain "https://example.com" for CSRF.
+        # Django's CSRF check matches the Origin header exactly,
+        # it doesn't interpret wildcards in CSRF_TRUSTED_ORIGINS in the same way as ALLOWED_HOSTS.
+        # Trusting the base domain is a common pattern.
+        # If specific subdomains (e.g., https://sub.example.com) also need to be trusted,
+        # they should ideally be listed explicitly in _BASE_HOST_SPECIFIERS (e.g., "sub.example.com").
+        _generated_csrf_origins.add(f"https://{specifier[1:]}")
+    else:
+        # For a specific host like "example.com", trust "https://example.com"
+        _generated_csrf_origins.add(f"https://{specifier}")
+
+CSRF_TRUSTED_ORIGINS = list(sorted(list(_generated_csrf_origins))) # Sorted for deterministic output
 
 
 # Application definition
