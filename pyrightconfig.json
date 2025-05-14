@@ -16,8 +16,9 @@
   "reportMissingImports": false,
   "reportMissingModuleSource": false,
   "reportMissingTypeStubs": false,
+  "reportMissingTypeStubs": false,
   "reportGeneralTypeIssues": "error",
-  "reportAttributeAccessIssue": "error", // Default for project code
+  "reportAttributeAccessIssue": "error",
 
   "executionEnvironments": [
     {
