@@ -20,6 +20,24 @@ cd searchai-experimental
 uv sync
 ```
 
+### Environment Variables for Development
+
+For local development, it's important to ensure `DEBUG` mode is enabled in Django. This project is configured to use environment variables for settings like `DEBUG` and `DJANGO_SECRET_KEY`. These are loaded from a `.env` file in the project root.
+
+Create a `.env` file in the root of the `crewai-experimental` directory with the following content:
+
+```env
+DJANGO_SECRET_KEY='your_super_secret_dev_key_here_make_something_up'
+DEBUG=True
+```
+
+Setting `DEBUG=True` will:
+- Enable Django's debug pages with detailed error information.
+- Prevent redirection to HTTPS by the development server.
+- Disable certain production security settings for ease of development.
+
+Make sure this `.env` file is included in your `.gitignore` and not committed to your repository, especially if it contains sensitive information.
+
 ### Run Development Server
 
 ```bash
@@ -30,7 +48,12 @@ uv run python manage.py migrate
 uv run python manage.py createsuperuser
 
 # Start development server
+# This will use settings from your .env file if present (e.g., DEBUG=True)
 uv run python manage.py runserver
+
+# Alternatively, you can set DEBUG directly in the command:
+# DEBUG=True uv run python manage.py runserver
+
 # Open http://127.0.0.1:8000/ in your browser to access the Django admin interface
 # Or visit http://127.0.0.1:8000/agent/search/ to access the SearchAI search web UI
 ```

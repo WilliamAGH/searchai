@@ -32,27 +32,36 @@
 </div>
 {% endif %}
 
-{% if results %}
-  <ul class="space-y-8">
-    {% for item in results %}
+{% if results %}<ul class="space-y-8">{% for item in results %}
     <li class="search-result-item mb-6 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out">
       <div class="flex items-center mb-1">
-        <input type="checkbox" name="selected" value="{{ forloop.counter0 }}" form="search-results-form" class="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+        <input type="checkbox" name="selected" value="{{ forloop.counter0 }}" form="search-results-form" class="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" aria-label="Select result {{ item.title }}" />
+        {% if item.link %}
         <a href="{{ item.link }}" target="_blank" class="hover:no-underline group">
           <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-400 group-hover:underline">
             {{ item.title }}
           </h3>
         </a>
+        {% else %}
+        <h3 class="text-lg font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ item.title }}
+        </h3>
+        {% endif %}
       </div>
+      {% if item.link %}
       <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ item.link }}</p>
+      {% endif %}
       <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300 line-clamp-3">
         {{ item.snippet }}
       </p>
-      <div class="mt-4 flex space-x-4">
+      <div class="mt-4 flex items-center space-x-4">
+        {% if item.link %}
         <a href="{{ item.link }}" target="_blank"
-           class="text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-500">
+           class="text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-500 inline-flex items-center">
           Visit site
+          <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4m-4-5l8-8m0 0v5m0-5h-5"></path></svg>
         </a>
+        {% endif %}
         <button
           hx-get="{% url 'agent:chatbot_interface' %}?query_context={{ query|urlencode }}&selected={{ forloop.counter0 }}"
           hx-target="#dynamic-content-area"
@@ -63,9 +72,7 @@
         </button>
       </div>
     </li>
-    {% endfor %}
-  </ul>
-{% elif query %}
+    {% endfor %}</ul>{% elif query %}
 <div class="text-center py-10">
   <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />

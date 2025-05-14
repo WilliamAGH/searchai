@@ -13,14 +13,12 @@
   {% if include_search_context and selected_items %}
   <div class="mb-4 p-4 bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded-lg">
     <p class="font-medium mb-2">Selected Context:</p>
-    <ul class="list-disc pl-5 space-y-1 text-sm text-gray-700 dark:text-gray-300">
-      {% for item in selected_items %}
+    <ul class="list-disc pl-5 space-y-1 text-sm text-gray-700 dark:text-gray-300">{% for item in selected_items %}
       <li>
         <strong class="text-gray-800 dark:text-gray-200">{{ item.title }}</strong> - {{ item.snippet }}
         <a href="{{ item.link }}" target="_blank" class="text-sky-600 hover:underline ml-2">View</a>
       </li>
-      {% endfor %}
-    </ul>
+      {% endfor %}</ul>
   </div>
   {% endif %}
 

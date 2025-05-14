@@ -2,12 +2,36 @@
   "pythonVersion": "3.12",
   "venvPath": ".",
   "venv": ".venv",
-  "reportMissingImports": false,
-  "reportMissingModuleSource": false,
-  "reportMissingTypeStubs": false,
+
+  "include": [
+    "."
+  ],
+
   "exclude": [
     ".venv/**",
     "**/__pycache__",
     "**/migrations"
+  ],
+
+  "reportMissingImports": false,
+  "reportMissingModuleSource": false,
+  "reportMissingTypeStubs": false,
+  "reportGeneralTypeIssues": "error",
+  "reportAttributeAccessIssue": "error",
+
+  "executionEnvironments": [
+    {
+      "root": ".venv/lib/python3.12/site-packages/langchain",
+      "reportGeneralTypeIssues": "none",
+      "reportMissingImports": "none",
+      "reportMissingModuleSource": "none",
+      "reportMissingTypeStubs": "none",
+      "reportAttributeAccessIssue": "none"
+    },
+    {
+      "root": ".venv/lib/python3.12/site-packages/langchain_community/vectorstores",
+      "reportAttributeAccessIssue": "none",
+      "reportGeneralTypeIssues": "none"
+    }
   ]
 }
