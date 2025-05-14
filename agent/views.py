@@ -40,7 +40,7 @@ def search_view(request: HttpRequest) -> HttpResponse:
                 search_results = [
                     {
                         "title": r.get("title"),
-                        "link": r.get("url"),  # Assuming 'url' from search maps to 'link' in template  # noqa: E501
+                        "link": r.get("link"),
                         "snippet": r.get("snippet") or r.get("content") or r.get("description"),  # Prioritize snippet, then content/description # noqa: E501
                     }
                     # Pyright should now understand r is a dict
