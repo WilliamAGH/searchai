@@ -1,6 +1,6 @@
-# CrewAI Experimental
+# SearchAI Experimental
 
-A modern Django project for experimenting with CrewAI tools, featuring a web search interface and CLI.
+A modern Django project for experimenting with SearchAI tools, featuring a web search interface and CLI.
 
 ## Prerequisites
 
@@ -13,8 +13,8 @@ A modern Django project for experimenting with CrewAI tools, featuring a web sea
 
 ```bash
 # Clone the repository
-git clone https://github.com/williamagh/crewai-experimental.git
-cd crewai-experimental
+git clone https://github.com/williamagh/searchai-experimental.git
+cd searchai-experimental
 
 # Sync environment for package installation
 uv sync
@@ -32,7 +32,7 @@ uv run python manage.py createsuperuser
 # Start development server
 uv run python manage.py runserver
 # Open http://127.0.0.1:8000/ in your browser to access the Django admin interface
-# Or visit http://127.0.0.1:8000/agent/search/ to access the CrewAI search web UI
+# Or visit http://127.0.0.1:8000/agent/search/ to access the SearchAI search web UI
 ```
 
 ### Production Server
@@ -86,7 +86,7 @@ uv add --dev package_name
 ## Project Structure
 
 ```
-crewai-experimental/
+searchai-experimental/
 ├── agent/             # CrewAI search agent implementation
 │   ├── services/      # API services and utilities
 │   └── cli.py         # Command-line interface
