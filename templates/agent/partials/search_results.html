@@ -36,12 +36,14 @@
   <ul class="space-y-8">
     {% for item in results %}
     <li class="search-result-item mb-6 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out">
-      <input type="checkbox" name="selected" value="{{ forloop.counter0 }}" form="search-results-form" class="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 inline-block" />
-      <a href="{{ item.link }}" target="_blank" class="block hover:no-underline group">
-        <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-400 group-hover:underline">
-          {{ item.title }}
-        </h3>
-      </a>
+      <div class="flex items-center mb-1">
+        <input type="checkbox" name="selected" value="{{ forloop.counter0 }}" form="search-results-form" class="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+        <a href="{{ item.link }}" target="_blank" class="hover:no-underline group">
+          <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-400 group-hover:underline">
+            {{ item.title }}
+          </h3>
+        </a>
+      </div>
       <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ item.link }}</p>
       <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300 line-clamp-3">
         {{ item.snippet }}
