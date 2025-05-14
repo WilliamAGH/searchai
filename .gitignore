@@ -1,0 +1,11 @@
+.idea
+.ropeproject
+.venv
+.DS_Store
+.env
+.claude
+*.egg-info
+__pycache__
+.mypy_cache
+.ruff_cache
+
