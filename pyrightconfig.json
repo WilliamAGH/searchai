@@ -16,7 +16,6 @@
   "reportMissingImports": false,
   "reportMissingModuleSource": false,
   "reportMissingTypeStubs": false,
-  "reportMissingTypeStubs": false,
   "reportGeneralTypeIssues": "error",
   "reportAttributeAccessIssue": "error",
 
