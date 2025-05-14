@@ -89,6 +89,9 @@ for specifier in _BASE_HOST_SPECIFIERS:
 
 CSRF_TRUSTED_ORIGINS = sorted(_generated_csrf_origins)
 
+# Honor the 'X-Forwarded-Proto' header for SSL detection when behind a proxy
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Security Settings for Production (when DEBUG is False)
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
@@ -219,6 +222,18 @@ warnings.filterwarnings(
     message=r".*is not a Python type.*",
     category=UserWarning,
     module=r"pydantic\._internal\._generate_schema",
+)
+
+# Silence SyntaxWarning from dependencies with invalid escape sequences
+warnings.filterwarnings(
+    "ignore",
+    category=SyntaxWarning,
+    module=r"pysbd\..*",
+)
+warnings.filterwarnings(
+    "ignore",
+    category=SyntaxWarning,
+    module=r"qdrant_client\.http\.models\..*",
 )
 
 # Configure logging to suppress Pydantic internals and control crewai_tools verbosity
