@@ -159,6 +159,30 @@ DATABASES = {
     },
 }
 
+# Enable persistent DB connections and wrap requests in transactions
+DATABASES["default"]["CONN_MAX_AGE"] = int(os.environ.get("CONN_MAX_AGE", 60))
+DATABASES["default"]["ATOMIC_REQUESTS"] = True
+
+# Security headers and cookie settings for security and resilience
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = "DENY"
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+
+# Error reporting: send emails to admins on unhandled exceptions
+ADMINS = [
+    (os.environ.get("ADMIN_NAME", "Admin"), os.environ.get("ADMIN_EMAIL", "")),
+]
+MANAGERS = ADMINS
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", "server@example.com")
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 25))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "False").lower() in ("true", "1", "t", "y", "yes")
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -244,6 +268,10 @@ LOGGING = {
         "console": {
             "class": "logging.StreamHandler",
         },
+        "mail_admins": {
+            "level": "ERROR",
+            "class": "django.utils.log.AdminEmailHandler",
+        },
     },
     "loggers": {
         "pydantic": {
@@ -254,6 +282,11 @@ LOGGING = {
         "crewai_tools": {
             "handlers": ["console"],
             "level": "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["mail_admins"],
+            "level": "ERROR",
             "propagate": False,
         },
     },
