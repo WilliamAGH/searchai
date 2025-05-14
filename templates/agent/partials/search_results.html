@@ -1,0 +1,75 @@
+{% if error_message %}
+  <div class="my-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
+    <p class="font-bold">Error:</p>
+    <p>{{ error_message }}</p>
+  </div>
+{% endif %}
+
+{% if query %}
+<div class="mb-6 flex justify-center space-x-4">
+  <a 
+    hx-get="{% url 'agent:chatbot_interface' %}?query_context={{ query|urlencode }}" 
+    hx-target="#dynamic-content-area"
+    hx-swap="innerHTML"
+    class="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition ease-in-out duration-150"
+  >
+    Discuss All
+  </a>
+  <form id="search-results-form"
+        hx-get="{% url 'agent:chatbot_interface' %}"
+        hx-include="[name='selected']"
+        hx-target="#dynamic-content-area"
+        hx-swap="innerHTML"
+        class="inline-block"
+  >
+    <input type="hidden" name="query_context" value="{{ query }}">
+    <button type="submit"
+            class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition ease-in-out duration-150"
+    >
+      Discuss Selected
+    </button>
+  </form>
+</div>
+{% endif %}
+
+{% if results %}
+  <ul class="space-y-8">
+    {% for item in results %}
+    <li class="search-result-item mb-6 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out">
+      <input type="checkbox" name="selected" value="{{ forloop.counter0 }}" form="search-results-form" class="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 inline-block" />
+      <a href="{{ item.link }}" target="_blank" class="block hover:no-underline group">
+        <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-400 group-hover:underline">
+          {{ item.title }}
+        </h3>
+      </a>
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ item.link }}</p>
+      <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300 line-clamp-3">
+        {{ item.snippet }}
+      </p>
+      <div class="mt-4 flex space-x-4">
+        <a href="{{ item.link }}" target="_blank"
+           class="text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-500">
+          Visit site
+        </a>
+        <button
+          hx-get="{% url 'agent:chatbot_interface' %}?query_context={{ query|urlencode }}&selected={{ forloop.counter0 }}"
+          hx-target="#dynamic-content-area"
+          hx-swap="innerHTML"
+          class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+        >
+          Discuss
+        </button>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+{% elif query %}
+<div class="text-center py-10">
+  <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+  </svg>
+  <h3 class="mt-2 text-lg font-medium text-gray-900">No results found</h3>
+  <p class="mt-1 text-sm text-gray-500">No results found for "<span class="font-semibold">{{ query }}</span>".</p>
+  <p class="mt-1 text-sm text-gray-500">Please try a different search term.</p>
+</div>
+{% endif %}

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>SearchAI Web Search</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    };
+  </script>
+  <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
+  <div class="fixed top-4 right-4 z-50">
+    <button id="theme-toggle" class="p-2 bg-gray-100 dark:bg-gray-900 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-300">
+      <i id="theme-icon" class="fas fa-moon text-gray-800 dark:text-gray-100"></i>
+    </button>
+  </div>
+  <div class="min-h-screen flex flex-col items-center p-4">
+    <h1 class="text-4xl font-bold mb-6">SearchAI Web Search</h1>
+    <form
+      hx-get="{% url 'agent:search' %}"
+      hx-target="#dynamic-content-area"
+      hx-trigger="submit"
+      hx-swap="innerHTML"
+      class="w-full max-w-xl flex"
+    >
+      <input
+        type="text"
+        name="q"
+        value="{{ query|default:'' }}"
+        placeholder="Type your search query..."
+        required
+        class="flex-grow p-3 rounded-l border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <button
+        type="submit"
+        class="px-6 bg-blue-600 text-white font-semibold rounded-r hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        Search
+      </button>
+    </form>
+    <div id="dynamic-content-area" class="mt-8 w-full max-w-3xl">
+      {% if error_message %}
+        <div class="my-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
+          <p class="font-bold">Error:</p>
+          <p>{{ error_message }}</p>
+        </div>
+      {% endif %}
+
+      {% if results %}
+        {% include "agent/partials/search_results.html" %}
+      {% elif query %}
+        <div class="text-center py-10">
+          <p class="text-center text-gray-500">No results found for "{{ query }}".</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  <script>
+    (function() {
+      const themeToggle = document.getElementById('theme-toggle');
+      const themeIcon = document.getElementById('theme-icon');
+
+      // Initialize theme based on localStorage or system preference
+      if (localStorage.theme === 'dark' || (!localStorage.theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      updateIcon();
+
+      function updateIcon() {
+        if (document.documentElement.classList.contains('dark')) {
+          themeIcon.classList.remove('fa-moon');
+          themeIcon.classList.add('fa-sun');
+        } else {
+          themeIcon.classList.remove('fa-sun');
+          themeIcon.classList.add('fa-moon');
+        }
+      }
+
+      themeToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        if (document.documentElement.classList.contains('dark')) {
+          localStorage.theme = 'dark';
+        } else {
+          localStorage.theme = 'light';
+        }
+        updateIcon();
+      });
+
+      themeToggle.addEventListener('mouseenter', () => {
+        // Show opposite icon on hover
+        if (themeIcon.classList.contains('fa-sun')) {
+          themeIcon.classList.remove('fa-sun');
+          themeIcon.classList.add('fa-moon');
+        } else {
+          themeIcon.classList.remove('fa-moon');
+          themeIcon.classList.add('fa-sun');
+        }
+      });
+
+      themeToggle.addEventListener('mouseleave', updateIcon);
+    })();
+  </script>
+</body>
+</html>

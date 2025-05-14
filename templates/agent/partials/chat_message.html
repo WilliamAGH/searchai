@@ -1,0 +1,36 @@
+{% comment %}
+  Represents a single chat message (either user or bot).
+  Context:
+  - message_type: 'user' or 'bot'
+  - text: The message content
+  - query_context: The original search query (optional, for bot messages if needed for context here)
+  - groq_tpm_remaining: Groq tokens remaining (optional, for bot messages)
+  - rate_limit_reset_seconds: Rate limit reset time in seconds (optional, for bot messages)
+{% endcomment %}
+
+{% if message_type == 'user' %}
+<div class="flex justify-end">
+  <div class="bg-blue-500 text-white p-3 rounded-lg max-w-xs lg:max-w-md shadow">
+    <p class="text-sm whitespace-pre-wrap">{{ text }}</p>
+  </div>
+</div>
+{% elif message_type == 'bot' %}
+<div class="flex justify-start">
+  <div class="bg-indigo-100 text-indigo-800 p-3 rounded-lg max-w-xs lg:max-w-md shadow">
+    <div class="chat-message {{ message_type }}">
+      <p class="text-sm whitespace-pre-wrap">{{ text }}</p>
+      {% if query_context %}
+        <p class="text-xs text-indigo-600 mt-1">Context: {{ query_context }}</p>
+      {% endif %}
+      <div class="rate-limit-info text-xs text-gray-500 mt-1">
+        {% if groq_tpm_remaining is not None %}
+          <span>Groq Tokens Remaining (TPM): {{ groq_tpm_remaining }}</span>
+        {% endif %}
+        {% if rate_limit_reset_seconds is not None %}
+          <span class="ml-2.5">Est. Reset: {{ rate_limit_reset_seconds }}s</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
