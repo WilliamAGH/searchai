@@ -1,0 +1,13 @@
+{
+  "pythonVersion": "3.12",
+  "venvPath": ".",
+  "venv": ".venv",
+  "reportMissingImports": false,
+  "reportMissingModuleSource": false,
+  "reportMissingTypeStubs": false,
+  "exclude": [
+    ".venv/**",
+    "**/__pycache__",
+    "**/migrations"
+  ]
+}
