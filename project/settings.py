@@ -43,6 +43,11 @@ ALLOWED_HOSTS = [
     ".dev.search-ai.io",
     "search-ai.io",
     ".search-ai.io",
+    "searchai.popos-sf7.com",
+    "https://search-ai.io",
+    "https://prod.search-ai.io",
+    "https://searchai.iocloudhost.net",
+    "https://iocloudhost.net",
 ]
 
 
