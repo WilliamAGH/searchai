@@ -17,7 +17,7 @@
   "reportMissingModuleSource": false,
   "reportMissingTypeStubs": false,
   "reportGeneralTypeIssues": "error",
-  "reportAttributeAccessIssue": "error", // Default for project code
+  "reportAttributeAccessIssue": "error",
 
   "executionEnvironments": [
     {
@@ -26,12 +26,12 @@
       "reportMissingImports": "none",
       "reportMissingModuleSource": "none",
       "reportMissingTypeStubs": "none",
-      "reportAttributeAccessIssue": "none" // Suppress for this path too
+      "reportAttributeAccessIssue": "none"
     },
     {
       "root": ".venv/lib/python3.12/site-packages/langchain_community/vectorstores",
-      "reportAttributeAccessIssue": "none", // Suppress attribute access errors here
-      "reportGeneralTypeIssues": "none" // Also suppress general issues from this path
+      "reportAttributeAccessIssue": "none",
+      "reportGeneralTypeIssues": "none"
     }
   ]
 }
