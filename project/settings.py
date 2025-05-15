@@ -247,17 +247,12 @@ warnings.filterwarnings(
     module=r"pydantic\._internal\._generate_schema",
 )
 
-# Silence SyntaxWarning from dependencies with invalid escape sequences
-warnings.filterwarnings(
-    "ignore",
-    category=SyntaxWarning,
-    module=r"pysbd\..*",
-)
-warnings.filterwarnings(
-    "ignore",
-    category=SyntaxWarning,
-    module=r"qdrant_client\.http\.models\..*",
-)
+# Silence all SyntaxWarnings to prevent invalid escape sequence warnings
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+
+# Additionally provide specific module filters for clarity
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="qdrant_client")
 
 # Configure logging to suppress Pydantic internals and control crewai_tools verbosity
 LOGGING = {
