@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 import warnings
 from pathlib import Path
 
@@ -43,6 +44,8 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG is False by default; set DEBUG=True in your .env file or environment for local development (truthy values: 'true','1','t','y','yes').
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t", "y", "yes")
+
+RUNSERVER = len(sys.argv) > 1 and sys.argv[1] == "runserver"
 
 # Define the base list of host specifiers to ensure consistency
 # between ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS
@@ -91,8 +94,8 @@ CSRF_TRUSTED_ORIGINS = sorted(_generated_csrf_origins)
 # Honor the 'X-Forwarded-Proto' header for SSL detection when behind a proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Security Settings for Production (when DEBUG is False)
-if not DEBUG:
+# Security Settings for Production (when DEBUG is False and not running dev server)
+if not DEBUG and not RUNSERVER:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -118,6 +121,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "project.middleware.forwarded.ForwardedHeaderMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -279,7 +283,7 @@ LOGGING = {
             "propagate": False,
         },
         "django.request": {
-            "handlers": ["mail_admins"],
+            "handlers": ["mail_admins", "console"],
             "level": "ERROR",
             "propagate": False,
         },
