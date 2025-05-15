@@ -12,12 +12,12 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 import warnings
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 from django.core.management.utils import get_random_secret_key
+from dotenv import load_dotenv
 
 # Build paths inside the app like this: BASE_DIR / 'subdir'
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,6 +44,8 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG is False by default; set DEBUG=True in your .env file or environment for local development (truthy values: 'true','1','t','y','yes').
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t", "y", "yes")
+
+RUNSERVER = len(sys.argv) > 1 and sys.argv[1] == "runserver"
 
 # Define the base list of host specifiers to ensure consistency
 # between ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS
@@ -92,8 +94,8 @@ CSRF_TRUSTED_ORIGINS = sorted(_generated_csrf_origins)
 # Honor the 'X-Forwarded-Proto' header for SSL detection when behind a proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Security Settings for Production (when DEBUG is False)
-if not DEBUG:
+# Security Settings for Production (when DEBUG is False and not running dev server)
+if not DEBUG and not RUNSERVER:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -119,6 +121,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "project.middleware.forwarded.ForwardedHeaderMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -248,17 +251,12 @@ warnings.filterwarnings(
     module=r"pydantic\._internal\._generate_schema",
 )
 
-# Silence SyntaxWarning from dependencies with invalid escape sequences
-warnings.filterwarnings(
-    "ignore",
-    category=SyntaxWarning,
-    module=r"pysbd\..*",
-)
-warnings.filterwarnings(
-    "ignore",
-    category=SyntaxWarning,
-    module=r"qdrant_client\.http\.models\..*",
-)
+# Silence all SyntaxWarnings to prevent invalid escape sequence warnings
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+
+# Additionally provide specific module filters for clarity
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="qdrant_client")
 
 # Configure logging to suppress Pydantic internals and control crewai_tools verbosity
 LOGGING = {
@@ -285,7 +283,7 @@ LOGGING = {
             "propagate": False,
         },
         "django.request": {
-            "handlers": ["mail_admins"],
+            "handlers": ["mail_admins", "console"],
             "level": "ERROR",
             "propagate": False,
         },
