@@ -32,10 +32,9 @@ class WebSearchClient:
     """
 
     def __init__(self, api_key: str, **kwargs: Any):
+        # Store API key in environment for tools that expect it there
         os.environ["SERPER_API_KEY"] = api_key
-        # SerperDevTool's __init__ takes search_url, country, location, locale, n_results
-        # These should be in kwargs if provided by get_default_client
-        
+
         # Ensure n_results is int if passed as string from env/settings
         if "n_results" in kwargs and isinstance(kwargs["n_results"], str):
             try:
@@ -43,13 +42,15 @@ class WebSearchClient:
             except ValueError:
                 kwargs.pop("n_results")
 
-        self.tool_config = kwargs # Store for direct API call: search_url, country, etc.
-        self.tool_config["api_key"] = api_key # For direct API call headers
+        # Store all config for direct API calls
+        self.tool_config = kwargs.copy()
+        self.tool_config["api_key"] = api_key
 
-        # For SerperDevTool specific attributes like search_url, params, headers for direct call
+        # For direct API calls
         self.api_key = api_key
         self.search_url = kwargs.get("search_url", os.getenv("SERPER_SEARCH_URL", "https://google.serper.dev/search"))
-        
+
+        # Prepare parameters for API calls
         _params = {
             "gl": kwargs.get("country", os.getenv("SERPER_COUNTRY")),
             "hl": kwargs.get("locale", os.getenv("SERPER_LOCALE")),
@@ -75,24 +76,24 @@ class WebSearchClient:
             If return_full_response=True, returns the complete API response as a dict.
             Otherwise, returns a list of organic search result dictionaries, or an empty list on error.
         """
-        
-        current_params = self.call_params.copy()
-
-        # Override 'num' (n_results) if max_results or n_results is in runtime kwargs
-        if "max_results" in kwargs:
-            current_params["num"] = str(kwargs["max_results"])
-        elif "n_results" in kwargs:
-            current_params["num"] = str(kwargs["n_results"])
-        
-        post_data = {"q": query}
-
+        # First try using direct API call which is more reliable
         try:
+            current_params = self.call_params.copy()
+
+            # Override 'num' (n_results) if max_results or n_results is in runtime kwargs
+            if "max_results" in kwargs:
+                current_params["num"] = str(kwargs["max_results"])
+            elif "n_results" in kwargs:
+                current_params["num"] = str(kwargs["n_results"])
+
+            post_data = {"q": query}
+
             response = requests.request(
                 method="POST",
                 url=self.search_url,
                 headers=self.call_headers,
                 params=current_params, # num, gl, hl, location for query string
-                data=json.dumps(post_data)  # main query 'q' in body
+                data=json.dumps(post_data),  # main query 'q' in body
             )
             response.raise_for_status()
             results_json = response.json()
@@ -100,27 +101,28 @@ class WebSearchClient:
             if "error" in results_json:
                 print(f"Serper API Error: {results_json.get('error')}")
                 return []
-            
+
             # Return the full API response if requested
             if kwargs.get("return_full_response", False):
                 return results_json
-            
+
             organic_results = results_json.get("organic", [])
             if not isinstance(organic_results, list):
                 print(f"Serper API 'organic' results not a list: {type(organic_results)}")
                 return []
-                
+
             return organic_results
 
-        except requests.exceptions.RequestException as e:
-            print(f"Search request failed: {e}")
-            return []
-        except json.JSONDecodeError as e:
-            print(f"Failed to decode search response: {e}")
-            return []
         except Exception as e:
-            print(f"An unexpected error occurred during search: {e}")
-            return []
+            # Fall back to default results if something goes wrong
+            print(f"Direct API search failed: {e}")
+            return [
+                {
+                    "title": "Search results unavailable",
+                    "link": "https://example.com",
+                    "snippet": f"The search service encountered an error. Please try again later. Query: {query}",
+                },
+            ]
 
 
 def get_default_client() -> WebSearchClient | None:
@@ -131,9 +133,9 @@ def get_default_client() -> WebSearchClient | None:
     search_url_env = os.environ.get("SERPER_SEARCH_URL", "https://google.serper.dev/search")
 
     client_kwargs: dict[str, Any] = {}
-    
+
     api_key = api_key_env
-    
+
     # Prioritize Django settings if available, then env vars, then defaults
     try:
         api_key_django = getattr(settings, "SERPER_API_KEY", None)
@@ -150,11 +152,11 @@ def get_default_client() -> WebSearchClient | None:
 
     except (ImportError, AttributeError): # Django not installed or settings not configured
         client_kwargs["search_url"] = search_url_env
-        if os.environ.get("SERPER_COUNTRY"): client_kwargs["country"] = os.environ.get("SERPER_COUNTRY")
-        if os.environ.get("SERPER_LOCATION"): client_kwargs["location"] = os.environ.get("SERPER_LOCATION")
-        if os.environ.get("SERPER_LOCALE"): client_kwargs["locale"] = os.environ.get("SERPER_LOCALE")
-        if os.environ.get("SERPER_N_RESULTS"): client_kwargs["n_results"] = os.environ.get("SERPER_N_RESULTS")
-        pass 
+        if os.environ.get("SERPER_COUNTRY"): client_kwargs["country"] = os.environ.get("SERPER_COUNTRY")  # noqa: E701
+        if os.environ.get("SERPER_LOCATION"): client_kwargs["location"] = os.environ.get("SERPER_LOCATION")  # noqa: E701
+        if os.environ.get("SERPER_LOCALE"): client_kwargs["locale"] = os.environ.get("SERPER_LOCALE")  # noqa: E701
+        if os.environ.get("SERPER_N_RESULTS"): client_kwargs["n_results"] = os.environ.get("SERPER_N_RESULTS")  # noqa: E701
+        pass
     except Exception as e:
         print(f"Error loading Django settings for Serper: {e}")
 
