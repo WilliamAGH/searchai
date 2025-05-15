@@ -63,16 +63,17 @@ class WebSearchClient:
         }
 
 
-    def search(self, query: str, **kwargs: Any) -> list[dict[str, Any]]:
+    def search(self, query: str, **kwargs: Any) -> dict[str, Any] | list[dict[str, Any]]:
         """
         Perform a web search using the Serper API directly.
 
         Args:
             query: The search query string.
-            **kwargs: Supports 'n_results' or 'max_results'.
+            **kwargs: Supports 'n_results' or 'max_results', 'return_full_response'.
 
         Returns:
-            A list of search result dictionaries, or an empty list on error.
+            If return_full_response=True, returns the complete API response as a dict.
+            Otherwise, returns a list of organic search result dictionaries, or an empty list on error.
         """
         
         current_params = self.call_params.copy()
@@ -99,6 +100,10 @@ class WebSearchClient:
             if "error" in results_json:
                 print(f"Serper API Error: {results_json.get('error')}")
                 return []
+            
+            # Return the full API response if requested
+            if kwargs.get("return_full_response", False):
+                return results_json
             
             organic_results = results_json.get("organic", [])
             if not isinstance(organic_results, list):

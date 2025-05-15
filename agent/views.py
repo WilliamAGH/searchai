@@ -31,10 +31,18 @@ def search_view(request: HttpRequest) -> HttpResponse:
         try:
             client = get_default_client()
             if client:
-                raw_results_data = client.search(query, max_results=10)
-                raw_results: list[dict[str, Any]] = cast(list[dict[str, Any]], raw_results_data)
-
-                # Store the full raw results in session
+                # Get full response from Serper API
+                full_response = client.search(query, max_results=10, return_full_response=True)
+                
+                # Store the full API response in session
+                session_key_full_response = f"search_full_response_{query}"
+                request.session[session_key_full_response] = full_response
+                
+                # Also get organic results for display
+                organic_results = client.search(query, max_results=10)
+                raw_results: list[dict[str, Any]] = cast(list[dict[str, Any]], organic_results)
+                
+                # Store the organic results in session (for backwards compatibility)
                 session_key_raw_results = f"search_raw_results_{query}"
                 request.session[session_key_raw_results] = raw_results
 
@@ -67,6 +75,23 @@ def search_view(request: HttpRequest) -> HttpResponse:
 
 @require_GET
 def view_full_json_result(request: HttpRequest, query: str, result_index: int) -> HttpResponse:
+    # Try to get the full API response first
+    session_key_full_response = f"search_full_response_{query}"
+    full_response = request.session.get(session_key_full_response)
+    
+    # Check if we're displaying the full API response (special case with index -1)
+    if result_index == -1 and full_response:
+        try:
+            # Display the complete Serper API response
+            pretty_json = json.dumps(full_response, indent=2)
+            from django.utils.html import escape
+            pretty_json_escaped = escape(pretty_json)
+            html_response = f'<pre class="bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 p-4 border border-gray-300 dark:border-zinc-700 rounded whitespace-pre-wrap break-words max-h-[500px] overflow-y-auto">{pretty_json_escaped}</pre>'
+            return HttpResponse(html_response)
+        except TypeError:
+            return HttpResponse("Full API response data is not JSON serializable.", status=500)
+    
+    # Otherwise fall back to showing individual organic results (legacy behavior)
     session_key_raw_results = f"search_raw_results_{query}"
     raw_results_list = request.session.get(session_key_raw_results, [])
 
@@ -82,7 +107,7 @@ def view_full_json_result(request: HttpRequest, query: str, result_index: int) -
         pretty_json = json.dumps(result_data, indent=2)
         from django.utils.html import escape
         pretty_json_escaped = escape(pretty_json)
-        html_response = f"<pre style='background-color: #f0f0f0; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto;'>{pretty_json_escaped}</pre>"
+        html_response = f'<pre class="bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 p-4 border border-gray-300 dark:border-zinc-700 rounded whitespace-pre-wrap break-words max-h-[300px] overflow-y-auto"><b>Individual Search Result:</b>\n{pretty_json_escaped}</pre>'
         return HttpResponse(html_response)
     except IndexError:
         return HttpResponse("Result index out of bounds.", status=404)
