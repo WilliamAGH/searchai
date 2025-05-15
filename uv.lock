@@ -456,7 +456,7 @@ wheels = [
 
 [[package]]
 name = "crewai"
-version = "0.118.0"
+version = "0.120.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "appdirs" },
@@ -483,14 +483,14 @@ dependencies = [
     { name = "tomli-w" },
     { name = "uv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/71/5321cd921e783288453c441fe4bbe05c0adefbf95ffa0954df3f3bac34cc/crewai-0.118.0.tar.gz", hash = "sha256:7d42b1552006c0b4b60acc9390a05ca16503669e34fd3e30d07996379e66b15b", size = 71688751, upload-time = "2025-04-30T18:54:54.217Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/f7/c33a3e80e00e6916604bd52593d7acaf40b81cddcbff6c182b0d3cca9b1a/crewai-0.120.1.tar.gz", hash = "sha256:d2300da6b52a11923c7f6bd304e12c227840c2febc20d495b7c2f37efe48ea5a", size = 72377150, upload-time = "2025-05-15T00:21:56.341Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/92/ed32f1472231be1333b059262dcfc60a4ed192fb7c916cc3fcc5af30d0f4/crewai-0.118.0-py3-none-any.whl", hash = "sha256:c6ffb34169756e565c403cadb709da7d69979f31e1d8d7504e61fe21e3d571f8", size = 305158, upload-time = "2025-04-30T18:54:50.457Z" },
+    { url = "https://files.pythonhosted.org/packages/af/d3/f33b44b30fabfd284d555334aa952dff303f5b8be0831192a28584071899/crewai-0.120.1-py3-none-any.whl", hash = "sha256:cfb5af8d3633a223ae4ad785b9f22c796bba153d2d1efd96d50794e555d25839", size = 310031, upload-time = "2025-05-15T00:21:51.417Z" },
 ]
 
 [[package]]
 name = "crewai-tools"
-version = "0.44.0"
+version = "0.45.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chromadb" },
@@ -505,9 +505,9 @@ dependencies = [
     { name = "pytube" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/1f/2977dc72628c1225bf5788ae22a65e5a53df384d19b197646d2c4760684e/crewai_tools-0.44.0.tar.gz", hash = "sha256:44e0c26079396503a326efdd9ff34bf369d410cbf95c362cc523db65b18f3c3a", size = 892004, upload-time = "2025-05-07T21:39:33.657Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/3a/7070dcacef56702c5d83ad1a87021b1666ff1850ff80b3aa7540892406e7/crewai_tools-0.45.0.tar.gz", hash = "sha256:1b2e4eff3f928ce5fac308d6e648719a0e4718a1228ae98980aa0d74fc16bfc7", size = 909723, upload-time = "2025-05-14T18:51:50.927Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ba/80/b91aa837d06edbb472445ea3c92d7619518894fd3049d480e5fffbf0c21b/crewai_tools-0.44.0-py3-none-any.whl", hash = "sha256:119e2365fe66ee16e18a5e8e222994b19f76bafcc8c1bb87f61609c1e39b2463", size = 583462, upload-time = "2025-05-07T21:39:31.407Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/72/db45626973027c992df75cbc7ef391f18393d631be3bceb6388c1b9f01e1/crewai_tools-0.45.0-py3-none-any.whl", hash = "sha256:9dd34e4792c075ee7a72134aedaab268e78d0e350114fd7fe2426e691c5f52a3", size = 602659, upload-time = "2025-05-14T18:51:49.077Z" },
 ]
 
 [[package]]
@@ -1526,7 +1526,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.67.1"
+version = "1.68.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1541,9 +1541,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/54/a4/bb3e9ae59e5a9857443448de7c04752630dc84cddcbd8cee037c0976f44f/litellm-1.67.1.tar.gz", hash = "sha256:78eab1bd3d759ec13aa4a05864356a4a4725634e78501db609d451bf72150ee7", size = 7242044, upload-time = "2025-04-22T22:08:54.623Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/22/138545b646303ca3f4841b69613c697b9d696322a1386083bb70bcbba60b/litellm-1.68.0.tar.gz", hash = "sha256:9fb24643db84dfda339b64bafca505a2eef857477afbc6e98fb56512c24dbbfa", size = 7314051, upload-time = "2025-05-04T05:41:48.081Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/86/c14d3c24ae13c08296d068e6f79fd4bd17a0a07bddbda94990b87c35d20e/litellm-1.67.1-py3-none-any.whl", hash = "sha256:8fff5b2a16b63bb594b94d6c071ad0f27d3d8cd4348bd5acea2fd40c8e0c11e8", size = 7607266, upload-time = "2025-04-22T22:08:50.262Z" },
+    { url = "https://files.pythonhosted.org/packages/10/af/1e344bc8aee41445272e677d802b774b1f8b34bdc3bb5697ba30f0fb5d52/litellm-1.68.0-py3-none-any.whl", hash = "sha256:3bca38848b1a5236b11aa6b70afa4393b60880198c939e582273f51a542d4759", size = 7684460, upload-time = "2025-05-04T05:41:44.78Z" },
 ]
 
 [[package]]
@@ -1877,7 +1877,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.78.1"
+version = "1.75.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1889,9 +1889,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/3f/4e5e7b0548a15eabc4a755c93cd5f9564887e3d2fd45b6ff531352e5859d/openai-1.78.1.tar.gz", hash = "sha256:8b26b364531b100df1b961d03560042e5f5be11301d7d49a6cd1a2b9af824dca", size = 442985, upload-time = "2025-05-12T09:59:51.098Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/b1/318f5d4c482f19c5fcbcde190801bfaaaec23413cda0b88a29f6897448ff/openai-1.75.0.tar.gz", hash = "sha256:fb3ea907efbdb1bcfd0c44507ad9c961afd7dce3147292b54505ecfd17be8fd1", size = 429492, upload-time = "2025-04-16T16:49:29.25Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/4c/3889bc332a6c743751eb78a4bada5761e50a8a847ff0e46c1bd23ce12362/openai-1.78.1-py3-none-any.whl", hash = "sha256:7368bf147ca499804cc408fe68cdb6866a060f38dec961bbc97b04f9d917907e", size = 680917, upload-time = "2025-05-12T09:59:48.948Z" },
+    { url = "https://files.pythonhosted.org/packages/80/9a/f34f163294345f123673ed03e77c33dee2534f3ac1f9d18120384457304d/openai-1.75.0-py3-none-any.whl", hash = "sha256:fe6f932d2ded3b429ff67cc9ad118c71327db32eb9d32dd723de3acfca337125", size = 646972, upload-time = "2025-04-16T16:49:27.196Z" },
 ]
 
 [[package]]
@@ -2926,13 +2926,13 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "crewai-tools", specifier = ">=0.1.0" },
+    { name = "crewai-tools", specifier = ">=0.45.0" },
     { name = "django", specifier = ">=5.2.1" },
     { name = "django-htmx", specifier = ">=1.23.0" },
     { name = "django-stubs", specifier = ">=5.2.0" },
     { name = "extended-mypy-django-plugin", specifier = ">=0.8.0" },
     { name = "groq", specifier = ">=0.24.0" },
-    { name = "openai", specifier = ">=1.78.1" },
+    { name = "openai", specifier = ">=1.75.0" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "ruff", specifier = ">=0.11.9" },
