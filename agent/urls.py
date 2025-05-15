@@ -13,4 +13,9 @@ urlpatterns = [
         views.get_models_for_provider_view,
         name="get_models_for_provider",
     ),
+    path(
+        "result_json/<str:query>/<int:result_index>/",
+        views.view_full_json_result,
+        name="view_full_json_result",
+    ),
 ]

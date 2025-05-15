@@ -1,4 +1,5 @@
-from typing import Any, Literal, cast  # Removed Dict and List
+from typing import Any, Literal, cast
+import json
 
 from django.http import (  # type: ignore[attr-defined]
     HttpRequest,
@@ -22,51 +23,71 @@ logger = logging.getLogger(__name__)
 
 @require_GET
 def search_view(request: HttpRequest) -> HttpResponse:
-    # Explicitly cast to str to satisfy Pyright, though .get() with a default string should suffice
     query: str = cast(str, request.GET.get("q", ""))
-    search_results: list[dict[str, Any]] = [] # Changed to lowercase
+    search_results: list[dict[str, Any]] = []
     error_message = None
-    # search_client_name = request.GET.get("client", "tavily") # Unused for now
 
     if query:
         try:
-            client = get_default_client()  # Using the refactored client getter
+            client = get_default_client()
             if client:
-                # Assuming client.search returns a list of dicts
-                # Add type hint for raw_results
                 raw_results_data = client.search(query, max_results=10)
-                raw_results: list[dict[str, Any]] = cast(list[dict[str, Any]], raw_results_data) # Changed to lowercase  # noqa: E501
+                raw_results: list[dict[str, Any]] = cast(list[dict[str, Any]], raw_results_data)
+
+                # Store the full raw results in session
+                session_key_raw_results = f"search_raw_results_{query}"
+                request.session[session_key_raw_results] = raw_results
 
                 search_results = [
                     {
                         "title": r.get("title"),
                         "link": r.get("link"),
-                        "snippet": r.get("snippet") or r.get("content") or r.get("description"),  # Prioritize snippet, then content/description # noqa: E501
+                        "snippet": r.get("snippet") or r.get("content") or r.get("description"),
+                        "index": idx
                     }
-                    # Pyright should now understand r is a dict
-                    for r in raw_results
+                    for idx, r in enumerate(raw_results)
                 ]
-                # Store search results in session for diagnostics
-                session_key_results = f"search_results_{query}"
-                request.session[session_key_results] = search_results
             else:
                 error_message = "Search service client not available."
         except Exception as e:
             error_message = f"An error occurred during search: {str(e)}"
 
-    if hasattr(request, "htmx") and request.htmx:  # type: ignore[attr-defined] # Changed single to double quotes
-        print(f"[AGENT_VIEW_LOG] HTMX request detected for query: '{query}'")
+    if hasattr(request, "htmx") and request.htmx:  # type: ignore[attr-defined]
+        print(f"[AGENT_VIEW_LOG] HTMX request detected for query: \'{query}\'")
         print(f"[AGENT_VIEW_LOG] Error message before HTMX render: {error_message}")
         print(f"[AGENT_VIEW_LOG] Search results count for HTMX: {len(search_results)}")
-        # For more detail, uncomment the next line, but be cautious with large result sets:
-        # print(f"[AGENT_VIEW_LOG] Search results content for HTMX: {search_results}")
         return render(
             request,
             "agent/partials/search_results.html",
             {"results": search_results, "query": query, "error_message": error_message},
         )
 
-    return render(request, "agent/search.html", {"query": query, "results": search_results, "error_message": error_message}) # noqa: E501
+    return render(request, "agent/search.html", {"query": query, "results": search_results, "error_message": error_message})
+
+
+@require_GET
+def view_full_json_result(request: HttpRequest, query: str, result_index: int) -> HttpResponse:
+    session_key_raw_results = f"search_raw_results_{query}"
+    raw_results_list = request.session.get(session_key_raw_results, [])
+
+    if not raw_results_list or not isinstance(raw_results_list, list):
+        return HttpResponse("Raw search results not found in session or invalid format for this query.", status=404)
+
+    try:
+        # Ensure result_index is within bounds
+        if not 0 <= result_index < len(raw_results_list):
+            return HttpResponse("Result index out of bounds.", status=404)
+            
+        result_data = raw_results_list[result_index]
+        pretty_json = json.dumps(result_data, indent=2)
+        from django.utils.html import escape
+        pretty_json_escaped = escape(pretty_json)
+        html_response = f"<pre style='background-color: #f0f0f0; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto;'>{pretty_json_escaped}</pre>"
+        return HttpResponse(html_response)
+    except IndexError:
+        return HttpResponse("Result index out of bounds.", status=404)
+    except TypeError:
+        return HttpResponse("Data for this result is not JSON serializable.", status=500)
 
 
 @require_GET
@@ -123,7 +144,7 @@ def chatbot_interface_view(request: HttpRequest) -> HttpResponse:
 
     llm_providers = get_llm_providers()
     default_provider_value = llm_providers[0]["value"] if llm_providers else None
-    initial_models: list[str] = [] # Changed to lowercase
+    initial_models: list[str] = []
     typed_provider_value: Literal["openai", "groq"] | None = None
 
     if default_provider_value == "openai":
@@ -184,7 +205,7 @@ def chatbot_send_message_view(request: HttpRequest) -> HttpResponse:
         return HttpResponse(status=204)  # No content to send
 
     raw_provider = data.get("llm_provider")
-    raw_model_value = data.get("llm_model") # Renamed to avoid confusion with selected_model
+    raw_model_value = data.get("llm_model")
 
     if not raw_provider or raw_provider not in ["openai", "groq"]:
         return HttpResponseBadRequest(b"LLM provider is missing or invalid.")
@@ -192,12 +213,12 @@ def chatbot_send_message_view(request: HttpRequest) -> HttpResponse:
     selected_model: str
     if isinstance(raw_model_value, str):
         selected_model = raw_model_value.strip()
-        if not selected_model: # Check if empty after strip
+        if not selected_model:
             return HttpResponseBadRequest(b"LLM model cannot be empty.")
-    else: # Not a string (could be None or something else if form data is unusual)
+    else:
         return HttpResponseBadRequest(b"LLM model is missing or invalid type.")
 
-    selected_provider = cast(Literal["openai", "groq"], raw_provider) # raw_provider is validated above  # noqa: E501
+    selected_provider = cast(Literal["openai", "groq"], raw_provider)  # noqa: E501
 
     available_models_for_provider = get_available_models(selected_provider)
     if selected_model not in available_models_for_provider:
