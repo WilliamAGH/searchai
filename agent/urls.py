@@ -1,4 +1,4 @@
-from django.urls import path  # type: ignore
+from django.urls import path, re_path  # type: ignore
 
 from . import views
 
@@ -13,8 +13,8 @@ urlpatterns = [
         views.get_models_for_provider_view,
         name="get_models_for_provider",
     ),
-    path(
-        "result_json/<str:query>/<int:result_index>/",
+    re_path(
+        r"^result_json/(?P<query>[^/]+)/(?P<result_index>-?\d+)/$",
         views.view_full_json_result,
         name="view_full_json_result",
     ),
