@@ -67,6 +67,9 @@ def scrape_url(url: str) -> str:
         logger.debug(f"Attempting to scrape {url} with BeautifulSoup")
         # Use connection pooling session
         session = get_requests_session()
+        if session is None:
+            # Graceful degradation: fall back to module-level requests object
+            session = requests
         timeout = getattr(settings, "REQUESTS_TIMEOUT", 10)
         response = session.get(url, timeout=timeout)
         response.raise_for_status()
