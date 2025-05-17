@@ -8,9 +8,9 @@ import os
 import resource
 import sys
 import threading
+import functools
 from collections.abc import Callable
 from typing import Any
-
 logger = logging.getLogger("agent.utils.memory")
 
 # Memory threshold for warnings (default: 80% of available memory)
