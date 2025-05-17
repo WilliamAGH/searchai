@@ -1,5 +1,6 @@
 """
-Agent package: simple web-search agent functionality.
+Agent package with web search and LLM integration
+:author: William Callahan
 """
 
 from .services.search import WebSearchClient, get_default_client
