@@ -1,1 +1,4 @@
-# This file makes agent/scraping a Python package.
+"""
+Web scraping package for content retrieval
+:author: William Callahan
+"""

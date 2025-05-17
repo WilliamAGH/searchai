@@ -1,24 +1,42 @@
+"""
+Web content scraping utilities
+:author: William Callahan
+"""
 import logging
 
 import requests
-import trafilatura  # Added trafilatura
+import trafilatura
 from bs4 import BeautifulSoup
-from bs4.element import Tag  # Import Tag
+from bs4.element import Tag
+from django.conf import settings
 from newspaper import Article
+
+from ..services.search import get_requests_session
 
 logger = logging.getLogger(__name__)
 
 def scrape_url(url: str) -> str:
     """
-    Scrape the main text content from the given URL using trafilatura,
-    falling back to newspaper3k, and then BeautifulSoup parsing if needed.
+    Scrape main text content from URL with multiple methods
+
+    Args:
+        url: Web page URL to scrape
+
+    Returns:
+        Extracted text content or empty string if all methods fail
+
+    Uses multiple approaches in fallback sequence:
+    - Trafilatura for high-quality extraction
+    - Newspaper3k for article parsing
+    - BeautifulSoup for basic HTML parsing
     """
     # Try with Trafilatura first for high-quality extraction
     try:
         logger.debug(f"Attempting to scrape {url} with Trafilatura")
-        downloaded = trafilatura.fetch_url(url)
+        # Configure trafilatura with our timeout settings
+        timeout = getattr(settings, "REQUESTS_TIMEOUT", 10)
+        downloaded = trafilatura.fetch_url(url, timeout=timeout)
         if downloaded:
-            # include_tables=False, include_comments=False are defaults but explicit
             text = trafilatura.extract(downloaded, include_comments=False, include_tables=False, deduplicate=True)
             if text:
                 logger.info(f"Successfully scraped {url} with Trafilatura, content length: {len(text)}")
@@ -26,12 +44,14 @@ def scrape_url(url: str) -> str:
         logger.debug(f"Trafilatura found no main content for {url}")
     except Exception as e:
         logger.warning(f"Trafilatura failed for {url}: {e}", exc_info=True)
-        pass # Fall through to next method
 
     # Try with newspaper3k as a fallback
     try:
         logger.debug(f"Attempting to scrape {url} with newspaper3k")
+        timeout = getattr(settings, "REQUESTS_TIMEOUT", 10)
         article = Article(url)
+        # Set config for newspaper3k
+        article.config.fetch_timeout = timeout
         article.download()
         article.parse()
         text = article.text
@@ -41,24 +61,24 @@ def scrape_url(url: str) -> str:
         logger.debug(f"newspaper3k found no main content for {url}")
     except Exception as e:
         logger.warning(f"newspaper3k failed for {url}: {e}", exc_info=True)
-        pass # Fall through to next method
 
     # Fallback: fetch page and parse <p> tags with BeautifulSoup
     try:
         logger.debug(f"Attempting to scrape {url} with BeautifulSoup")
-        response = requests.get(url, timeout=10)
-        response.raise_for_status() # Raise an exception for HTTP errors
+        # Use connection pooling session
+        session = get_requests_session()
+        timeout = getattr(settings, "REQUESTS_TIMEOUT", 10)
+        response = session.get(url, timeout=timeout)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
-        target_element: BeautifulSoup | Tag = soup # Default to the whole soup
+        target_element: BeautifulSoup | Tag = soup
 
         # Attempt to find a main content area if possible
-        # Ensure that main_content is a Tag before assigning it to target_element
         potential_main_content = soup.find("main") or soup.find("article") or soup.find(id="content") or soup.find(id="main-content")
 
         if isinstance(potential_main_content, Tag):
             target_element = potential_main_content
-        # If potential_main_content is None or NavigableString, target_element remains 'soup'
 
         paragraphs = target_element.find_all("p")
         text = " ".join(p.get_text(separator=" ", strip=True) for p in paragraphs)
