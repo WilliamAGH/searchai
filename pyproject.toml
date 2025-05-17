@@ -5,7 +5,7 @@ description = ""
 requires-python = ">=3.12"
 dependencies = [
     "django>=5.2.1",
-    "ruff>=0.11.9",
+    "ruff>=0.11.10",
     "requests>=2.32.3",
     "python-dotenv>=1.1.0",
     "crewai-tools>=0.45.0",
@@ -74,6 +74,7 @@ strict_optional = true
 
 [tool.django-stubs]
 django_settings_module = "project.settings"
+scratch_path = "./.mypy_cache/django-stubs"
 
 [[tool.mypy.overrides]]
 module = "*.migrations.*"
