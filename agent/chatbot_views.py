@@ -126,7 +126,11 @@ def chatbot_interface_view(request: HttpRequest) -> HttpResponse:
 
     if typed_provider_value:
         initial_models = get_available_models(typed_provider_value)
-
+    else:
+        logger.error("No LLM provider configured – cannot load chatbot interface")
+        return HttpResponseServerError(
+            "LLM provider configuration is missing – please contact support."
+        )
     system_messages = []
     system_message = f"You are a helpful assistant. The user is asking about a topic related to their recent search: '{query_context}'. Keep your answers concise and relevant to this context."
     system_messages.append({"role": "system", "content": system_message})
