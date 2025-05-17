@@ -176,6 +176,7 @@ def memory_intensive(func: Callable) -> Callable:
     @param func: Function to decorate
     @return: Decorated function
     """
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         func_name = func.__name__
         logger.info(f"Starting memory-intensive function: {func_name}")
