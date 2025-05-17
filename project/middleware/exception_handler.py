@@ -32,18 +32,18 @@ class GlobalExceptionMiddleware:
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         """
-        Initialize middleware with response handler
+        Initializes the middleware with the next request-response handler.
         
-        @param get_response: Callable that processes the request
+        Args:
+            get_response: The callable that processes each HTTP request.
         """
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
-        Process request and handle any exceptions
+        Processes an incoming HTTP request and handles uncaught exceptions.
         
-        @param request: HTTP request to process
-        @return: HTTP response from the next middleware or view
+        If an exception occurs during request processing, delegates handling to the middleware's exception handler and returns an appropriate HTTP response.
         """
         try:
             return self.get_response(request)
@@ -52,11 +52,9 @@ class GlobalExceptionMiddleware:
 
     def handle_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse:
         """
-        Handle uncaught exceptions with appropriate responses
+        Handles uncaught exceptions during request processing and returns an appropriate HTTP response.
         
-        @param request: HTTP request being processed
-        @param exception: Exception that was raised
-        @return: HTTP response with error information
+        If the exception is a PermissionDenied, returns a 403 Forbidden response. For other exceptions, logs the error, notifies admins in production, and returns a 500 Server Error response. In debug mode, re-raises the exception to allow Django's debug page to display it.
         """
         # Get exception info
         exc_info = sys.exc_info()
@@ -82,11 +80,9 @@ class GlobalExceptionMiddleware:
 
     def _handle_permission_denied(self, request: HttpRequest, exception: Exception) -> HttpResponse:
         """
-        Handle permission denied exceptions
+        Handles PermissionDenied exceptions by logging the incident and returning a 403 Forbidden response.
         
-        @param request: HTTP request being processed
-        @param exception: PermissionDenied exception
-        @return: Forbidden response
+        Logs a warning with user and request path details, then renders the "403.html" template with the exception message.
         """
         logger.warning(
             f"Permission denied: {str(exception)} "
@@ -99,11 +95,9 @@ class GlobalExceptionMiddleware:
 
     def _log_exception(self, request: HttpRequest, exception: Exception, exc_info) -> None:
         """
-        Log exception with request details
+        Logs uncaught exceptions with detailed request and traceback information.
         
-        @param request: HTTP request being processed
-        @param exception: Exception that was raised
-        @param exc_info: Exception info tuple from sys.exc_info()
+        Includes the exception type, message, HTTP method, request path, user, and full traceback in the log entry.
         """
         # Format traceback
         tb = "".join(traceback.format_exception(*exc_info))
@@ -118,11 +112,9 @@ class GlobalExceptionMiddleware:
 
     def _notify_admins(self, request: HttpRequest, exception: Exception, exc_info) -> None:
         """
-        Send email notification to admins
+        Sends an email notification to site admins with details of an unhandled exception.
         
-        @param request: HTTP request being processed
-        @param exception: Exception that was raised
-        @param exc_info: Exception info tuple from sys.exc_info()
+        Includes request information, user, exception type, message, and full traceback in the email body. Logs an error if email notification fails.
         """
         try:
             subject = f"Server Error: {request.path}"
@@ -145,11 +137,9 @@ class GlobalExceptionMiddleware:
 
     def _render_error_response(self, request: HttpRequest, exception: Exception) -> HttpResponse:
         """
-        Render appropriate error response
+        Returns an HTTP 500 error response rendered with the "500.html" template.
         
-        @param request: HTTP request being processed
-        @param exception: Exception that was raised
-        @return: HTTP response with error information
+        If template rendering fails, returns a simple HTML error message as a fallback.
         """
         # Generic server error response
         try:

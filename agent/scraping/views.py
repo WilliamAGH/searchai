@@ -24,15 +24,9 @@ logger = logging.getLogger("agent.scraping.views")
 
 def _get_diagnostics_context(request: HttpRequest, query_context: str, task_group_id_override: str | None = None) -> dict:
     """
-    Build context data for diagnostics panel display
-
-    Args:
-        request: HTTP request containing session data
-        query_context: Query string to identify session data keys
-        task_group_id_override: Optional Celery task group ID
-
-    Returns:
-        Dictionary with context variables for diagnostics template
+    Constructs context data for rendering the diagnostics panel for a scraping session.
+    
+    Retrieves scraped results and chat history from the session using the provided query context, calculates total tokens from successful scrapes, and combines this with previous diagnostics data. Returns a dictionary with message count, token usage, results count, chat history count, query context, and scraping task group status for use in diagnostics templates.
     """
     scraped_results = request.session.get(f"scraped_results_{query_context}", [])
     total_scraped_tokens = sum(item.get("token_count", 0) for item in scraped_results if item.get("status") == "success")
@@ -60,19 +54,9 @@ def _get_diagnostics_context(request: HttpRequest, query_context: str, task_grou
 @require_GET
 def check_scraping_status_view(request: HttpRequest) -> HttpResponse:
     """
-    Check and display status of ongoing scraping tasks
-
-    Args:
-        request: HTTP request with query_context parameter
-
-    Returns:
-        HTML fragment with scraping status information
-
-    The view:
-    - Checks Celery task group status if applicable
-    - Updates session with scraped results when complete
-    - Renders appropriate status indicators and messages
-    - Triggers OOB update of the diagnostics panel when complete
+    Handles HTTP GET requests to display the status of ongoing web scraping tasks for a given query context.
+    
+    Checks the progress of Celery-managed scraping tasks associated with the provided query context. If tasks are completed, updates the session with results and renders status and diagnostics panels. If tasks are still pending or errors occur, returns an appropriate HTML fragment indicating the current status or error message.
     """
     query_context = request.GET.get("query_context")
     if not query_context:
@@ -195,15 +179,9 @@ def check_scraping_status_view(request: HttpRequest) -> HttpResponse:
 @require_GET
 def view_scraped_json_result(request: HttpRequest, query_context: str, item_index: int) -> HttpResponse:
     """
-    View for presenting scraped content in JSON format
-
-    Args:
-        request: HTTP request object
-        query_context: The search query context from which scraping was initiated
-        item_index: The index of the scraped item to display, or -1 for all items
-
-    Returns:
-        HTML response with formatted JSON content
+    Returns an HTML response displaying scraped content in JSON format for a given query context and item index.
+    
+    If scraping is still in progress, returns a 202 response indicating so. If no results are available or the item index is invalid, returns a 404 response with an appropriate message. For valid indices, returns the scraped item as formatted and escaped JSON, truncating long content fields for preview. If all items are requested (item_index = -1), returns all results as a JSON array. Handles errors related to Celery communication, JSON formatting, and unexpected exceptions with user-friendly messages and appropriate HTTP status codes.
     """
     if isinstance(item_index, str):
         try:
@@ -237,6 +215,11 @@ def view_scraped_json_result(request: HttpRequest, query_context: str, item_inde
         MAX_PREVIEW_LENGTH = 50000
 
         def truncate_content_for_preview(item_data):
+            """
+            Truncates the 'content' field of an item dictionary if it exceeds the maximum preview length.
+            
+            If the input is not a dictionary, it is returned unchanged. Otherwise, a shallow copy is made and the 'content' field is truncated with an indicator if it is too long.
+            """
             if not isinstance(item_data, dict):
                 return item_data
 

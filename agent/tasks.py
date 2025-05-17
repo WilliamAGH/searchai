@@ -29,27 +29,18 @@ class ScrapeUrlTask(Task):
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """
-        Handle task failure with logging
+        Logs detailed information when a scraping task fails.
         
-        Args:
-            exc: Exception that caused the failure
-            task_id: Celery task identifier
-            args: Task arguments
-            kwargs: Task keyword arguments
-            einfo: Exception information
+        Logs the task ID, URL argument, exception, and traceback for debugging purposes.
         """
         url_arg = args[0] if args else "Unknown URL"
         logger.error(f"Celery task {task_id} (scrape_url_task) FAILED for URL: {url_arg}. Error: {exc!r}\n{einfo!r}")
 
     def on_success(self, retval, task_id, args, kwargs):
         """
-        Handle task success with logging
+        Logs the outcome of a successful scraping task execution.
         
-        Args:
-            retval: Return value from the task
-            task_id: Celery task identifier
-            args: Task arguments
-            kwargs: Task keyword arguments
+        If the task result indicates success, logs content length and token count; otherwise, logs a warning with error details or unexpected return values.
         """
         url_arg = args[0] if args else "Unknown URL"
         if isinstance(retval, dict) and retval.get("status") == "success":
@@ -62,20 +53,9 @@ class ScrapeUrlTask(Task):
 @shared_task(base=ScrapeUrlTask, name="agent.tasks.scrape_url_task")
 def scrape_url_task(url: str, query_context: str, result_index: int, session_id: str | None = None):
     """
-    Scrape URL content and process with token counting
+    Scrapes the content of a URL asynchronously and returns metadata and token count.
     
-    Args:
-        url: Web page URL to scrape
-        query_context: Query string for identification
-        result_index: Position in original search results
-        session_id: Optional session identifier for cache updates
-        
-    Returns:
-        Dictionary with scraping results including:
-        - Original URL and metadata
-        - Extracted content or error information
-        - Token count for LLM processing
-        - Operation status
+    Attempts to retrieve and process the content of the specified URL, counting tokens using the "gpt-4o" model encoding. Returns a dictionary with the original URL, extracted content, query context, result index, session ID, operation status, and token count. If scraping or tokenization fails, returns a failure status with error details.
     """
     logger.info(f"REQUEST: Starting scrape_url_task for URL: {url} (Query: {query_context}, Index: {result_index}, Session: {session_id})")
     token_count = 0

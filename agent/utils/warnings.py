@@ -8,8 +8,9 @@ import warnings
 
 def suppress_pydantic_warnings():
     """
-    Specifically suppress Pydantic warnings about callable types.
-    This targets the exact warning message we're seeing.
+    Suppresses specific Pydantic warnings related to callable types not being Python types.
+    
+    Configures the warnings filter and environment to ignore UserWarnings from Pydantic's schema generation about callable types, and sets global warning suppression via the PYTHONWARNINGS environment variable.
     """
     warnings.filterwarnings(
         "ignore",

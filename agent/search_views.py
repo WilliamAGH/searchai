@@ -23,18 +23,9 @@ logger = logging.getLogger("agent.search_views")
 @require_GET
 def search_view(request: HttpRequest) -> HttpResponse:
     """
-    Handle web search requests and render results
+    Handles web search requests and renders search results or the search form.
     
-    Args:
-        request: HTTP request with query parameter 'q'
-        
-    Returns:
-        Rendered search results or search form
-        
-    The view:
-    - Processes search queries
-    - Stores results in session for later use
-    - Handles both full-page and HTMX partial requests
+    Processes search queries submitted via the 'q' query parameter, performs a search using the default client, and stores both raw results and the full API response in the session for later retrieval. Supports both full-page rendering and partial updates for HTMX requests. Displays error messages if the search client is unavailable or if an error occurs during the search.
     """
     query: str = cast(str, request.GET.get("q", ""))
     search_results: list[dict[str, Any]] = []
@@ -89,20 +80,9 @@ def search_view(request: HttpRequest) -> HttpResponse:
 @require_GET
 def view_full_json_result(request: HttpRequest, query: str, result_index: int) -> HttpResponse:
     """
-    Display JSON details for search results
+    Displays formatted JSON details for a search result or the full API response.
     
-    Args:
-        request: HTTP request
-        query: Search query string used to identify stored results
-        result_index: Index of the result to display or -1 for full API response
-        
-    Returns:
-        HTML response with formatted JSON data
-        
-    The view renders:
-    - Full API response when result_index is -1
-    - Individual result data for specific indexes
-    - Appropriate error messages if data is unavailable
+    If the result index is -1, returns the full API response stored in the session for the given query. Otherwise, returns the JSON data for the specified search result index. Responds with informative HTML error messages if the requested data is unavailable or if an error occurs.
     """
     if isinstance(result_index, str):
         try:

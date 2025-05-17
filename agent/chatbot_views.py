@@ -24,19 +24,19 @@ logger = logging.getLogger("agent.chatbot_views")
 @require_GET
 def chatbot_interface_view(request: HttpRequest) -> HttpResponse:
     """
-    Render chatbot interface initialized with search context
-
+    Renders the chatbot interface initialized with a search query context.
+    
+    Initializes a new chat session for the provided search query, retrieves and processes search results, handles selection and scraping of specific results, prepares the initial system message and context for the LLM, and renders the chatbot interface template with relevant context and diagnostics.
+    
     Args:
-        request: HTTP request with query_context and optional selected items
-
+        request: HTTP GET request containing a required 'query_context' parameter and optional 'selected' and 'scrape_selected' parameters to specify search results for context or scraping.
+    
     Returns:
-        Rendered chatbot interface with initial context
-
-    The view:
-    - Initializes chat session with search results
-    - Handles selection of specific search results
-    - Processes scraping requests for selected items
-    - Prepares initial system context for LLM conversation
+        An HTTP response rendering the chatbot interface with initial context, available LLM providers and models, selected and scraped search results, and diagnostic information.
+    
+    Raises:
+        HttpResponseBadRequest: If 'query_context' is missing from the request.
+        HttpResponseServerError: If no LLM provider is configured.
     """
     query_context = request.GET.get("query_context", "")
     if not query_context:
@@ -188,13 +188,9 @@ def chatbot_interface_view(request: HttpRequest) -> HttpResponse:
 @require_GET
 def get_models_for_provider_view(request: HttpRequest) -> HttpResponse:
     """
-    Get available models for selected LLM provider
-
-    Args:
-        request: HTTP request with provider parameter
-
-    Returns:
-        HTML options for available models or error response
+    Returns HTML option elements for available LLM models for a specified provider.
+    
+    If the provider parameter is missing or invalid, returns an HTTP 400 error response.
     """
     provider_param = request.GET.get("llm_provider") or request.GET.get("provider")
     if not provider_param or provider_param not in ["openai", "groq"]:
@@ -210,21 +206,9 @@ def get_models_for_provider_view(request: HttpRequest) -> HttpResponse:
 @require_POST
 def chatbot_send_message_view(request: HttpRequest) -> HttpResponse:
     """
-    Process user message and return LLM response
-
-    Args:
-        request: HTTP POST with message, provider, model and context data
-
-    Returns:
-        HTML response with user message, bot response and diagnostics
-
-    The view:
-    - Processes user message and chat history
-    - Optionally adds fresh web search results if requested
-    - Checks for completed scraping tasks and adds content
-    - Calls LLM API with constructed context
-    - Updates session with new history
-    - Returns rendered HTML with necessary components
+    Processes a user message and returns an LLM-generated chatbot response.
+    
+    Handles POST requests by validating input, retrieving chat history and context from the session, optionally augmenting with fresh web search results and scraped content, and constructing a prompt for the selected LLM provider and model. Updates the session with the new conversation state and returns rendered HTML for the user message, bot reply, and diagnostics. Responds with appropriate HTTP status codes for missing or invalid input.
     """
     data = request.POST
     user_message_text = cast(str, data.get("message", "")).strip()

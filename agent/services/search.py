@@ -29,14 +29,10 @@ class QuietSerperDevTool(SerperDevTool):
 
     def run(self, search_query: str, **kwargs: Any) -> str:
         """
-        Run search query with suppressed output
-
-        Args:
-            search_query: Search terms to query
-            **kwargs: Additional search parameters
-
-        Returns:
-            Search results as string
+        Executes a search query using the parent SerperDevTool while suppressing console output.
+        
+        Temporarily redirects standard output to prevent unwanted console messages during execution.
+        Returns the search results as a string, or an error message if an exception occurs.
         """
         original_stdout = sys.stdout
         sys.stdout = io.StringIO()
@@ -75,16 +71,9 @@ class WebSearchClient:
 
     def __init__(self, api_key: str, **kwargs: Any):
         """
-        Initialize search client with API key and configuration
-
-        Args:
-            api_key: Serper API key for authentication
-            **kwargs: Optional configuration including:
-                - search_url: API endpoint URL
-                - country: Country code for search region
-                - locale: Language locale
-                - location: Geographic location
-                - n_results: Number of results to return
+        Initializes the web search client with the provided Serper API key and configuration.
+        
+        Stores the API key in the environment for compatibility with other tools, sets up the API endpoint, and prepares request parameters and headers for subsequent search requests. Optional configuration can be provided for search region, language, location, and number of results.
         """
         # Store API key in environment for tools that expect it there
         os.environ["SERPER_API_KEY"] = api_key
@@ -120,15 +109,17 @@ class WebSearchClient:
 
     def search(self, query: str, **kwargs: Any) -> dict[str, Any] | list[dict[str, Any]]:
         """
-        Perform a web search using the Serper API directly
-
+        Performs a web search using the Serper API and returns search results.
+        
         Args:
-            query: The search query string
-            **kwargs: Supports 'n_results' or 'max_results', 'return_full_response'
-
+            query: The search query string.
+            **kwargs: Optional overrides such as 'n_results', 'max_results', or 'return_full_response'.
+        
         Returns:
-            If return_full_response=True, returns the complete API response as a dict
-            Otherwise, returns a list of organic search result dictionaries, or an empty list on error
+            If 'return_full_response' is True, returns the complete API response as a dictionary.
+            Otherwise, returns a list of organic search result dictionaries. If an error occurs or
+            results are unavailable, returns a fallback list with a single dictionary indicating
+            the search service is unavailable.
         """
         # First try using direct API call which is more reliable
         try:
@@ -198,15 +189,15 @@ class WebSearchClient:
 
 def get_default_client() -> WebSearchClient | None:
     """
-    Create WebSearchClient with default configuration
-
+    Creates a WebSearchClient instance using configuration from Django settings, environment variables, or defaults.
+    
     Returns:
-        Configured WebSearchClient instance or None if API key missing
-
-    Sources configuration from:
-    - Django settings (highest priority)
-    - Environment variables (fallback)
-    - Default values (lowest priority)
+        A configured WebSearchClient instance, or None if the API key is missing.
+    
+    Configuration priority:
+        1. Django settings (highest)
+        2. Environment variables (fallback)
+        3. Hardcoded defaults (lowest)
     """
     api_key_env = os.environ.get("SERPER_API_KEY")
     search_url_env = os.environ.get("SERPER_SEARCH_URL", "https://google.serper.dev/search")
@@ -253,9 +244,10 @@ def get_default_client() -> WebSearchClient | None:
 
 def configure_requests_session(session: requests.Session) -> None:
     """
-    Configure global requests session for connection pooling
-
-    @param session: Configured requests Session object
+    Sets the global requests session for HTTP connection pooling.
+    
+    Replaces the default session used for outgoing HTTP requests with the provided
+    session instance, enabling custom configuration and improved connection reuse.
     """
     global _requests_session
     _requests_session = session
@@ -264,9 +256,10 @@ def configure_requests_session(session: requests.Session) -> None:
 
 def get_requests_session() -> requests.Session:
     """
-    Get the configured requests session or create a new one
-
-    @return: Requests Session object for making HTTP requests
+    Returns the global requests session, creating a new one if none is configured.
+    
+    If a session has not been set via `configure_requests_session`, a new `requests.Session`
+    instance is created and returned. This enables connection pooling for HTTP requests.
     """
     global _requests_session
     if _requests_session is None:

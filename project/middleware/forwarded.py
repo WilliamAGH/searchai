@@ -16,22 +16,26 @@ class ForwardedHeaderMiddleware:
     """
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         """
-        Initialize middleware with response handler
+        Initializes the middleware with the next response handler.
         
         Args:
-            get_response: Callable that processes the request
+            get_response: The callable to process each HTTP request.
         """
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
-        Process request to handle forwarded headers
+        Processes the request to update protocol and client IP based on forwarded headers.
+        
+        If present, sets the request's URL scheme and remote address using the values from
+        the 'X-Forwarded-Proto' and 'X-Forwarded-For' headers before passing the request
+        to the next middleware or view.
         
         Args:
-            request: HTTP request to process
-            
+            request: The incoming HTTP request.
+        
         Returns:
-            HTTP response from the next middleware or view
+            The HTTP response from the next middleware or view.
         """
         proto = request.META.get("HTTP_X_FORWARDED_PROTO")
         if proto:

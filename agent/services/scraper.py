@@ -17,18 +17,15 @@ logger = logging.getLogger(__name__)
 
 def scrape_url(url: str) -> str:
     """
-    Scrape main text content from URL with multiple methods
-
+    Extracts the main textual content from a web page URL using multiple fallback scraping methods.
+    
+    Attempts extraction in the following order: Trafilatura for high-quality content, newspaper3k for article parsing, and BeautifulSoup for basic HTML parsing. Returns the extracted text, or an empty string if all methods fail.
+    
     Args:
-        url: Web page URL to scrape
-
+        url: The URL of the web page to scrape.
+    
     Returns:
-        Extracted text content or empty string if all methods fail
-
-    Uses multiple approaches in fallback sequence:
-    - Trafilatura for high-quality extraction
-    - Newspaper3k for article parsing
-    - BeautifulSoup for basic HTML parsing
+        The main text content as a string, or an empty string if extraction is unsuccessful.
     """
     # Try with Trafilatura first for high-quality extraction
     try:
