@@ -53,9 +53,9 @@ app.conf.task_acks_late = True
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
     """
-    Debug task for troubleshooting Celery setup
-
-    @param self: Task instance with request information
+    Logs execution details for debugging Celery task setup.
+    
+    This task records the hostname and request information to help verify Celery worker configuration and connectivity.
     """
     logger.info(f"Debug task executed on {socket.gethostname()}: {self.request!r}")
 
@@ -63,9 +63,9 @@ def debug_task(self):
 @signals.worker_ready.connect
 def log_worker_ready(**kwargs):
     """
-    Log when a worker is ready to receive tasks
-
-    @param kwargs: Signal keyword arguments
+    Logs a message indicating that a Celery worker is ready to receive tasks.
+    
+    This function is intended to be used as a signal handler for the Celery worker_ready event.
     """
     logger.info(f"Celery worker ready: {socket.gethostname()}")
 
@@ -73,9 +73,7 @@ def log_worker_ready(**kwargs):
 @signals.worker_shutdown.connect
 def log_worker_shutdown(**kwargs):
     """
-    Log when a worker is shutting down
-
-    @param kwargs: Signal keyword arguments
+    Logs a message indicating that a Celery worker is shutting down, including the hostname.
     """
     logger.info(f"Celery worker shutting down: {socket.gethostname()}")
 
@@ -83,10 +81,9 @@ def log_worker_shutdown(**kwargs):
 @worker_process_init.connect
 def reset_database_connections(**kwargs):
     """
-    Reset database connections when worker processes start
-    Prevents sharing connections between worker processes
-
-    @param kwargs: Signal keyword arguments
+    Closes all Django database connections when a Celery worker process starts.
+    
+    This prevents database connections from being shared between worker processes, ensuring each process has its own fresh connections.
     """
     from django.db import connections
 

@@ -28,18 +28,18 @@ class SessionSizeMiddleware:
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         """
-        Initialize middleware with response handler
-
-        @param get_response: Callable that processes the request
+        Initializes the middleware with the next request handler.
+        
+        Args:
+            get_response: The callable that processes the HTTP request and returns a response.
         """
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
-        Process request to manage session size
-
-        @param request: HTTP request to process
-        @return: HTTP response from the next middleware or view
+        Processes the HTTP request and response, checking and managing session size after the response is generated.
+        
+        If the session was modified during the request, evaluates its size and triggers cleanup if necessary.
         """
         # Process the request first
         response = self.get_response(request)
@@ -52,9 +52,9 @@ class SessionSizeMiddleware:
 
     def _check_session_size(self, request: HttpRequest) -> None:
         """
-        Check session size and clean up if necessary
-
-        @param request: HTTP request with session data
+        Checks the size of the session data and triggers cleanup if it exceeds configured limits.
+        
+        Logs a warning if the session size approaches the maximum allowed size. If the session exceeds the maximum size, initiates cleanup of large session entries. Errors during this process are logged.
         """
         try:
             # Estimate session size by serializing to JSON
@@ -79,9 +79,9 @@ class SessionSizeMiddleware:
 
     def _clean_session(self, request: HttpRequest) -> None:
         """
-        Clean up session by removing oldest search and scraping data
-
-        @param request: HTTP request with session to clean
+        Removes the oldest search and scraping result data from the session to reduce its size.
+        
+        Iteratively deletes session keys related to search and scraping results, starting with the oldest, until the session size falls below 70% of the maximum allowed limit.
         """
         # Find search result keys (which tend to be large)
         search_keys = [

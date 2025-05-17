@@ -9,10 +9,9 @@ import sys
 
 def main():
     """
-    Run Django administrative tasks
-    - Sets up Django environment
-    - Handles command line arguments
-    - Executes appropriate Django command
+    Executes Django administrative commands from the command line.
+    
+    Sets the default Django settings module if not already defined, imports the Django command execution utility, and runs the management command specified by the command-line arguments. Raises an ImportError if Django is not installed or the environment is not properly configured.
     """
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
     try:

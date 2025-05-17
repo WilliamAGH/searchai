@@ -1,4 +1,3 @@
-
 """
 View functions for the main application
 :author: William Callahan
@@ -8,12 +7,8 @@ from django.http import HttpResponse  # type: ignore
 
 def hello_view(request):
     """
-    Simple hello world view
+    Returns an HTTP response with a greeting message.
     
-    Args:
-        request: HTTP request object
-        
-    Returns:
-        HTTP response with greeting message
+    This view responds to any HTTP request with a plain text greeting.
     """
     return HttpResponse("Hello, my name is William Callahan!")

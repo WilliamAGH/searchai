@@ -19,9 +19,10 @@ DEFAULT_MEMORY_THRESHOLD = 0.8
 
 def get_memory_usage() -> dict[str, Any]:
     """
-    Get current memory usage statistics
+    Retrieves current memory usage statistics for the running process.
     
-    @return: Dictionary with memory usage information
+    Returns:
+        A dictionary containing memory usage metrics such as resident set size (RSS), virtual memory size (VMS), memory usage percent, and available and total system memory if available.
     """
     usage = {}
 
@@ -55,9 +56,12 @@ def get_memory_usage() -> dict[str, Any]:
 
 def log_memory_usage(threshold: float = DEFAULT_MEMORY_THRESHOLD) -> None:
     """
-    Log current memory usage and warn if above threshold
+    Logs current memory usage and issues a warning if usage exceeds the specified threshold.
     
-    @param threshold: Memory usage threshold for warnings (0.0-1.0)
+    Args:
+        threshold: Fraction of total system memory usage (0.0–1.0) that triggers a warning. Default is 0.8.
+    
+    If memory usage exceeds the threshold, a warning is logged and garbage collection is triggered.
     """
     usage = get_memory_usage()
 
@@ -98,10 +102,11 @@ class MemoryMonitorThread(threading.Thread):
 
     def __init__(self, interval: int = 300, threshold: float = DEFAULT_MEMORY_THRESHOLD):
         """
-        Initialize memory monitor thread
+        Initializes a daemon thread for periodic memory usage monitoring.
         
-        @param interval: Monitoring interval in seconds
-        @param threshold: Memory usage threshold for warnings (0.0-1.0)
+        Args:
+            interval: Time in seconds between memory checks.
+            threshold: Fraction of total memory usage that triggers a warning (0.0–1.0).
         """
         super().__init__(daemon=True)
         self.interval = interval
@@ -110,13 +115,15 @@ class MemoryMonitorThread(threading.Thread):
 
     def stop(self) -> None:
         """
-        Signal the thread to stop
+        Signals the monitoring thread to stop at the next interval.
+        
+        Sets the internal stop event, allowing the thread to exit its monitoring loop gracefully.
         """
         self._stop_event.set()
 
     def run(self) -> None:
         """
-        Run the monitoring loop
+        Runs the memory monitoring loop, periodically logging memory usage until stopped.
         """
         logger.info(f"Memory monitor started (interval: {self.interval}s, threshold: {self.threshold*100:.1f}%)")
 
@@ -138,10 +145,9 @@ _monitor: MemoryMonitorThread | None = None
 
 def start_memory_monitor(interval: int = 300, threshold: float = DEFAULT_MEMORY_THRESHOLD) -> None:
     """
-    Start the memory monitoring thread
+    Starts a background thread to periodically monitor and log memory usage.
     
-    @param interval: Monitoring interval in seconds
-    @param threshold: Memory usage threshold for warnings (0.0-1.0)
+    If a memory monitor is already running, this function does nothing.
     """
     global _monitor
 
@@ -155,7 +161,9 @@ def start_memory_monitor(interval: int = 300, threshold: float = DEFAULT_MEMORY_
 
 def stop_memory_monitor() -> None:
     """
-    Stop the memory monitoring thread
+    Stops the running memory monitoring thread if active.
+    
+    Logs a warning if no memory monitor is currently running.
     """
     global _monitor
 
@@ -169,15 +177,17 @@ def stop_memory_monitor() -> None:
 
 def memory_intensive(func: Callable) -> Callable:
     """
-    Decorator for memory-intensive functions
-    - Logs memory usage before and after function execution
-    - Forces garbage collection after execution
+    Decorator that logs memory usage before and after executing a function and forces garbage collection after execution.
     
-    @param func: Function to decorate
-    @return: Decorated function
+    The decorated function's memory usage is logged, and the number of objects collected by garbage collection is reported after the function completes.
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        """
+        Wraps a function to log memory usage before and after execution, forcing garbage collection post-execution.
+        
+        Logs the start and completion of the decorated function, including the number of objects collected by garbage collection.
+        """
         func_name = func.__name__
         logger.info(f"Starting memory-intensive function: {func_name}")
 

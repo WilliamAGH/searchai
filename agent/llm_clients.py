@@ -47,10 +47,10 @@ class LLMResponseData(TypedDict, total=False):
 
 def get_llm_providers() -> list[dict[str, str]]:
     """
-    Get supported LLM providers with display names and values
+    Returns a list of supported LLM providers with their display names and identifiers.
     
-    Returns:
-        List of provider dictionaries with value and name keys
+    Each provider is represented as a dictionary containing 'value' (the provider's identifier)
+    and 'name' (the human-readable display name).
     """
     return [
         {"value": "openai", "name": "OpenAI"},
@@ -60,13 +60,13 @@ def get_llm_providers() -> list[dict[str, str]]:
 
 def get_available_models(provider: Literal["openai", "groq"]) -> list[str]:
     """
-    Get available model names for a provider
+    Returns the list of available model names for the specified LLM provider.
     
     Args:
-        provider: LLM provider identifier
-        
+        provider: The identifier of the LLM provider ("openai" or "groq").
+    
     Returns:
-        List of model identifiers available for the provider
+        A list of model identifiers supported by the given provider. Returns an empty list if the provider is unrecognized.
     """
     if provider == "openai":
         return OPENAI_MODELS
@@ -78,13 +78,13 @@ def get_available_models(provider: Literal["openai", "groq"]) -> list[str]:
 
 def _parse_groq_reset_time(reset_string: str | None) -> float | None:
     """
-    Parse Groq's rate limit reset time string to seconds
+    Converts a Groq rate limit reset time string (e.g., "2m59.56s") to total seconds.
     
     Args:
-        reset_string: Time string in format like "2m59.56s"
-        
+        reset_string: A string representing the reset time in minutes and seconds, or None.
+    
     Returns:
-        Total seconds as float or None if parsing fails
+        The total reset time in seconds as a float, or None if parsing fails or input is None.
     """
     if not reset_string:
         return None
@@ -108,15 +108,15 @@ def get_llm_response(
     messages: list[dict[str, str]],
 ) -> LLMResponseData:
     """
-    Send request to LLM provider and get response
+    Sends a chat completion request to the specified LLM provider and returns the response or error details.
     
     Args:
-        provider: LLM provider to use
-        model_name: Specific model identifier to request
-        messages: List of message objects in chat format
-        
+        provider: The LLM provider to use ("openai" or "groq").
+        model_name: The model identifier to request.
+        messages: List of message objects in chat format.
+    
     Returns:
-        Structured response data with text or error information
+        A structured response containing the generated text or error information, including rate limit and retry details when applicable.
     """
     api_key: str | None
 

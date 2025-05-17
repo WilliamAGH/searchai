@@ -24,10 +24,9 @@ class AgentConfig(AppConfig):
 
     def ready(self):
         """
-        Initialize application components when Django starts
-        - Sets up memory monitoring if enabled
-        - Configures request connection pooling
-        - Ensures log directory exists
+        Initializes reliability features and resources when the Django application starts.
+        
+        Ensures the logs directory exists, starts memory monitoring if enabled in settings, and configures HTTP connection pooling and retry logic for outbound requests. Skips initialization when not running the main server process.
         """
         # Skip when running management commands to avoid duplicate initialization
         if os.environ.get("RUN_MAIN") != "true" and "runserver" not in sys.argv:
@@ -77,6 +76,18 @@ class AgentConfig(AppConfig):
 
             # Set default timeout
             def request_with_timeout(method, url, *args, **kwargs):
+                """
+                Sends an HTTP request using the provided session, applying a default timeout if none is specified.
+                
+                Args:
+                	method: HTTP method (e.g., 'GET', 'POST').
+                	url: The URL to send the request to.
+                	*args: Additional positional arguments for the request.
+                	**kwargs: Additional keyword arguments for the request. If 'timeout' is not provided, a default timeout is used.
+                
+                Returns:
+                	The response object from the HTTP request.
+                """
                 kwargs_with_timeout = kwargs.copy()
                 if "timeout" not in kwargs_with_timeout:
                     kwargs_with_timeout["timeout"] = timeout

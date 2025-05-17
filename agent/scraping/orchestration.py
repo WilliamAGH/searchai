@@ -26,18 +26,20 @@ def dispatch_scraping_tasks(
     request: HttpRequest, query_context: str, links_to_scrape: list[tuple[str, int]],
 ) -> tuple[list[dict[str, Any]], str | None, bool]:
     """
-    Dispatch scraping tasks synchronously or via Celery
+    Dispatches web scraping tasks either asynchronously via Celery or synchronously as a fallback.
+    
+    If Celery is enabled and available, tasks are dispatched in a group and tracked by a task group ID stored in the session. If Celery is unavailable or dispatch fails, scraping is performed synchronously for each link, and results are returned immediately. Scraping results are saved in the session under a key specific to the query context.
     
     Args:
-        request: HTTP request object containing session data
-        query_context: Query string for context and identification
-        links_to_scrape: List of URL and index pairs to scrape
-        
+        request: Django HTTP request object containing session data.
+        query_context: String identifier for the scraping query context.
+        links_to_scrape: List of (URL, index) tuples specifying the links to scrape.
+    
     Returns:
-        Tuple containing:
-        - List of items with initial scraping status
-        - Celery task group ID if applicable, else None
-        - Boolean indicating if scraping is pending
+        A tuple containing:
+            - List of dictionaries with initial scraping results or statuses.
+            - Celery task group ID if asynchronous dispatch was used, else None.
+            - Boolean indicating if scraping is still pending.
     """
     scraped_items_initial: list[dict[str, Any]] = []
     active_scrape_task_group_id: str | None = None
@@ -135,17 +137,17 @@ def update_scraped_results_from_celery(
     request: HttpRequest, query_context: str, active_task_group_id: str | None,
 ) -> tuple[str | None, bool]:
     """
-    Check Celery task group status and update session with results
+    Checks the status of a Celery scraping task group and updates the session with completed results.
+    
+    If the task group is still running or cannot be restored, returns the current task group ID and indicates that scraping is still in progress. When all tasks are complete, updates the session with the final scraping results and clears the task group ID.
     
     Args:
-        request: HTTP request object containing session data
-        query_context: Query string for context and identification
-        active_task_group_id: Current Celery task group ID to check
-        
+        request: Django HTTP request object containing session data.
+        query_context: String identifying the scraping query context.
+        active_task_group_id: Celery task group ID to check.
+    
     Returns:
-        Tuple containing:
-        - Updated task group ID if still pending, else None
-        - Boolean indicating if scraping is still in progress
+        A tuple containing the updated task group ID (or None if complete) and a boolean indicating if scraping is still in progress.
     """
     still_scraping_some = False
     if not (settings.USE_CELERY_FOR_SCRAPING and CELERY_AVAILABLE and active_task_group_id and _celery_GroupResult and _actual_celery_app):
