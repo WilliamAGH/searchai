@@ -17,7 +17,7 @@ _actual_scrape_url_task = None
 _actual_celery_app = None
 CELERY_AVAILABLE = False
 
-if settings.USE_CELERY_FOR_SCRAPING:
+if getattr(settings, "USE_CELERY_FOR_SCRAPING", False):
     try:
         from celery import group as imported_group
         try:
