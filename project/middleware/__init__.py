@@ -1,1 +1,4 @@
-# package for custom middleware 
+"""
+Custom middleware package
+:author: William Callahan
+"""

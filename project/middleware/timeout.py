@@ -3,13 +3,11 @@ Request timeout middleware for preventing long-running views
 :author: William Callahan
 """
 import logging
-import threading
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
-from django.http import HttpResponseServerError
 
 logger = logging.getLogger("project.middleware.timeout")
 
@@ -31,7 +29,7 @@ class RequestTimeoutMiddleware:
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         """
         Initialize middleware with response handler
-        
+
         @param get_response: Callable that processes the request
         """
         self.get_response = get_response
@@ -39,7 +37,7 @@ class RequestTimeoutMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
         Process request with timeout monitoring
-        
+
         @param request: HTTP request to process
         @return: HTTP response from the next middleware or view
         """
@@ -49,44 +47,41 @@ class RequestTimeoutMiddleware:
 
         # Get custom timeout from view if specified
         timeout = self._get_timeout(request)
-        
+
         # Track start time
         start_time = time.time()
-        
+
         # Process the request
         response = self.get_response(request)
-        
+
         # Check execution time
         execution_time = time.time() - start_time
         if execution_time > timeout * 0.8:  # Log warning at 80% of timeout
             logger.warning(
                 f"Slow view detected: {request.path} took {execution_time:.2f}s "
-                f"(80% of {timeout}s timeout)"
+                f"(80% of {timeout}s timeout)",
             )
-            
+
         return response
 
     def _should_skip_timeout(self, request: HttpRequest) -> bool:
         """
         Determine if timeout should be skipped for this request
-        
+
         @param request: HTTP request to check
         @return: True if timeout should be skipped
         """
         # Skip for admin views
         if request.path.startswith("/admin/"):
             return True
-            
+
         # Skip for explicitly marked views
-        if getattr(request, "_skip_timeout", False):
-            return True
-            
-        return False
+        return bool(getattr(request, "_skip_timeout", False))
 
     def _get_timeout(self, request: HttpRequest) -> int:
         """
         Get timeout value for this request
-        
+
         @param request: HTTP request to check
         @return: Timeout in seconds
         """
@@ -94,14 +89,14 @@ class RequestTimeoutMiddleware:
         custom_timeout = getattr(request, "_custom_timeout", None)
         if custom_timeout is not None:
             return custom_timeout
-            
+
         return REQUEST_TIMEOUT
 
 
 def skip_timeout(view_func):
     """
     Decorator to mark a view as exempt from timeout monitoring
-    
+
     @param view_func: View function to decorate
     @return: Decorated view function
     """
@@ -114,7 +109,7 @@ def skip_timeout(view_func):
 def custom_timeout(seconds: int):
     """
     Decorator to set custom timeout for a view
-    
+
     @param seconds: Timeout in seconds
     @return: Decorator function
     """

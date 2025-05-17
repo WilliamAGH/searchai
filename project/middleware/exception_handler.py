@@ -5,7 +5,7 @@ Global exception handling middleware
 import logging
 import sys
 import traceback
-from typing import Callable
+from collections.abc import Callable
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
@@ -13,12 +13,10 @@ from django.core.mail import mail_admins
 from django.http import (
     HttpRequest,
     HttpResponse,
-    HttpResponseServerError,
     HttpResponseForbidden,
-    HttpResponseNotFound,
+    HttpResponseServerError,
 )
 from django.template.loader import render_to_string
-from django.utils.encoding import force_str
 
 logger = logging.getLogger("project.middleware.exception_handler")
 
@@ -62,18 +60,18 @@ class GlobalExceptionMiddleware:
         """
         # Get exception info
         exc_info = sys.exc_info()
-        
+
         # Handle specific exception types
         if isinstance(exception, PermissionDenied):
             return self._handle_permission_denied(request, exception)
-            
+
         # Log the exception with details
         self._log_exception(request, exception, exc_info)
-        
+
         # Notify admins if in production
         if not settings.DEBUG:
             self._notify_admins(request, exception, exc_info)
-        
+
         # Return appropriate response
         if settings.DEBUG:
             # Let Django's debug page handle it in debug mode
@@ -92,11 +90,11 @@ class GlobalExceptionMiddleware:
         """
         logger.warning(
             f"Permission denied: {str(exception)} "
-            f"(User: {request.user}, Path: {request.path})"
+            f"(User: {request.user}, Path: {request.path})",
         )
-        
+
         return HttpResponseForbidden(
-            render_to_string("403.html", {"exception": str(exception)}, request=request)
+            render_to_string("403.html", {"exception": str(exception)}, request=request),
         )
 
     def _log_exception(self, request: HttpRequest, exception: Exception, exc_info) -> None:
@@ -108,14 +106,14 @@ class GlobalExceptionMiddleware:
         @param exc_info: Exception info tuple from sys.exc_info()
         """
         # Format traceback
-        tb = ''.join(traceback.format_exception(*exc_info))
-        
+        tb = "".join(traceback.format_exception(*exc_info))
+
         # Log with request details
         logger.error(
             f"Uncaught exception: {exception.__class__.__name__}: {str(exception)}\n"
             f"Request: {request.method} {request.path}\n"
             f"User: {request.user}\n"
-            f"Traceback:\n{tb}"
+            f"Traceback:\n{tb}",
         )
 
     def _notify_admins(self, request: HttpRequest, exception: Exception, exc_info) -> None:
@@ -128,10 +126,10 @@ class GlobalExceptionMiddleware:
         """
         try:
             subject = f"Server Error: {request.path}"
-            
+
             # Format traceback
-            tb = ''.join(traceback.format_exception(*exc_info))
-            
+            tb = "".join(traceback.format_exception(*exc_info))
+
             # Prepare message
             message = (
                 f"Request: {request.method} {request.path}\n"
@@ -139,7 +137,7 @@ class GlobalExceptionMiddleware:
                 f"Exception: {exception.__class__.__name__}: {str(exception)}\n"
                 f"Traceback:\n{tb}"
             )
-            
+
             # Send email
             mail_admins(subject, message, fail_silently=True)
         except Exception as e:
@@ -156,11 +154,11 @@ class GlobalExceptionMiddleware:
         # Generic server error response
         try:
             return HttpResponseServerError(
-                render_to_string("500.html", {"exception": str(exception)}, request=request)
+                render_to_string("500.html", {"exception": str(exception)}, request=request),
             )
         except Exception:
             # Fallback if template rendering fails
             return HttpResponseServerError(
                 "<h1>Server Error</h1><p>An unexpected error occurred.</p>",
-                content_type="text/html"
+                content_type="text/html",
             )

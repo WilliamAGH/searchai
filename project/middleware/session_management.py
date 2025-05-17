@@ -4,7 +4,7 @@ Session management middleware for controlling session size and cleanup
 """
 import json
 import logging
-from typing import Callable, Dict, Any
+from collections.abc import Callable
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
@@ -29,7 +29,7 @@ class SessionSizeMiddleware:
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         """
         Initialize middleware with response handler
-        
+
         @param get_response: Callable that processes the request
         """
         self.get_response = get_response
@@ -37,7 +37,7 @@ class SessionSizeMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
         Process request to manage session size
-        
+
         @param request: HTTP request to process
         @return: HTTP response from the next middleware or view
         """
@@ -53,26 +53,26 @@ class SessionSizeMiddleware:
     def _check_session_size(self, request: HttpRequest) -> None:
         """
         Check session size and clean up if necessary
-        
+
         @param request: HTTP request with session data
         """
         try:
             # Estimate session size by serializing to JSON
             session_data = dict(request.session)
             session_size = len(json.dumps(session_data))
-            
+
             # Log warning if session is getting large
             if session_size > MAX_SESSION_SIZE * 0.8:
                 logger.warning(
                     f"Session {request.session.session_key} is approaching size limit: "
-                    f"{session_size} bytes (80% of {MAX_SESSION_SIZE})"
+                    f"{session_size} bytes (80% of {MAX_SESSION_SIZE})",
                 )
-            
+
             # Clean up if session exceeds max size
             if session_size > MAX_SESSION_SIZE:
                 logger.warning(
                     f"Session {request.session.session_key} exceeds size limit: "
-                    f"{session_size} bytes. Cleaning up oldest data."
+                    f"{session_size} bytes. Cleaning up oldest data.",
                 )
                 self._clean_session(request)
         except Exception as e:
@@ -81,20 +81,20 @@ class SessionSizeMiddleware:
     def _clean_session(self, request: HttpRequest) -> None:
         """
         Clean up session by removing oldest search and scraping data
-        
+
         @param request: HTTP request with session to clean
         """
         # Find search result keys (which tend to be large)
         search_keys = [
-            k for k in request.session.keys()
+            k for k in request.session
             if k.startswith(("search_raw_results_", "search_full_response_", "scraped_results_"))
         ]
-        
+
         # Sort by assumed age (no timestamp available in standard session)
         # Remove oldest items first until we're under 70% of limit
         for key in search_keys:
             del request.session[key]
-            
+
             # Check if we're now under the threshold
             remaining_data = dict(request.session)
             remaining_size = len(json.dumps(remaining_data))
