@@ -2,4 +2,16 @@
   <p>
     Messages: {{ message_count }}, Tokens In: {{ tokens_in }}, Tokens Out: {{ tokens_out }}, Search Results: {{ results_count }}, History: {{ history_count }}
   </p>
-</div> 
+  {% if still_scraping_some and active_scrape_task_group_id %}
+  <div class="mt-1">
+    <button type="button"
+      hx-get="{% url 'agent:check_scraping_status' %}?query_context={{ query_context|urlencode }}"
+      hx-target="#scraping-status-indicator" {# This div is in chatbot_interface.html #}
+      hx-swap="innerHTML"
+      class="px-2 py-0.5 text-xs bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors"
+    >
+      Refresh Scraping Status ({{ active_scrape_task_group_id }})
+    </button>
+  </div>
+  {% endif %}
+</div>

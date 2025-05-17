@@ -1,0 +1,65 @@
+{% if status == "pending" %}
+  <p>Scraping in progress for <span class="font-semibold">"{{ query_context }}"</span>: {{ completed_count }} of {{ total_count }} tasks completed.</p>
+  <p class="mt-1">Beginning chat now might exclude some content from context.</p>
+  <div class="mt-2">
+    <button 
+      hx-get="{% url 'agent:check_scraping_status' %}?query_context={{ query_context|urlencode }}"
+      hx-target="#scraping-status-indicator-content"
+      hx-swap="innerHTML"
+      class="px-3 py-1 text-xs bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors"
+    >
+      Refresh Scraping Status
+    </button>
+  </div>
+{% elif status == "completed" %}
+  <p class="text-green-700">Scraping completed for <span class="font-semibold">"{{ query_context }}"</span>. Successful: {{ successful_count }}, Failed: {{ failed_count }} (of {{ total_count }} total).</p>
+  {% if results %}
+    <p class="text-xs mt-1">You can now proceed with the chat, and the updated context will be used.</p>
+    
+    <div class="mt-3 flex flex-wrap gap-2">
+      <!-- View all scraped content as JSON -->
+      <button
+        hx-get="{% url 'agent:view_scraped_json_result' query_context=query_context item_index=-1 %}"
+        hx-target="#scraped-json-preview"
+        hx-swap="innerHTML"
+        class="px-3 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+      >
+        View All Scraped Content (JSON)
+      </button>
+      
+      <!-- Individual JSON preview buttons for each scraped item -->
+      {% for item in results %}
+        {% if item.status == "success" %}
+          <button
+            hx-get="{% url 'agent:view_scraped_json_result' query_context=query_context item_index=forloop.counter0 %}"
+            hx-target="#scraped-json-preview"
+            hx-swap="innerHTML"
+            class="px-3 py-1 text-xs bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors"
+            title="{{ item.link }}"
+          >
+            View URL {{ forloop.counter }} JSON
+          </button>
+        {% endif %}
+      {% endfor %}
+    </div>
+    
+    <!-- Container for JSON preview -->
+    <div id="scraped-json-preview" class="mt-3"></div>
+  {% endif %}
+{% elif status == "not_applicable" %}
+  <p class="text-sm text-gray-600">{{ message|default:"Scraping not active or already completed for this query." }}</p>
+{% elif status == "unknown" or status == "error" %}
+  <p class="text-red-700">Error checking scraping status for <span class="font-semibold">"{{ query_context }}"</span>: {{ message|default:"An unknown error occurred." }}</p>
+  <div class="mt-2">
+    <button 
+      hx-get="{% url 'agent:check_scraping_status' %}?query_context={{ query_context|urlencode }}"
+      hx-target="#scraping-status-indicator-content"
+      hx-swap="innerHTML"
+      class="px-3 py-1 text-xs bg-gray-400 text-white rounded-md hover:bg-gray-500 transition-colors"
+    >
+      Retry Status Check
+    </button>
+  </div>
+{% else %}
+  <p class="text-sm text-gray-600">Scraping status: {{ message|default:"Unavailable" }}</p>
+{% endif %}

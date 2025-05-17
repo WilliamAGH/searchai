@@ -106,6 +106,27 @@ uv add package_name
 uv add --dev package_name
 ```
 
+## Linting and Type Checking
+
+This project uses several tools for code quality and type checking:
+
+```bash
+# Run Ruff linter
+uv run ruff check .
+
+# Auto-fix Ruff linting issues
+uv run ruff check --fix .
+
+# Run Mypy type checker
+uv run mypy .
+
+# Run Pyright type checker
+uv run pyright .
+
+# Run Django system checks
+uv run python manage.py check
+```
+
 ## Project Structure
 
 ```
