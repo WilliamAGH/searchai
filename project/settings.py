@@ -289,3 +289,22 @@ LOGGING = {
         },
     },
 }
+
+# Celery Configuration
+# ------------------------------------------------------------------------------
+# Controls whether Celery is used for background tasks like scraping.
+# Set to "True" in .env or environment to enable.
+USE_CELERY_FOR_SCRAPING = os.environ.get("USE_CELERY_FOR_SCRAPING", "False").lower() in ("true", "1", "t", "y", "yes")
+
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE # Use Django's TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60 # 30 minutes time limit for tasks
+# Optional: for more robust task management, especially if you have many tasks
+# CELERY_WORKER_CONCURRENCY = os.cpu_count() or 1 # Default to number of CPUs
+# CELERY_WORKER_PREFETCH_MULTIPLIER = 1 # Disable prefetching for long-running tasks
+# CELERY_TASK_ACKS_LATE = True # Acknowledge tasks after they complete/fail
