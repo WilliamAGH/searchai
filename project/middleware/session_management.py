@@ -59,8 +59,7 @@ class SessionSizeMiddleware:
         try:
             # Estimate session size by serializing to JSON
             session_data = dict(request.session)
-            session_size = len(json.dumps(session_data))
-
+            session_size = len(json.dumps(session_data).encode("utf-8"))
             # Log warning if session is getting large
             if session_size > MAX_SESSION_SIZE * 0.8:
                 logger.warning(
