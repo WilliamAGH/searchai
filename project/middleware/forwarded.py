@@ -1,5 +1,4 @@
-"""
-Middleware for handling proxy headers
+"""Middleware for handling proxy headers
 :author: William Callahan
 """
 from collections.abc import Callable
@@ -17,7 +16,7 @@ class ForwardedHeaderMiddleware:
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         """
         Initialize middleware with response handler
-        
+
         Args:
             get_response: Callable that processes the request
         """
@@ -26,10 +25,10 @@ class ForwardedHeaderMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
         Process request to handle forwarded headers
-        
+
         Args:
             request: HTTP request to process
-            
+
         Returns:
             HTTP response from the next middleware or view
         """

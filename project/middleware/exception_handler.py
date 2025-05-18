@@ -1,5 +1,4 @@
-"""
-Global exception handling middleware
+"""Global exception handling middleware
 :author: William Callahan
 """
 import logging
@@ -33,7 +32,7 @@ class GlobalExceptionMiddleware:
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         """
         Initialize middleware with response handler
-        
+
         @param get_response: Callable that processes the request
         """
         self.get_response = get_response
@@ -41,7 +40,7 @@ class GlobalExceptionMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
         Process request and handle any exceptions
-        
+
         @param request: HTTP request to process
         @return: HTTP response from the next middleware or view
         """
@@ -53,7 +52,7 @@ class GlobalExceptionMiddleware:
     def handle_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse:
         """
         Handle uncaught exceptions with appropriate responses
-        
+
         @param request: HTTP request being processed
         @param exception: Exception that was raised
         @return: HTTP response with error information
@@ -83,7 +82,7 @@ class GlobalExceptionMiddleware:
     def _handle_permission_denied(self, request: HttpRequest, exception: Exception) -> HttpResponse:
         """
         Handle permission denied exceptions
-        
+
         @param request: HTTP request being processed
         @param exception: PermissionDenied exception
         @return: Forbidden response
@@ -100,7 +99,7 @@ class GlobalExceptionMiddleware:
     def _log_exception(self, request: HttpRequest, exception: Exception, exc_info) -> None:
         """
         Log exception with request details
-        
+
         @param request: HTTP request being processed
         @param exception: Exception that was raised
         @param exc_info: Exception info tuple from sys.exc_info()
@@ -119,7 +118,7 @@ class GlobalExceptionMiddleware:
     def _notify_admins(self, request: HttpRequest, exception: Exception, exc_info) -> None:
         """
         Send email notification to admins
-        
+
         @param request: HTTP request being processed
         @param exception: Exception that was raised
         @param exc_info: Exception info tuple from sys.exc_info()
@@ -146,7 +145,7 @@ class GlobalExceptionMiddleware:
     def _render_error_response(self, request: HttpRequest, exception: Exception) -> HttpResponse:
         """
         Render appropriate error response
-        
+
         @param request: HTTP request being processed
         @param exception: Exception that was raised
         @return: HTTP response with error information
