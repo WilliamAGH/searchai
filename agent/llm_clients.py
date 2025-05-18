@@ -1,5 +1,4 @@
-"""
-LLM client interfaces for OpenAI and Groq providers
+"""LLM client interfaces for OpenAI and Groq providers
 :author: William Callahan
 """
 import contextlib
@@ -33,7 +32,7 @@ GROQ_MODELS: list[str] = [
 class LLMResponseData(TypedDict, total=False):
     """
     Type definition for LLM API response data
-    
+
     - Contains response text or error information
     - Includes rate limit details specific to providers
     """
@@ -48,7 +47,7 @@ class LLMResponseData(TypedDict, total=False):
 def get_llm_providers() -> list[dict[str, str]]:
     """
     Get supported LLM providers with display names and values
-    
+
     Returns:
         List of provider dictionaries with value and name keys
     """
@@ -61,10 +60,10 @@ def get_llm_providers() -> list[dict[str, str]]:
 def get_available_models(provider: Literal["openai", "groq"]) -> list[str]:
     """
     Get available model names for a provider
-    
+
     Args:
         provider: LLM provider identifier
-        
+
     Returns:
         List of model identifiers available for the provider
     """
@@ -79,10 +78,10 @@ def get_available_models(provider: Literal["openai", "groq"]) -> list[str]:
 def _parse_groq_reset_time(reset_string: str | None) -> float | None:
     """
     Parse Groq's rate limit reset time string to seconds
-    
+
     Args:
         reset_string: Time string in format like "2m59.56s"
-        
+
     Returns:
         Total seconds as float or None if parsing fails
     """
@@ -109,12 +108,12 @@ def get_llm_response(
 ) -> LLMResponseData:
     """
     Send request to LLM provider and get response
-    
+
     Args:
         provider: LLM provider to use
         model_name: Specific model identifier to request
         messages: List of message objects in chat format
-        
+
     Returns:
         Structured response data with text or error information
     """

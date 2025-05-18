@@ -1,5 +1,4 @@
-"""
-Scraping task orchestration and management
+"""Scraping task orchestration and management
 :author: William Callahan
 """
 import logging
@@ -27,12 +26,12 @@ def dispatch_scraping_tasks(
 ) -> tuple[list[dict[str, Any]], str | None, bool]:
     """
     Dispatch scraping tasks synchronously or via Celery
-    
+
     Args:
         request: HTTP request object containing session data
         query_context: Query string for context and identification
         links_to_scrape: List of URL and index pairs to scrape
-        
+
     Returns:
         Tuple containing:
         - List of items with initial scraping status
@@ -136,12 +135,12 @@ def update_scraped_results_from_celery(
 ) -> tuple[str | None, bool]:
     """
     Check Celery task group status and update session with results
-    
+
     Args:
         request: HTTP request object containing session data
         query_context: Query string for context and identification
         active_task_group_id: Current Celery task group ID to check
-        
+
     Returns:
         Tuple containing:
         - Updated task group ID if still pending, else None

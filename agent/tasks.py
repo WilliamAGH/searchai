@@ -1,5 +1,4 @@
-"""
-Celery tasks for asynchronous processing
+"""Celery tasks for asynchronous processing
 :author: William Callahan
 """
 import logging
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ScrapeUrlTask(Task):
     """
     Celery task class for URL scraping operations
-    
+
     - Implements retry mechanism with exponential backoff
     - Provides failure and success handling hooks
     - Configures task acknowledgement behavior
@@ -30,7 +29,7 @@ class ScrapeUrlTask(Task):
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """
         Handle task failure with logging
-        
+
         Args:
             exc: Exception that caused the failure
             task_id: Celery task identifier
@@ -44,7 +43,7 @@ class ScrapeUrlTask(Task):
     def on_success(self, retval, task_id, args, kwargs):
         """
         Handle task success with logging
-        
+
         Args:
             retval: Return value from the task
             task_id: Celery task identifier
@@ -63,13 +62,13 @@ class ScrapeUrlTask(Task):
 def scrape_url_task(url: str, query_context: str, result_index: int, session_id: str | None = None):
     """
     Scrape URL content and process with token counting
-    
+
     Args:
         url: Web page URL to scrape
         query_context: Query string for identification
         result_index: Position in original search results
         session_id: Optional session identifier for cache updates
-        
+
     Returns:
         Dictionary with scraping results including:
         - Original URL and metadata

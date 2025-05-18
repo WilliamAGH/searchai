@@ -1,16 +1,16 @@
-"""
-Memory monitoring utilities for tracking resource usage
+"""Memory monitoring utilities for tracking resource usage
 :author: William Callahan
 """
+import functools
 import gc
 import logging
 import os
 import resource
 import sys
 import threading
-import functools
 from collections.abc import Callable
 from typing import Any
+
 logger = logging.getLogger("agent.utils.memory")
 
 # Memory threshold for warnings (default: 80% of available memory)
@@ -20,7 +20,7 @@ DEFAULT_MEMORY_THRESHOLD = 0.8
 def get_memory_usage() -> dict[str, Any]:
     """
     Get current memory usage statistics
-    
+
     @return: Dictionary with memory usage information
     """
     usage = {}
@@ -56,7 +56,7 @@ def get_memory_usage() -> dict[str, Any]:
 def log_memory_usage(threshold: float = DEFAULT_MEMORY_THRESHOLD) -> None:
     """
     Log current memory usage and warn if above threshold
-    
+
     @param threshold: Memory usage threshold for warnings (0.0-1.0)
     """
     usage = get_memory_usage()
@@ -99,7 +99,7 @@ class MemoryMonitorThread(threading.Thread):
     def __init__(self, interval: int = 300, threshold: float = DEFAULT_MEMORY_THRESHOLD):
         """
         Initialize memory monitor thread
-        
+
         @param interval: Monitoring interval in seconds
         @param threshold: Memory usage threshold for warnings (0.0-1.0)
         """
@@ -139,7 +139,7 @@ _monitor: MemoryMonitorThread | None = None
 def start_memory_monitor(interval: int = 300, threshold: float = DEFAULT_MEMORY_THRESHOLD) -> None:
     """
     Start the memory monitoring thread
-    
+
     @param interval: Monitoring interval in seconds
     @param threshold: Memory usage threshold for warnings (0.0-1.0)
     """
@@ -172,7 +172,7 @@ def memory_intensive(func: Callable) -> Callable:
     Decorator for memory-intensive functions
     - Logs memory usage before and after function execution
     - Forces garbage collection after execution
-    
+
     @param func: Function to decorate
     @return: Decorated function
     """

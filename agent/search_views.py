@@ -1,5 +1,4 @@
-"""
-Django views for search functionality
+"""Django views for search functionality
 :author: William Callahan
 """
 import json
@@ -24,13 +23,13 @@ logger = logging.getLogger("agent.search_views")
 def search_view(request: HttpRequest) -> HttpResponse:
     """
     Handle web search requests and render results
-    
+
     Args:
         request: HTTP request with query parameter 'q'
-        
+
     Returns:
         Rendered search results or search form
-        
+
     The view:
     - Processes search queries
     - Stores results in session for later use
@@ -90,15 +89,15 @@ def search_view(request: HttpRequest) -> HttpResponse:
 def view_full_json_result(request: HttpRequest, query: str, result_index: int) -> HttpResponse:
     """
     Display JSON details for search results
-    
+
     Args:
         request: HTTP request
         query: Search query string used to identify stored results
         result_index: Index of the result to display or -1 for full API response
-        
+
     Returns:
         HTML response with formatted JSON data
-        
+
     The view renders:
     - Full API response when result_index is -1
     - Individual result data for specific indexes

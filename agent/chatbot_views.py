@@ -1,14 +1,14 @@
-"""
-Django views for chatbot interface and API endpoints
+"""Django views for chatbot interface and API endpoints
 :author: William Callahan
 """
 import logging
 from typing import Any, Literal, cast
 
-from django.http import (  # type: ignore[attr-defined]
+from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
+    HttpResponseServerError,
 )
 from django.shortcuts import render
 from django.template.loader import render_to_string
@@ -129,7 +129,7 @@ def chatbot_interface_view(request: HttpRequest) -> HttpResponse:
     else:
         logger.error("No LLM provider configured – cannot load chatbot interface")
         return HttpResponseServerError(
-            "LLM provider configuration is missing – please contact support."
+            "LLM provider configuration is missing – please contact support.",
         )
     system_messages = []
     system_message = f"You are a helpful assistant. The user is asking about a topic related to their recent search: '{query_context}'. Keep your answers concise and relevant to this context."
@@ -274,17 +274,17 @@ def chatbot_send_message_view(request: HttpRequest) -> HttpResponse:
         client = get_default_client()
         if client:
             raw_web = client.search(user_message_text, max_results=5)
-            web_results = cast(list[dict[str, Any]], raw_web)
+            web_results_data = cast(list[dict[str, Any]], raw_web)
         else:
-            web_results: list[dict[str, Any]] = []
+            web_results_data = []
         lines: list[str] = []
-        for idx, r in enumerate(web_results):
+        for idx, r in enumerate(web_results_data):
             title = r.get("title", "")
             snippet = r.get("snippet") or r.get("description", "")
             link = r.get("url") or r.get("link", "")
             lines.append(f"{idx+1}. {title} - {snippet} (Link: {link})")
         web_context_content = "Here are fresh web search results for your question:\n" + "\n".join(lines)
-        request.session[f"web_results_{query_context}"] = web_results
+        request.session[f"web_results_{query_context}"] = web_results_data
 
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": system_message_content}]
 
@@ -345,6 +345,7 @@ def chatbot_send_message_view(request: HttpRequest) -> HttpResponse:
         bot_response_text = text_content
     else:
         bot_response_text = "Error: Unexpected LLM response format."
+        # This is unreachable code as all cases are already covered above
 
     history.append({"role": "user", "content": user_message_text})
     history.append({"role": "assistant", "content": bot_response_text})

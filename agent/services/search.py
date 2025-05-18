@@ -1,5 +1,4 @@
-"""
-Web search functionality using Serper API
+"""Web search functionality using Serper API
 :author: William Callahan
 """
 import io
@@ -44,14 +43,14 @@ class QuietSerperDevTool(SerperDevTool):
             # Log before calling super().run() to see if this is reached
             logger.debug(f"QuietSerperDevTool: Attempting super().run() for query: {search_query}")
             result = super().run(search_query=search_query, **kwargs)
-            logger.debug(f"QuietSerperDevTool: super().run() completed.")
+            logger.debug("QuietSerperDevTool: super().run() completed.")
             return str(result)
         except AttributeError as ae:
             # Specifically catch AttributeError that might be the 'super' object issue
             logger.error(
                 f"QuietSerperDevTool: AttributeError during super().run(): {ae}. "
                 "This might indicate the tool is used without proper CrewAI context.",
-                exc_info=True
+                exc_info=True,
             )
             # Return a clear error message instead of letting it propagate ambiguously
             return f"Error in search tool: AttributeError - {ae}"
@@ -61,7 +60,7 @@ class QuietSerperDevTool(SerperDevTool):
             return f"Error in search tool: {ex}"
         finally:
             sys.stdout = original_stdout
-            logger.debug(f"QuietSerperDevTool: Restored stdout.")
+            logger.debug("QuietSerperDevTool: Restored stdout.")
 
 
 class WebSearchClient:
