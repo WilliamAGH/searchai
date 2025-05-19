@@ -44,9 +44,9 @@ def chatbot_interface_view(request: HttpRequest) -> HttpResponse:
             b"A search query is required to initialize the chatbot.",
         )
 
-    # Initialize empty chat history in session for this context
+    # Initialise chat history only if it does not yet exist
     session_key = f"chat_history_{query_context}"
-    request.session[session_key] = []
+    request.session.setdefault(session_key, [])
 
     session_key_results = f"search_raw_results_{query_context}"
     results_list = request.session.get(session_key_results, [])
@@ -288,10 +288,14 @@ def chatbot_send_message_view(request: HttpRequest) -> HttpResponse:
 
     llm_messages: list[dict[str, str]] = [{"role": "system", "content": system_message_content}]
 
-    active_task_group_id = request.session.get(f"scrape_task_group_id_{query_context}")
-    active_task_group_id, still_scraping_some = update_scraped_results_from_celery(
-        request, query_context, active_task_group_id,
+    # Retrieve and *persist* the possibly new task-group id
+    active_task_group_id_in_session = request.session.get(
+        f"scrape_task_group_id_{query_context}"
     )
+    active_task_group_id, still_scraping_some = update_scraped_results_from_celery(
+        request, query_context, active_task_group_id_in_session,
+    )
+    request.session[f"scrape_task_group_id_{query_context}"] = active_task_group_id
 
     prompt_tokens_base = len(system_message_content) // 4 + 1
     if web_context_content:
@@ -387,7 +391,7 @@ def chatbot_send_message_view(request: HttpRequest) -> HttpResponse:
     total_tokens_in_for_diagnostics = diag_tokens_in_base + total_successful_scraped_tokens_for_diag + diag_tokens_in_history
 
     current_diag_context_for_session = {
-        "message_count": len(history) // 2 + 1,
+        "message_count": len(history) // 2,
         "tokens_in_base": diag_tokens_in_base + diag_tokens_in_history,
         "tokens_out": approx_tokens_out,
         "results_count": len(results_list),
@@ -396,7 +400,7 @@ def chatbot_send_message_view(request: HttpRequest) -> HttpResponse:
     request.session[f"last_diagnostics_context_{query_context}"] = current_diag_context_for_session
 
     diagnostics_render_context = {
-        "message_count": len(history) // 2 + 1,
+        "message_count": len(history) // 2,
         "tokens_in": total_tokens_in_for_diagnostics,
         "tokens_out": approx_tokens_out,
         "results_count": len(results_list),

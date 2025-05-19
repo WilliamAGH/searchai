@@ -24,6 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env at project root
 load_dotenv(BASE_DIR / ".env")
 
+# Ensure logs directory exists before logging is configured
+logs_dir = BASE_DIR / "logs"
+logs_dir.mkdir(exist_ok=True)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -299,7 +302,8 @@ LOGGING = {
         "file": {
             "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(BASE_DIR, "logs/django.log"),
+            "filename": os.path.join(BASE_DIR, "logs", "django.log"),
+            "encoding": "utf-8",
             "maxBytes": 10 * 1024 * 1024,  # 10 MB
             "backupCount": 5,
             "formatter": "verbose",

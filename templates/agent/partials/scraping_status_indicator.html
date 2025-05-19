@@ -1,15 +1,17 @@
 {% if status == "pending" %}
-  <p>Scraping in progress for <span class="font-semibold">"{{ query_context }}"</span>: {{ completed_count }} of {{ total_count }} tasks completed.</p>
-  <p class="mt-1">Beginning chat now might exclude some content from context.</p>
-  <div class="mt-2">
-    <button 
-      hx-get="{% url 'agent:check_scraping_status' %}?query_context={{ query_context|urlencode }}"
-      hx-target="#scraping-status-indicator-content"
-      hx-swap="innerHTML"
-      class="px-3 py-1 text-xs bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors"
-    >
-      Refresh Scraping Status
-    </button>
+  <div aria-live="polite">
+    <p>Scraping in progress for <span class="font-semibold">"{{ query_context }}"</span>: {{ completed_count }} of {{ total_count }} tasks completed.</p>
+    <p class="mt-1">Beginning chat now might exclude some content from context.</p>
+    <div class="mt-2">
+      <button 
+        hx-get="{% url 'agent:check_scraping_status' %}?query_context={{ query_context|urlencode }}"
+        hx-target="#scraping-status-indicator-content"
+        hx-swap="innerHTML"
+        class="px-3 py-1 text-xs bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors"
+      >
+        Refresh Scraping Status
+      </button>
+    </div>
   </div>
 {% elif status == "completed" %}
   <p class="text-green-700">Scraping completed for <span class="font-semibold">"{{ query_context }}"</span>. Successful: {{ successful_count }}, Failed: {{ failed_count }} (of {{ total_count }} total).</p>

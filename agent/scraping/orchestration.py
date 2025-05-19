@@ -99,7 +99,10 @@ def dispatch_scraping_tasks(
                 if content:
                     logger.info(f"SUCCESS (Sync): Successfully synchronously scraped URL: {link}. Content length: {len(content)}")
                     try:
-                        encoding = tiktoken.encoding_for_model("gpt-4o")
+                        encoding = getattr(dispatch_scraping_tasks, "_gpt4o_enc", None)
+                        if encoding is None:
+                            encoding = tiktoken.encoding_for_model("gpt-4o")
+                            dispatch_scraping_tasks._gpt4o_enc = encoding   # cache
                         token_count = len(encoding.encode(content))
                         logger.info(f"Calculated token count (Sync) for {link}: {token_count}")
                     except Exception as e_tok:

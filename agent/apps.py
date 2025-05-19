@@ -30,14 +30,27 @@ class AgentConfig(AppConfig):
         - Ensures log directory exists
         """
         # Skip when running management commands to avoid duplicate initialization
-        if os.environ.get("RUN_MAIN") != "true" and "runserver" not in sys.argv:
+        # Also, ensure that production processes (like Gunicorn/Celery workers)
+        # which don't set RUN_MAIN or include 'runserver' in sys.argv,
+        # still get full initialization if not in DEBUG mode
+        if settings.DEBUG and os.environ.get("RUN_MAIN") != "true" and "runserver" not in sys.argv:
+            logger.info("Skipping full app initialization for auxiliary Django process in DEBUG mode.")
             return
 
-        # Ensure logs directory exists
+        # Ensure logs directory exists (race-safe)
         logs_dir = os.path.join(settings.BASE_DIR, "logs")
-        if not os.path.exists(logs_dir):
-            os.makedirs(logs_dir)
-            logger.info(f"Created logs directory at {logs_dir}")
+        os.makedirs(logs_dir, exist_ok=True)
+        # Optionally, log if it was newly created, though exist_ok=True means it won't error if it exists
+        # To log creation specifically, you might need a slightly different approach or accept not logging it
+        # For simplicity and idempotency, just ensuring it exists is often enough
+        # If logging creation is critical:
+        # if not os.path.exists(logs_dir): # Check before for logging, then create with exist_ok=True
+        #     os.makedirs(logs_dir, exist_ok=True)
+        #     logger.info(f"Created logs directory at {logs_dir}")
+        # else:
+        #     os.makedirs(logs_dir, exist_ok=True) # Ensures it's there even if check was momentarily false
+        # For now, keeping it simple as per the direct suggestion:
+        logger.debug(f"Ensured logs directory exists at {logs_dir}")
 
         # Start memory monitoring if enabled
         if getattr(settings, "MEMORY_MONITOR_ENABLED", False):

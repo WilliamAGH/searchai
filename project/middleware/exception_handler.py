@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.core.mail import mail_admins
 from django.http import (
+    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseForbidden,
@@ -61,6 +62,9 @@ class GlobalExceptionMiddleware:
         exc_info = sys.exc_info()
 
         # Handle specific exception types
+        if isinstance(exception, Http404):
+            # Let Django's normal 404 handling take over
+            raise exception
         if isinstance(exception, PermissionDenied):
             return self._handle_permission_denied(request, exception)
 
@@ -74,7 +78,8 @@ class GlobalExceptionMiddleware:
         # Return appropriate response
         if settings.DEBUG:
             # Let Django's debug page handle it in debug mode
-            raise exception
+            from django.views import debug  # inline import avoids overhead
+            return debug.technical_500_response(request, *exc_info)
         else:
             # Custom error page in production
             return self._render_error_response(request, exception)

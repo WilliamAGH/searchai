@@ -11,8 +11,21 @@ logger = logging.getLogger("agent.celery_setup")
 # Initialize module-level variables for Celery components
 _celery_group = None
 _celery_GroupResult = None
-_CeleryBaseError: type[Exception] = Exception
-_CeleryBrokerError: type[Exception] = IOError
+_CeleryBaseError: type[Exception]
+_CeleryBrokerError: type[Exception]
+
+# Hide internals unless explicitly intended
+__all__ = ["CELERY_AVAILABLE", "CeleryBaseError", "CeleryBrokerError",
+           "celery_group", "celery_GroupResult", "celery_app",
+           "scrape_url_task"]
+
+# Provide public, None-safe aliases
+CeleryBaseError = Exception
+CeleryBrokerError = IOError
+celery_group = None
+celery_GroupResult = None
+celery_app = None
+scrape_url_task = None
 _actual_scrape_url_task = None
 _actual_celery_app = None
 CELERY_AVAILABLE = False

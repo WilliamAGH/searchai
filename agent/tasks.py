@@ -117,14 +117,6 @@ def scrape_url_task(url: str, query_context: str, result_index: int, session_id:
             "token_count": 0,
         }
     except Exception as exc:
-        logger.error(f"FAILURE (Exception): Scraping failed in scrape_url_task for URL {url}: {exc!r}", exc_info=True)
-        return {
-            "link": url,
-            "content": "",
-            "index": result_index,
-            "query_context": query_context,
-            "session_id": session_id,
-            "status": "failed",
-            "error": str(exc),
-            "token_count": 0,
-        }
+        # Leverage Celery's autoretry mechanism
+        logger.warning(f"Retrying due to unexpected error while scraping {url}: {exc!r}")
+        raise scrape_url_task.retry(exc=exc, countdown=10) # type: ignore[misc]

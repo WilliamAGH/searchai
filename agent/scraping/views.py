@@ -4,6 +4,8 @@ Django views for web scraping status and results display
 """
 import json
 import logging
+import re
+from typing import Any
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
@@ -13,10 +15,10 @@ from django.views.decorators.http import require_GET
 
 from ..celery_setup import (
     CELERY_AVAILABLE,
+    _CeleryBaseError,  # Alphabetized within this block
+    _CeleryBrokerError,
     _actual_celery_app,
     _celery_GroupResult,
-    _CeleryBaseError,
-    _CeleryBrokerError,
 )
 
 logger = logging.getLogger("agent.scraping.views")
@@ -78,15 +80,20 @@ def check_scraping_status_view(request: HttpRequest) -> HttpResponse:
     if not query_context:
         return HttpResponse("<p class='text-red-500'>Error: query_context is required.</p>", status=400)
 
+    # Validate query_context more defensively (alphanumeric, underscore, hyphen, 1-40 chars)
+    if not re.fullmatch(r"^[a-zA-Z0-9_\-]{1,40}$", query_context):
+        logger.warning(f"Invalid query_context received from GET parameter: '{query_context}'")
+        return HttpResponse("<p class='text-red-500'>Error: query_context is invalid or contains disallowed characters/length.</p>", status=400)
+
     task_group_id = request.session.get(f"scrape_task_group_id_{query_context}")
 
-    status_render_context = {
+    status_render_context: dict[str, Any] = {
         "query_context": query_context,
         "status": "not_applicable",
         "message": "No active asynchronous scraping tasks for this context or Celery is not configured/enabled/initialized.",
     }
 
-    if not task_group_id or not CELERY_AVAILABLE or not settings.USE_CELERY_FOR_SCRAPING or not _celery_GroupResult or not _actual_celery_app:
+    if not task_group_id or not CELERY_AVAILABLE or not getattr(settings, "USE_CELERY_FOR_SCRAPING", False) or not _celery_GroupResult or not _actual_celery_app:
         html_content = render_to_string("agent/partials/scraping_status_indicator.html", status_render_context)
         return HttpResponse(html_content)
 
