@@ -34,12 +34,11 @@ if getattr(settings, "USE_CELERY_FOR_SCRAPING", False):
     try:
         from celery import group as imported_group
         try:
-            from celery.exceptions import (
-                BrokerConnectionError as imported_BrokerError,  # type: ignore[misc]
-            )
-            _CeleryBrokerError = imported_BrokerError
+            from celery.exceptions import OperationalError as imported_OperationalError
+            _CeleryBrokerError = imported_OperationalError
         except ImportError:
-            logger.warning("Could not import celery.exceptions.BrokerConnectionError, using generic IOError for broker errors.")
+            logger.warning("Could not import celery.exceptions.OperationalError, using generic IOError for broker errors.")
+            # _CeleryBrokerError will retain its default value of IOError if this fails
 
         from celery.exceptions import CeleryError as imported_CeleryBaseError
         from celery.result import GroupResult as imported_GroupResult
@@ -52,7 +51,9 @@ if getattr(settings, "USE_CELERY_FOR_SCRAPING", False):
         _celery_GroupResult = imported_GroupResult
         _CeleryBaseError = imported_CeleryBaseError
         _actual_scrape_url_task = imported_scrape_url_task
+        scrape_url_task = _actual_scrape_url_task
         _actual_celery_app = imported_celery_app
+        celery_app = _actual_celery_app
         CELERY_AVAILABLE = True
         logger.info("Celery is configured and available for scraping tasks.")
     except ImportError:

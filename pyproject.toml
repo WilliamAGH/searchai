@@ -19,6 +19,7 @@ dependencies = [
     "newspaper3k>=0.2.8",
     "trafilatura>=2.0.0",
     "celery>=5.5.2",
+    "celery-stubs",
     "tiktoken>=0.7.0",
     "mypy>=1.15.0",
 ]
@@ -91,3 +92,7 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = "crewai_tools.*"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "celery.*"
+ignore_missing_imports = true
