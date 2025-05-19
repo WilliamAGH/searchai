@@ -18,7 +18,8 @@ RUN uv pip install --system --no-cache --upgrade pip setuptools wheel \
 
 COPY . .
 
-RUN python manage.py collectstatic --noinput
+RUN mkdir -p /app/logs && \
+    python manage.py collectstatic --noinput
 
 EXPOSE 8000
 

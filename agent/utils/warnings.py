@@ -1,8 +1,10 @@
 """
-Utilities for suppressing warnings in the application.
+Warning handling utilities for runtime suppression
+:author: William Callahan
 """
 import os
 import warnings
+
 
 def suppress_pydantic_warnings():
     """

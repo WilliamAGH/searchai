@@ -5,7 +5,7 @@ description = ""
 requires-python = ">=3.12"
 dependencies = [
     "django>=5.2.1",
-    "ruff>=0.11.9",
+    "ruff>=0.11.10",
     "requests>=2.32.3",
     "python-dotenv>=1.1.0",
     "crewai-tools>=0.45.0",
@@ -15,6 +15,13 @@ dependencies = [
     "extended-mypy-django-plugin>=0.8.0",
     "django-htmx>=1.23.0",
     "beautifulsoup4>=4.13.4",
+    "lxml[html-clean]>=4.9.2",
+    "newspaper3k>=0.2.8",
+    "trafilatura>=2.0.0",
+    "celery>=5.5.2",
+    "celery-stubs",
+    "tiktoken>=0.7.0",
+    "mypy>=1.15.0",
 ]
 
 [project.scripts]
@@ -52,9 +59,40 @@ ignore = [
 known-first-party = ["agent", "app", "project"]
 
 [tool.mypy]
-exclude = "\\\\.venv"
+exclude = "\\.venv"
 plugins = ["extended_mypy_django_plugin.main"]
+python_version = "3.12"
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+strict_optional = true
+
+[tool.django-stubs]
+django_settings_module = "project.settings"
+scratch_path = "./.mypy_cache/django-stubs"
 
 [[tool.mypy.overrides]]
 module = "*.migrations.*"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "manage"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "crewai.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "crewai_tools.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "celery.*"
+ignore_missing_imports = true

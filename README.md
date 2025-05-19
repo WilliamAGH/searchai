@@ -2,101 +2,106 @@
 
 A modern Django project for experimenting with SearchAI tools, featuring a web search interface and CLI.
 
-## Prerequisites
+## Quick Start Guide
+
+### Prerequisites
 
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv) - Fast Python package installer and resolver
 
-## Getting Started
-
-### Setup Environment
+### 1. Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/williamagh/searchai-experimental.git
 cd searchai-experimental
 
-# Sync environment for package installation
+# Install dependencies
 uv sync
 ```
 
-### Environment Variables for Development
+### 2. Configuration
 
-For local development, it's important to ensure `DEBUG` mode is enabled in Django. This project is configured to use environment variables for settings like `DEBUG` and `DJANGO_SECRET_KEY`. These are loaded from a `.env` file in the project root.
-
-Create a `.env` file in the root of the `crewai-experimental` directory with the following content:
+Create a `.env` file in the project root:
 
 ```env
 DJANGO_SECRET_KEY='your_super_secret_dev_key_here_make_something_up'
 DEBUG=True
+CELERY_BROKER_URL='redis://localhost:6379/0'
+CELERY_RESULT_BACKEND='redis://localhost:6379/0'
+# USE_CELERY_FOR_SCRAPING=True # Uncomment to enable Celery for scraping tasks
 ```
 
-Setting `DEBUG=True` will:
-- Enable Django's debug pages with detailed error information.
-- Prevent redirection to HTTPS by the development server.
-- Disable certain production security settings for ease of development.
-
-Make sure this `.env` file is included in your `.gitignore` and not committed to your repository, especially if it contains sensitive information.
-
-### Run Development Server
+### 3. Development
 
 ```bash
-# Apply migrations as needed
+# Apply database migrations
 uv run python manage.py migrate
-
-# Create a superuser (optional) for Django admin access
-uv run python manage.py createsuperuser
 
 # Start development server
-# This will use settings from your .env file if present (e.g., DEBUG=True)
-uv run python manage.py runserver
+uv run python manage.py runserver localhost:8000
 
-# Alternatively, you can set DEBUG directly in the command:
-# DEBUG=True uv run python manage.py runserver
+# Start Celery worker (for asynchronous tasks like scraping)
+# Ensure your CELERY_BROKER_URL (e.g., Redis) is running and accessible.
+uv run celery -A project worker --loglevel=info
+# If you use Celery Beat for scheduled tasks, start it with:
+# uv run celery -A project beat --loglevel=info
 
-# Open http://127.0.0.1:8000/ in your browser to access the Django admin interface
-# Or visit http://127.0.0.1:8000/agent/search/ to access the SearchAI search web UI
+# Visit http://127.0.0.1:8000/agent/search/ in your browser
 ```
 
-### Production Server
+## Common Commands
+
+### Development
 
 ```bash
-# Apply migrations as needed
+# Run development server
+uv run python manage.py runserver localhost:8000
+
+# Create admin user (if needed)
+uv run python manage.py createsuperuser
+
+# Apply database migrations
 uv run python manage.py migrate
 
-# Start production server
-uv run gunicorn project.wsgi:application --bind 0.0.0.0:8000
+# Create new migrations
+uv run python manage.py makemigrations
+
+# Django shell
+uv run python manage.py shell
 ```
 
-## Using the Search CLI
-
-This project includes a CLI tool for web searches using CrewAI:
+### CLI Usage
 
 ```bash
-# Basic search
+# Search from command line
 uv run crew-search "your search query"
 ```
 
-The CLI provides nicely formatted search results using Rich's console features.
-
-## Running Project Commands
-
-Use `uv run` to execute Python scripts and Django management commands:
+### Production
 
 ```bash
-# Run Django management commands
-uv run python manage.py makemigrations
-uv run python manage.py migrate
-uv run python manage.py shell
+# Start production server
+uv run gunicorn project.wsgi:application --bind 0.0.0.0:8000
 
-# Run tests
-uv run python manage.py test
-
-# Run with specific settings
-uv run python manage.py runserver --settings=project.settings
+# For Celery in production, you need to run Celery workers and optionally Celery Beat
+# as background services. This is typically managed with tools like:
+# - systemd: For creating and managing service files.
+# - Supervisor: Another process control system
+# - Docker Compose: to containerizw the application
+# Example (conceptual, adapt to your deployment tool):
+# uv run celery -A project worker --loglevel=INFO --concurrency=4 (daemonized)
+# uv run celery -A project beat --loglevel=INFO (daemonized)
 ```
 
-## Adding Dependencies
+### Testing
+
+```bash
+# Run tests
+uv run python manage.py test
+```
+
+### Dependency Management
 
 ```bash
 # Add a new package
@@ -104,6 +109,38 @@ uv add package_name
 
 # Add a development dependency
 uv add --dev package_name
+```
+
+## Code Quality
+
+### Linting
+
+```bash
+# Check code with Ruff
+uv run ruff check .
+
+# Auto-fix basic issues
+uv run ruff check --fix .
+
+# Auto-fix all issues (including docstring whitespace)
+uv run ruff check --unsafe-fixes --fix .
+```
+
+### Type Checking
+
+```bash
+# Check types with MyPy
+uv run mypy .
+
+# Check types with Pyright
+uv run pyright .
+```
+
+### System Checks
+
+```bash
+# Run Django system checks
+uv run python manage.py check
 ```
 
 ## Project Structure
@@ -118,6 +155,14 @@ searchai-experimental/
 ├── templates/         # HTML templates
 └── manage.py          # Django management script
 ```
+
+## Environment Variables
+
+- `DEBUG`: Set to `True` for development (detailed error pages, no HTTPS redirection).
+- `DJANGO_SECRET_KEY`: Required for Django security features.
+- `CELERY_BROKER_URL`: URL for the Celery message broker (e.g., `redis://localhost:6379/0`). Required if using Celery.
+- `CELERY_RESULT_BACKEND`: URL for the Celery result backend (e.g., `redis://localhost:6379/0`). Required if using Celery and want to store task results.
+- `USE_CELERY_FOR_SCRAPING`: Set to `True` to enable Celery for background scraping tasks. Defaults to `False`.
 
 ## Learn More
 

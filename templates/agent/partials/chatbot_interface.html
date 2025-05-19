@@ -24,8 +24,77 @@
   </div>
   {% endif %}
 
+  {% if include_scrape_context and scraped_items %}
+  <div class="mb-4 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
+    <p class="font-medium mb-2">Scraped Content:</p>
+    <ul class="list-disc pl-5 space-y-1 text-sm text-gray-700 dark:text-gray-300">
+      {% for item in scraped_items %}
+      <li>
+        <strong class="text-gray-800 dark:text-gray-200">{{ item.link }}</strong> - {{ item.content|truncatechars:200 }}
+        <a href="{{ item.link }}" target="_blank" class="text-sky-600 hover:underline ml-2">Visit Site</a>
+        <button
+          hx-get="{% url 'agent:view_scraped_json_result' query_context=query_context item_index=forloop.counter0 %}"
+          hx-target="#scraped-json-preview-{{ forloop.counter0 }}"
+          hx-swap="innerHTML"
+          class="px-3 py-1 text-xs bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors ml-2"
+        >
+          View JSON
+        </button>
+        <div id="scraped-json-preview-{{ forloop.counter0 }}" class="mt-2"></div>
+      </li>
+      {% endfor %}
+    </ul>
+    
+    <div class="mt-3">
+      <button
+        hx-get="{% url 'agent:view_scraped_json_result' query_context=query_context item_index=-1 %}"
+        hx-target="#all-scraped-json-preview"
+        hx-swap="innerHTML"
+        class="px-3 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+      >
+        View All Scraped Content (JSON)
+      </button>
+      <div id="all-scraped-json-preview" class="mt-3"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Scraping Status Indicator - Initial State #}
+  <div 
+    id="scraping-status-indicator-wrapper" 
+    class="my-4"
+    {% if scraping_pending_initial %}
+      hx-get="{% url 'agent:check_scraping_status' %}?query_context={{ query_context|urlencode }}"
+      hx-trigger="load, every 5s"
+      hx-target="#scraping-status-indicator-content"
+      hx-swap="innerHTML"
+    {% endif %}
+  >
+    <div id="scraping-status-indicator-content">
+      {% if scraping_pending_initial %}
+        {# Initial content for pending state, will be replaced by polling #}
+        <div class="p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-md text-sm">
+          <p>Scraping website(s) in progress for <span class="font-semibold">"{{ query_context }}"</span>...</p>
+          <p class="mt-1">Beginning chat now might exclude some content from context.</p>
+          <div class="mt-2">
+            <button 
+              hx-get="{% url 'agent:check_scraping_status' %}?query_context={{ query_context|urlencode }}"
+              hx-target="#scraping-status-indicator-content" {# Target the inner div now #}
+              hx-swap="innerHTML"
+              class="px-3 py-1 text-xs bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors"
+            >
+              Refresh Scraping Status (Manual)
+            </button>
+          </div>
+        </div>
+      {% else %}
+        {# Placeholder for potential dynamic updates or if no scraping initially #}
+      {% endif %}
+    </div>
+  </div>
+
   {# Diagnostics panel #}
-  {% include "agent/partials/diagnostics.html" with message_count=0 tokens_in=0 tokens_out=0 results_count=results_count history_count=history_count %}
+  {% include "agent/partials/diagnostics.html" %}
 
   <div id="chat-messages" class="flex-grow overflow-y-auto mb-4 space-y-3 p-3 bg-gray-50 rounded-lg min-h-[300px] max-h-[50vh]">
     <!-- Initial bot message -->

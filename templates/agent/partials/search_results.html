@@ -17,7 +17,7 @@
   </a>
   <form id="search-results-form"
         hx-get="{% url 'agent:chatbot_interface' %}"
-        hx-include="[name='selected']"
+        hx-include="[name='selected'], [name='scrape_selected']"
         hx-target="#dynamic-content-area"
         hx-swap="innerHTML"
         class="inline-block"
@@ -62,9 +62,13 @@
           </div>
           
           <div class="flex justify-between items-center border-t pt-3 mt-2">
-            <div class="flex items-center space-x-2">
+            <div class="flex items-center space-x-4">
               <input type="checkbox" name="selected" value="{{ result.index }}" id="result-{{ result.index }}" class="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-zinc-700 border-gray-300 dark:border-zinc-600 rounded focus:ring-2 focus:ring-blue-500">
               <label for="result-{{ result.index }}" class="text-sm text-gray-700 dark:text-gray-300">Select</label>
+            </div>
+            <div class="flex items-center space-x-2">
+              <input type="checkbox" name="scrape_selected" value="{{ result.index }}" id="scrape-{{ result.index }}" class="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-zinc-700 border-gray-300 dark:border-zinc-600 rounded focus:ring-2 focus:ring-blue-500">
+              <label for="scrape-{{ result.index }}" class="text-sm text-gray-700 dark:text-gray-300">Scrape</label>
             </div>
             
             <div class="flex space-x-2">
@@ -79,6 +83,7 @@
               
               <a
                 hx-get="{% url 'agent:chatbot_interface' %}?query_context={{ query|urlencode }}&selected={{ result.index }}"
+                hx-include="#scrape-{{ result.index }}"
                 hx-target="#dynamic-content-area"
                 hx-swap="innerHTML"
                 class="px-3 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors cursor-pointer"

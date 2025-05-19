@@ -1,6 +1,10 @@
 """
-Module for suppressing warnings at the earliest possible point.
-This must be imported before ANY other imports in your application.
+Warning suppression utilities
+:author: William Callahan
+
+Suppresses warnings at the earliest possible point
+Must be imported before ANY other imports in your application
+Prevents unnecessary warnings from dependencies like Pydantic and libraries
 """
 import os
 import sys
