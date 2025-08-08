@@ -1,7 +1,25 @@
 {
-  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/schemas/oxlint.json",
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "import",
+    "typescript",
+    "unicorn"
+  ],
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "settings": {},
   "rules": {
-    "import/order": "off"
+    "eqeqeq": "warn",
+    "import/no-cycle": "error",
+    "import/order": "off",
+    "react/self-closing-comp": [
+      "error",
+      {
+        "html": false
+      }
+    ]
   },
   "ignorePatterns": [
     "dist/**",
@@ -9,5 +27,16 @@
     "node_modules/**",
     "*.config.js",
     "*.config.ts"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "*.test.ts",
+        "*.spec.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
   ]
 }
