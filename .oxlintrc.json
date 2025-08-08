@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/schemas/oxlint.json",
+  "rules": {
+    "import/order": "off"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "convex/_generated/**",
+    "node_modules/**",
+    "*.config.js",
+    "*.config.ts"
+  ]
+}

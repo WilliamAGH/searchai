@@ -19,7 +19,7 @@ http.route({
   path: "/api/search",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const { query, maxResults } = await request.json();
+      const { query, maxResults } = await request.json();
     
     console.log('🔍 SEARCH ENDPOINT CALLED:');
     console.log('Query:', query);
@@ -123,7 +123,7 @@ http.route({
 http.route({
   path: "/api/ai",
   method: "POST",
-  handler: httpAction(async (ctx, request) => {
+  handler: httpAction(async (_ctx, request) => {
     const { message, systemPrompt, searchResults, sources } = await request.json();
     
     console.log('🤖 AI ENDPOINT CALLED:');
