@@ -1,7 +1,16 @@
-import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import { httpRouter } from "convex/server";
 import { api } from "./_generated/api";
 import { auth } from "./auth";
+
+/**
+ * Search result interface for type safety
+ */
+interface SearchResult {
+  title: string;
+  snippet: string;
+  url: string;
+}
 
 const http = httpRouter();
 
@@ -9,7 +18,7 @@ const http = httpRouter();
 http.route({
   path: "/api/search",
   method: "POST",
-  handler: httpAction(async (ctx, request) => {
+  handler: httpAction(async (_ctx, request) => {
     const { query, maxResults } = await request.json();
     
     console.log('🔍 SEARCH ENDPOINT CALLED:');
@@ -191,7 +200,7 @@ http.route({
       
       // Final fallback - create response from search results
       const fallbackResponse = searchResults && searchResults.length > 0
-        ? `Based on the search results I found:\n\n${searchResults.map((r: any) => `**${r.title}**\n${r.snippet}\nSource: ${r.url}`).join('\n\n').substring(0, 1500)}...\n\n*Note: AI processing is currently unavailable, but the above search results should help answer your question.*`
+        ? `Based on the search results I found:\n\n${searchResults.map((r: SearchResult) => `**${r.title}**\n${r.snippet}\nSource: ${r.url}`).join('\n\n').substring(0, 1500)}...\n\n*Note: AI processing is currently unavailable, but the above search results should help answer your question.*`
         : `I'm unable to process your question with AI right now due to missing API configuration. However, I can suggest searching for "${message}" on:\n\n- [Google](https://www.google.com/search?q=${encodeURIComponent(message)})\n- [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(message)})\n- [Wikipedia](https://en.wikipedia.org/wiki/Special:Search/${encodeURIComponent(message)})`;
 
       const fallbackResponseObj = {
@@ -331,7 +340,7 @@ http.route({
       // Final fallback response with detailed error info
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const fallbackResponse = searchResults && searchResults.length > 0
-        ? `Based on the search results I found:\n\n${searchResults.map((r: any) => `**${r.title}**\n${r.snippet}\nSource: ${r.url}`).join('\n\n').substring(0, 1500)}...\n\n*Note: AI processing failed (${errorMessage}), but the above search results should help answer your question.*`
+        ? `Based on the search results I found:\n\n${searchResults.map((r: SearchResult) => `**${r.title}**\n${r.snippet}\nSource: ${r.url}`).join('\n\n').substring(0, 1500)}...\n\n*Note: AI processing failed (${errorMessage}), but the above search results should help answer your question.*`
         : `I'm having trouble generating a response right now.\n\n**Error details:** ${errorMessage}\n\nPlease try again, or search manually for "${message}" on:\n- [Google](https://www.google.com/search?q=${encodeURIComponent(message)})\n- [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(message)})`;
 
       const finalErrorResponse = {
