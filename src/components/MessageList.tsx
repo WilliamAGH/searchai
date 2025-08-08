@@ -176,15 +176,20 @@ export function MessageList({
                                   {new URL(result.url).hostname}
                                 </div>
                               </div>
+                              {/* External link icon (hover only) */}
                               <svg
-                                className="ml-auto mt-0.5 w-4 h-4 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                className="pointer-events-none absolute top-2 right-2 w-4 h-4 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 group-active:opacity-0 transition-opacity"
+                                viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
-                                viewBox="0 0 24 24"
                                 aria-hidden="true"
                               >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h4a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={1.5}
+                                  d="M13.5 6H21m0 0v7.5M21 6l-8.25 8.25M15 15H6.75A2.25 2.25 0 014.5 12.75V6.75A2.25 2.25 0 016.75 4.5H12"
+                                />
                               </svg>
                             </div>
                           </a>

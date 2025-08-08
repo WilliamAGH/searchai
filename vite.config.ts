@@ -1,5 +1,5 @@
-import react from "@vitejs/plugin-react";
 import path from "node:path";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // https://vite.dev/config/
@@ -43,7 +43,7 @@ window.addEventListener('message', async (message) => {
   server: {
     proxy: {
       '/api': {
-        target: 'https://vivid-boar-858.convex.cloud',
+        target: 'https://diligent-greyhound-240.convex.site',
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path,
