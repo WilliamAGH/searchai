@@ -1,5 +1,23 @@
 import React from 'react';
 
+function getSafeHostname(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch (_) {
+    try {
+      return new URL(`https://${url}`).hostname;
+    } catch (_) {
+      return '';
+    }
+  }
+}
+
+function getFaviconUrl(url: string): string | null {
+  const hostname = getSafeHostname(url);
+  if (!hostname) return null;
+  return `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
+}
+
 interface SearchProgressProps {
   progress: {
     stage: 'searching' | 'scraping' | 'analyzing' | 'generating';
@@ -61,15 +79,19 @@ export function SearchProgress({ progress }: SearchProgressProps) {
           
           {progress.currentUrl && (
             <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 mb-2">
-              <img 
-                src={`https://icons.duckduckgo.com/ip3/${new URL(progress.currentUrl).hostname}.ico`}
-                alt=""
-                className="w-3 h-3"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-              <span className="truncate">{new URL(progress.currentUrl).hostname}</span>
+              {getFaviconUrl(progress.currentUrl) ? (
+                <img
+                  src={getFaviconUrl(progress.currentUrl) as string}
+                  alt=""
+                  width={12}
+                  height={12}
+                  className="w-3 h-3 object-contain rounded-sm"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : null}
+              <span className="truncate">{getSafeHostname(progress.currentUrl) || progress.currentUrl}</span>
             </div>
           )}
           
@@ -77,16 +99,20 @@ export function SearchProgress({ progress }: SearchProgressProps) {
             <div className="flex flex-wrap gap-2 mt-2">
               {progress.urls.map((url, idx) => (
                 <div key={idx} className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-700 rounded-md text-xs">
-                  <img 
-                    src={`https://icons.duckduckgo.com/ip3/${new URL(url).hostname}.ico`}
-                    alt=""
-                    className="w-3 h-3"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  {getFaviconUrl(url) ? (
+                    <img
+                      src={getFaviconUrl(url) as string}
+                      alt=""
+                      width={12}
+                      height={12}
+                      className="w-3 h-3 object-contain rounded-sm"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : null}
                   <span className="text-gray-600 dark:text-gray-400">
-                    {new URL(url).hostname}
+                    {getSafeHostname(url) || url}
                   </span>
                 </div>
               ))}

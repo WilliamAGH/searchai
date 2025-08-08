@@ -2,6 +2,24 @@ import React, { useEffect, useRef } from 'react';
 import { SearchProgress } from './SearchProgress';
 import { ReasoningDisplay } from './ReasoningDisplay';
 
+function getSafeHostname(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch (_) {
+    try {
+      return new URL(`https://${url}`).hostname;
+    } catch (_) {
+      return '';
+    }
+  }
+}
+
+function getFaviconUrl(url: string): string | null {
+  const hostname = getSafeHostname(url);
+  if (!hostname) return null;
+  return `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
+}
+
 interface SearchResult {
   title: string;
   url: string;
@@ -157,14 +175,18 @@ export function MessageList({
                             className="group relative block p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors"
                           >
                             <div className="flex items-start gap-3">
-                              <img 
-                                src={`https://icons.duckduckgo.com/ip3/${new URL(result.url).hostname}.ico`}
-                                alt=""
-                                className="w-4 h-4 mt-0.5 flex-shrink-0"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
+                              {getFaviconUrl(result.url) ? (
+                                <img
+                                  src={getFaviconUrl(result.url) as string}
+                                  alt=""
+                                  width={16}
+                                  height={16}
+                                  className="w-4 h-4 mt-0.5 shrink-0 object-contain rounded-sm"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              ) : null}
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-300 text-sm">
                                   {result.title}
@@ -173,12 +195,12 @@ export function MessageList({
                                   {result.snippet}
                                 </div>
                                 <div className="text-gray-500 dark:text-gray-500 text-xs mt-1">
-                                  {new URL(result.url).hostname}
+                                  {getSafeHostname(result.url) || result.url}
                                 </div>
                               </div>
                               {/* External link icon (hover only) */}
                               <svg
-                                className="pointer-events-none absolute top-2 right-2 w-4 h-4 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 group-active:opacity-0 transition-opacity"
+                                className="pointer-events-none absolute top-2 right-2 w-4 h-4 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 group-active:opacity-0 transition-opacity z-10"
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
