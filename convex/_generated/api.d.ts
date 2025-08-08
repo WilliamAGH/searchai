@@ -20,7 +20,6 @@ import type * as email from "../email.js";
 import type * as http from "../http.js";
 import type * as messages from "../messages.js";
 import type * as preferences from "../preferences.js";
-import type * as router from "../router.js";
 import type * as search from "../search.js";
 
 /**
@@ -39,7 +38,6 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   messages: typeof messages;
   preferences: typeof preferences;
-  router: typeof router;
   search: typeof search;
 }>;
 export declare const api: FilterApi<

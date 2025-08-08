@@ -40,4 +40,14 @@ window.addEventListener('message', async (message) => {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://vivid-boar-858.convex.cloud',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path,
+      },
+    },
+  },
 }));
