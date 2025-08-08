@@ -148,12 +148,13 @@ export function MessageList({
                     </div>
                     <div className="space-y-3">
                       {message.searchResults.map((result, idx) => (
-                        <div key={idx} className="group">
+                        <div key={idx}>
                           <a
                             href={result.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors"
+                            title="Opens in a new tab"
+                            className="group relative block p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors"
                           >
                             <div className="flex items-start gap-3">
                               <img 
@@ -175,6 +176,16 @@ export function MessageList({
                                   {new URL(result.url).hostname}
                                 </div>
                               </div>
+                              <svg
+                                className="ml-auto mt-0.5 w-4 h-4 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                aria-hidden="true"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h4a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
+                              </svg>
                             </div>
                           </a>
                         </div>
