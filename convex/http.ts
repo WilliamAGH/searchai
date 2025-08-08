@@ -155,12 +155,12 @@ http.route({
 	}),
 });
 
-// AI generation endpoint for unauthenticated users
+// AI generation endpoint for unauthenticated users with streaming support
 http.route({
 	path: "/api/ai",
 	method: "POST",
 	handler: httpAction(async (_ctx, request) => {
-		const { message, systemPrompt, searchResults, sources } =
+		const { message, systemPrompt, searchResults, sources, chatHistory } =
 			await request.json();
 
 		console.log("🤖 AI ENDPOINT CALLED:");
@@ -168,6 +168,7 @@ http.route({
 		console.log("System Prompt Length:", systemPrompt?.length || 0);
 		console.log("Search Results Count:", searchResults?.length || 0);
 		console.log("Sources Count:", sources?.length || 0);
+		console.log("Chat History Length:", chatHistory?.length || 0);
 		console.log("Environment Variables Available:");
 		console.log(
 			"- OPENROUTER_API_KEY:",

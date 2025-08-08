@@ -172,7 +172,7 @@ export function MessageList({
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Opens in a new tab"
-                            className="group relative block p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors"
+                            className="group relative block p-3 pr-7 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors"
                           >
                             <div className="flex items-start gap-3">
                               {getFaviconUrl(result.url) ? (
@@ -198,21 +198,21 @@ export function MessageList({
                                   {getSafeHostname(result.url) || result.url}
                                 </div>
                               </div>
-                              {/* External link icon (hover only) */}
-                              <svg
-                                className="pointer-events-none absolute top-2 right-2 w-4 h-4 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 group-active:opacity-0 transition-opacity z-10"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={1.5}
-                                  d="M13.5 6H21m0 0v7.5M21 6l-8.25 8.25M15 15H6.75A2.25 2.25 0 014.5 12.75V6.75A2.25 2.25 0 016.75 4.5H12"
-                                />
-                              </svg>
+                            {/* External link icon (hover only) */}
+                            <svg
+                              className="pointer-events-none absolute top-2 right-2 w-4 h-4 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 group-active:opacity-0 transition-opacity z-10"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M13.5 6H21m0 0v7.5M21 6l-8.25 8.25M15 15H6.75A2.25 2.25 0 014.5 12.75V6.75A2.25 2.25 0 016.75 4.5H12"
+                              />
+                            </svg>
                             </div>
                           </a>
                         </div>
