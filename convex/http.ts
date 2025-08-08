@@ -18,7 +18,7 @@ const http = httpRouter();
 http.route({
   path: "/api/search",
   method: "POST",
-  handler: httpAction(async (_ctx, request) => {
+  handler: httpAction(async (ctx, request) => {
     const { query, maxResults } = await request.json();
     
     console.log('🔍 SEARCH ENDPOINT CALLED:');
