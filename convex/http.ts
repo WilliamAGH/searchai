@@ -1,6 +1,6 @@
+import { api } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { httpRouter } from "convex/server";
-import { api } from "./_generated/api";
 import { auth } from "./auth";
 
 /**
@@ -18,7 +18,7 @@ const http = httpRouter();
 http.route({
   path: "/api/search",
   method: "POST",
-  handler: httpAction(async (ctx, request) => {
+  handler: httpAction(async (_ctx, request) => {
     const { query, maxResults } = await request.json();
     
     console.log('🔍 SEARCH ENDPOINT CALLED:');
