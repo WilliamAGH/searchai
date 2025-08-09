@@ -5,10 +5,10 @@ import { ReasoningDisplay } from './ReasoningDisplay';
 function getSafeHostname(url: string): string {
   try {
     return new URL(url).hostname;
-  } catch (_) {
+  } catch {
     try {
       return new URL(`https://${url}`).hostname;
-    } catch (_) {
+    } catch {
       return '';
     }
   }
@@ -83,7 +83,7 @@ export function MessageList({
     <div className="flex-1 overflow-y-auto">
       {messages.length === 0 ? (
         <div className="flex-1 flex items-center justify-center min-h-[60vh]">
-          <div className="text-center max-w-lg px-6">
+          <div className="text-center max-w-sm sm:max-w-lg px-4 sm:px-6">
             <button
               onClick={onToggleSidebar}
               className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 transform hover:scale-105"
@@ -93,17 +93,17 @@ export function MessageList({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
-            <h2 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white">
               Search the web with AI
             </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
+            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
               Ask me anything and I'll search the web in real-time to give you accurate, 
               up-to-date information with sources.
             </p>
           </div>
         </div>
       ) : (
-        <div className="px-6 py-8 space-y-8">
+        <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
           {/* Share button - only show if there are messages and onShare is provided */}
           {messages.length > 0 && onShare && (
             <div className="flex justify-end mb-4">
@@ -120,7 +120,14 @@ export function MessageList({
             </div>
           )}
 
-          {messages.map((message, index) => (
+           {messages.map((message, index) => {
+             const safeTimestamp = typeof message.timestamp === 'number' ? message.timestamp : Date.now();
+             const safeResults = Array.isArray(message.searchResults)
+               ? message.searchResults.filter(
+                   (r) => r && typeof r.url === 'string' && typeof r.title === 'string'
+                 )
+               : [];
+             return (
             <div key={message._id || index} className="flex gap-4">
               <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center">
                 {message.role === 'user' ? (
@@ -149,7 +156,7 @@ export function MessageList({
                   </div>
                 </div>
                 
-                {message.searchResults && message.searchResults.length > 0 && (
+                 {safeResults.length > 0 && (
                   <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
                     <div className="text-sm font-medium mb-3 flex items-center justify-between text-gray-700 dark:text-gray-300">
                       <div className="flex items-center gap-2">
@@ -164,8 +171,8 @@ export function MessageList({
                         </span>
                       )}
                     </div>
-                    <div className="space-y-3">
-                      {message.searchResults.map((result, idx) => (
+                     <div className="space-y-3">
+                       {safeResults.map((result, idx) => (
                         <div key={idx}>
                           <a
                             href={result.url}
@@ -221,12 +228,12 @@ export function MessageList({
                   </div>
                 )}
                 
-                <div className="text-xs text-gray-500 dark:text-gray-500 mt-3">
-                  {new Date(message.timestamp).toLocaleTimeString()}
+                 <div className="text-xs text-gray-500 dark:text-gray-500 mt-3">
+                   {new Date(safeTimestamp).toLocaleTimeString()}
                 </div>
               </div>
             </div>
-          ))}
+           )})}
           
           {isGenerating && searchProgress && (
             <SearchProgress progress={searchProgress} />
