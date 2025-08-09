@@ -1,3 +1,11 @@
+/**
+ * Message list display component
+ * - Auto-scrolls to bottom unless user scrolls up
+ * - Collapses sources/reasoning based on stream state
+ * - Renders markdown with sanitization
+ * - Shows scroll-to-bottom FAB when scrolled up
+ */
+
 import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,6 +16,11 @@ import type { Schema } from 'hast-util-sanitize';
 import { SearchProgress } from './SearchProgress';
 import { ReasoningDisplay } from './ReasoningDisplay';
 
+/**
+ * Extract hostname from URL safely
+ * - Handles malformed URLs
+ * - Falls back to empty string
+ */
 function getSafeHostname(url: string): string {
   try {
     return new URL(url).hostname;
@@ -20,6 +33,11 @@ function getSafeHostname(url: string): string {
   }
 }
 
+/**
+ * Get favicon URL from DuckDuckGo service
+ * - Returns null if hostname invalid
+ * - Uses DDG icon proxy service
+ */
 function getFaviconUrl(url: string): string | null {
   const hostname = getSafeHostname(url);
   if (!hostname) return null;
@@ -69,6 +87,15 @@ interface MessageListProps {
   } | null;
 }
 
+/**
+ * Main message list component
+ * @param messages - Array of chat messages
+ * @param isGenerating - AI currently generating response
+ * @param onToggleSidebar - Toggle sidebar callback
+ * @param onShare - Share conversation callback
+ * @param currentChat - Current chat metadata
+ * @param searchProgress - Search progress indicator
+ */
 export function MessageList({ 
   messages, 
   isGenerating, 
@@ -82,6 +109,11 @@ export function MessageList({
   const [collapsedById, setCollapsedById] = React.useState<Record<string, boolean>>({});
   const [userHasScrolled, setUserHasScrolled] = React.useState(false);
 
+  /**
+   * Scroll to bottom of messages
+   * - Uses smooth scroll behavior
+   * - Targets sentinel element
+   */
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -152,12 +184,20 @@ export function MessageList({
     });
   }, [messages]); // Remove collapsedById from deps to prevent loops
 
+  /**
+   * Toggle collapsed state for element
+   * @param id - Element ID to toggle
+   */
   const toggleCollapsed = (id: string) => {
     setCollapsedById(prev => ({ ...prev, [id]: !prev[id] }));
   };
   
-  // Use the same toggle function for both sources and reasoning
-
+  /**
+   * Compact sources component
+   * - Shows collapsed summary by default
+   * - Expands to show all sources on click
+   * - Displays favicons and snippets
+   */
   const CompactSources: React.FC<{ id: string; results: SearchResult[]; method?: Message['searchMethod'] }>
     = ({ id, results, method }) => {
     // Always collapsed by default, only expanded if manually clicked
