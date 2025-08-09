@@ -12,8 +12,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
-import { useDebounce } from "../hooks/useDebounce";
-// If a separate throttle hook exists, import it. Otherwise, use a lightweight inline throttle.
+import { useDebounce, useThrottle } from "../hooks/useDebounce";
 import { useRef, useCallback } from "react";
 import { logger } from "../lib/logger";
 import { ChatSidebar } from "./ChatSidebar";
@@ -346,12 +345,7 @@ export function ChatInterface({
 	 * - Prevents UI jank during streaming
 	 * - Only updates if mounted
 	 */
-  // Inline throttle to avoid incorrect import; 50ms minimum interval
-  const throttleRef = useRef<number>(0);
-  const throttledMessageUpdate = useCallback((messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
-    const now = Date.now();
-    if (now - throttleRef.current < 50) return;
-    throttleRef.current = now;
+  const throttledMessageUpdate = useThrottle(useCallback((messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
     if (isMountedRef.current) {
       setLocalMessages((prev) =>
         prev.map((msg) =>
@@ -366,7 +360,7 @@ export function ChatInterface({
         ),
       );
     }
-  }, [setLocalMessages]);
+  }, [setLocalMessages]), 50);
 
 	// Add abort controller for stream cancellation
 	const abortControllerRef = React.useRef<AbortController | null>(null);
