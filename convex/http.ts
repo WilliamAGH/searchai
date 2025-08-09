@@ -14,7 +14,68 @@ interface SearchResult {
 	url: string;
 }
 
+/**
+ * Helper function to add CORS headers to responses
+ */
+function corsResponse(body: string, status = 200) {
+	return new Response(body, {
+		status,
+		headers: {
+			"Content-Type": "application/json",
+			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type",
+		},
+	});
+}
+
 const http = httpRouter();
+
+// Add OPTIONS handler for CORS preflight
+http.route({
+	path: "/api/search",
+	method: "OPTIONS",
+	handler: httpAction(async () => {
+		return new Response(null, {
+			status: 204,
+			headers: {
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+				"Access-Control-Allow-Headers": "Content-Type",
+			},
+		});
+	}),
+});
+
+http.route({
+	path: "/api/scrape",
+	method: "OPTIONS",
+	handler: httpAction(async () => {
+		return new Response(null, {
+			status: 204,
+			headers: {
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+				"Access-Control-Allow-Headers": "Content-Type",
+			},
+		});
+	}),
+});
+
+http.route({
+	path: "/api/ai",
+	method: "OPTIONS",
+	handler: httpAction(async () => {
+		return new Response(null, {
+			status: 204,
+			headers: {
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+				"Access-Control-Allow-Headers": "Content-Type",
+			},
+		});
+	}),
+});
 
 http.route({
 	path: "/api/chat",
@@ -57,10 +118,7 @@ http.route({
 
 			console.log("🔍 SEARCH RESULT:", JSON.stringify(result, null, 2));
 
-			return new Response(JSON.stringify(result), {
-				status: 200,
-				headers: { "Content-Type": "application/json" },
-			});
+			return corsResponse(JSON.stringify(result));
 		} catch (error) {
 			console.error("❌ SEARCH API ERROR:", error);
 			console.error(
@@ -119,10 +177,7 @@ http.route({
 
 			console.log("🌐 SCRAPE RESULT:", JSON.stringify(result, null, 2));
 
-			return new Response(JSON.stringify(result), {
-				status: 200,
-				headers: { "Content-Type": "application/json" },
-			});
+			return corsResponse(JSON.stringify(result));
 		} catch (error) {
 			console.error("❌ SCRAPE API ERROR:", error);
 			console.error(
