@@ -1,3 +1,12 @@
+/**
+ * Root application component
+ * - Auth state management (sign-in/sign-up modals)
+ * - Theme provider wrapper
+ * - Responsive header with branding
+ * - Sidebar toggle for mobile
+ * - Conditional rendering for auth/unauth users
+ */
+
 import { Authenticated, Unauthenticated } from "convex/react";
 import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "sonner";
@@ -5,18 +14,33 @@ import { ChatInterface } from "./components/ChatInterface";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { useState } from "react";
-import { AuthModal } from "./components/AuthModal";
+import { SignInModal } from "./components/SignInModal";
+import { SignUpModal } from "./components/SignUpModal";
 
+/**
+ * Main App component
+ * - Manages auth modal states
+ * - Controls sidebar visibility
+ * - Handles navigation to home
+ */
 export default function App() {
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
+  /**
+   * Toggle sidebar visibility
+   * - Used for mobile menu
+   */
   const toggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);
   };
 
+  /**
+   * Navigate to home (new chat)
+   * - Reloads page to clear state
+   */
   const handleHomeClick = () => {
-    // Navigate to home (new chat)
     window.location.href = '/';
   };
 
@@ -56,14 +80,14 @@ export default function App() {
                 </Authenticated>
                 <Unauthenticated>
                   <button 
-                    onClick={() => setShowAuthModal(true)}
+                    onClick={() => setShowSignUpModal(true)}
                     className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap"
                   >
                     <span className="hidden sm:inline">Sign Up Free</span>
                     <span className="sm:hidden">Sign Up</span>
                   </button>
                   <button 
-                    onClick={() => setShowAuthModal(true)}
+                    onClick={() => setShowSignInModal(true)}
                     className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap"
                   >
                     Sign In
@@ -93,9 +117,21 @@ export default function App() {
           
           <Toaster position="top-center" />
           
-          <AuthModal 
-            isOpen={showAuthModal}
-            onClose={() => setShowAuthModal(false)}
+          <SignInModal 
+            isOpen={showSignInModal}
+            onClose={() => setShowSignInModal(false)}
+            onSwitchToSignUp={() => {
+              setShowSignInModal(false);
+              setShowSignUpModal(true);
+            }}
+          />
+          <SignUpModal 
+            isOpen={showSignUpModal}
+            onClose={() => setShowSignUpModal(false)}
+            onSwitchToSignIn={() => {
+              setShowSignUpModal(false);
+              setShowSignInModal(true);
+            }}
           />
         </div>
       </div>
