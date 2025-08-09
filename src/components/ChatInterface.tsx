@@ -24,6 +24,17 @@ import { SignInModal } from "./SignInModal";
 import { SignUpModal } from "./SignUpModal";
 import { useSwipeable } from 'react-swipeable';
 
+// Topic-change detection constants
+const TOPIC_CHANGE_SIMILARITY_THRESHOLD = 0.2;
+const TOPIC_CHANGE_MIN_WORD_LENGTH = 3;
+const TOPIC_CHANGE_INDICATORS = [
+  /^(now|next|also|another|different|switch|change|new question)/i,
+  /^(what about|how about|tell me about)/i,
+  /^(unrelated|separate|different topic)/i,
+];
+// Planner cooldown (ms)
+const CHAT_COOLDOWN_MS = 20_000;
+
 interface LocalChat {
 	_id: string;
 	title: string;
@@ -162,8 +173,8 @@ export function ChatInterface({
 		
 		// Simple heuristic: Check if the new message has very different keywords
 		// or is asking about something completely different
-		const newWords = new Set(newMessage.toLowerCase().split(/\s+/).filter(w => w.length > 3));
-		const lastWords = new Set(lastUserMessage.content.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+		const newWords = new Set(newMessage.toLowerCase().split(/\s+/).filter(w => w.length > TOPIC_CHANGE_MIN_WORD_LENGTH));
+		const lastWords = new Set(lastUserMessage.content.toLowerCase().split(/\s+/).filter(w => w.length > TOPIC_CHANGE_MIN_WORD_LENGTH));
 		
 		// Calculate overlap
 		const intersection = new Set([...newWords].filter(x => lastWords.has(x)));
@@ -171,15 +182,9 @@ export function ChatInterface({
 		
 		// If similarity is very low, it's likely a topic change
 		// Also check for explicit signals of new topics
-		const topicChangeIndicators = [
-			/^(now|next|also|another|different|switch|change|new question)/i,
-			/^(what about|how about|tell me about)/i,
-			/^(unrelated|separate|different topic)/i
-		];
+		const hasIndicator = TOPIC_CHANGE_INDICATORS.some(pattern => pattern.test(newMessage));
 		
-		const hasIndicator = topicChangeIndicators.some(pattern => pattern.test(newMessage));
-		
-		return similarity < 0.2 || hasIndicator;
+		return similarity < TOPIC_CHANGE_SIMILARITY_THRESHOLD || hasIndicator;
 	}, []);
 
 	// Get all chats (either from Convex or local storage)
@@ -658,15 +663,15 @@ export function ChatInterface({
 					try {
 						while (isReading && isMountedRef.current) {
 							const { done, value } = await reader.read();
-                            if (done) {
+            if (done) {
                                 // If the model streamed no visible content, fall back to a concise answer
                                 if (!accumulatedContent || accumulatedContent.trim().length === 0) {
-                                    if (searchResults && searchResults.length > 0) {
-                                        const top = searchResults[0];
-                                        accumulatedContent = `Google is headquartered at the Googleplex, 1600 Amphitheatre Parkway, Mountain View, California.\n\nTop source: ${top.title} — ${top.url}`;
-                                    } else {
-                                        accumulatedContent = "I'm sorry, I couldn't generate a response this time.";
-                                    }
+                                  if (searchResults && searchResults.length > 0) {
+                                    const topFew = searchResults.slice(0, 3).map(r => `- ${r.title} — ${r.url}`).join("\n");
+                                    accumulatedContent = `I'm sorry, I couldn't complete the streamed response. Here are top sources that may help:\n\n${topFew}`;
+                                  } else {
+                                    accumulatedContent = "I'm sorry, I couldn't generate a response this time.";
+                                  }
                                 }
 								logger.debug("🔄 Streaming completed:", {
 									totalChunks: chunkCount,
@@ -702,12 +707,12 @@ export function ChatInterface({
 									const data = line.slice(6);
                                     if (data === "[DONE]") {
                                         if (!accumulatedContent || accumulatedContent.trim().length === 0) {
-                                            if (searchResults && searchResults.length > 0) {
-                                                const top = searchResults[0];
-                                                accumulatedContent = `Google is headquartered at the Googleplex, 1600 Amphitheatre Parkway, Mountain View, California.\n\nTop source: ${top.title} — ${top.url}`;
-                                            } else {
-                                                accumulatedContent = "I'm sorry, I couldn't generate a response this time.";
-                                            }
+                                          if (searchResults && searchResults.length > 0) {
+                                            const topFew = searchResults.slice(0, 3).map(r => `- ${r.title} — ${r.url}`).join("\n");
+                                            accumulatedContent = `I'm sorry, I couldn't complete the streamed response. Here are top sources that may help:\n\n${topFew}`;
+                                          } else {
+                                            accumulatedContent = "I'm sorry, I couldn't generate a response this time.";
+                                          }
                                         }
 										logger.debug("✅ Streaming finished with [DONE]");
 										// Finalize the message only if component is still mounted
@@ -839,7 +844,7 @@ export function ChatInterface({
 		} catch (error) {
 			// Check if error is due to abort
 			if (error instanceof Error && error.name === 'AbortError') {
-				console.log("Request aborted (component unmounted or navigation)");
+				logger.debug("Request aborted (component unmounted or navigation)");
 				return; // Don't show error message for intentional aborts
 			}
 			
@@ -923,9 +928,11 @@ export function ChatInterface({
       ? localMessages.filter((msg) => msg.chatId === currentChatId)
       : messages || [];
 
-		if (isAuthenticated && typeof currentChatId !== "string") {
+    // Do NOT block sending while a suggestion banner is visible.
+    // If the banner is already open, bypass gating and proceed to send.
+    if (!showFollowUpPrompt && isAuthenticated && typeof currentChatId !== "string") {
 			// Client-side gating before planner call
-			const CHAT_COOLDOWN_MS = 20_000;
+			// Using module-level CHAT_COOLDOWN_MS constant
 			const contentTrim = content.trim();
 			const words = contentTrim.split(/\s+/).filter(Boolean);
 			const estTokens = Math.ceil(contentTrim.length / 4);
@@ -971,7 +978,7 @@ export function ChatInterface({
             return;
           }
         }
-    } else {
+    } else if (!showFollowUpPrompt) {
       if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
         setPendingMessage(content);
         setPlannerHint(undefined);
@@ -1180,7 +1187,14 @@ export function ChatInterface({
         }
       }
     } catch {}
-  }, 350);
+  }, 650);
+
+  // Only forward drafts when meaningful and not generating
+  const handleDraftChange = React.useCallback((draft: string) => {
+    if (isGenerating) return;
+    if (draft.trim().length < 12) return; // avoid popping banner on very short drafts
+    draftAnalyzer(draft);
+  }, [isGenerating, draftAnalyzer]);
 
 	// Auto-create first chat if none exists and not on a chat URL
 	useEffect(() => {
@@ -1263,13 +1277,13 @@ export function ChatInterface({
 						hintReason={plannerHint?.reason}
 						hintConfidence={plannerHint?.confidence}
 					/>
-					<MessageInput
-						onSendMessage={handleSendMessage}
-            onDraftChange={draftAnalyzer}
-						disabled={isGenerating || showFollowUpPrompt}
-						placeholder={isGenerating ? "AI is working..." : showFollowUpPrompt ? "Choose an option above..." : "Ask me anything..."}
-            history={userHistory}
-					/>
+                    <MessageInput
+                        onSendMessage={handleSendMessage}
+                        onDraftChange={handleDraftChange}
+                        disabled={isGenerating}
+                        placeholder={isGenerating ? "AI is working..." : "Ask me anything..."}
+                        history={userHistory}
+                    />
 				</div>
 			</div>
 
