@@ -78,15 +78,36 @@ export function MessageList({
   searchProgress 
 }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [collapsedById, setCollapsedById] = React.useState<Record<string, boolean>>({});
+  const [userHasScrolled, setUserHasScrolled] = React.useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Only auto-scroll if user hasn't manually scrolled up
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isGenerating]);
+    if (!userHasScrolled) {
+      scrollToBottom();
+    }
+  }, [messages, isGenerating, userHasScrolled]);
+
+  // Detect when user scrolls manually
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      // Check if user has scrolled up from the bottom (with 50px threshold)
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setUserHasScrolled(!isAtBottom);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Auto-collapse sources when thinking begins, keep reasoning visible until content starts
   useEffect(() => {
@@ -212,7 +233,22 @@ export function MessageList({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
+      {/* Scroll to bottom button */}
+      {userHasScrolled && messages.length > 0 && (
+        <button
+          onClick={() => {
+            scrollToBottom();
+            setUserHasScrolled(false);
+          }}
+          className="fixed bottom-20 right-4 z-10 p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg transition-all transform hover:scale-105"
+          aria-label="Scroll to bottom"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </button>
+      )}
       {messages.length === 0 ? (
         <div className="flex-1 flex items-center justify-center min-h-[60vh]">
           <div className="text-center max-w-sm sm:max-w-lg px-4 sm:px-6">
