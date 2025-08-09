@@ -11,6 +11,7 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        'container': '0.75rem',
       },
       colors: {
         background: "hsl(var(--background))",
@@ -51,10 +52,9 @@ export default {
         'section': '2rem',
         'container': '1rem',
       },
-      borderRadius: {
-        'container': '0.75rem',
-      },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/container-queries'),
+  ],
 }
