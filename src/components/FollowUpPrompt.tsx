@@ -11,59 +11,65 @@ interface FollowUpPromptProps {
   isOpen: boolean;
   onContinue: () => void;
   onNewChat: () => void;
+  onNewChatWithSummary?: () => void;
   /** Short reason string from planner (already sanitized) */
   hintReason?: string;
   /** Confidence 0-1 from planner */
   hintConfidence?: number;
 }
 
-export function FollowUpPrompt({ isOpen, onContinue, onNewChat, hintReason, hintConfidence }: FollowUpPromptProps) {
+export function FollowUpPrompt({ isOpen, onContinue, onNewChat, onNewChatWithSummary, hintReason, hintConfidence }: FollowUpPromptProps) {
   if (!isOpen) return null;
 
   const confidencePct = typeof hintConfidence === 'number' ? Math.round(hintConfidence * 100) : undefined;
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-50 p-4 animate-slide-up">
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-800 shadow-lg max-w-md mx-auto">
-        <div className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <svg className="w-5 h-5 text-amber-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-                New Question Detected
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                Starting a new chat may yield a cleaner, focused answer.
-              </p>
-              {(hintReason || confidencePct !== undefined) && (
-                <div className="text-[11px] text-amber-700 dark:text-amber-300 mb-3 flex items-center gap-2">
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100/60 dark:bg-amber-900/30 border border-amber-300/60 dark:border-amber-700/60">
-                    {confidencePct !== undefined ? `${confidencePct}%` : ''}
-                  </span>
+    <div role="status" className="w-full px-3 sm:px-4 py-2 animate-slide-up">
+      <div className="w-full border border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200 rounded-md">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="text-sm font-medium">This looks like a new topic.</span>
+          </div>
+          <div className="text-xs text-amber-800/90 dark:text-amber-200/90 sm:flex-1">
+            Starting a new chat can keep results focused. Choose where to continue.
+            {(hintReason || confidencePct !== undefined) && (
+              <span className="ml-2 inline-flex items-center gap-1">
+                {confidencePct !== undefined && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100/60 dark:bg-amber-900/30 border border-amber-300/60 dark:border-amber-700/60 text-[11px]">{confidencePct}%</span>
+                )}
+                {hintReason && (
                   <span className="truncate" title={hintReason}>{hintReason}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onNewChat}
-                  className="flex-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-md transition-colors"
-                >
-                  Start New Chat
-                </button>
-                <button
-                  type="button"
-                  onClick={onContinue}
-                  className="flex-1 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-md transition-colors"
-                >
-                  Continue Here
-                </button>
-              </div>
-            </div>
+                )}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+            <button
+              type="button"
+              onClick={onNewChat}
+              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-md transition-colors w-full sm:w-auto"
+            >
+              Start New Chat
+            </button>
+            {onNewChatWithSummary && (
+              <button
+                type="button"
+                onClick={onNewChatWithSummary}
+                className="px-3 py-1.5 bg-emerald-600/90 hover:bg-emerald-700 text-white text-xs font-medium rounded-md transition-colors w-full sm:w-auto"
+              >
+                New Chat w/ Summary
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onContinue}
+              className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-md transition-colors w-full sm:w-auto"
+            >
+              Continue Here
+            </button>
           </div>
         </div>
       </div>
