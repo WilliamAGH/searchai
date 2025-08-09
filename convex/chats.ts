@@ -1,7 +1,24 @@
+/**
+ * Chat management functions
+ * - CRUD operations for chats/messages
+ * - Share ID generation and lookup
+ * - Auth-based access control
+ * - Rolling summary for context compression
+ */
+
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+/**
+ * Create new chat
+ * - Generates unique share ID
+ * - Associates with authenticated user
+ * - Sets timestamps
+ * @param title - Chat title
+ * @param shareId - Optional custom share ID
+ * @returns Chat ID
+ */
 export const createChat = mutation({
 	args: {
 		title: v.string(),
@@ -27,6 +44,12 @@ export const createChat = mutation({
 	},
 });
 
+/**
+ * Get user's chats
+ * - Returns empty for unauth users
+ * - Ordered by creation desc
+ * @returns Array of user's chats
+ */
 export const getUserChats = query({
 	args: {},
 	handler: async (ctx) => {
@@ -43,6 +66,13 @@ export const getUserChats = query({
 	},
 });
 
+/**
+ * Get chat by ID
+ * - Validates ownership
+ * - Allows anonymous chats
+ * @param chatId - Chat database ID
+ * @returns Chat or null
+ */
 export const getChatById = query({
 	args: { chatId: v.id("chats") },
 	handler: async (ctx, args) => {
@@ -54,10 +84,17 @@ export const getChatById = query({
 		// Allow access to chats without userId (anonymous chats) or user's own chats
 		if (chat.userId && chat.userId !== userId) return null;
 
-		return chat;
+    return chat;
 	},
 });
 
+/**
+ * Get chat by share ID
+ * - For shareable URLs
+ * - Checks sharing permissions
+ * @param shareId - Unique share identifier
+ * @returns Chat or null
+ */
 export const getChatByShareId = query({
 	args: { shareId: v.string() },
 	handler: async (ctx, args) => {
@@ -76,6 +113,13 @@ export const getChatByShareId = query({
 	},
 });
 
+/**
+ * Get chat messages
+ * - Validates chat ownership
+ * - Returns chronological order
+ * @param chatId - Chat database ID
+ * @returns Array of messages
+ */
 export const getChatMessages = query({
 	args: { chatId: v.id("chats") },
 	handler: async (ctx, args) => {
@@ -95,6 +139,13 @@ export const getChatMessages = query({
 	},
 });
 
+/**
+ * Update chat title
+ * - Validates ownership
+ * - Updates timestamp
+ * @param chatId - Chat database ID
+ * @param title - New title
+ */
 export const updateChatTitle = mutation({
 	args: {
 		chatId: v.id("chats"),
@@ -114,6 +165,37 @@ export const updateChatTitle = mutation({
 	},
 });
 
+/**
+ * Update rolling summary for a chat
+ * - Compact summary of latest context (<= ~1-2KB)
+ * - Used by planner to shrink tokens
+ */
+export const updateRollingSummary = mutation({
+  args: {
+    chatId: v.id("chats"),
+    summary: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) throw new Error("Chat not found");
+    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+
+    await ctx.db.patch(args.chatId, {
+      rollingSummary: args.summary.slice(0, 2000),
+      rollingSummaryUpdatedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Share chat publicly/privately
+ * - Sets sharing flags
+ * - Validates ownership
+ * @param chatId - Chat database ID
+ * @param isPublic - Public visibility
+ */
 export const shareChat = mutation({
 	args: {
 		chatId: v.id("chats"),
@@ -134,6 +216,12 @@ export const shareChat = mutation({
 	},
 });
 
+/**
+ * Delete chat and messages
+ * - Cascades to all messages
+ * - Validates ownership
+ * @param chatId - Chat database ID
+ */
 export const deleteChat = mutation({
 	args: { chatId: v.id("chats") },
 	handler: async (ctx, args) => {
