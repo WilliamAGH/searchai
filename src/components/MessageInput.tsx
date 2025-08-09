@@ -1,15 +1,37 @@
+/**
+ * Message input textarea component
+ * - Auto-resizing textarea up to 200px
+ * - Enter to send, Shift+Enter for newline
+ * - Mobile-optimized with proper font sizing
+ * - Disabled state during generation
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 
 interface MessageInputProps {
+  /** Callback when message is sent */
   onSendMessage: (message: string) => void;
+  /** Disable input during generation */
   disabled?: boolean;
+  /** Placeholder text */
   placeholder?: string;
 }
 
+/**
+ * Message input with auto-resize and keyboard shortcuts
+ * @param onSendMessage - Handler for message submission
+ * @param disabled - Prevent input when true
+ * @param placeholder - Input placeholder text
+ */
 export function MessageInput({ onSendMessage, disabled = false, placeholder = "Ask me anything..." }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  /**
+   * Handle form submission
+   * - Trims whitespace
+   * - Clears input after send
+   */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
@@ -18,6 +40,11 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
     }
   };
 
+  /**
+   * Handle keyboard shortcuts
+   * - Enter: send message
+   * - Shift+Enter: newline
+   */
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -25,7 +52,11 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
     }
   };
 
-  // Auto-resize textarea
+  /**
+   * Auto-resize textarea based on content
+   * - Min: 1 row
+   * - Max: 200px height
+   */
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
