@@ -1,5 +1,24 @@
+/**
+ * Search functions
+ * - Public web search providers (SERP, OpenRouter, DuckDuckGo)
+ * - Planner: summarize recent chat, emit focused queries
+ * - Ephemeral cache (in-process) for plan decisions (per chat+message)
+ */
+
 import { v } from "convex/values";
 import { action } from "./_generated/server";
+import { api } from "./_generated/api";
+
+// Ephemeral in-process cache for planner decisions (best-effort only)
+type PlanResult = {
+  shouldSearch: boolean;
+  contextSummary: string;
+  queries: string[];
+  suggestNewChat: boolean;
+  decisionConfidence: number;
+  reasons: string;
+};
+const planCache: Map<string, { expires: number; result: PlanResult }> = new Map();
 
 /**
  * Perform a best-effort web search using available providers.
@@ -107,6 +126,175 @@ export const searchWeb = action({
 			hasRealResults: false,
 		};
 	},
+});
+
+/**
+ * Plan a context-aware web search.
+ * - Summarizes recent chat context
+ * - Optionally calls an LLM to propose focused search queries
+ * - Falls back to a single-query plan using the user's message
+ */
+export const planSearch = action({
+  args: {
+    chatId: v.id("chats"),
+    newMessage: v.string(),
+    maxContextMessages: v.optional(v.number()),
+  },
+  returns: v.object({
+    shouldSearch: v.boolean(),
+    contextSummary: v.string(),
+    queries: v.array(v.string()),
+    suggestNewChat: v.boolean(),
+    decisionConfidence: v.number(),
+    reasons: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    // Cache key: chat + normalized message (first 200 chars)
+    const normMsg = args.newMessage.toLowerCase().trim().slice(0, 200);
+    const cacheKey = `${args.chatId}|${normMsg}`;
+    const now = Date.now();
+    const hit = planCache.get(cacheKey);
+    if (hit && hit.expires > now) {
+      return hit.result;
+    }
+
+    const maxContext = Math.max(1, Math.min(args.maxContextMessages ?? 10, 25));
+
+    // Load recent messages for lightweight context summary
+    const messages = await ctx.runQuery(api.chats.getChatMessages, {
+      chatId: args.chatId,
+    });
+
+    const recent = messages.slice(Math.max(0, messages.length - maxContext));
+    const serialize = (s: string | undefined) => (s || "").replace(/\s+/g, " ").trim();
+
+    // Simple lexical overlap heuristic with last user message
+    const last = recent.length > 0 ? recent[recent.length - 1] : undefined;
+    const lastContent = serialize(last?.content);
+    const newContent = serialize(args.newMessage);
+    const tokenize = (t: string) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+    const a = tokenize(lastContent);
+    const b = tokenize(newContent);
+    const inter = new Set([...a].filter((x) => b.has(x)));
+    const unionSize = new Set([...a, ...b]).size || 1;
+    const jaccard = inter.size / unionSize;
+
+    // Time-based heuristic
+    const lastTs = typeof last?.timestamp === "number" ? last.timestamp : undefined;
+    const minutesGap = lastTs ? Math.floor((Date.now() - lastTs) / 60000) : 0;
+    const timeSuggestNew = minutesGap >= 120;
+
+    // Build a compact rolling summary (no external call)
+    const contextSummary = serialize(
+      recent
+        .map((m) => `${m.role}: ${serialize(m.content)}`)
+        .join(" \n ")
+        .slice(0, 1200),
+    );
+
+    // Default plan if no LLM is available or JSON parsing fails
+    const defaultPlan = {
+      shouldSearch: true,
+      contextSummary,
+      queries: [args.newMessage],
+      suggestNewChat: timeSuggestNew ? true : jaccard < 0.5,
+      decisionConfidence: timeSuggestNew ? 0.85 : 0.65,
+      reasons: `jaccard=${jaccard.toFixed(2)} gapMin=${minutesGap}`,
+    };
+
+    // If no API key present, skip LLM planning
+    if (!process.env.OPENROUTER_API_KEY) {
+      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+      return defaultPlan;
+    }
+
+    // Only call LLM if the topic boundary is ambiguous; otherwise save tokens
+    const borderline = jaccard >= 0.45 && jaccard <= 0.7;
+    if (!borderline) {
+      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+      return defaultPlan;
+    }
+
+    try {
+      const prompt = {
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You plan web searches for a conversational assistant. Return strict JSON only with fields: shouldSearch:boolean, contextSummary:string(<=500 tokens), queries:string[], suggestNewChat:boolean, decisionConfidence:number (0-1), reasons:string. Keep queries de-duplicated, concrete, and specific.",
+          },
+          {
+            role: "user",
+            content: `Recent context (most recent last):\n${contextSummary}\n\nNew message: ${args.newMessage}\n\nReturn JSON only.`,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 600,
+      } as const;
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(prompt),
+      });
+
+      if (!response.ok) {
+        planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+        return defaultPlan;
+      }
+      const data = await response.json();
+      const text: string = data?.choices?.[0]?.message?.content || "";
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        // Some models wrap JSON in code fences; try to extract
+        const match = text.match(/\{[\s\S]*\}/);
+        parsed = match ? JSON.parse(match[0]) : null;
+      }
+
+      if (
+        parsed &&
+        typeof (parsed as any).shouldSearch === "boolean" &&
+        typeof (parsed as any).contextSummary === "string" &&
+        Array.isArray((parsed as any).queries) &&
+        typeof (parsed as any).suggestNewChat === "boolean" &&
+        typeof (parsed as any).decisionConfidence === "number" &&
+        typeof (parsed as any).reasons === "string"
+      ) {
+        const plan = parsed as { shouldSearch: boolean; contextSummary: string; queries: string[]; suggestNewChat: boolean; decisionConfidence: number; reasons: string };
+        // Sanitize queries
+        const queries = Array.from(
+          new Set(
+            plan.queries
+              .map((q) => serialize(q))
+              .filter((q) => q.length > 0)
+              .slice(0, 6),
+          ),
+        );
+        const finalPlan = {
+          shouldSearch: plan.shouldSearch,
+          contextSummary: serialize(plan.contextSummary).slice(0, 2000),
+          queries: queries.length > 0 ? queries : [args.newMessage],
+          suggestNewChat: plan.suggestNewChat,
+          decisionConfidence: Math.max(0, Math.min(1, plan.decisionConfidence)),
+          reasons: serialize(plan.reasons).slice(0, 500),
+        };
+        planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: finalPlan });
+        return finalPlan;
+      }
+      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+      return defaultPlan;
+    } catch {
+      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+      return defaultPlan;
+    }
+  },
 });
 
 interface SearchResult {
