@@ -2,50 +2,121 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { action, internalAction } from "./_generated/server";
 
-// Helper function to handle streaming from OpenRouter
-async function* streamOpenRouter(body: any) {
-	const response = await fetch(
-		"https://openrouter.ai/api/v1/chat/completions",
-		{
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-				"Content-Type": "application/json",
+interface OpenRouterMessage {
+	role: string;
+	content: string;
+	cache_control?: { type: string };
+}
+
+interface OpenRouterBody {
+	model: string;
+	messages: OpenRouterMessage[];
+	temperature: number;
+	max_tokens: number;
+	top_p?: number;
+	frequency_penalty?: number;
+	presence_penalty?: number;
+	stream?: boolean;
+}
+
+// Helper function to handle streaming from OpenRouter with enhanced error reporting
+async function* streamOpenRouter(body: OpenRouterBody) {
+	console.log("🔄 OpenRouter streaming request initiated:", {
+		model: body.model,
+		messageCount: body.messages.length,
+		temperature: body.temperature,
+		max_tokens: body.max_tokens,
+	});
+
+	try {
+		const response = await fetch(
+			"https://openrouter.ai/api/v1/chat/completions",
+			{
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ ...body, stream: true }),
 			},
-			body: JSON.stringify({ ...body, stream: true }),
-		},
-	);
+		);
 
-	if (!response.ok || !response.body) {
-		const errorText = await response.text();
-		throw new Error(`OpenRouter API error: ${response.status} ${errorText}`);
-	}
+		console.log("📊 OpenRouter response received:", {
+			status: response.status,
+			statusText: response.statusText,
+			hasBody: !!response.body,
+		});
 
-	const reader = response.body.getReader();
-	const decoder = new TextDecoder();
-	let buffer = "";
+		if (!response.ok) {
+			const errorText = await response.text();
+			const errorMessage = `OpenRouter API error: ${response.status} ${response.statusText} - ${errorText}`;
+			console.error("❌ OpenRouter API error details:", {
+				status: response.status,
+				statusText: response.statusText,
+				errorText: errorText,
+				url: "https://openrouter.ai/api/v1/chat/completions",
+			});
+			throw new Error(errorMessage);
+		}
 
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) break;
+		if (!response.body) {
+			const errorMessage = "OpenRouter API returned no response body";
+			console.error("❌ OpenRouter API no body error");
+			throw new Error(errorMessage);
+		}
 
-		buffer += decoder.decode(value, { stream: true });
-		const lines = buffer.split("\n");
-		buffer = lines.pop() || "";
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+		let chunkCount = 0;
 
-		for (const line of lines) {
-			if (line.startsWith("data: ")) {
-				const data = line.slice(6);
-				if (data === "[DONE]") {
-					return;
+		console.log("✅ OpenRouter streaming started successfully");
+
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) {
+					console.log("🔄 OpenRouter streaming completed:", {
+						totalChunks: chunkCount,
+					});
+					break;
 				}
-				try {
-					yield JSON.parse(data);
-				} catch (e) {
-					console.error("Failed to parse stream chunk:", e);
+
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split("\n");
+				buffer = lines.pop() || "";
+
+				for (const line of lines) {
+					if (line.startsWith("data: ")) {
+						const data = line.slice(6);
+						if (data === "[DONE]") {
+							console.log("✅ OpenRouter streaming finished with [DONE]");
+							return;
+						}
+						try {
+							chunkCount++;
+							const parsedData = JSON.parse(data);
+							yield parsedData;
+						} catch (e) {
+							console.error("❌ Failed to parse stream chunk:", {
+								error: e instanceof Error ? e.message : "Unknown parsing error",
+								chunk: data,
+								chunkNumber: chunkCount,
+							});
+						}
+					}
 				}
 			}
+		} finally {
+			reader.releaseLock();
 		}
+	} catch (error) {
+		console.error("💥 OpenRouter streaming failed with exception:", {
+			error: error instanceof Error ? error.message : "Unknown error",
+			stack: error instanceof Error ? error.stack : "No stack trace",
+			timestamp: new Date().toISOString(),
+		});
+		throw error;
 	}
 }
 
@@ -89,7 +160,12 @@ export const generationStep = internalAction({
 		userMessage: v.string(),
 	},
 	handler: async (ctx, args) => {
-		let searchResults: any[] = [];
+		let searchResults: Array<{
+			title: string;
+			url: string;
+			snippet: string;
+			relevanceScore?: number;
+		}> = [];
 		let searchContext = "";
 		const sources: string[] = [];
 		let hasRealResults = false;
@@ -111,7 +187,7 @@ export const generationStep = internalAction({
 
 			searchResults = searchResponse.results || [];
 			hasRealResults = searchResponse.hasRealResults || false;
-			searchMethod = searchResponse.searchMethod as any;
+			searchMethod = searchResponse.searchMethod as "serp" | "openrouter" | "duckduckgo" | "fallback";
 
 			await ctx.runMutation(internal.messages.updateMessage, {
 				messageId: args.assistantMessageId,
@@ -125,7 +201,7 @@ export const generationStep = internalAction({
 				// 5. Scrape content from top results
 				const contentPromises = searchResults
 					.slice(0, 3)
-					.map(async (result: any) => {
+					.map(async (result: { url: string; title: string; snippet: string }) => {
 						try {
 							const content = await ctx.runAction(api.search.scrapeUrl, {
 								url: result.url,
@@ -154,14 +230,17 @@ export const generationStep = internalAction({
 			);
 		}
 
-		// 6. Fetch chat history for context
+		// 6. Fetch chat history for context - include ALL previous messages
 		const messages = await ctx.runQuery(api.chats.getChatMessages, {
 			chatId: args.chatId,
 		});
-		const messageHistory = messages.map((m) => ({
-			role: m.role,
-			content: m.content || "",
-		}));
+		// Build full message history, excluding the current assistant message being generated
+		const messageHistory = messages
+			.filter((m) => m._id !== args.assistantMessageId)
+			.map((m) => ({
+				role: m.role,
+				content: m.content || "",
+			}));
 
 		// 7. Generate AI response with streaming
 		await ctx.runMutation(internal.messages.updateMessage, {
@@ -169,43 +248,75 @@ export const generationStep = internalAction({
 			thinking: "Generating response...",
 		});
 
-		let systemPrompt = `You are a helpful AI assistant. Use the following search results to inform your response. Cite sources naturally.\n\nSearch Results:\n${searchContext}\n\n`;
-		if (!hasRealResults) {
+		// Build comprehensive system prompt with ALL context
+		let systemPrompt = `You are a helpful AI assistant. `;
+		
+		if (hasRealResults && searchContext) {
+			systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant.\n\n`;
+			systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
+			systemPrompt += `## Search Metadata:\n`;
+			searchResults.forEach((result: { title: string; url: string; snippet: string }, idx: number) => {
+				systemPrompt += `${idx + 1}. ${result.title}\n   URL: ${result.url}\n   Snippet: ${result.snippet}\n\n`;
+			});
+		} else if (!hasRealResults && searchResults.length > 0) {
+			systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n`;
+			systemPrompt += `## Available Results:\n`;
+			searchResults.forEach((result: { title: string; snippet: string }) => {
+				systemPrompt += `- ${result.title}: ${result.snippet}\n`;
+			});
+		} else {
 			systemPrompt = `You are a helpful AI assistant. Web search was not successful. Provide helpful responses based on your knowledge.`;
 		}
-		systemPrompt += `Provide clear, helpful responses. Format in markdown when appropriate.`;
+		
+		systemPrompt += `\n\nProvide clear, helpful responses. Format in markdown when appropriate. This is a continued conversation, so consider the full context of previous messages.`;
 
 		const openRouterBody = {
-			model: "google/gemini-flash-1.5",
-			messages: [{ role: "system", content: systemPrompt }, ...messageHistory],
+			model: "google/gemini-2.5-flash",
+			messages: [
+				{ 
+					role: "system", 
+					content: systemPrompt,
+					// Enable caching for the system prompt with search context
+					cache_control: searchContext.length > 1000 ? { type: "ephemeral" } : undefined
+				},
+				...messageHistory
+			],
 			temperature: 0.7,
 			max_tokens: 4000,
-			// Caching is implicit for Gemini models on OpenRouter
+			// Enable streaming and caching optimizations
+			top_p: 1,
+			frequency_penalty: 0,
+			presence_penalty: 0,
 		};
 
-		let responseContent = "";
-		let reasoning = "";
+        let responseContent = "";
+        let hasStartedContent = false;
 		try {
 			for await (const chunk of streamOpenRouter(openRouterBody)) {
-				if (chunk.choices[0].delta.content) {
-					responseContent += chunk.choices[0].delta.content;
-					await ctx.runMutation(internal.messages.updateMessage, {
-						messageId: args.assistantMessageId,
-						streamedContent: responseContent,
-					});
-				}
-				if (chunk.choices[0].delta.reasoning) {
-					reasoning += chunk.choices[0].delta.reasoning;
-					await ctx.runMutation(internal.messages.updateMessage, {
-						messageId: args.assistantMessageId,
-						thinking: reasoning,
-					});
+                if (chunk.choices?.[0]?.delta) {
+					if (chunk.choices[0].delta.content) {
+						responseContent += chunk.choices[0].delta.content;
+						if (!hasStartedContent) {
+							hasStartedContent = true;
+							await ctx.runMutation(internal.messages.updateMessage, {
+								messageId: args.assistantMessageId,
+								streamedContent: responseContent,
+								hasStartedContent: true,
+							});
+						} else {
+							await ctx.runMutation(internal.messages.updateMessage, {
+								messageId: args.assistantMessageId,
+								streamedContent: responseContent,
+							});
+						}
+					}
 				}
 			}
 		} catch (error) {
 			console.error("OpenRouter streaming failed:", error);
-			responseContent =
-				"I apologize, but I couldn't generate a response. Please try again.";
+            // Keep any partial content if we had started, otherwise provide a friendly fallback
+            responseContent =
+                responseContent || "I apologize, but I couldn't generate a response. Please try again.";
 			errorDetails.push(
 				`AI generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
@@ -216,8 +327,7 @@ export const generationStep = internalAction({
 			messageId: args.assistantMessageId,
 			content: responseContent,
 			isStreaming: false,
-			thinking: null, // Clear thinking state
-			reasoning,
+			thinking: undefined, // Clear thinking state
 		});
 	},
 });
