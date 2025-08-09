@@ -1,3 +1,10 @@
+/**
+ * AI generation pipeline
+ * - Appends user msg, creates assistant placeholder, streams model output
+ * - Plans context-aware search, scrapes top sources, builds system prompt
+ * - Streams chunks safely with batched DB updates
+ */
+
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { action, internalAction } from "./_generated/server";
