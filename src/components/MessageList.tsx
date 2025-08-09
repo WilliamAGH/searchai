@@ -134,7 +134,7 @@ export function MessageList({
       setUserHasScrolled(!isAtBottom);
     };
 
-    container.addEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -234,17 +234,18 @@ export function MessageList({
         </button>
         {!collapsed && (
           <div className="mt-2 space-y-1 sm:space-y-2 max-w-full overflow-hidden">
-            {results.map((result, idx) => (
+            {results.map((result) => (
               <a 
-                key={idx} 
+                key={result.url} 
                 href={result.url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className={`block p-2 rounded-lg bg-white dark:bg-gray-800 border transition-all duration-200 touch-manipulation overflow-hidden ${
-                  hoveredCitationUrl === result.url 
-                    ? 'border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 ring-2 ring-yellow-400 dark:ring-yellow-600'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 active:border-emerald-400 dark:active:border-emerald-500'
-                }`}
+                className={(() => {
+                  const base = 'block p-2 rounded-lg bg-white dark:bg-gray-800 border transition-all duration-200 touch-manipulation overflow-hidden';
+                  const highlight = 'border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 ring-2 ring-yellow-400 dark:ring-yellow-600';
+                  const normal = 'border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 active:border-emerald-400 dark:active:border-emerald-500';
+                  return `${base} ${hoveredCitationUrl === result.url ? highlight : normal}`;
+                })()}
                 onMouseEnter={() => setHoveredSourceUrl(result.url)}
                 onMouseLeave={() => setHoveredSourceUrl(null)}
               >
