@@ -464,8 +464,9 @@ export function ChatInterface({
 				chatHistory,
 			};
 
+			const aiUrl = resolveApi("/api/ai");
 			console.log("🤖 AI API REQUEST:");
-			console.log("URL:", "/api/ai");
+			console.log("URL:", aiUrl);
 			console.log("Method:", "POST");
 			console.log("Body:", JSON.stringify(aiRequestBody, null, 2));
 
@@ -492,7 +493,7 @@ export function ChatInterface({
 			abortControllerRef.current = new AbortController();
 			
 			const aiStartTime = Date.now();
-            const aiResponse = await fetch(`${apiBase}/api/ai`, {
+            const aiResponse = await fetch(aiUrl, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(aiRequestBody),
