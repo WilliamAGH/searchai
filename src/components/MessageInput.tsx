@@ -15,6 +15,8 @@ interface MessageInputProps {
   disabled?: boolean;
   /** Placeholder text */
   placeholder?: string;
+  /** Optional draft-change callback (debounced in parent) */
+  onDraftChange?: (draft: string) => void;
 }
 
 /**
@@ -23,7 +25,7 @@ interface MessageInputProps {
  * @param disabled - Prevent input when true
  * @param placeholder - Input placeholder text
  */
-export function MessageInput({ onSendMessage, disabled = false, placeholder = "Ask me anything..." }: MessageInputProps) {
+export function MessageInput({ onSendMessage, disabled = false, placeholder = "Ask me anything...", onDraftChange }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -73,7 +75,11 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
             <textarea
               ref={textareaRef}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setMessage(val);
+                if (onDraftChange) onDraftChange(val);
+              }}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={disabled}
