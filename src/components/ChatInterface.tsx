@@ -52,6 +52,9 @@ export function ChatInterface({
     isSidebarOpen?: boolean;
     onToggleSidebar?: () => void;
 }) {
+    // Use Convex site URL for HTTP API endpoints (unauthenticated users)
+    const convexUrl = (import.meta as any).env?.VITE_CONVEX_URL || "";
+    const apiBase = convexUrl.replace('.convex.cloud', '.convex.site');
 	const [currentChatId, setCurrentChatId] = useState<
 		Id<"chats"> | string | null
 	>(null);
@@ -274,7 +277,7 @@ export function ChatInterface({
 			);
 
 			const searchStartTime = Date.now();
-			const searchResponse = await fetch("/api/search", {
+            const searchResponse = await fetch(`${apiBase}/api/search`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ query: message, maxResults: 5 }),
@@ -332,8 +335,8 @@ export function ChatInterface({
 										JSON.stringify({ url: result.url }, null, 2),
 									);
 
-									const scrapeStartTime = Date.now();
-									const scrapeResponse = await fetch("/api/scrape", {
+                                    const scrapeStartTime = Date.now();
+            const scrapeResponse = await fetch(`${apiBase}/api/scrape`, {
 										method: "POST",
 										headers: { "Content-Type": "application/json" },
 										body: JSON.stringify({ url: result.url }),
@@ -477,7 +480,7 @@ export function ChatInterface({
 			abortControllerRef.current = new AbortController();
 			
 			const aiStartTime = Date.now();
-			const aiResponse = await fetch("/api/ai", {
+            const aiResponse = await fetch(`${apiBase}/api/ai`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(aiRequestBody),

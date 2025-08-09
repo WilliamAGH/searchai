@@ -1,6 +1,20 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 
+/**
+ * Perform a best-effort web search using available providers.
+ * Order of attempts:
+ * 1) SERP API (Google via SerpAPI) if SERP_API_KEY is set
+ * 2) OpenRouter web-search capable model if OPENROUTER_API_KEY is set
+ * 3) DuckDuckGo JSON API as a backup
+ * 4) Minimal fallback links
+ *
+ * Args:
+ * - query: The user query string
+ * - maxResults: Optional maximum number of results to return (default 5)
+ *
+ * Returns: { results, searchMethod, hasRealResults }
+ */
 export const searchWeb = action({
 	args: {
 		query: v.string(),
@@ -112,6 +126,10 @@ interface SerpApiResponse {
 }
 
 // SERP API search function using Google engine with enhanced error reporting
+/**
+ * Query SerpAPI (Google engine) to retrieve web results.
+ * Returns a normalized list of SearchResult.
+ */
 async function searchWithSerpApiDuckDuckGo(
 	query: string,
 	maxResults: number,
@@ -217,6 +235,10 @@ interface OpenRouterResponse {
 }
 
 // OpenRouter web search function
+/**
+ * Use OpenRouter to ask an online-capable model for sources and extract URLs.
+ * Returns a normalized list of SearchResult.
+ */
 async function searchWithOpenRouter(
 	query: string,
 	maxResults: number,
@@ -314,6 +336,10 @@ interface SearchResult {
 }
 
 // DuckDuckGo direct API search function
+/**
+ * Call DuckDuckGo's JSON API and normalize results.
+ * Returns a normalized list of SearchResult with reasonable fallbacks.
+ */
 async function searchWithDuckDuckGo(
 	query: string,
 	maxResults: number,
@@ -383,6 +409,15 @@ async function searchWithDuckDuckGo(
 	return results;
 }
 
+/**
+ * Fetch a page and extract a readable, cleaned summary of its content.
+ * Performs lightweight sanitization and truncation to keep payload small.
+ *
+ * Args:
+ * - url: Absolute URL to fetch
+ *
+ * Returns: { title, content, summary }
+ */
 export const scrapeUrl = action({
 	args: { url: v.string() },
 	handler: async (
