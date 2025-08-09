@@ -8,7 +8,7 @@
 
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { action, mutation, query } from "./_generated/server";
+import { action, mutation, query, internalMutation } from "./_generated/server";
 import { api } from "./_generated/api";
 
 /**
@@ -25,6 +25,7 @@ export const createChat = mutation({
 	args: {
 		title: v.string(),
 	},
+  returns: v.id("chats"),
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
 		const now = Date.now();
@@ -32,7 +33,7 @@ export const createChat = mutation({
 		const shareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 		const publicId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-		return await ctx.db.insert("chats", {
+    return await ctx.db.insert("chats", {
 			title: args.title,
 			userId: userId || undefined,
 			shareId,
@@ -52,6 +53,7 @@ export const createChat = mutation({
  */
 export const getUserChats = query({
 	args: {},
+  returns: v.array(v.any()),
 	handler: async (ctx) => {
 		const userId = await getAuthUserId(ctx);
 
@@ -75,6 +77,7 @@ export const getUserChats = query({
  */
 export const getChatById = query({
 	args: { chatId: v.id("chats") },
+  returns: v.union(v.any(), v.null()),
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
 		const chat = await ctx.db.get(args.chatId);
@@ -90,6 +93,7 @@ export const getChatById = query({
 
 export const getChatByOpaqueId = query({
  args: { chatId: v.string() },
+  returns: v.union(v.any(), v.null()),
  handler: async (ctx, args) => {
   const userId = await getAuthUserId(ctx);
   // This is intentionally not using the index.
@@ -113,11 +117,12 @@ export const getChatByOpaqueId = query({
  */
 export const getChatByShareId = query({
 	args: { shareId: v.string() },
+  returns: v.union(v.any(), v.null()),
 	handler: async (ctx, args) => {
 		const chat = await ctx.db
 			.query("chats")
 			.withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
-			.first();
+      .unique();
 
 		if (!chat) return null;
 
@@ -133,6 +138,7 @@ export const getChatByShareId = query({
 
 export const getChatByPublicId = query({
 	args: { publicId: v.string() },
+  returns: v.union(v.any(), v.null()),
 	handler: async (ctx, args) => {
 		const chat = await ctx.db
 			.query("chats")
@@ -158,6 +164,7 @@ export const getChatByPublicId = query({
  */
 export const getChatMessages = query({
 	args: { chatId: v.id("chats") },
+  returns: v.array(v.any()),
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
 		const chat = await ctx.db.get(args.chatId);
@@ -187,6 +194,7 @@ export const updateChatTitle = mutation({
 		chatId: v.id("chats"),
 		title: v.string(),
 	},
+  returns: v.null(),
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
 		const chat = await ctx.db.get(args.chatId);
@@ -206,11 +214,12 @@ export const updateChatTitle = mutation({
  * - Compact summary of latest context (<= ~1-2KB)
  * - Used by planner to shrink tokens
  */
-export const updateRollingSummary = mutation({
+export const updateRollingSummary = internalMutation({
   args: {
     chatId: v.id("chats"),
     summary: v.string(),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
@@ -286,6 +295,7 @@ export const updateChatPrivacy = mutation({
 		chatId: v.id("chats"),
 		privacy: v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
 	},
+  returns: v.null(),
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
 		const chat = await ctx.db.get(args.chatId);
@@ -308,6 +318,7 @@ export const updateChatPrivacy = mutation({
  */
 export const deleteChat = mutation({
 	args: { chatId: v.id("chats") },
+  returns: v.null(),
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
 		const chat = await ctx.db.get(args.chatId);
