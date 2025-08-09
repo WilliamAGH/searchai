@@ -74,10 +74,12 @@ export function ChatInterface({
 	const [localChats, setLocalChats] = useLocalStorage<LocalChat[]>(
 		"searchai_chats",
 		[],
+		{ debounceMs: 800 },
 	);
 	const [localMessages, setLocalMessages] = useLocalStorage<LocalMessage[]>(
 		"searchai_messages",
 		[],
+		{ debounceMs: 800 },
 	);
 
 	const chats = useQuery(api.chats.getUserChats);
@@ -194,25 +196,51 @@ export function ChatInterface({
 	}, [isAuthenticated, createChat, setLocalChats, generateShareId]);
 
 	// Function to call AI API directly for unauthenticated users
+	// Create a ref to track if component is mounted
+	const isMountedRef = React.useRef(true);
+	
+	React.useEffect(() => {
+		isMountedRef.current = true;
+		return () => {
+			isMountedRef.current = false;
+		};
+	}, []);
+	
 	// Throttled update function to prevent excessive re-renders
 	const throttledMessageUpdate = useThrottle(
-		(messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
-			setLocalMessages((prev) =>
-				prev.map((msg) =>
-					msg._id === messageId
-						? {
-								...msg,
-								content,
-								reasoning,
-								hasStartedContent: hasStarted,
-							}
-						: msg,
-				),
-			);
-		},
+		React.useCallback((messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
+			// Only update state if component is still mounted
+			if (isMountedRef.current) {
+				setLocalMessages((prev) =>
+					prev.map((msg) =>
+						msg._id === messageId
+							? {
+									...msg,
+									content,
+									reasoning,
+									hasStartedContent: hasStarted,
+								}
+							: msg,
+					),
+				);
+			}
+		}, []),
 		50 // Throttle to max 20 updates per second
 	);
 
+	// Add abort controller for stream cancellation
+	const abortControllerRef = React.useRef<AbortController | null>(null);
+	
+	// Cleanup on unmount
+	React.useEffect(() => {
+		return () => {
+			// Abort any ongoing streams when component unmounts
+			if (abortControllerRef.current) {
+				abortControllerRef.current.abort();
+			}
+		};
+	}, []);
+	
 	const generateUnauthenticatedResponse = async (
 		message: string,
 		chatId: string,
@@ -445,11 +473,15 @@ export function ChatInterface({
 
 			setLocalMessages((prev) => [...prev, assistantMessage]);
 
+			// Create new abort controller for this request
+			abortControllerRef.current = new AbortController();
+			
 			const aiStartTime = Date.now();
 			const aiResponse = await fetch("/api/ai", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(aiRequestBody),
+				signal: abortControllerRef.current.signal,
 			});
 			const aiDuration = Date.now() - aiStartTime;
 
@@ -472,8 +504,17 @@ export function ChatInterface({
 					let chunkCount = 0;
 					const streamStartTime = Date.now();
 
+					let isReading = true;
+					
+					// Listen for abort signal
+					if (abortControllerRef.current) {
+						abortControllerRef.current.signal.addEventListener('abort', () => {
+							isReading = false;
+						});
+					}
+					
 					try {
-						while (true) {
+						while (isReading && isMountedRef.current) {
 							const { done, value } = await reader.read();
                             if (done) {
                                 // If the model streamed no visible content, fall back to a concise answer
@@ -491,20 +532,22 @@ export function ChatInterface({
 									finalContentLength: accumulatedContent.length,
 									timestamp: new Date().toISOString(),
 								});
-								// Finalize the message
-								setLocalMessages((prev) =>
-									prev.map((msg) =>
-										msg._id === assistantMessageId
-											? {
-													...msg,
-													content: accumulatedContent,
-													reasoning: accumulatedThinking,
-													isStreaming: false,
-													hasStartedContent: true,
-												}
-											: msg,
-									),
-								);
+								// Finalize the message only if component is still mounted
+								if (isMountedRef.current) {
+									setLocalMessages((prev) =>
+										prev.map((msg) =>
+											msg._id === assistantMessageId
+												? {
+															...msg,
+															content: accumulatedContent,
+															reasoning: accumulatedThinking,
+															isStreaming: false,
+															hasStartedContent: true,
+														}
+													: msg,
+										),
+									);
+								}
 								break;
 							}
 
@@ -525,20 +568,22 @@ export function ChatInterface({
                                             }
                                         }
 										console.log("✅ Streaming finished with [DONE]");
-										// Finalize the message
-										setLocalMessages((prev) =>
-											prev.map((msg) =>
-												msg._id === assistantMessageId
-													? {
-															...msg,
-															content: accumulatedContent,
-                                                            reasoning: String(accumulatedThinking || ""),
-															isStreaming: false,
-															hasStartedContent: true,
-														}
-													: msg,
-											),
-										);
+										// Finalize the message only if component is still mounted
+										if (isMountedRef.current) {
+											setLocalMessages((prev) =>
+												prev.map((msg) =>
+													msg._id === assistantMessageId
+														? {
+																...msg,
+																content: accumulatedContent,
+																reasoning: String(accumulatedThinking || ""),
+																isStreaming: false,
+																hasStartedContent: true,
+															}
+														: msg,
+												),
+											);
+										}
 										return;
 									}
 									try {
@@ -576,6 +621,12 @@ export function ChatInterface({
 							}
 						}
 					} catch (streamError) {
+						// Check if error is due to abort
+						if (streamError instanceof Error && streamError.name === 'AbortError') {
+							console.log("Stream aborted (component unmounted or navigation)");
+							return; // Don't show error message for intentional aborts
+						}
+						
 						console.error("💥 Stream reading error:", {
 							error: streamError instanceof Error ? streamError.message : "Unknown streaming error",
 							stack: streamError instanceof Error ? streamError.stack : "No stack trace",
@@ -583,19 +634,21 @@ export function ChatInterface({
 							chunkCount: chunkCount,
 							timestamp: new Date().toISOString(),
 						});
-						// Fallback to error message
-						setLocalMessages((prev) =>
-							prev.map((msg) =>
-								msg._id === assistantMessageId
-									? {
-											...msg,
-                                            content:
-                                                accumulatedContent || "I apologize, but I encountered an error while streaming the response. Please try again.",
-											isStreaming: false,
-										}
-									: msg,
-							),
-						);
+						// Fallback to error message only if component is still mounted
+						if (isMountedRef.current) {
+							setLocalMessages((prev) =>
+								prev.map((msg) =>
+									msg._id === assistantMessageId
+										? {
+												...msg,
+												content:
+													accumulatedContent || "I apologize, but I encountered an error while streaming the response. Please try again.",
+												isStreaming: false,
+											}
+										: msg,
+								),
+							);
+						}
 					} finally {
 						reader.releaseLock();
 					}
@@ -612,19 +665,21 @@ export function ChatInterface({
 						"I apologize, but I couldn't generate a response. Please try again.";
 					const reasoningTokens = aiData.reasoning || null;
 
-					// Update the placeholder message
-					setLocalMessages((prev) =>
-						prev.map((msg) =>
-							msg._id === assistantMessageId
-								? {
-										...msg,
-										content: responseContent,
-										reasoning: reasoningTokens,
-										isStreaming: false,
-									}
-								: msg,
-						),
-					);
+					// Update the placeholder message only if component is still mounted
+					if (isMountedRef.current) {
+						setLocalMessages((prev) =>
+							prev.map((msg) =>
+								msg._id === assistantMessageId
+									? {
+											...msg,
+											content: responseContent,
+											reasoning: reasoningTokens,
+											isStreaming: false,
+										}
+									: msg,
+							),
+						);
+					}
 				}
 			} else {
 				const aiErrorData = await aiResponse.text();
@@ -640,6 +695,12 @@ export function ChatInterface({
 				throw new Error(`AI API failed with status ${aiResponse.status} ${aiResponse.statusText}`);
 			}
 		} catch (error) {
+			// Check if error is due to abort
+			if (error instanceof Error && error.name === 'AbortError') {
+				console.log("Request aborted (component unmounted or navigation)");
+				return; // Don't show error message for intentional aborts
+			}
+			
 			console.error("💥 AI generation failed with exception:", {
 				error: error instanceof Error ? error.message : "Unknown error",
 				stack: error instanceof Error ? error.stack : "No stack trace",
@@ -692,7 +753,9 @@ export function ChatInterface({
 				hasRealResults: hasRealResults,
 			};
 
-			setLocalMessages((prev) => [...prev, aiMessage]);
+			if (isMountedRef.current) {
+				setLocalMessages((prev) => [...prev, aiMessage]);
+			}
 		}
 	};
 
