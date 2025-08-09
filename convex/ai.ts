@@ -1,3 +1,4 @@
+"use node";
 /**
  * AI generation pipeline
  * - Appends user msg, creates assistant placeholder, streams model output
