@@ -431,7 +431,7 @@ export function ChatInterface({
 				systemPrompt += `Web search is unavailable. Provide helpful responses based on your knowledge. `;
 			}
 
-			systemPrompt += `\n\nProvide clear, helpful responses. Format in markdown when appropriate. This is a continued conversation, so consider the full context of previous messages.`;
+            systemPrompt += `\n\nProvide clear, helpful responses. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;
 
 			// Get chat history for context
 			const chatHistory = localMessages

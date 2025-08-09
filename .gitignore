@@ -14,8 +14,6 @@ dist-ssr
 .env
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
 .idea
 .DS_Store
 *.suo
@@ -25,4 +23,3 @@ dist-ssr
 *.sw?
 
 # Ignored for the template, you probably want to remove it:
-package-lock.json

@@ -307,8 +307,8 @@ http.route({
 			console.log("🔄 Attempting OpenRouter API call with streaming...");
 			
 			// Build message history including system prompt and chat history
-			const messages = [
-				{ role: "system", content: systemPrompt },
+            const messages = [
+                { role: "system", content: `${systemPrompt}\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.` },
 				...(chatHistory || []),
 				{ role: "user", content: message },
 			];
