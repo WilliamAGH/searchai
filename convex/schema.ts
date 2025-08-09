@@ -1,8 +1,22 @@
+/**
+ * Database schema definition
+ * - Chat/message storage
+ * - User preferences
+ * - Analytics metrics
+ * - Auth tables from Convex Auth
+ */
+
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 const applicationTables = {
+  /**
+   * Chats table
+   * - User conversations
+   * - Share IDs for URLs
+   * - Rolling summaries for context
+   */
   chats: defineTable({
     title: v.string(),
     userId: v.optional(v.id("users")),
@@ -11,10 +25,20 @@ const applicationTables = {
     isPublic: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
+    // Rolling, compact summary of recent context for token efficiency
+    rollingSummary: v.optional(v.string()),
+    rollingSummaryUpdatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_share_id", ["shareId"]),
 
+  /**
+   * Messages table
+   * - Chat messages (user/assistant)
+   * - Search results metadata
+   * - Streaming state tracking
+   * - Reasoning/thinking tokens
+   */
   messages: defineTable({
     chatId: v.id('chats'),
     role: v.union(v.literal('user'), v.literal('assistant'), v.literal('system')),
@@ -30,6 +54,25 @@ const applicationTables = {
     timestamp: v.optional(v.number()),
   }).index('by_chatId', ['chatId']),
 
+  /**
+   * Metrics table
+   * - Daily aggregated counters
+   * - Planner events
+   * - User behavior tracking
+   */
+  metrics: defineTable({
+    name: v.string(),
+    date: v.string(), // YYYY-MM-DD
+    chatId: v.optional(v.id('chats')),
+    count: v.number(),
+  }).index('by_name_and_date', ['name', 'date']),
+
+  /**
+   * User preferences
+   * - Theme settings
+   * - Search configuration
+   * - Per-user customization
+   */
   preferences: defineTable({
     userId: v.string(),
     theme: v.union(v.literal("light"), v.literal("dark"), v.literal("system")),
@@ -39,6 +82,11 @@ const applicationTables = {
     .index("by_user", ["userId"]),
 };
 
+/**
+ * Complete schema export
+ * - Merges auth tables
+ * - Includes app tables
+ */
 export default defineSchema({
   ...authTables,
   ...applicationTables,
