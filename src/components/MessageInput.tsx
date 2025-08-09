@@ -47,16 +47,12 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
               placeholder={placeholder}
               disabled={disabled}
               rows={1}
-              className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-hidden message-input-textarea"
-              style={{ 
-                minHeight: '52px',
-                maxHeight: '200px',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-hidden message-input-textarea message-textarea"
             />
             <button
               type="submit"
+              aria-label="Send message"
+              title="Send message"
               disabled={!message.trim() || disabled}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-colors"
             >
