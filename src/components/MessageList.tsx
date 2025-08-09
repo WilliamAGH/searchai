@@ -9,7 +9,7 @@
 import React, { useEffect, useRef } from 'react';
 import { SearchProgress } from './SearchProgress';
 import { ReasoningDisplay } from './ReasoningDisplay';
-import { MarkdownWithCitations } from './MarkdownWithCitations';
+import { ContentWithCitations } from './ContentWithCitations';
 
 /**
  * Extract hostname from URL safely
@@ -377,7 +377,7 @@ export function MessageList({
                 {/* 4) AI/user content last – always appears under sources/thinking */}
                 <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden">
                   {message.role === 'assistant' ? (
-                    <MarkdownWithCitations
+                    <ContentWithCitations
                       content={message.content || ""}
                       searchResults={safeResults}
                       hoveredSourceUrl={hoveredSourceUrl}
