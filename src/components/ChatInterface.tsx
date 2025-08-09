@@ -54,7 +54,15 @@ export function ChatInterface({
 }) {
     // Use Convex site URL for HTTP API endpoints (unauthenticated users)
     const convexUrl = (import.meta as any).env?.VITE_CONVEX_URL || "";
-    const apiBase = convexUrl.replace('.convex.cloud', '.convex.site');
+    // Replace .cloud with .site and normalize to remove trailing slashes
+    const apiBase = convexUrl.replace('.convex.cloud', '.convex.site').replace(/\/+$/, '');
+    
+    // Helper function to build API URLs without double slashes
+    const resolveApi = (path: string) => {
+        const segment = path.startsWith('/') ? path.slice(1) : path;
+        return apiBase ? `${apiBase}/${segment}` : `/${segment}`;
+    };
+    
 	const [currentChatId, setCurrentChatId] = useState<
 		Id<"chats"> | string | null
 	>(null);
@@ -268,8 +276,9 @@ export function ChatInterface({
 				message: "Searching the web for relevant information...",
 			});
 
+			const searchUrl = resolveApi("/api/search");
 			console.log("🔍 SEARCH API REQUEST:");
-			console.log("URL:", "/api/search");
+			console.log("URL:", searchUrl);
 			console.log("Method:", "POST");
 			console.log(
 				"Body:",
@@ -277,10 +286,11 @@ export function ChatInterface({
 			);
 
 			const searchStartTime = Date.now();
-            const searchResponse = await fetch(`${apiBase}/api/search`, {
+            const searchResponse = await fetch(searchUrl, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ query: message, maxResults: 5 }),
+				signal: abortControllerRef.current?.signal,
 			});
 			const searchDuration = Date.now() - searchStartTime;
 
