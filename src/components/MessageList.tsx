@@ -1,4 +1,9 @@
 import React, { useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+import rehypeSanitize from 'rehype-sanitize';
+import { defaultSchema } from 'hast-util-sanitize';
 import { SearchProgress } from './SearchProgress';
 import { ReasoningDisplay } from './ReasoningDisplay';
 
@@ -82,35 +87,59 @@ export function MessageList({
     scrollToBottom();
   }, [messages, isGenerating]);
 
-  // Auto-collapse sources when assistant starts generating content
+  // Auto-collapse sources when thinking begins, keep reasoning visible until content starts
   useEffect(() => {
-    messages.forEach((m) => {
-      const id = m._id || String(messages.indexOf(m));
-      if (!id) return;
+    setCollapsedById(prev => {
+      const updates: Record<string, boolean> = {};
       
-      // Only set initial collapsed state if not already set
-      if (m.role === 'assistant' && m.searchResults && m.searchResults.length > 0) {
-        if (collapsedById[id] === undefined) {
-          // Start with sources collapsed when content starts streaming
-          const shouldCollapse = m.hasStartedContent || m.isStreaming || m.content;
-          setCollapsedById(prev => {
-            if (prev[id] === undefined) {
-              return { ...prev, [id]: shouldCollapse };
-            }
-            return prev;
-          });
+      messages.forEach((m, index) => {
+        const id = m._id || String(index);
+        if (!id || m.role !== 'assistant') return;
+        
+        // Check if this message has reasoning or content or is streaming
+        const hasReasoning = Boolean(m.reasoning && m.reasoning.trim());
+        const hasContent = Boolean(m.content && m.content.trim());
+        const isStreaming = Boolean(m.isStreaming);
+        
+        // Sources should collapse immediately when streaming begins (AI starts responding)
+        if (m.searchResults && m.searchResults.length > 0) {
+          const sourceId = id;
+          // Only set if not already manually toggled by user
+          if (prev[sourceId] === undefined) {
+            // Collapse sources when streaming starts OR reasoning OR content exists
+            updates[sourceId] = isStreaming || hasReasoning || hasContent;
+          }
         }
+        
+        // Reasoning should only collapse when actual content starts
+        if (hasReasoning) {
+          const reasoningId = `reasoning-${id}`;
+          // Only set if not already manually toggled by user
+          if (prev[reasoningId] === undefined) {
+            // Keep reasoning expanded until content appears
+            updates[reasoningId] = hasContent;
+          }
+        }
+      });
+      
+      // Only update if there are changes
+      if (Object.keys(updates).length > 0) {
+        return { ...prev, ...updates };
       }
+      return prev;
     });
-  }, [messages]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [messages]); // Remove collapsedById from deps to prevent loops
 
   const toggleCollapsed = (id: string) => {
     setCollapsedById(prev => ({ ...prev, [id]: !prev[id] }));
   };
+  
+  // Use the same toggle function for both sources and reasoning
 
   const CompactSources: React.FC<{ id: string; results: SearchResult[]; method?: Message['searchMethod'] }>
     = ({ id, results, method }) => {
-    const collapsed = collapsedById[id] ?? true; // Default to collapsed
+    // Always collapsed by default, only expanded if manually clicked
+    const collapsed = collapsedById[id] ?? true;
     const hostnames = results.map(r => getSafeHostname(r.url) || r.url).filter(Boolean);
     const summary = hostnames.slice(0, 3).join(' · ');
 
@@ -229,6 +258,7 @@ export function MessageList({
                    (r) => r && typeof r.url === 'string' && typeof r.title === 'string'
                  )
                : [];
+             
              return (
             <div key={message._id || index} className="flex gap-2 sm:gap-4 max-w-full overflow-hidden">
               <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center">
@@ -252,16 +282,64 @@ export function MessageList({
                   <CompactSources id={message._id || String(index)} results={safeResults} method={message.searchMethod} />
                 )}
 
-                {/* 2) Reasoning / thinking */}
-                {message.role === 'assistant' && message.reasoning && (
-                  <ReasoningDisplay reasoning={message.reasoning} />
+                {/* 2) Reasoning / thinking - positioned below sources */}
+                {message.role === 'assistant' && message.reasoning && message.reasoning.trim() && (
+                  <ReasoningDisplay 
+                    id={message._id || String(index)}
+                    reasoning={message.reasoning}
+                    isStreaming={message.isStreaming}
+                    hasStartedContent={message.hasStartedContent}
+                    collapsed={collapsedById[`reasoning-${message._id || String(index)}`] ?? false}
+                    onToggle={toggleCollapsed}
+                  />
                 )}
 
-                {/* 3) AI/user content last – always appears under sources/thinking */}
+                {/* 4) AI/user content last – always appears under sources/thinking */}
                 <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden">
-                  <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed break-words">
-                    {message.content}
-                  </div>
+                  {message.role === 'assistant' ? (
+                    (() => {
+                      const baseTags = defaultSchema.tagNames ?? [];
+                      const baseAttrs = defaultSchema.attributes ?? {};
+                      const sanitizeSchema: any = {
+                        ...defaultSchema,
+                        tagNames: [
+                          ...baseTags,
+                          'u',
+                          'table','thead','tbody','tr','th','td',
+                          'blockquote','hr','strong','em','del','br','p','ul','ol','li','pre','code','h1','h2','h3','h4','h5','h6'
+                        ],
+                        attributes: {
+                          ...baseAttrs,
+                          a: [
+                            'href', 'target', 'rel'
+                          ],
+                          code: [
+                            ['className']
+                          ]
+                        }
+                      };
+                      return (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm, remarkBreaks]}
+                      rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
+                      components={{
+                        a: ({ _node, ...props }) => (
+                          <a {...props} target="_blank" rel="noopener noreferrer" />
+                        ),
+                        code: ({ _inline, className, children, ...props }) => (
+                          <code className={className} {...props}>{String(children)}</code>
+                        )
+                      }}
+                    >
+                      {message.content || ""}
+                    </ReactMarkdown>
+                      );
+                    })()
+                  ) : (
+                    <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed break-words">
+                      {message.content}
+                    </div>
+                  )}
                 </div>
                 
                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-3">
@@ -271,7 +349,32 @@ export function MessageList({
             </div>
            )})}
           
-          {isGenerating && searchProgress && (
+          {/* Show "AI is thinking" when in generating stage */}
+          {isGenerating && searchProgress && searchProgress.stage === 'generating' && (
+            <div className="flex gap-2 sm:gap-4">
+              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>AI is thinking and generating response...</span>
+                  <div className="flex space-x-1">
+                    <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:0ms]"></div>
+                    <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:100ms]"></div>
+                    <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:200ms]"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Show search progress for non-generating stages */}
+          {isGenerating && searchProgress && searchProgress.stage !== 'generating' && (
             <SearchProgress progress={searchProgress} />
           )}
         </div>
