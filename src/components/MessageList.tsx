@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeSanitize from 'rehype-sanitize';
 import { defaultSchema } from 'hast-util-sanitize';
+import type { Schema } from 'hast-util-sanitize';
 import { SearchProgress } from './SearchProgress';
 import { ReasoningDisplay } from './ReasoningDisplay';
 
@@ -300,7 +301,7 @@ export function MessageList({
                     (() => {
                       const baseTags = defaultSchema.tagNames ?? [];
                       const baseAttrs = defaultSchema.attributes ?? {};
-                      const sanitizeSchema: any = {
+                      const sanitizeSchema: Schema = {
                         ...defaultSchema,
                         tagNames: [
                           ...baseTags,
@@ -314,7 +315,7 @@ export function MessageList({
                             'href', 'target', 'rel'
                           ],
                           code: [
-                            ['className']
+                            'className'
                           ]
                         }
                       };
