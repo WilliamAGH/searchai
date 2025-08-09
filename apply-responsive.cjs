@@ -117,21 +117,30 @@ updateFile('./src/components/ShareModal.tsx', [
   }
 ]);
 
-// 6. Update AuthModal.tsx with responsive classes
-updateFile('./src/components/AuthModal.tsx', [
-  {
-    find: 'className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8',
-    replace: 'className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm sm:max-w-md w-full mx-4 p-6 sm:p-8'
-  },
-  {
-    find: 'className="w-16 h-16 mx-auto mb-4',
-    replace: 'className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4'
-  },
-  {
-    find: 'className="text-2xl font-bold',
-    replace: 'className="text-xl sm:text-2xl font-bold'
+// 6. Update AuthModal.tsx with responsive classes (if present)
+try {
+  const authModalPath = './src/components/AuthModal.tsx';
+  if (fs.existsSync(authModalPath)) {
+    updateFile(authModalPath, [
+      {
+        find: 'className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8',
+        replace: 'className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm sm:max-w-md w-full mx-4 p-6 sm:p-8'
+      },
+      {
+        find: 'className="w-16 h-16 mx-auto mb-4',
+        replace: 'className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4'
+      },
+      {
+        find: 'className="text-2xl font-bold',
+        replace: 'className="text-xl sm:text-2xl font-bold'
+      }
+    ]);
+  } else {
+    console.log('ℹ️  AuthModal.tsx not found; skipping responsive updates for it');
   }
-]);
+} catch (e) {
+  console.log('⚠️  Could not update AuthModal.tsx (optional):', e?.message || e);
+}
 
 // 7. Update ChatSidebar.tsx for mobile
 updateFile('./src/components/ChatSidebar.tsx', [
