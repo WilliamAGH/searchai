@@ -291,25 +291,55 @@ export const generationStep = internalAction({
 
         let responseContent = "";
         let hasStartedContent = false;
+        let updateBuffer = "";
+        let lastUpdateTime = Date.now();
+        const UPDATE_INTERVAL_MS = 100; // Batch updates every 100ms to avoid race conditions
+        
 		try {
 			for await (const chunk of streamOpenRouter(openRouterBody)) {
                 if (chunk.choices?.[0]?.delta) {
 					if (chunk.choices[0].delta.content) {
 						responseContent += chunk.choices[0].delta.content;
-						if (!hasStartedContent) {
-							hasStartedContent = true;
-							await ctx.runMutation(internal.messages.updateMessage, {
-								messageId: args.assistantMessageId,
-								streamedContent: responseContent,
-								hasStartedContent: true,
-							});
-						} else {
-							await ctx.runMutation(internal.messages.updateMessage, {
-								messageId: args.assistantMessageId,
-								streamedContent: responseContent,
-							});
+						updateBuffer += chunk.choices[0].delta.content;
+						
+						const now = Date.now();
+						const shouldUpdate = now - lastUpdateTime >= UPDATE_INTERVAL_MS || !hasStartedContent;
+						
+						if (shouldUpdate && updateBuffer) {
+							try {
+								if (!hasStartedContent) {
+									hasStartedContent = true;
+									await ctx.runMutation(internal.messages.updateMessage, {
+										messageId: args.assistantMessageId,
+										streamedContent: responseContent,
+										hasStartedContent: true,
+									});
+								} else {
+									await ctx.runMutation(internal.messages.updateMessage, {
+										messageId: args.assistantMessageId,
+										streamedContent: responseContent,
+									});
+								}
+								updateBuffer = "";
+								lastUpdateTime = now;
+							} catch (mutationError) {
+								// Log but don't fail the entire stream
+								console.error("Failed to update message during streaming:", mutationError);
+							}
 						}
 					}
+				}
+			}
+			
+			// Final update with any remaining buffer
+			if (updateBuffer) {
+				try {
+					await ctx.runMutation(internal.messages.updateMessage, {
+						messageId: args.assistantMessageId,
+						streamedContent: responseContent,
+					});
+				} catch (finalUpdateError) {
+					console.error("Failed final message update:", finalUpdateError);
 				}
 			}
 		} catch (error) {
