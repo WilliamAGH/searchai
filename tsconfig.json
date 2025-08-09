@@ -8,8 +8,10 @@
     "baseUrl": ".",
     "strict": true,
     "forceConsistentCasingInFileNames": true,
+    "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/*"]
     }
-  }
+  },
+  "exclude": ["node_modules"]
 }
