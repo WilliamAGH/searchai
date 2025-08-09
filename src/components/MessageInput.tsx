@@ -36,7 +36,7 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
 
   return (
     <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-      <div className="max-w-4xl mx-auto p-4">
+      <div className="max-w-4xl mx-auto p-3 sm:p-4">
         <form onSubmit={handleSubmit}>
           <div className="relative flex items-end">
             <textarea
@@ -47,7 +47,7 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
               placeholder={placeholder}
               disabled={disabled}
               rows={1}
-              className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-hidden message-input-textarea"
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-hidden message-input-textarea"
               style={{ 
                 minHeight: '52px',
                 maxHeight: '200px',
