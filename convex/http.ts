@@ -395,7 +395,7 @@ http.route({
                             // SSE comment line; ignored by client parser but keeps connections alive
                             try {
 								controller.enqueue(new TextEncoder().encode(`: keepalive ${Date.now()}\n\n`));
-							} catch (_) {
+							} catch {
 								// Controller might be closed, stop pinging
 								clearInterval(pingIntervalId);
 							}
@@ -407,7 +407,7 @@ http.route({
 							isStreamActive = false;
 							try {
 								controller.error(new Error("OpenRouter stream timeout after 120 seconds"));
-							} catch (_) {
+							} catch {
 								// Controller might already be closed
 							}
                         }, 120000);
@@ -419,7 +419,7 @@ http.route({
 							clearInterval(pingIntervalId);
 							try {
 								reader.releaseLock();
-							} catch (_) {
+							} catch {
 								// Reader might already be released
 							}
 						};
@@ -444,7 +444,7 @@ http.route({
 									isStreamActive = false;
 									try {
 										controller.error(new Error("OpenRouter stream timeout after 120 seconds"));
-									} catch (_) {
+									} catch {
 										// Controller might already be closed
 									}
                                 }, 120000);
@@ -481,7 +481,7 @@ http.route({
 													`data: ${JSON.stringify(streamData)}\n\n`
 												)
 											);
-										} catch (_) {
+										} catch (e) {
 											console.error("❌ Failed to parse stream chunk:", {
 												error: e instanceof Error ? e.message : "Unknown parsing error",
 												chunk: data,
@@ -501,7 +501,7 @@ http.route({
 							});
 							try {
 								controller.error(error);
-							} catch (_) {
+							} catch {
 								// Controller might already be closed
 							}
 						} finally {
