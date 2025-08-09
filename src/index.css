@@ -294,6 +294,22 @@ html.dark .prose code {
   @apply my-4 border-gray-300 dark:border-gray-700;
 }
 
+/* Animation for follow-up prompt */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
 /* Hide scrollbar on message input textarea */
 .message-input-textarea::-webkit-scrollbar {
   display: none;
