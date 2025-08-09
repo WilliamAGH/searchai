@@ -61,26 +61,14 @@ export function MarkdownWithCitations({
     // Replace [domain.com] with custom markers that survive markdown processing
     const citationRegex = /\[([^\]]+(?:\.[^\]]+)+)\]/g;
     
-    // Debug logging
-    console.log('Citation processing:', {
-      contentLength: content.length,
-      domainMap: Array.from(domainToUrlMap.entries()),
-      contentPreview: content.substring(0, 200)
-    });
-    
     const processed = content.replace(citationRegex, (match, domain) => {
-      console.log('Found citation:', { match, domain });
       const url = domainToUrlMap.get(domain);
       if (url) {
         // Use a special marker that won't be escaped by markdown
-        console.log('Replacing with marker for:', domain);
         return `@@CITATION@@${domain}@@${url}@@`;
       }
-      console.log('No URL found for domain:', domain);
       return match;
     });
-    
-    console.log('Processed content preview:', processed.substring(0, 200));
     return processed;
   }, [content, domainToUrlMap]);
 
@@ -116,10 +104,8 @@ export function MarkdownWithCitations({
           const processChildren = (children: React.ReactNode): React.ReactNode => {
             return React.Children.map(children, (child) => {
               if (typeof child === 'string') {
-                console.log('Processing paragraph text:', child.substring(0, 100));
                 // Process citation markers in text
                 const parts = child.split(/@@CITATION@@([^@]+)@@([^@]+)@@/);
-                console.log('Split parts:', parts.length, parts);
                 const result: React.ReactNode[] = [];
                 
                 for (let i = 0; i < parts.length; i++) {
@@ -138,14 +124,12 @@ export function MarkdownWithCitations({
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`
-                          inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium
-                          transition-all duration-200 no-underline align-baseline
-                          ${isHighlighted 
-                            ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600' 
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300'
-                          }
-                        `}
+                        className={(() => {
+                          const base = 'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline';
+                          const highlight = 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600';
+                          const normal = 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300';
+                          return `${base} ${isHighlighted ? highlight : normal}`;
+                        })()}
                         onMouseEnter={() => onCitationHover?.(url)}
                         onMouseLeave={() => onCitationHover?.(null)}
                         onClick={(e) => e.stopPropagation()}
@@ -202,14 +186,12 @@ export function MarkdownWithCitations({
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`
-                          inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium
-                          transition-all duration-200 no-underline align-baseline
-                          ${isHighlighted 
-                            ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600' 
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300'
-                          }
-                        `}
+                        className={(() => {
+                          const base = 'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline';
+                          const highlight = 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600';
+                          const normal = 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300';
+                          return `${base} ${isHighlighted ? highlight : normal}`;
+                        })()}
                         onMouseEnter={() => onCitationHover?.(url)}
                         onMouseLeave={() => onCitationHover?.(null)}
                         onClick={(e) => e.stopPropagation()}
