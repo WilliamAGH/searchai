@@ -95,7 +95,13 @@ http.route({
 			model: openai("gpt-4-turbo"),
 			messages,
 		});
-		return result.toTextStreamResponse();
+    // Add CORS headers to the streaming response
+    const base = result.toTextStreamResponse();
+    const headers = new Headers(base.headers);
+    headers.set("Access-Control-Allow-Origin", "*");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    headers.set("Cache-Control", "no-cache, no-transform");
+    return new Response(base.body, { status: base.status, headers });
 	}),
 });
 
