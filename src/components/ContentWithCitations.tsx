@@ -1,11 +1,11 @@
 /**
- * Post-processes rendered content to add interactive citations
- * - Finds [domain.com] patterns in rendered HTML
- * - Converts them to interactive citation links
- * - Handles hover highlighting
+ * Adds interactive citations without DOM mutation
+ * - Converts [domain.com] patterns to markdown links when domain maps to a source URL
+ * - Renders anchors with hover callbacks and highlight state
+ * - Avoids direct DOM manipulation to prevent React reconciliation errors
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -58,155 +58,15 @@ export function ContentWithCitations({
     return map;
   }, [searchResults]);
 
-  // Process citations after content is rendered
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    // Small delay to ensure React has finished rendering
-    const timeoutId = setTimeout(() => {
-      if (!containerRef.current) return;
-
-      console.log('Processing citations in:', containerRef.current.textContent?.substring(0, 200));
-      console.log('Domain map:', Array.from(domainToUrlMap.entries()));
-
-      // Find all text nodes that contain [domain.com] patterns
-      const citationRegex = /\[([^\]]+(?:\.[^\]]+)+)\]/g;
-      const walker = document.createTreeWalker(
-        containerRef.current,
-        NodeFilter.SHOW_TEXT,
-        null
-      );
-
-      const textNodes: Text[] = [];
-      let node;
-      while ((node = walker.nextNode())) {
-        if (node.textContent) {
-          // Reset regex for test
-          citationRegex.lastIndex = 0;
-          if (citationRegex.test(node.textContent)) {
-            console.log('Found text node with citation:', node.textContent.substring(0, 100));
-            textNodes.push(node as Text);
-          }
-        }
-      }
-
-      console.log('Found text nodes with citations:', textNodes.length);
-
-    // Process each text node
-    textNodes.forEach(textNode => {
-      const text = textNode.textContent || '';
-      const parent = textNode.parentNode;
-      if (!parent) return;
-
-      // Reset regex for each use
-      citationRegex.lastIndex = 0;
-      
-      const fragments: (string | HTMLElement)[] = [];
-      let lastIndex = 0;
-      let match;
-
-      while ((match = citationRegex.exec(text)) !== null) {
-        // Add text before the citation
-        if (match.index > lastIndex) {
-          fragments.push(text.substring(lastIndex, match.index));
-        }
-
-        const citedDomain = match[1];
-        const matchedUrl = domainToUrlMap.get(citedDomain);
-
-        if (matchedUrl) {
-          // Create citation link element
-          const link = document.createElement('a');
-          link.href = matchedUrl;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          link.className = `inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300`;
-          link.setAttribute('data-citation-url', matchedUrl);
-          
-          // Add hover handlers
-          link.addEventListener('mouseenter', () => {
-            onCitationHover?.(matchedUrl);
-            link.classList.remove('bg-gray-100', 'dark:bg-gray-800');
-            link.classList.add('bg-emerald-100', 'dark:bg-emerald-900/30');
-          });
-          
-          link.addEventListener('mouseleave', () => {
-            onCitationHover?.(null);
-            link.classList.remove('bg-emerald-100', 'dark:bg-emerald-900/30');
-            link.classList.add('bg-gray-100', 'dark:bg-gray-800');
-          });
-
-          // Create content
-          const domainSpan = document.createElement('span');
-          domainSpan.textContent = citedDomain;
-          link.appendChild(domainSpan);
-
-          // Add external link icon
-          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          svg.setAttribute('class', 'w-3 h-3 opacity-60');
-          svg.setAttribute('fill', 'none');
-          svg.setAttribute('stroke', 'currentColor');
-          svg.setAttribute('viewBox', '0 0 24 24');
-          
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('stroke-linecap', 'round');
-          path.setAttribute('stroke-linejoin', 'round');
-          path.setAttribute('stroke-width', '2');
-          path.setAttribute('d', 'M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14');
-          
-          svg.appendChild(path);
-          link.appendChild(svg);
-
-          fragments.push(link);
-        } else {
-          // No matching source - keep as plain text
-          fragments.push(match[0]);
-        }
-
-        lastIndex = match.index + match[0].length;
-      }
-
-      // Add remaining text after last citation
-      if (lastIndex < text.length) {
-        fragments.push(text.substring(lastIndex));
-      }
-
-      // Only replace if we found citations
-      if (fragments.length > 0) {
-        const fragment = document.createDocumentFragment();
-        fragments.forEach(item => {
-          if (typeof item === 'string') {
-            fragment.appendChild(document.createTextNode(item));
-          } else {
-            fragment.appendChild(item);
-          }
-        });
-        parent.replaceChild(fragment, textNode);
-      }
+  // Convert [domain] to markdown links where domain is known
+  const processedContent = React.useMemo(() => {
+    const citationRegex = /\[([^\]]+(?:\.[^\]]+)+)\]/g;
+    return content.replace(citationRegex, (match, p1) => {
+      const citedDomain = String(p1);
+      const url = domainToUrlMap.get(citedDomain);
+      return url ? `[${citedDomain}](${url})` : match;
     });
-
-    // Update citation highlighting based on hovered source
-    const updateHighlighting = () => {
-      const citations = containerRef.current?.querySelectorAll('a[data-citation-url]');
-      citations?.forEach(citation => {
-        const citationUrl = citation.getAttribute('data-citation-url');
-        const link = citation as HTMLElement;
-        
-        if (hoveredSourceUrl && citationUrl === hoveredSourceUrl) {
-          link.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'bg-emerald-100', 'dark:bg-emerald-900/30');
-          link.classList.add('bg-yellow-200', 'dark:bg-yellow-900/50', 'text-yellow-900', 'dark:text-yellow-200', 'ring-2', 'ring-yellow-400', 'dark:ring-yellow-600');
-        } else if (!link.matches(':hover')) {
-          link.classList.remove('bg-yellow-200', 'dark:bg-yellow-900/50', 'text-yellow-900', 'dark:text-yellow-200', 'ring-2', 'ring-yellow-400', 'dark:ring-yellow-600', 'bg-emerald-100', 'dark:bg-emerald-900/30');
-          link.classList.add('bg-gray-100', 'dark:bg-gray-800');
-        }
-      });
-    };
-
-    updateHighlighting();
-    }, 100); // 100ms delay to ensure React has rendered
-
-    return () => clearTimeout(timeoutId);
-  }, [content, domainToUrlMap, onCitationHover, hoveredSourceUrl]);
+  }, [content, domainToUrlMap]);
 
   // Custom sanitize schema
   const sanitizeSchema: Schema = {
@@ -230,15 +90,34 @@ export function ContentWithCitations({
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
         components={{
-          a: ({ ...props }) => (
-            <a {...props} target="_blank" rel="noopener noreferrer" />
-          ),
+          a: ({ href, children, ...props }) => {
+            const url = String(href || '');
+            const isCitation = url && [...domainToUrlMap.values()].includes(url);
+            const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
+            const baseClass = 'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium no-underline align-baseline transition-colors';
+            const normalClass = 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300';
+            const hiClass = 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600';
+            return (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-citation-url={isCitation ? url : undefined}
+                className={`${baseClass} ${highlighted ? hiClass : normalClass}`}
+                onMouseEnter={() => isCitation && onCitationHover?.(url)}
+                onMouseLeave={() => isCitation && onCitationHover?.(null)}
+                {...props}
+              >
+                {children}
+              </a>
+            );
+          },
           code: ({ className, children, ...props }) => (
             <code className={className} {...props}>{String(children)}</code>
           )
         }}
       >
-        {content}
+        {processedContent}
       </ReactMarkdown>
     </div>
   );
