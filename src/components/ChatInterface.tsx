@@ -591,10 +591,10 @@ export function ChatInterface({
 			};
 
 			const aiUrl = resolveApi("/api/ai");
-			console.log("🤖 AI API REQUEST:");
-			console.log("URL:", aiUrl);
-			console.log("Method:", "POST");
-			console.log("Body:", JSON.stringify(aiRequestBody, null, 2));
+			logger.debug("🤖 AI API REQUEST:");
+			logger.debug("URL:", aiUrl);
+			logger.debug("Method:", "POST");
+			logger.debug("Body:", JSON.stringify(aiRequestBody, null, 2));
 
 			// Create placeholder assistant message for streaming
 			const assistantMessageId = `msg_${Date.now() + 1}`;
@@ -627,10 +627,10 @@ export function ChatInterface({
 			});
 			const aiDuration = Date.now() - aiStartTime;
 
-			console.log("🤖 AI API RESPONSE:");
-			console.log("Status:", aiResponse.status);
-			console.log("Duration:", `${aiDuration}ms`);
-			console.log("Headers:", Object.fromEntries(aiResponse.headers.entries()));
+			logger.debug("🤖 AI API RESPONSE:");
+			logger.debug("Status:", aiResponse.status);
+			logger.debug("Duration:", `${aiDuration}ms`);
+			logger.debug("Headers:", Object.fromEntries(aiResponse.headers.entries()));
 
 			if (aiResponse.ok && aiResponse.body) {
 				const contentType = aiResponse.headers.get("content-type");
@@ -668,7 +668,7 @@ export function ChatInterface({
                                         accumulatedContent = "I'm sorry, I couldn't generate a response this time.";
                                     }
                                 }
-								console.log("🔄 Streaming completed:", {
+								logger.debug("🔄 Streaming completed:", {
 									totalChunks: chunkCount,
 									duration: Date.now() - streamStartTime,
 									finalContentLength: accumulatedContent.length,
@@ -709,7 +709,7 @@ export function ChatInterface({
                                                 accumulatedContent = "I'm sorry, I couldn't generate a response this time.";
                                             }
                                         }
-										console.log("✅ Streaming finished with [DONE]");
+										logger.debug("✅ Streaming finished with [DONE]");
 										// Finalize the message only if component is still mounted
 										if (isMountedRef.current) {
 											setLocalMessages((prev) =>
@@ -765,7 +765,7 @@ export function ChatInterface({
 					} catch (streamError) {
 						// Check if error is due to abort
 						if (streamError instanceof Error && streamError.name === 'AbortError') {
-							console.log("Stream aborted (component unmounted or navigation)");
+							logger.debug("Stream aborted (component unmounted or navigation)");
 							return; // Don't show error message for intentional aborts
 						}
 						
@@ -797,7 +797,7 @@ export function ChatInterface({
 				} else {
 					// Fallback to non-streaming response
 					const aiData = await aiResponse.json();
-					console.log(
+					logger.debug(
 						"🤖 AI API RESPONSE BODY:",
 						JSON.stringify(aiData, null, 2),
 					);
