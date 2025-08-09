@@ -29,7 +29,7 @@ try {
     fs.writeFileSync(indexCssPath, indexCss, 'utf8');
     console.log('✅ Added responsive CSS import');
   }
-} catch (err) {
+} catch {
   console.log('⚠️  Could not add responsive CSS import');
 }
 
