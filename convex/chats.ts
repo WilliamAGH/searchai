@@ -8,7 +8,8 @@
 
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./_generated/server";
+import { api } from "./_generated/api";
 
 /**
  * Create new chat
@@ -239,6 +240,29 @@ export const summarizeRecent = query({
       .take(limit);
 
     const ordered = messages.reverse();
+    const lines: string[] = [];
+    for (const m of ordered) {
+      const role = m.role === 'assistant' ? 'Assistant' : m.role === 'user' ? 'User' : 'System';
+      const txt = (m.content || '').replace(/\s+/g, ' ').trim();
+      if (txt) lines.push(`- ${role}: ${txt.slice(0, 220)}`);
+      if (lines.length >= 12) break;
+    }
+    return lines.join("\n");
+  },
+});
+
+/**
+ * Action wrapper to build a compact summary (calls query under the hood)
+ * - Allows clients to request a summary imperatively
+ */
+export const summarizeRecentAction = action({
+  args: { chatId: v.id("chats"), limit: v.optional(v.number()) },
+  returns: v.string(),
+  handler: async (ctx, args) => {
+    const lim = Math.max(1, Math.min(args.limit ?? 12, 40));
+    // Load messages via query to respect auth and avoid using ctx.db in actions
+    const all = await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId });
+    const ordered = all.slice(-lim);
     const lines: string[] = [];
     for (const m of ordered) {
       const role = m.role === 'assistant' ? 'Assistant' : m.role === 'user' ? 'User' : 'System';
