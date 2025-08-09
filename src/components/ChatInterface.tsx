@@ -10,6 +10,7 @@ import { MessageInput } from "./MessageInput";
 import { MessageList } from "./MessageList";
 import { ShareModal } from "./ShareModal";
 import { MobileSidebar } from "./MobileSidebar";
+import { FollowUpPrompt } from "./FollowUpPrompt";
 import { useSwipeable } from 'react-swipeable';
 
 interface LocalChat {
@@ -74,6 +75,8 @@ export function ChatInterface({
 	const [messageCount, setMessageCount] = useState(0);
 	const [showAuthModal, setShowAuthModal] = useState(false);
 	const [showShareModal, setShowShareModal] = useState(false);
+	const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
+	const [pendingMessage, setPendingMessage] = useState<string>("");
 	const [searchProgress, setSearchProgress] = useState<{
 		stage: "searching" | "scraping" | "analyzing" | "generating";
 		message: string;
@@ -102,11 +105,43 @@ export function ChatInterface({
 	);
 
 	const createChat = useMutation(api.chats.createChat);
-	const generateResponse = useAction(api.ai.generateStreamingResponse);
+  const generateResponse = useAction(api.ai.generateStreamingResponse);
+  const planSearch = useAction(api.search.planSearch);
 
 	// Generate unique share ID
 	const generateShareId = React.useCallback(() => {
 		return `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+	}, []);
+
+	// Function to detect if new message is a topic change
+	const isTopicChange = React.useCallback((newMessage: string, previousMessages: LocalMessage[]) => {
+		// Don't prompt if there are no previous messages or only one exchange
+		if (previousMessages.length < 2) return false;
+		
+		// Get the last user message (if any)
+		const lastUserMessage = [...previousMessages].reverse().find(m => m.role === 'user');
+		if (!lastUserMessage) return false;
+		
+		// Simple heuristic: Check if the new message has very different keywords
+		// or is asking about something completely different
+		const newWords = new Set(newMessage.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+		const lastWords = new Set(lastUserMessage.content.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+		
+		// Calculate overlap
+		const intersection = new Set([...newWords].filter(x => lastWords.has(x)));
+		const similarity = intersection.size / Math.max(newWords.size, lastWords.size);
+		
+		// If similarity is very low, it's likely a topic change
+		// Also check for explicit signals of new topics
+		const topicChangeIndicators = [
+			/^(now|next|also|another|different|switch|change|new question)/i,
+			/^(what about|how about|tell me about)/i,
+			/^(unrelated|separate|different topic)/i
+		];
+		
+		const hasIndicator = topicChangeIndicators.some(pattern => pattern.test(newMessage));
+		
+		return similarity < 0.2 || hasIndicator;
 	}, []);
 
 	// Update URL when chat changes
@@ -784,6 +819,35 @@ export function ChatInterface({
 			return;
 		}
 
+    // New-topic decision: use server planner when authenticated; otherwise fallback heuristic
+    const currentMessagesForChat = typeof currentChatId === "string" 
+      ? localMessages.filter((msg) => msg.chatId === currentChatId)
+      : messages || [];
+
+    if (isAuthenticated && typeof currentChatId !== "string") {
+      try {
+        const plan = await planSearch({
+          chatId: currentChatId,
+          newMessage: content,
+          maxContextMessages: 10,
+        });
+        if (plan?.suggestNewChat && (plan.decisionConfidence ?? 0) >= 0.6) {
+          setPendingMessage(content);
+          setShowFollowUpPrompt(true);
+          return;
+        }
+      } catch (e) {
+        // If planner fails, fall back to heuristic below
+        console.warn("planSearch failed, falling back to heuristic", e);
+      }
+    } else {
+      if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
+        setPendingMessage(content);
+        setShowFollowUpPrompt(true);
+        return;
+      }
+    }
+
 		setIsGenerating(true);
 		setSearchProgress({ stage: "searching", message: "Searching the web..." });
 
@@ -860,6 +924,36 @@ export function ChatInterface({
 		setShowShareModal(false);
 	};
 
+	// Handle continuing in the same chat
+	const handleContinueChat = React.useCallback(() => {
+		setShowFollowUpPrompt(false);
+		// Send the pending message in the current chat
+		if (pendingMessage) {
+			const tempMessage = pendingMessage;
+			setPendingMessage("");
+			// Use setTimeout to ensure state updates properly
+			setTimeout(() => {
+				handleSendMessage(tempMessage);
+			}, 100);
+		}
+	}, [pendingMessage]);
+
+	// Handle starting a new chat for the follow-up
+	const handleNewChatForFollowUp = React.useCallback(async () => {
+		setShowFollowUpPrompt(false);
+		const tempMessage = pendingMessage;
+		setPendingMessage("");
+		
+		// Create new chat and send message
+		await handleNewChat();
+		// Wait for the new chat to be created before sending the message
+		setTimeout(() => {
+			if (tempMessage) {
+				handleSendMessage(tempMessage);
+			}
+		}, 500);
+	}, [pendingMessage, handleNewChat]);
+
 	// Auto-create first chat if none exists and not on a shared chat URL
 	useEffect(() => {
 		const path = window.location.pathname;
@@ -920,8 +1014,8 @@ export function ChatInterface({
 			/>
 
 
-			<div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full overflow-hidden">
-				<div className="flex-1 overflow-hidden">
+			<div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full">
+				<div className="flex-1 flex flex-col min-h-0">
 					<MessageList
 						messages={currentMessages}
 						isGenerating={isGenerating}
@@ -931,11 +1025,17 @@ export function ChatInterface({
 						currentChat={currentChat}
 					/>
 				</div>
-				<div className="flex-shrink-0">
+				<div className="flex-shrink-0 relative">
+					<FollowUpPrompt
+						isOpen={showFollowUpPrompt}
+						onContinue={handleContinueChat}
+						onNewChat={handleNewChatForFollowUp}
+						message={pendingMessage}
+					/>
 					<MessageInput
 						onSendMessage={handleSendMessage}
-						disabled={isGenerating}
-						placeholder={isGenerating ? "AI is working..." : "Ask me anything..."}
+						disabled={isGenerating || showFollowUpPrompt}
+						placeholder={isGenerating ? "AI is working..." : showFollowUpPrompt ? "Choose an option above..." : "Ask me anything..."}
 					/>
 				</div>
 			</div>
