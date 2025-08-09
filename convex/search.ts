@@ -19,6 +19,8 @@ type PlanResult = {
   reasons: string;
 };
 const planCache: Map<string, { expires: number; result: PlanResult }> = new Map();
+// Simple per-chat leaky bucket limiter: allow 6 calls per 60s per chat
+const planRate: Map<string, number[]> = new Map();
 
 /**
  * Perform a best-effort web search using available providers.
@@ -153,8 +155,31 @@ export const planSearch = action({
     const normMsg = args.newMessage.toLowerCase().trim().slice(0, 200);
     const cacheKey = `${args.chatId}|${normMsg}`;
     const now = Date.now();
+    // Rate limit: retain timestamps within last 60s
+    const bucket = planRate.get(String(args.chatId)) || [];
+    const windowStart = now - 60_000;
+    const pruned = bucket.filter((t) => t >= windowStart);
+    if (pruned.length >= 6) {
+      // Too many plan calls; serve default plan (also cached)
+      const fallback = {
+        shouldSearch: true,
+        contextSummary: "",
+        queries: [args.newMessage],
+        suggestNewChat: false,
+        decisionConfidence: 0.5,
+        reasons: "rate_limited",
+      } as PlanResult;
+      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: fallback });
+      // telemetry
+      await recordMetric(ctx, 'planner_rate_limited', args.chatId);
+      return fallback;
+    }
+    // Record this attempt in the rate bucket
+    pruned.push(now);
+    planRate.set(String(args.chatId), pruned);
     const hit = planCache.get(cacheKey);
     if (hit && hit.expires > now) {
+      await recordMetric(ctx, 'planner_invoked', args.chatId);
       return hit.result;
     }
 
@@ -164,6 +189,8 @@ export const planSearch = action({
     const messages = await ctx.runQuery(api.chats.getChatMessages, {
       chatId: args.chatId,
     });
+    // Prefer server-stored rolling summary if present (reduces tokens)
+    const chat = await ctx.runQuery(api.chats.getChatById, { chatId: args.chatId });
 
     const recent = messages.slice(Math.max(0, messages.length - maxContext));
     const serialize = (s: string | undefined) => (s || "").replace(/\s+/g, " ").trim();
@@ -185,12 +212,16 @@ export const planSearch = action({
     const timeSuggestNew = minutesGap >= 120;
 
     // Build a compact rolling summary (no external call)
-    const contextSummary = serialize(
+    let contextSummary = serialize(
       recent
         .map((m) => `${m.role}: ${serialize(m.content)}`)
         .join(" \n ")
         .slice(0, 1200),
     );
+    if ((chat as any)?.rollingSummary) {
+      // Prepend a compact rolling summary to guide planning
+      contextSummary = `${serialize((chat as any).rollingSummary).slice(0, 800)} \n ${contextSummary}`.slice(0, 1600);
+    }
 
     // Default plan if no LLM is available or JSON parsing fails
     const defaultPlan = {
@@ -205,6 +236,7 @@ export const planSearch = action({
     // If no API key present, skip LLM planning
     if (!process.env.OPENROUTER_API_KEY) {
       planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+      await recordMetric(ctx, 'planner_invoked', args.chatId);
       return defaultPlan;
     }
 
@@ -212,6 +244,7 @@ export const planSearch = action({
     const borderline = jaccard >= 0.45 && jaccard <= 0.7;
     if (!borderline) {
       planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+      await recordMetric(ctx, 'planner_invoked', args.chatId);
       return defaultPlan;
     }
 
@@ -244,6 +277,7 @@ export const planSearch = action({
 
       if (!response.ok) {
         planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+        await recordMetric(ctx, 'planner_invoked', args.chatId);
         return defaultPlan;
       }
       const data = await response.json();
@@ -286,16 +320,45 @@ export const planSearch = action({
           reasons: serialize(plan.reasons).slice(0, 500),
         };
         planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: finalPlan });
+        await recordMetric(ctx, 'planner_invoked', args.chatId);
         return finalPlan;
       }
       planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+      await recordMetric(ctx, 'planner_invoked', args.chatId);
       return defaultPlan;
     } catch {
       planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+      await recordMetric(ctx, 'planner_invoked', args.chatId);
       return defaultPlan;
     }
   },
 });
+
+/**
+ * Record metric for analytics
+ * - Daily aggregation by name
+ * - Increments counter
+ * - Best-effort (fails silently)
+ * @param ctx - Context with database
+ * @param name - Metric name
+ * @param chatId - Optional chat ID
+ */
+async function recordMetric(ctx: any, name: 'planner_invoked' | 'planner_rate_limited' | 'user_overrode_prompt' | 'new_chat_confirmed', chatId?: string) {
+  try {
+    const date = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+    const existing = await ctx.db
+      .query('metrics')
+      .withIndex('by_name_and_date', (q: any) => q.eq('name', name).eq('date', date))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, { count: (existing.count || 0) + 1 });
+    } else {
+      await ctx.db.insert('metrics', { name, date, chatId, count: 1 });
+    }
+  } catch (e) {
+    console.warn('metrics failed', name, e);
+  }
+}
 
 interface SearchResult {
 	title: string;
@@ -313,10 +376,15 @@ interface SerpApiResponse {
 	}>;
 }
 
-// SERP API search function using Google engine with enhanced error reporting
 /**
- * Query SerpAPI (Google engine) to retrieve web results.
- * Returns a normalized list of SearchResult.
+ * Query SerpAPI (Google engine)
+ * - Fetches organic results
+ * - Returns normalized SearchResult[]
+ * - Detailed error logging
+ * - Relevance score: 0.9
+ * @param query - Search query
+ * @param maxResults - Max results to return
+ * @returns Array of search results
  */
 export async function searchWithSerpApiDuckDuckGo(
 	query: string,
@@ -422,10 +490,15 @@ interface OpenRouterResponse {
 	}>;
 }
 
-// OpenRouter web search function
 /**
- * Use OpenRouter to ask an online-capable model for sources and extract URLs.
- * Returns a normalized list of SearchResult.
+ * Search via OpenRouter model
+ * - Uses Perplexity Sonar model
+ * - Extracts URLs from annotations
+ * - Falls back to regex extraction
+ * - Relevance score: 0.75-0.85
+ * @param query - Search query
+ * @param maxResults - Max results to return
+ * @returns Array of search results
  */
 export async function searchWithOpenRouter(
 	query: string,
@@ -523,10 +596,15 @@ interface SearchResult {
 	relevanceScore: number;
 }
 
-// DuckDuckGo direct API search function
 /**
- * Call DuckDuckGo's JSON API and normalize results.
- * Returns a normalized list of SearchResult with reasonable fallbacks.
+ * Search via DuckDuckGo API
+ * - Uses instant answer API
+ * - Extracts RelatedTopics/Abstract
+ * - Fallback to Wikipedia/DDG links
+ * - Relevance score: 0.4-0.8
+ * @param query - Search query
+ * @param maxResults - Max results to return
+ * @returns Array of search results
  */
 export async function searchWithDuckDuckGo(
 	query: string,
@@ -598,13 +676,14 @@ export async function searchWithDuckDuckGo(
 }
 
 /**
- * Fetch a page and extract a readable, cleaned summary of its content.
- * Performs lightweight sanitization and truncation to keep payload small.
- *
- * Args:
- * - url: Absolute URL to fetch
- *
- * Returns: { title, content, summary }
+ * Scrape and clean web page content
+ * - Extracts title from <title> or <h1>
+ * - Removes scripts/styles/HTML
+ * - Filters junk patterns
+ * - Truncates to 5000 chars
+ * - 10s timeout
+ * @param url - Absolute URL to fetch
+ * @returns {title, content, summary}
  */
 export const scrapeUrl = action({
 	args: { url: v.string() },
@@ -790,4 +869,24 @@ export const scrapeUrl = action({
 			};
 		}
 	},
+});
+
+/**
+ * Record client-side metric
+ * - Supports: user_overrode_prompt, new_chat_confirmed
+ * - Optional chatId for attribution
+ */
+export const recordClientMetric = action({
+  args: {
+    name: v.union(
+      v.literal('user_overrode_prompt'),
+      v.literal('new_chat_confirmed')
+    ),
+    chatId: v.optional(v.id('chats')),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await recordMetric(ctx, args.name, args.chatId);
+    return null;
+  },
 });
