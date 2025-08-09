@@ -33,8 +33,12 @@ COPY convex/ ./convex/
 ARG VITE_CONVEX_URL
 ARG NODE_ENV=production
 
-# Optional: Validate required build args (remove if handled by CI/CD)
-# RUN test -n "$VITE_CONVEX_URL" || (echo "ERROR: VITE_CONVEX_URL is required at build time" && exit 1)
+# Make build args available as environment variables for Vite
+ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
+ENV NODE_ENV=$NODE_ENV
+
+# Validate required build args
+RUN test -n "$VITE_CONVEX_URL" || (echo "ERROR: VITE_CONVEX_URL is required at build time" && exit 1)
 
 # Build the application
 RUN npm run build
