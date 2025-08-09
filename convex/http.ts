@@ -1,3 +1,11 @@
+/**
+ * HTTP endpoints for unauthenticated API access
+ * - CORS-enabled for cross-origin requests
+ * - SSE streaming for AI responses
+ * - Fallback handling for missing APIs
+ * - Routes: /api/chat, /api/search, /api/scrape, /api/ai
+ */
+
 import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { httpRouter } from "convex/server";
@@ -16,6 +24,12 @@ interface SearchResult {
 
 /**
  * Helper function to add CORS headers to responses
+ * - Allows all origins (*)
+ * - Supports GET, POST, OPTIONS
+ * - Returns JSON content type
+ * @param body - JSON string response body
+ * @param status - HTTP status code (default 200)
+ * @returns Response with CORS headers
  */
 function corsResponse(body: string, status = 200) {
 	return new Response(body, {
@@ -40,7 +54,11 @@ function corsResponse(body: string, status = 200) {
  */
 const http = httpRouter();
 
-// Add OPTIONS handler for CORS preflight
+/**
+ * CORS preflight handler for /api/chat
+ * - Returns 204 No Content
+ * - Sets CORS headers
+ */
 http.route({
     path: "/api/chat",
     method: "OPTIONS",
@@ -56,7 +74,11 @@ http.route({
     }),
 });
 
-// Add OPTIONS handler for CORS preflight
+/**
+ * CORS preflight handler for /api/search
+ * - Returns 204 No Content
+ * - Sets CORS headers
+ */
 http.route({
 	path: "/api/search",
 	method: "OPTIONS",
@@ -122,7 +144,14 @@ http.route({
 	}),
 });
 
-// Search endpoint for unauthenticated users
+/**
+ * Web search endpoint for unauthenticated users
+ * - Calls searchWeb action
+ * - Returns results with fallback
+ * - Logs detailed debug info
+ * @body {query: string, maxResults?: number}
+ * @returns {results, searchMethod, hasRealResults}
+ */
 http.route({
 	path: "/api/search",
 	method: "POST",
@@ -191,7 +220,14 @@ http.route({
 	}),
 });
 
-// Scrape endpoint for unauthenticated users
+/**
+ * URL scraping endpoint
+ * - Extracts page content
+ * - Returns title, content, summary
+ * - Handles errors gracefully
+ * @body {url: string}
+ * @returns {title, content, summary}
+ */
 http.route({
 	path: "/api/scrape",
 	method: "POST",
@@ -236,7 +272,16 @@ http.route({
 	}),
 });
 
-// AI generation endpoint for unauthenticated users with streaming support
+/**
+ * AI generation endpoint with SSE streaming
+ * - Primary: OpenRouter (Gemini 2.5 Flash)
+ * - Fallback: Convex OpenAI (GPT-4.1 nano)
+ * - Final: Search results summary
+ * - Streams chunks via Server-Sent Events
+ * - 120s timeout with keepalive pings
+ * @body {message, systemPrompt, searchResults, sources, chatHistory}
+ * @returns SSE stream with chunks or JSON fallback
+ */
 http.route({
 	path: "/api/ai",
 	method: "POST",
@@ -446,7 +491,12 @@ http.route({
 			if (response.body) {
 				console.log("✅ OpenRouter streaming response started");
 				
-                // Create a streaming response with proper cleanup
+                /**
+                 * Create SSE stream with cleanup
+                 * - Keepalive pings every 15s
+                 * - 120s timeout refresh on activity
+                 * - Proper resource cleanup
+                 */
                 const stream = new ReadableStream({
 					async start(controller) {
 						if (!response.body) {
@@ -727,7 +777,11 @@ http.route({
 	}),
 });
 
-// Add auth routes
+/**
+ * Register auth routes
+ * - Adds OAuth endpoints
+ * - Handles auth callbacks
+ */
 auth.addHttpRoutes(http);
 
 export default http;
