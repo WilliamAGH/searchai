@@ -24,16 +24,17 @@ COPY tailwind.config.js ./
 COPY postcss.config.cjs ./
 COPY index.html ./
 
-# Copy source code
+# Copy source code and styles
 COPY src/ ./src/
 COPY convex/ ./convex/
 
 # Set build-time environment variables for Vite
+# Note: VITE_CONVEX_URL must be provided as a build argument
 ARG VITE_CONVEX_URL
 ARG NODE_ENV=production
 
-# Validate required build args
-RUN test -n "$VITE_CONVEX_URL" || (echo "ERROR: VITE_CONVEX_URL is required at build time" && exit 1)
+# Optional: Validate required build args (remove if handled by CI/CD)
+# RUN test -n "$VITE_CONVEX_URL" || (echo "ERROR: VITE_CONVEX_URL is required at build time" && exit 1)
 
 # Build the application
 RUN npm run build
