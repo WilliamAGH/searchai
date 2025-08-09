@@ -1,29 +1,52 @@
-# AI-Powered Search Chat Application
-  
-This is a project built with [Chef](https://chef.convex.dev) using [Convex](https://convex.dev) as its backend.
- You can find docs about Chef with useful information like how to deploy to production [here](https://docs.convex.dev/chef).
-  
-This project is connected to the Convex deployment named [`diligent-greyhound-240`](https://dashboard.convex.dev/d/diligent-greyhound-240).
-  
-## Project structure
-  
-The frontend code is in the `app` directory and is built with [Vite](https://vitejs.dev/).
-  
-The backend code is in the `convex` directory.
-  
-`npm run dev` will start the frontend and backend servers.
+# AI-Powered Search Chat
 
-## App authentication
+Built with React + Vite on the frontend and Convex on the backend. Connected to Convex deployment: `diligent-greyhound-240`.
 
-Chef apps use [Convex Auth](https://auth.convex.dev/) with Anonymous auth for easy sign in. You may wish to change this before deploying your app.
+## Structure
 
-## Developing and deploying your app
+- `src/` — React app and components
+- `convex/` — Convex functions, auth, and HTTP routes (see `convex/http.ts`)
 
-Check out the [Convex docs](https://docs.convex.dev/) for more information on how to develop with Convex.
-* If you're new to Convex, the [Overview](https://docs.convex.dev/understanding/) is a good place to start
-* Check out the [Hosting and Deployment](https://docs.convex.dev/production/) docs for how to deploy your app
-* Read the [Best Practices](https://docs.convex.dev/understanding/best-practices/) guide for tips on how to improve you app further
+## Quick start
 
-## HTTP API
+1. Install: `npm install`
+2. Env (.env.local):
+   - `VITE_CONVEX_URL=https://diligent-greyhound-240.convex.cloud`
+   - `CONVEX_SITE_URL=https://diligent-greyhound-240.convex.site`
+3. Convex env (required for AI/search):
+   - `OPENROUTER_API_KEY` (required)
+   - `SERP_API_KEY` (optional)
+   - Push with: `npx convex env push`
+4. Run dev servers: `npm run dev` (Vite + Convex)
+5. Open `http://localhost:5173`
 
-User-defined http routes are defined in the `convex/router.ts` file. We split these routes into a separate file from `convex/http.ts` to allow us to prevent the LLM from modifying the authentication routes.
+## HTTP endpoints
+
+Defined in `convex/http.ts`:
+
+- `POST /api/search`
+- `POST /api/scrape`
+- `POST /api/ai` (SSE streaming)
+
+## Auth
+
+Uses Convex Auth. Update providers in `convex/auth.config.ts` if needed.
+
+## Deploy
+
+`npx convex deploy`
+
+## Convex quick commands
+
+- Start local server: `npx convex dev`
+- View logs: `npx convex logs` (or `npx convex logs --prod`)
+- Open dashboard: `npx convex dashboard`
+- Deploy functions: `npx convex deploy`
+- Env sync: `npx convex env pull` / `npx convex env push`
+- Schema sync: `npx convex schema pull` / `npx convex schema push`
+- Docs: <https://docs.convex.dev/>
+
+## Troubleshooting
+
+- Streaming ends early or no response renders: verify env vars above and allow `*.convex.cloud` / `*.convex.site` in extensions/ad‑blockers.
+- VS Code TS cache issues: `npm run clean:vscode` and restart the TS server.
