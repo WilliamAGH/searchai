@@ -371,7 +371,7 @@ http.route({
 			if (response.body) {
 				console.log("✅ OpenRouter streaming response started");
 				
-                // Create a streaming response
+                // Create a streaming response with proper cleanup
                 const stream = new ReadableStream({
 					async start(controller) {
 						if (!response.body) {
@@ -383,21 +383,49 @@ http.route({
 						let buffer = "";
 						let chunkCount = 0;
                         let lastChunkTime = Date.now();
+						let isStreamActive = true;
 						
                         // Periodic keepalive pings and adaptive timeout for streaming
                         const pingIntervalMs = 15000;
                         const pingIntervalId = setInterval(() => {
+							if (!isStreamActive) {
+								clearInterval(pingIntervalId);
+								return;
+							}
                             // SSE comment line; ignored by client parser but keeps connections alive
-                            controller.enqueue(new TextEncoder().encode(`: keepalive ${Date.now()}\n\n`));
+                            try {
+								controller.enqueue(new TextEncoder().encode(`: keepalive ${Date.now()}\n\n`));
+							} catch (_) {
+								// Controller might be closed, stop pinging
+								clearInterval(pingIntervalId);
+							}
                         }, pingIntervalMs);
 
                         let streamTimeoutId = setTimeout(() => {
+							if (!isStreamActive) return;
                             console.error("⏰ OpenRouter stream timeout after 120 seconds");
-                            controller.error(new Error("OpenRouter stream timeout after 120 seconds"));
+							isStreamActive = false;
+							try {
+								controller.error(new Error("OpenRouter stream timeout after 120 seconds"));
+							} catch (_) {
+								// Controller might already be closed
+							}
                         }, 120000);
 						
+						// Cleanup function
+						const cleanup = () => {
+							isStreamActive = false;
+							clearTimeout(streamTimeoutId);
+							clearInterval(pingIntervalId);
+							try {
+								reader.releaseLock();
+							} catch (_) {
+								// Reader might already be released
+							}
+						};
+						
 						try {
-							while (true) {
+							while (isStreamActive) {
 								const { done, value } = await reader.read();
 								if (done) {
 									console.log("🔄 OpenRouter streaming completed:", {
@@ -411,9 +439,16 @@ http.route({
                                 // Refresh timeout upon activity
                                 clearTimeout(streamTimeoutId);
                                 streamTimeoutId = setTimeout(() => {
+									if (!isStreamActive) return;
                                     console.error("⏰ OpenRouter stream timeout after 120 seconds");
-                                    controller.error(new Error("OpenRouter stream timeout after 120 seconds"));
+									isStreamActive = false;
+									try {
+										controller.error(new Error("OpenRouter stream timeout after 120 seconds"));
+									} catch (_) {
+										// Controller might already be closed
+									}
                                 }, 120000);
+								
 								buffer += decoder.decode(value, { stream: true });
 								const lines = buffer.split("\n");
 								buffer = lines.pop() || "";
@@ -423,7 +458,9 @@ http.route({
 										const data = line.slice(6);
 										if (data === "[DONE]") {
 											console.log("✅ OpenRouter streaming finished with [DONE]");
+											isStreamActive = false;
 											controller.close();
+											cleanup();
 											return;
 										}
 										try {
@@ -444,7 +481,7 @@ http.route({
 													`data: ${JSON.stringify(streamData)}\n\n`
 												)
 											);
-										} catch (e) {
+										} catch (_) {
 											console.error("❌ Failed to parse stream chunk:", {
 												error: e instanceof Error ? e.message : "Unknown parsing error",
 												chunk: data,
@@ -454,17 +491,21 @@ http.route({
 									}
 								}
 							}
+							// Normal completion
+							controller.close();
                         } catch (error) {
 							console.error("💥 Stream reading error:", {
 								error: error instanceof Error ? error.message : "Unknown streaming error",
 								stack: error instanceof Error ? error.stack : "No stack trace",
 								timestamp: new Date().toISOString(),
 							});
-							controller.error(error);
+							try {
+								controller.error(error);
+							} catch (_) {
+								// Controller might already be closed
+							}
 						} finally {
-                            clearTimeout(streamTimeoutId);
-                            clearInterval(pingIntervalId);
-							reader.releaseLock();
+							cleanup();
 						}
 					},
 				});
