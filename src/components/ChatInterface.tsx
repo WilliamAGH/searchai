@@ -12,6 +12,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useDebounce } from "../hooks/useDebounce";
 // If a separate throttle hook exists, import it. Otherwise, use a lightweight inline throttle.
 import { useRef, useCallback } from "react";
 import { logger } from "../lib/logger";
