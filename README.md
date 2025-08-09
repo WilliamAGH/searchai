@@ -138,7 +138,7 @@ Set these using `npx convex env set`:
 
 ### "AI generation failed with exception: Object"
 **Cause**: Missing `OPENROUTER_API_KEY` in Convex deployment
-**Solution**: 
+**Solution**:
 ```bash
 npx convex env set OPENROUTER_API_KEY "your-key"
 ```
