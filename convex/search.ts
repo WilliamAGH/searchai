@@ -1,3 +1,4 @@
+"use node";
 /**
  * Search functions
  * - Public web search providers (SERP, OpenRouter, DuckDuckGo)
