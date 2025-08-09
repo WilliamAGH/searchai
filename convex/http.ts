@@ -304,24 +304,34 @@ http.route({
 		}
 
 		try {
-			console.log("🤖 Attempting OpenRouter API call...");
+			console.log("🔄 Attempting OpenRouter API call with streaming...");
+			
+			// Build message history including system prompt and chat history
+			const messages = [
+				{ role: "system", content: systemPrompt },
+				...(chatHistory || []),
+				{ role: "user", content: message },
+			];
+			
 			const openRouterBody = {
-				model: "google/gemini-2.5-flash-lite",
-				messages: [
-					{ role: "system", content: systemPrompt },
-					{ role: "user", content: message },
-				],
+				model: "google/gemini-2.5-flash",
+				messages,
 				temperature: 0.7,
 				max_tokens: 4000,
-				reasoning: {
-					effort: "high",
-					exclude: false,
-				},
+				stream: true,
+				// Enable caching for repeated context
+				top_p: 1,
+				frequency_penalty: 0,
+				presence_penalty: 0,
 			};
 
 			console.log("🤖 OPENROUTER REQUEST:");
 			console.log("URL:", "https://openrouter.ai/api/v1/chat/completions");
 			console.log("Body:", JSON.stringify(openRouterBody, null, 2));
+
+            // Add timeout for the fetch request (90s)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 90000);
 
 			const response = await fetch(
 				"https://openrouter.ai/api/v1/chat/completions",
@@ -330,59 +340,157 @@ http.route({
 					headers: {
 						Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
 						"Content-Type": "application/json",
+						"HTTP-Referer": "https://searchai.io",
+						"X-Title": "SearchAI",
 					},
 					body: JSON.stringify(openRouterBody),
+					signal: controller.signal,
 				},
 			);
 
-			console.log("🤖 OPENROUTER RESPONSE STATUS:", response.status);
+			clearTimeout(timeoutId);
+
+			console.log("📊 OpenRouter Response Status:", response.status);
 			console.log(
-				"🤖 OPENROUTER RESPONSE HEADERS:",
+				"📊 OpenRouter Response Headers:",
 				Object.fromEntries(response.headers.entries()),
 			);
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error("🤖 OPENROUTER ERROR RESPONSE:", errorText);
+				console.error("❌ OpenRouter API Error:", {
+					status: response.status,
+					statusText: response.statusText,
+					error: errorText,
+				});
 				throw new Error(
-					`OpenRouter API error: ${response.status} - ${errorText}`,
+					`OpenRouter API error: ${response.status} ${response.statusText} - ${errorText}`,
 				);
 			}
 
-			const data = await response.json();
-			console.log(
-				"🤖 OPENROUTER RESPONSE BODY:",
-				JSON.stringify(data, null, 2),
-			);
+			if (response.body) {
+				console.log("✅ OpenRouter streaming response started");
+				
+                // Create a streaming response
+                const stream = new ReadableStream({
+					async start(controller) {
+						if (!response.body) {
+							controller.close();
+							return;
+						}
+						const reader = response.body.getReader();
+						const decoder = new TextDecoder();
+						let buffer = "";
+						let chunkCount = 0;
+                        let lastChunkTime = Date.now();
+						
+                        // Periodic keepalive pings and adaptive timeout for streaming
+                        const pingIntervalMs = 15000;
+                        const pingIntervalId = setInterval(() => {
+                            // SSE comment line; ignored by client parser but keeps connections alive
+                            controller.enqueue(new TextEncoder().encode(`: keepalive ${Date.now()}\n\n`));
+                        }, pingIntervalMs);
 
-			const aiMessage = data.choices[0].message;
-			const responseContent =
-				aiMessage.content ||
-				"I apologize, but I couldn't generate a response. Please try again.";
-			const reasoningTokens = aiMessage.reasoning || null;
-
-			const successResponse = {
-				response: responseContent,
-				reasoning: reasoningTokens,
-				searchResults,
-				sources,
-			};
-
-			console.log(
-				"🤖 OPENROUTER SUCCESS RESPONSE:",
-				JSON.stringify(successResponse, null, 2),
-			);
-
-			return new Response(JSON.stringify(successResponse), {
-				status: 200,
-				headers: { "Content-Type": "application/json" },
-			});
+                        let streamTimeoutId = setTimeout(() => {
+                            console.error("⏰ OpenRouter stream timeout after 120 seconds");
+                            controller.error(new Error("OpenRouter stream timeout after 120 seconds"));
+                        }, 120000);
+						
+						try {
+							while (true) {
+								const { done, value } = await reader.read();
+								if (done) {
+									console.log("🔄 OpenRouter streaming completed:", {
+										totalChunks: chunkCount,
+										duration: Date.now() - lastChunkTime,
+									});
+									break;
+								}
+								
+                                lastChunkTime = Date.now();
+                                // Refresh timeout upon activity
+                                clearTimeout(streamTimeoutId);
+                                streamTimeoutId = setTimeout(() => {
+                                    console.error("⏰ OpenRouter stream timeout after 120 seconds");
+                                    controller.error(new Error("OpenRouter stream timeout after 120 seconds"));
+                                }, 120000);
+								buffer += decoder.decode(value, { stream: true });
+								const lines = buffer.split("\n");
+								buffer = lines.pop() || "";
+								
+								for (const line of lines) {
+									if (line.startsWith("data: ")) {
+										const data = line.slice(6);
+										if (data === "[DONE]") {
+											console.log("✅ OpenRouter streaming finished with [DONE]");
+											controller.close();
+											return;
+										}
+										try {
+											chunkCount++;
+											const chunk = JSON.parse(data);
+											const streamData = {
+												type: "chunk",
+												content: chunk.choices?.[0]?.delta?.content || "",
+												thinking: chunk.choices?.[0]?.delta?.reasoning || "",
+												searchResults,
+												sources,
+												provider: "openrouter",
+												model: "google/gemini-flash-1.5",
+												chunkNumber: chunkCount,
+											};
+											controller.enqueue(
+												new TextEncoder().encode(
+													`data: ${JSON.stringify(streamData)}\n\n`
+												)
+											);
+										} catch (e) {
+											console.error("❌ Failed to parse stream chunk:", {
+												error: e instanceof Error ? e.message : "Unknown parsing error",
+												chunk: data,
+												chunkNumber: chunkCount,
+											});
+										}
+									}
+								}
+							}
+                        } catch (error) {
+							console.error("💥 Stream reading error:", {
+								error: error instanceof Error ? error.message : "Unknown streaming error",
+								stack: error instanceof Error ? error.stack : "No stack trace",
+								timestamp: new Date().toISOString(),
+							});
+							controller.error(error);
+						} finally {
+                            clearTimeout(streamTimeoutId);
+                            clearInterval(pingIntervalId);
+							reader.releaseLock();
+						}
+					},
+				});
+				
+                return new Response(stream, {
+                    headers: {
+                        // Harden SSE headers to avoid buffering by proxies and ensure UTF-8
+                        "Content-Type": "text/event-stream; charset=utf-8",
+                        "Cache-Control": "no-cache, no-transform",
+                        "Connection": "keep-alive",
+                        // Disable proxy buffering on common reverse proxies (harmless elsewhere)
+                        "X-Accel-Buffering": "no",
+                        // CORS: endpoints are proxied locally during dev
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Headers": "Content-Type",
+                    },
+                });
+			} else {
+				throw new Error("No response body received from OpenRouter");
+			}
 		} catch (error) {
-			console.error("❌ OPENROUTER FAILED:", error);
-			console.error(
-				"OpenRouter Error stack:",
-				error instanceof Error ? error.stack : "No stack trace",
-			);
+			console.error("💥 OPENROUTER FAILED with exception:", {
+				error: error instanceof Error ? error.message : "Unknown error",
+				stack: error instanceof Error ? error.stack : "No stack trace",
+				timestamp: new Date().toISOString(),
+			});
 
 			// Try Convex OpenAI as backup
 			if (
