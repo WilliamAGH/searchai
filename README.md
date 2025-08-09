@@ -188,6 +188,13 @@ npx convex logs --prod         # View production logs
 npx convex functions list      # List deployed functions
 ```
 
+## Testing
+
+```bash
+# Placeholder: add tests when test runner is introduced
+# npm run test
+```
+
 ## Troubleshooting
 
 - **Streaming issues**: Allow `*.convex.cloud` / `*.convex.site` in ad-blockers
