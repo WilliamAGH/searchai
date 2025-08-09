@@ -14,8 +14,12 @@
   },
   "files.associations": {
     "*.tsx": "typescriptreact",
-    "*.jsx": "javascriptreact"
+    "*.jsx": "javascriptreact",
+    "*.css": "tailwindcss"
   },
+  "css.validate": false,
+  "scss.validate": false,
+  "less.validate": false,
   "javascript.validate.enable": false,
   "typescript.validate.enable": true,
   "markdownlint.config": {

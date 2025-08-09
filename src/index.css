@@ -153,8 +153,17 @@
 }
 
 @layer utilities {
+  /* Default: broad compatibility */
   .text-balance {
-    text-wrap: balance;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
+  /* Use text-wrap: balance only when supported */
+  @supports (text-wrap: balance) {
+    .text-balance {
+      text-wrap: balance;
+    }
   }
   
   .line-clamp-2 {
@@ -162,6 +171,7 @@
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
   
   /* Font utilities for explicit control */
@@ -207,6 +217,57 @@
   @apply text-foreground;
 }
 
+.prose p {
+  margin: 0.5rem 0 0.75rem 0;
+}
+
+.prose ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.prose ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.prose li {
+  margin: 0.25rem 0;
+}
+
+.prose strong {
+  @apply font-semibold;
+}
+
+/* Strengthen bold contrast in dark mode */
+html.dark .prose strong,
+html.dark .prose b {
+  @apply font-extrabold;
+  color: #ffffff;
+}
+
+.prose em {
+  @apply italic;
+}
+
+.prose u {
+  text-decoration: underline;
+}
+
+/* Increase bold contrast in dark mode by slightly dimming normal text */
+html.dark .prose p,
+html.dark .prose li {
+  color: hsl(var(--foreground) / 0.85);
+}
+
+/* Keep links and code fully legible */
+html.dark .prose a,
+html.dark .prose code {
+  color: hsl(var(--foreground));
+}
+
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
   @apply text-foreground;
 }
@@ -229,7 +290,25 @@
   @apply border-l-4 border-primary pl-4 italic;
 }
 
+.prose hr {
+  @apply my-4 border-gray-300 dark:border-gray-700;
+}
+
 /* Hide scrollbar on message input textarea */
 .message-input-textarea::-webkit-scrollbar {
   display: none;
+}
+
+/* Message textarea sizing and scrollbar behavior (no inline styles) */
+.message-textarea {
+  min-height: 52px;
+  max-height: 200px;
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+
+/* Apply Firefox-specific scrollbar suppression only when supported */
+@supports (scrollbar-width: none) {
+  .message-textarea {
+    scrollbar-width: none; /* Firefox */
+  }
 }
