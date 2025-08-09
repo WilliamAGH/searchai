@@ -129,7 +129,10 @@ export function ChatInterface({
 	);
 
 	const chats = useQuery(api.chats.getUserChats);
-	const chatByOpaqueId = useQuery(api.chats.getChatByOpaqueId, propChatId ? { chatId: propChatId } : "skip");
+  const chatByOpaqueId = useQuery(
+    api.chats.getChatByOpaqueId,
+    propChatId ? { chatId: propChatId as Id<"chats"> } : "skip"
+  );
 	const chatByShareId = useQuery(api.chats.getChatByShareId, propShareId ? { shareId: propShareId } : "skip");
 	const chatByPublicId = useQuery(api.chats.getChatByPublicId, propPublicId ? { publicId: propPublicId } : "skip");
 	
@@ -1217,8 +1220,7 @@ export function ChatInterface({
 		}
 	}, [currentChatId, handleNewChat, propChatId, propShareId, propPublicId]);
 
-	const canShare =
-		currentMessages.length > 0 && typeof currentChatId === "string";
+  const canShare = currentMessages.length > 0 && !!currentChatId;
 
 	// Swipe handlers for mobile
 	const swipeHandlers = useSwipeable({

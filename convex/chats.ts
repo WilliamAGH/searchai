@@ -142,7 +142,7 @@ export const getChatByPublicId = query({
 		const chat = await ctx.db
 			.query("chats")
 			.withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
-			.first();
+			.unique();
 
 		if (!chat) return null;
 
