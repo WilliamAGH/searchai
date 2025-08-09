@@ -17,6 +17,8 @@ interface MessageInputProps {
   placeholder?: string;
   /** Optional draft-change callback (debounced in parent) */
   onDraftChange?: (draft: string) => void;
+  /** Optional history of previous user messages (oldest -> newest) */
+  history?: Array<string>;
 }
 
 /**
@@ -25,9 +27,13 @@ interface MessageInputProps {
  * @param disabled - Prevent input when true
  * @param placeholder - Input placeholder text
  */
-export function MessageInput({ onSendMessage, disabled = false, placeholder = "Ask me anything...", onDraftChange }: MessageInputProps) {
+export function MessageInput({ onSendMessage, disabled = false, placeholder = "Ask me anything...", onDraftChange, history = [] }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Track navigation through history (index into `history`), null when not navigating
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  // Preserve current draft when entering history navigation so it can be restored
+  const [draftBeforeHistory, setDraftBeforeHistory] = useState<string | null>(null);
 
   /**
    * Handle form submission
@@ -39,6 +45,8 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
     if (message.trim() && !disabled) {
       onSendMessage(message.trim());
       setMessage('');
+      setHistoryIndex(null);
+      setDraftBeforeHistory(null);
     }
   };
 
@@ -51,6 +59,79 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
+      return;
+    }
+
+    // Ignore modifier combos
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
+    const atEnd = ta.selectionStart === message.length && ta.selectionEnd === message.length;
+
+    // Navigate up: only when caret at start
+    if (e.key === 'ArrowUp' && atStart && history.length > 0) {
+      e.preventDefault();
+      // On first entry into history mode, save current draft
+      if (historyIndex === null) {
+        setDraftBeforeHistory(message);
+        const idx = history.length - 1;
+        setHistoryIndex(idx);
+        const next = history[idx] || '';
+        setMessage(next);
+        if (onDraftChange) onDraftChange(next);
+      } else {
+        const idx = Math.max(0, historyIndex - 1);
+        setHistoryIndex(idx);
+        const next = history[idx] || '';
+        setMessage(next);
+        if (onDraftChange) onDraftChange(next);
+      }
+      // Move caret to end after setting message
+      queueMicrotask(() => {
+        const el = textareaRef.current;
+        if (el) {
+          const len = el.value.length;
+          el.setSelectionRange(len, len);
+        }
+      });
+      return;
+    }
+
+    // Navigate down: only when caret at end
+    if (e.key === 'ArrowDown' && atEnd && history.length > 0) {
+      if (historyIndex === null) return; // Not in history mode
+      e.preventDefault();
+      if (historyIndex < history.length - 1) {
+        const idx = historyIndex + 1;
+        setHistoryIndex(idx);
+        const next = history[idx] || '';
+        setMessage(next);
+        if (onDraftChange) onDraftChange(next);
+        queueMicrotask(() => {
+          const el = textareaRef.current;
+          if (el) {
+            const len = el.value.length;
+            el.setSelectionRange(len, len);
+          }
+        });
+      } else {
+        // Exiting history mode -> restore draft
+        const restore = draftBeforeHistory ?? '';
+        setHistoryIndex(null);
+        setDraftBeforeHistory(null);
+        setMessage(restore);
+        if (onDraftChange) onDraftChange(restore);
+        queueMicrotask(() => {
+          const el = textareaRef.current;
+          if (el) {
+            const len = el.value.length;
+            el.setSelectionRange(len, len);
+          }
+        });
+      }
+      return;
     }
   };
 
@@ -78,6 +159,8 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
               onChange={(e) => {
                 const val = e.target.value;
                 setMessage(val);
+                // Typing exits history navigation mode
+                if (historyIndex !== null) setHistoryIndex(null);
                 if (onDraftChange) onDraftChange(val);
               }}
               onKeyDown={handleKeyDown}
