@@ -44,7 +44,7 @@ export function FollowUpPrompt({ isOpen, onContinue, onNewChat, hintReason, hint
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100/60 dark:bg-amber-900/30 border border-amber-300/60 dark:border-amber-700/60">
                     {confidencePct !== undefined ? `${confidencePct}%` : ''}
                   </span>
-                  <span className="truncate">{hintReason}</span>
+                  <span className="truncate" title={hintReason}>{hintReason}</span>
                 </div>
               )}
               <div className="flex items-center gap-2">
