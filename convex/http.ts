@@ -141,6 +141,7 @@ http.route({
     headers.set("Access-Control-Allow-Headers", "Content-Type");
     headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     headers.set("Cache-Control", "no-cache, no-transform");
+    headers.set("Vary", "Origin");
     return new Response(base.body, { status: base.status, headers });
 	}),
 });
