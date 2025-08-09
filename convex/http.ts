@@ -39,6 +39,7 @@ function corsResponse(body: string, status = 200) {
 			"Access-Control-Allow-Origin": "*",
 			"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 			"Access-Control-Allow-Headers": "Content-Type",
+      "Vary": "Origin",
 		},
 	});
 }
@@ -156,7 +157,12 @@ http.route({
 	path: "/api/search",
 	method: "POST",
 	handler: httpAction(async (ctx, request) => {
-		const { query, maxResults } = await request.json();
+    const { query, maxResults } = await request.json();
+    if (!query || String(query).trim().length === 0) {
+      return corsResponse(
+        JSON.stringify({ results: [], searchMethod: "fallback", hasRealResults: false })
+      );
+    }
 
 		console.log("🔍 SEARCH ENDPOINT CALLED:");
 		console.log("Query:", query);
@@ -250,7 +256,8 @@ http.route({
 				error instanceof Error ? error.stack : "No stack trace",
 			);
 
-			const hostname = new URL(url).hostname;
+      let hostname = "";
+      try { hostname = new URL(url).hostname; } catch { hostname = "unknown"; }
 			const errorResponse = {
 				title: hostname,
 				content: `Unable to fetch content from ${url}. Error: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -289,12 +296,12 @@ http.route({
 		const { message, systemPrompt, searchResults, sources, chatHistory } =
 			await request.json();
 
-		console.log("🤖 AI ENDPOINT CALLED:");
-		console.log("Message:", message);
-		console.log("System Prompt Length:", systemPrompt?.length || 0);
-		console.log("Search Results Count:", searchResults?.length || 0);
-		console.log("Sources Count:", sources?.length || 0);
-		console.log("Chat History Length:", chatHistory?.length || 0);
+    console.log("🤖 AI ENDPOINT CALLED:");
+    console.log("Message length:", typeof message === 'string' ? message.length : 0);
+    console.log("System Prompt length:", systemPrompt?.length || 0);
+    console.log("Search Results count:", searchResults?.length || 0);
+    console.log("Sources count:", sources?.length || 0);
+    console.log("Chat History count:", chatHistory?.length || 0);
 		console.log("Environment Variables Available:");
 		console.log(
 			"- OPENROUTER_API_KEY:",
@@ -591,14 +598,14 @@ http.route({
 										try {
 											chunkCount++;
 											const chunk = JSON.parse(data);
-											const streamData = {
+                        const streamData = {
 												type: "chunk",
 												content: chunk.choices?.[0]?.delta?.content || "",
 												thinking: chunk.choices?.[0]?.delta?.reasoning || "",
 												searchResults,
 												sources,
 												provider: "openrouter",
-												model: "google/gemini-flash-1.5",
+                          model: "google/gemini-2.5-flash",
 												chunkNumber: chunkCount,
 											};
 											controller.enqueue(
