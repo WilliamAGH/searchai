@@ -19,7 +19,10 @@ interface OpenRouterBody {
 	stream?: boolean;
 }
 
-// Helper function to handle streaming from OpenRouter with enhanced error reporting
+/**
+ * Helper: Stream chunks from OpenRouter chat completions API with detailed logging.
+ * Yields parsed SSE JSON payloads until [DONE]. Throws on HTTP or parsing errors.
+ */
 async function* streamOpenRouter(body: OpenRouterBody) {
 	console.log("🔄 OpenRouter streaming request initiated:", {
 		model: body.model,
@@ -120,6 +123,10 @@ async function* streamOpenRouter(body: OpenRouterBody) {
 	}
 }
 
+/**
+ * Public action: Append user message, create assistant placeholder, then
+ * schedule streaming generation via an internal action.
+ */
 export const generateStreamingResponse = action({
 	args: {
 		chatId: v.id("chats"),
@@ -153,6 +160,11 @@ export const generateStreamingResponse = action({
 	},
 });
 
+/**
+ * Internal action: Orchestrates search, scraping, context assembly, and
+ * streaming AI generation. Streams partial content into the placeholder
+ * assistant message and finalizes at the end.
+ */
 export const generationStep = internalAction({
 	args: {
 		chatId: v.id("chats"),
