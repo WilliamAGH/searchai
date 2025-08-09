@@ -185,57 +185,85 @@ export const generationStep = internalAction({
 			"fallback";
 		const errorDetails: string[] = [];
 
-		try {
-			// 4. Search the web
-			await ctx.runMutation(internal.messages.updateMessage, {
-				messageId: args.assistantMessageId,
-				thinking: "Searching the web...",
-			});
+    try {
+      // 4. Plan and perform context-aware web search
+      await ctx.runMutation(internal.messages.updateMessage, {
+        messageId: args.assistantMessageId,
+        thinking: "Planning search...",
+      });
 
-			const searchResponse = await ctx.runAction(api.search.searchWeb, {
-				query: args.userMessage,
-				maxResults: 5,
-			});
+      const plan = await ctx.runAction(api.search.planSearch, {
+        chatId: args.chatId,
+        newMessage: args.userMessage,
+        maxContextMessages: 10,
+      });
 
-			searchResults = searchResponse.results || [];
-			hasRealResults = searchResponse.hasRealResults || false;
-			searchMethod = searchResponse.searchMethod as "serp" | "openrouter" | "duckduckgo" | "fallback";
+      await ctx.runMutation(internal.messages.updateMessage, {
+        messageId: args.assistantMessageId,
+        thinking: plan.shouldSearch ? `Searching the web (queries: ${plan.queries.length})...` : "Analyzing without search...",
+      });
 
-			await ctx.runMutation(internal.messages.updateMessage, {
-				messageId: args.assistantMessageId,
-				thinking: `Found ${searchResults.length} results. Parsing content...`,
-				searchResults,
-				searchMethod,
-				hasRealResults,
-			});
+      let aggregated: Array<{ title: string; url: string; snippet: string; relevanceScore?: number }> = [];
+      if (plan.shouldSearch) {
+        for (const q of plan.queries) {
+          const res = await ctx.runAction(api.search.searchWeb, { query: q, maxResults: 5 });
+          const results = res.results || [];
+          // Track last successful method for display
+          if (results.length > 0) {
+            searchMethod = res.searchMethod as "serp" | "openrouter" | "duckduckgo" | "fallback";
+          }
+          aggregated = aggregated.concat(results);
+          hasRealResults = hasRealResults || !!res.hasRealResults;
+        }
 
-			if (searchResults.length > 0) {
-				// 5. Scrape content from top results
-				const contentPromises = searchResults
-					.slice(0, 3)
-					.map(async (result: { url: string; title: string; snippet: string }) => {
-						try {
-							const content = await ctx.runAction(api.search.scrapeUrl, {
-								url: result.url,
-							});
-							sources.push(result.url);
-							return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
-						} catch (error) {
-							errorDetails.push(
-								`Failed to scrape ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`,
-							);
-							return `Source: ${result.title} (${result.url})\n${result.snippet}`;
-						}
-					});
-				const contents = await Promise.all(contentPromises);
-				searchContext = contents.join("\n\n");
+        // Dedupe by URL, keep highest relevance
+        const byUrl = new Map<string, { title: string; url: string; snippet: string; relevanceScore: number }>();
+        for (const r of aggregated) {
+          const existing = byUrl.get(r.url);
+          const score = typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;
+          if (!existing || score > existing.relevanceScore) {
+            byUrl.set(r.url, { title: r.title, url: r.url, snippet: r.snippet, relevanceScore: score });
+          }
+        }
+        searchResults = Array.from(byUrl.values())
+          .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+          .slice(0, 7);
 
-				await ctx.runMutation(internal.messages.updateMessage, {
-					messageId: args.assistantMessageId,
-					sources,
-				});
-			}
-		} catch (error) {
+        await ctx.runMutation(internal.messages.updateMessage, {
+          messageId: args.assistantMessageId,
+          thinking: `Found ${searchResults.length} results. Parsing content...`,
+          searchResults,
+          searchMethod,
+          hasRealResults,
+        });
+
+        if (searchResults.length > 0) {
+          // 5. Scrape content from top results
+          const contentPromises = searchResults
+            .slice(0, 3)
+            .map(async (result: { url: string; title: string; snippet: string }) => {
+              try {
+                const content = await ctx.runAction(api.search.scrapeUrl, { url: result.url });
+                sources.push(result.url);
+                return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
+              } catch (error) {
+                errorDetails.push(
+                  `Failed to scrape ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`,
+                );
+                return `Source: ${result.title} (${result.url})\n${result.snippet}`;
+              }
+            });
+          const contents = await Promise.all(contentPromises);
+          // Include planner summary at the top if present
+          searchContext = (plan.contextSummary ? `Conversation context:\n${plan.contextSummary}\n\n` : "") + contents.join("\n\n");
+
+          await ctx.runMutation(internal.messages.updateMessage, {
+            messageId: args.assistantMessageId,
+            sources,
+          });
+        }
+      }
+    } catch (error) {
 			console.error("Search failed:", error);
 			errorDetails.push(
 				`Search failed: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -261,9 +289,9 @@ export const generationStep = internalAction({
 		});
 
 		// Build comprehensive system prompt with ALL context
-		let systemPrompt = `You are a helpful AI assistant. `;
+    let systemPrompt = `You are a helpful AI assistant. `;
 		
-		if (hasRealResults && searchContext) {
+    if (hasRealResults && searchContext) {
 			systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant.\n\n`;
 			systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
 			systemPrompt += `## Search Metadata:\n`;
