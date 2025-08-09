@@ -1,16 +1,25 @@
+/**
+ * Main chat interface with authentication modals and message handling
+ * - Orchestrates chats/messages for authenticated and anonymous users
+ * - Handles sign-in/sign-up modal separation and switching
+ * - Streams AI responses (Convex for auth, HTTP API for anonymous)
+ * - Manages local storage for unauthenticated user data
+ * - Implements topic change detection and new chat suggestions
+ */
+
 import { useAction, useMutation, useQuery } from "convex/react";
 import React, { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useThrottle } from "../hooks/useDebounce";
-import { AuthModal } from "./AuthModal";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageInput } from "./MessageInput";
 import { MessageList } from "./MessageList";
 import { ShareModal } from "./ShareModal";
 import { MobileSidebar } from "./MobileSidebar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
+import { SignInModal } from "./SignInModal";
 import { useSwipeable } from 'react-swipeable';
 
 interface LocalChat {
@@ -73,10 +82,13 @@ export function ChatInterface({
 	const sidebarOpen = isSidebarOpen !== undefined ? isSidebarOpen : localSidebarOpen;
 	const handleToggleSidebar = onToggleSidebar || (() => setLocalSidebarOpen(!localSidebarOpen));
 	const [messageCount, setMessageCount] = useState(0);
-	const [showAuthModal, setShowAuthModal] = useState(false);
+	const [showSignUpModal, setShowSignUpModal] = useState(false);
+	const [showSignInModal, setShowSignInModal] = useState(false);
 	const [showShareModal, setShowShareModal] = useState(false);
 	const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
 	const [pendingMessage, setPendingMessage] = useState<string>("");
+	const [plannerHint, setPlannerHint] = useState<{ reason?: string; confidence?: number } | undefined>(undefined);
+	const [lastPlannerCallAtByChat, setLastPlannerCallAtByChat] = useState<Record<string, number>>({});
 	const [searchProgress, setSearchProgress] = useState<{
 		stage: "searching" | "scraping" | "analyzing" | "generating";
 		message: string;
@@ -107,13 +119,26 @@ export function ChatInterface({
 	const createChat = useMutation(api.chats.createChat);
   const generateResponse = useAction(api.ai.generateStreamingResponse);
   const planSearch = useAction(api.search.planSearch);
+  const recordClientMetric = useAction(api.search.recordClientMetric);
 
-	// Generate unique share ID
+	/**
+	 * Generate unique share ID
+	 * - Random alphanumeric string
+	 * - Used for shareable chat URLs
+	 */
 	const generateShareId = React.useCallback(() => {
 		return `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
 	}, []);
 
-	// Function to detect if new message is a topic change
+	/**
+	 * Detect topic change between messages
+	 * - Uses lexical similarity (Jaccard index)
+	 * - Checks topic change indicators  
+	 * - Returns true if similarity < 0.2
+	 * @param newMessage - New message text
+	 * @param previousMessages - Chat history
+	 * @returns true if topic changed significantly
+	 */
 	const isTopicChange = React.useCallback((newMessage: string, previousMessages: LocalMessage[]) => {
 		// Don't prompt if there are no previous messages or only one exchange
 		if (previousMessages.length < 2) return false;
@@ -209,6 +234,12 @@ export function ChatInterface({
 		return allChats.find((c) => c._id === currentChatId);
 	}, [currentChatId, localChats, allChats]);
 
+	/**
+	 * Create new chat
+	 * - Auth: creates via Convex mutation
+	 * - Anon: creates local with share ID
+	 * - Updates URL for shareable chats
+	 */
 	const handleNewChat = React.useCallback(async () => {
 		try {
 			if (isAuthenticated) {
@@ -252,7 +283,12 @@ export function ChatInterface({
 		};
 	}, []);
 	
-	// Throttled update function to prevent excessive re-renders
+	/**
+	 * Throttled message update
+	 * - Limits updates to 20/sec max
+	 * - Prevents UI jank during streaming
+	 * - Only updates if mounted
+	 */
 	const throttledMessageUpdate = useThrottle(
 		React.useCallback((messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
 			// Only update state if component is still mounted
@@ -287,6 +323,15 @@ export function ChatInterface({
 		};
 	}, []);
 	
+	/**
+	 * Generate AI response for anon users
+	 * - Calls HTTP endpoints (search/scrape/ai)
+	 * - Streams response via SSE
+	 * - Updates local storage
+	 * - Handles errors with detailed debug info
+	 * @param message - User's message
+	 * @param chatId - Local chat ID
+	 */
 	const generateUnauthenticatedResponse = async (
 		message: string,
 		chatId: string,
@@ -460,15 +505,15 @@ export function ChatInterface({
 			let systemPrompt = `You are a helpful AI assistant. `;
 
 			if (hasRealResults && searchContext) {
-				systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant.\n\n`;
+				systemPrompt += `Use the following search results to inform your response. IMPORTANT: When citing sources, use the exact format [1], [2], etc. corresponding to the source numbers below. Place citations inline immediately after the relevant information.\n\n`;
 				systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
-				systemPrompt += `## Search Metadata:\n`;
+				systemPrompt += `## Source References (USE THESE NUMBERS FOR CITATIONS):\n`;
 				searchResults.forEach(
 					(
 						result: { title: string; url: string; snippet: string },
 						idx: number,
 					) => {
-						systemPrompt += `${idx + 1}. ${result.title}\n   URL: ${result.url}\n   Snippet: ${result.snippet}\n\n`;
+						systemPrompt += `[${idx + 1}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
 					},
 				);
 			} else if (!hasRealResults && searchResults.length > 0) {
@@ -481,7 +526,7 @@ export function ChatInterface({
 				systemPrompt += `Web search is unavailable. Provide helpful responses based on your knowledge. `;
 			}
 
-            systemPrompt += `\n\nProvide clear, helpful responses. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;
+            systemPrompt += `\n\nProvide clear, helpful responses. When you reference information from the search results, you MUST include citations using [1], [2], etc. format that corresponds to the source numbers above. Place citations immediately after the relevant statement. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;
 
 			// Get chat history for context
 			const chatHistory = localMessages
@@ -810,12 +855,20 @@ export function ChatInterface({
 		}
 	};
 
+	/**
+	 * Send message handler
+	 * - Checks msg limits (4 for anon)
+	 * - Calls planner for topic detection
+	 * - Routes to auth/anon generation
+	 * - Updates chat title on first msg
+	 * @param content - Message content
+	 */
 	const handleSendMessage = async (content: string) => {
 		if (!currentChatId || isGenerating) return;
 
 		// Check message limit for unauthenticated users
 		if (!isAuthenticated && messageCount >= 4) {
-			setShowAuthModal(true);
+			setShowSignUpModal(true);
 			return;
 		}
 
@@ -824,15 +877,38 @@ export function ChatInterface({
       ? localMessages.filter((msg) => msg.chatId === currentChatId)
       : messages || [];
 
-    if (isAuthenticated && typeof currentChatId !== "string") {
+		if (isAuthenticated && typeof currentChatId !== "string") {
+			// Client-side gating before planner call
+			const CHAT_COOLDOWN_MS = 20_000;
+			const contentTrim = content.trim();
+			const words = contentTrim.split(/\s+/).filter(Boolean);
+			const estTokens = Math.ceil(contentTrim.length / 4);
+			const cue = /^(now|next|also|another|different|switch|new question|unrelated)/i.test(contentTrim);
+			let gapMinutes = 0;
+			try {
+				const prior = (messages || []).filter((m) => m.role === 'user');
+				const lastUser = prior.length > 0 ? prior[prior.length - 1] : undefined;
+				if (lastUser && typeof (lastUser as any).timestamp === 'number') {
+					gapMinutes = Math.floor((Date.now() - (lastUser as any).timestamp) / 60000);
+				}
+			} catch {}
+			const shouldPlanBase = estTokens >= 20 || words.length >= 10 || cue || gapMinutes >= 120;
+			const chatKey = String(currentChatId);
+			const lastAt = lastPlannerCallAtByChat[chatKey] || 0;
+			const cooldownPassed = Date.now() - lastAt >= CHAT_COOLDOWN_MS;
+			const shouldCallPlanner = shouldPlanBase && cooldownPassed;
+
+			if (shouldCallPlanner) {
       try {
         const plan = await planSearch({
           chatId: currentChatId,
           newMessage: content,
           maxContextMessages: 10,
         });
+				setLastPlannerCallAtByChat((prev) => ({ ...prev, [chatKey]: Date.now() }));
         if (plan?.suggestNewChat && (plan.decisionConfidence ?? 0) >= 0.6) {
           setPendingMessage(content);
+          setPlannerHint({ reason: plan.reasons, confidence: plan.decisionConfidence });
           setShowFollowUpPrompt(true);
           return;
         }
@@ -840,9 +916,11 @@ export function ChatInterface({
         // If planner fails, fall back to heuristic below
         console.warn("planSearch failed, falling back to heuristic", e);
       }
+			}
     } else {
       if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
         setPendingMessage(content);
+        setPlannerHint(undefined);
         setShowFollowUpPrompt(true);
         return;
       }
@@ -909,6 +987,12 @@ export function ChatInterface({
 		}
 	};
 
+	/**
+	 * Share chat handler
+	 * - Updates local chat sharing status
+	 * - Sets public/private visibility
+	 * @param isPublic - Public visibility flag
+	 */
 	const handleShare = (isPublic: boolean) => {
 		if (!currentChat || typeof currentChatId !== "string") return;
 
@@ -924,9 +1008,19 @@ export function ChatInterface({
 		setShowShareModal(false);
 	};
 
-	// Handle continuing in the same chat
+	/**
+	 * Continue in same chat
+	 * - Dismisses follow-up prompt
+	 * - Sends pending message
+	 * - Uses setTimeout for state sync
+	 */
 	const handleContinueChat = React.useCallback(() => {
 		setShowFollowUpPrompt(false);
+		setPlannerHint(undefined);
+    // Telemetry: user chose to continue in current chat
+    if (isAuthenticated && typeof currentChatId !== 'string') {
+      recordClientMetric({ name: 'user_overrode_prompt', chatId: currentChatId }).catch(() => {});
+    }
 		// Send the pending message in the current chat
 		if (pendingMessage) {
 			const tempMessage = pendingMessage;
@@ -938,11 +1032,21 @@ export function ChatInterface({
 		}
 	}, [pendingMessage]);
 
-	// Handle starting a new chat for the follow-up
+	/**
+	 * Start new chat for follow-up
+	 * - Creates new chat
+	 * - Waits 500ms for creation
+	 * - Sends pending message
+	 */
 	const handleNewChatForFollowUp = React.useCallback(async () => {
 		setShowFollowUpPrompt(false);
+		setPlannerHint(undefined);
 		const tempMessage = pendingMessage;
 		setPendingMessage("");
+    // Telemetry: user agreed to start new chat
+    if (isAuthenticated && typeof currentChatId !== 'string') {
+      recordClientMetric({ name: 'new_chat_confirmed', chatId: currentChatId }).catch(() => {});
+    }
 		
 		// Create new chat and send message
 		await handleNewChat();
@@ -1030,7 +1134,8 @@ export function ChatInterface({
 						isOpen={showFollowUpPrompt}
 						onContinue={handleContinueChat}
 						onNewChat={handleNewChatForFollowUp}
-						message={pendingMessage}
+						hintReason={plannerHint?.reason}
+						hintConfidence={plannerHint?.confidence}
 					/>
 					<MessageInput
 						onSendMessage={handleSendMessage}
@@ -1040,9 +1145,21 @@ export function ChatInterface({
 				</div>
 			</div>
 
-			<AuthModal
-				isOpen={showAuthModal}
-				onClose={() => setShowAuthModal(false)}
+			<SignUpModal
+				isOpen={showSignUpModal}
+				onClose={() => setShowSignUpModal(false)}
+				onSwitchToSignIn={() => {
+					setShowSignUpModal(false);
+					setShowSignInModal(true);
+				}}
+			/>
+			<SignInModal
+				isOpen={showSignInModal}
+				onClose={() => setShowSignInModal(false)}
+				onSwitchToSignUp={() => {
+					setShowSignInModal(false);
+					setShowSignUpModal(true);
+				}}
 			/>
 
 			<ShareModal
