@@ -19,25 +19,24 @@ import { mutation, query } from "./_generated/server";
  * @param shareId - Optional custom share ID
  * @returns Chat ID
  */
+
 export const createChat = mutation({
 	args: {
 		title: v.string(),
-		shareId: v.optional(v.string()),
 	},
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
 		const now = Date.now();
 
-		// Generate unique share ID if not provided
-		const shareId =
-			args.shareId ||
-			Math.random().toString(36).substring(2, 15) +
-				Math.random().toString(36).substring(2, 15);
+		const shareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+		const publicId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 		return await ctx.db.insert("chats", {
 			title: args.title,
 			userId: userId || undefined,
 			shareId,
+			publicId,
+			privacy: "private",
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -85,7 +84,23 @@ export const getChatById = query({
 		if (chat.userId && chat.userId !== userId) return null;
 
     return chat;
-	},
+ },
+});
+
+export const getChatByOpaqueId = query({
+ args: { chatId: v.string() },
+ handler: async (ctx, args) => {
+  const userId = await getAuthUserId(ctx);
+  // This is intentionally not using the index.
+  const chat = await ctx.db.query("chats").filter(q => q.eq(q.field("_id"), args.chatId)).first();
+
+  if (!chat) return null;
+
+  // Allow access to chats without userId (anonymous chats) or user's own chats
+  if (chat.userId && chat.userId !== userId) return null;
+
+  return chat;
+ },
 });
 
 /**
@@ -103,11 +118,31 @@ export const getChatByShareId = query({
 			.withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
 			.first();
 
-		if (!chat || !chat.shareId) return null;
+		if (!chat) return null;
 
-		// Only return shared chats or user's own chats
-		const userId = await getAuthUserId(ctx);
-		if (!chat.isShared && chat.userId !== userId) return null;
+		// Only return shared or public chats
+		if (chat.privacy !== "shared" && chat.privacy !== "public") {
+			const userId = await getAuthUserId(ctx);
+			if (chat.userId !== userId) return null;
+		}
+
+		return chat;
+	},
+});
+
+export const getChatByPublicId = query({
+	args: { publicId: v.string() },
+	handler: async (ctx, args) => {
+		const chat = await ctx.db
+			.query("chats")
+			.withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
+			.first();
+
+		if (!chat) return null;
+
+		if (chat.privacy !== "public") {
+			return null;
+		}
 
 		return chat;
 	},
@@ -196,10 +231,10 @@ export const updateRollingSummary = mutation({
  * @param chatId - Chat database ID
  * @param isPublic - Public visibility
  */
-export const shareChat = mutation({
+export const updateChatPrivacy = mutation({
 	args: {
 		chatId: v.id("chats"),
-		isPublic: v.boolean(),
+		privacy: v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
 	},
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
@@ -209,8 +244,7 @@ export const shareChat = mutation({
 		if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
 		await ctx.db.patch(args.chatId, {
-			isShared: true,
-			isPublic: args.isPublic,
+			privacy: args.privacy,
 			updatedAt: Date.now(),
 		});
 	},
