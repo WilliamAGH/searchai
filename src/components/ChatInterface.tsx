@@ -52,8 +52,9 @@ export function ChatInterface({
     isSidebarOpen?: boolean;
     onToggleSidebar?: () => void;
 }) {
-    // Use Convex URL for API calls - HTTP endpoints are served at the same URL
-    const apiBase = (import.meta as any).env?.VITE_CONVEX_URL || "";
+    // Use Convex site URL for HTTP API endpoints (unauthenticated users)
+    const convexUrl = (import.meta as any).env?.VITE_CONVEX_URL || "";
+    const apiBase = convexUrl.replace('.convex.cloud', '.convex.site');
 	const [currentChatId, setCurrentChatId] = useState<
 		Id<"chats"> | string | null
 	>(null);
