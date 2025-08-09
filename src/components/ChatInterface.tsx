@@ -337,8 +337,9 @@ export function ChatInterface({
 								});
 
 								try {
+									const scrapeUrl = resolveApi("/api/scrape");
 									console.log("🌐 SCRAPE API REQUEST:");
-									console.log("URL:", "/api/scrape");
+									console.log("URL:", scrapeUrl);
 									console.log("Method:", "POST");
 									console.log(
 										"Body:",
@@ -346,10 +347,11 @@ export function ChatInterface({
 									);
 
                                     const scrapeStartTime = Date.now();
-            const scrapeResponse = await fetch(`${apiBase}/api/scrape`, {
+            const scrapeResponse = await fetch(scrapeUrl, {
 										method: "POST",
 										headers: { "Content-Type": "application/json" },
 										body: JSON.stringify({ url: result.url }),
+										signal: abortControllerRef.current?.signal,
 									});
 									const scrapeDuration = Date.now() - scrapeStartTime;
 
