@@ -186,17 +186,17 @@ export const planSearch = action({
     const maxContext = Math.max(1, Math.min(args.maxContextMessages ?? 10, 25));
 
     // Load recent messages for lightweight context summary
-    const messages = await ctx.runQuery(api.chats.getChatMessages, {
+    const messages: any[] = await ctx.runQuery(api.chats.getChatMessages, {
       chatId: args.chatId,
     });
     // Prefer server-stored rolling summary if present (reduces tokens)
     const chat = await ctx.runQuery(api.chats.getChatById, { chatId: args.chatId });
 
-    const recent = messages.slice(Math.max(0, messages.length - maxContext));
+    const recent: any[] = messages.slice(Math.max(0, messages.length - maxContext));
     const serialize = (s: string | undefined) => (s || "").replace(/\s+/g, " ").trim();
 
     // Simple lexical overlap heuristic with last user message
-    const last = recent.length > 0 ? recent[recent.length - 1] : undefined;
+    const last: any = recent.length > 0 ? recent[recent.length - 1] : undefined;
     const lastContent = serialize(last?.content);
     const newContent = serialize(args.newMessage);
     const tokenize = (t: string) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
@@ -207,14 +207,14 @@ export const planSearch = action({
     const jaccard = inter.size / unionSize;
 
     // Time-based heuristic
-    const lastTs = typeof last?.timestamp === "number" ? last.timestamp : undefined;
-    const minutesGap = lastTs ? Math.floor((Date.now() - lastTs) / 60000) : 0;
-    const timeSuggestNew = minutesGap >= 120;
+    const lastTs: number | undefined = typeof last?.timestamp === "number" ? last.timestamp : undefined;
+    const minutesGap: number = lastTs ? Math.floor((Date.now() - lastTs) / 60000) : 0;
+    const timeSuggestNew: boolean = minutesGap >= 120;
 
     // Build a compact rolling summary (no external call)
     let contextSummary = serialize(
       recent
-        .map((m) => `${m.role}: ${serialize(m.content)}`)
+        .map((m: any) => `${m.role}: ${serialize(m.content)}`)
         .join(" \n ")
         .slice(0, 1200),
     );
@@ -224,7 +224,7 @@ export const planSearch = action({
     }
 
     // Default plan if no LLM is available or JSON parsing fails
-    const defaultPlan = {
+    const defaultPlan: PlanResult = {
       shouldSearch: true,
       contextSummary,
       queries: [args.newMessage],
