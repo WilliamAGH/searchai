@@ -82,23 +82,27 @@ export function MessageList({
     scrollToBottom();
   }, [messages, isGenerating]);
 
-  // Auto-collapse sources as soon as assistant content begins streaming
+  // Auto-collapse sources when assistant starts generating content
   useEffect(() => {
-    const updates: Record<string, boolean> = {};
-    for (const m of messages) {
+    messages.forEach((m) => {
       const id = m._id || String(messages.indexOf(m));
-      if (!id) continue;
-      // Only auto-collapse if we haven't set a state for this message yet
-      if (m.role === 'assistant' && (m.hasStartedContent || m.isStreaming)) {
-        if (!(id in collapsedById)) {
-          updates[id] = true; // Start collapsed
+      if (!id) return;
+      
+      // Only set initial collapsed state if not already set
+      if (m.role === 'assistant' && m.searchResults && m.searchResults.length > 0) {
+        if (collapsedById[id] === undefined) {
+          // Start with sources collapsed when content starts streaming
+          const shouldCollapse = m.hasStartedContent || m.isStreaming || m.content;
+          setCollapsedById(prev => {
+            if (prev[id] === undefined) {
+              return { ...prev, [id]: shouldCollapse };
+            }
+            return prev;
+          });
         }
       }
-    }
-    if (Object.keys(updates).length > 0) {
-      setCollapsedById(prev => ({ ...prev, ...updates }));
-    }
-  }, [messages]); // Remove collapsedById from dependencies to prevent infinite loop
+    });
+  }, [messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleCollapsed = (id: string) => {
     setCollapsedById(prev => ({ ...prev, [id]: !prev[id] }));
@@ -114,10 +118,7 @@ export function MessageList({
       <div className="mt-3 max-w-full overflow-hidden">
         <button
           type="button"
-          onClick={() => {
-            console.log('Sources button clicked, current collapsed state:', collapsed, 'id:', id);
-            toggleCollapsed(id);
-          }}
+          onClick={() => toggleCollapsed(id)}
           className="w-full text-left px-2 sm:px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 transition-colors touch-manipulation"
           aria-expanded={!collapsed ? "true" : "false"}
           aria-label="Toggle sources display"
