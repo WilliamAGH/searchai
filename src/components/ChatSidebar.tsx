@@ -52,8 +52,8 @@ export function ChatSidebar({
   }
 
   return (
-    <div className="w-80 border-r bg-muted/30 flex flex-col">
-      <div className="p-4 border-b">
+    <div className="w-full sm:w-80 border-r bg-muted/30 flex flex-col">
+      <div className="p-3 sm:p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">Chats</h3>
           <button
