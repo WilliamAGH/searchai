@@ -1,24 +1,56 @@
+/**
+ * Share modal for chat conversations
+ * - Public/private sharing toggle
+ * - Copy link functionality
+ * - Visual share status indicator
+ * - Mobile-responsive design
+ */
+
 import React, { useState } from 'react';
 
 interface ShareModalProps {
+  /** Modal visibility state */
   isOpen: boolean;
+  /** Close modal handler */
   onClose: () => void;
+  /** Share action handler */
   onShare: (isPublic: boolean) => void;
+  /** Generated share URL */
   shareUrl: string;
+  /** Current share state */
   isShared: boolean;
+  /** Public indexing state */
   isPublic: boolean;
 }
 
+/**
+ * Modal for sharing chat conversations
+ * @param isOpen - Show/hide modal
+ * @param onClose - Close handler
+ * @param onShare - Share submission handler
+ * @param shareUrl - URL to share
+ * @param isShared - Already shared flag
+ * @param isPublic - Public visibility flag
+ */
 export function ShareModal({ isOpen, onClose, onShare, shareUrl, isShared, isPublic }: ShareModalProps) {
   const [allowIndexing, setAllowIndexing] = useState(isPublic);
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
+  /**
+   * Handle share action
+   * - Passes indexing preference
+   */
   const handleShare = () => {
     onShare(allowIndexing);
   };
 
+  /**
+   * Copy URL to clipboard
+   * - Shows feedback for 2s
+   * - Handles clipboard API errors
+   */
   const handleCopyUrl = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -29,6 +61,12 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, isShared, isPub
     }
   };
 
+  /**
+   * Get share status label
+   * - public: searchable
+   * - shared: link-only
+   * - private: not shared
+   */
   const getShareStatus = () => {
     if (isPublic) return 'public';
     if (isShared) return 'shared';
@@ -48,6 +86,7 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, isShared, isPub
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          aria-label="Close"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -88,19 +127,22 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, isShared, isPub
             </div>
 
             <div className="space-y-3">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="share-url-input" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Share URL
               </label>
               <div className="flex gap-2">
                 <input
+                  id="share-url-input"
                   type="text"
                   value={shareUrl}
                   readOnly
                   className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  aria-label="Shareable URL"
                 />
                 <button
                   onClick={handleCopyUrl}
-                  className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
+                  className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                  aria-label={copied ? "URL copied to clipboard" : "Copy share URL to clipboard"}
                 >
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
@@ -137,7 +179,7 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, isShared, isPub
               </button>
               <button
                 onClick={handleShare}
-                className="flex-1 px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors font-medium"
+                className="flex-1 px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
               >
                 Share Chat
               </button>
