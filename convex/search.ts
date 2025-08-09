@@ -130,7 +130,7 @@ interface SerpApiResponse {
  * Query SerpAPI (Google engine) to retrieve web results.
  * Returns a normalized list of SearchResult.
  */
-async function searchWithSerpApiDuckDuckGo(
+export async function searchWithSerpApiDuckDuckGo(
 	query: string,
 	maxResults: number,
 ): Promise<SearchResult[]> {
@@ -239,7 +239,7 @@ interface OpenRouterResponse {
  * Use OpenRouter to ask an online-capable model for sources and extract URLs.
  * Returns a normalized list of SearchResult.
  */
-async function searchWithOpenRouter(
+export async function searchWithOpenRouter(
 	query: string,
 	maxResults: number,
 ): Promise<SearchResult[]> {
@@ -340,7 +340,7 @@ interface SearchResult {
  * Call DuckDuckGo's JSON API and normalize results.
  * Returns a normalized list of SearchResult with reasonable fallbacks.
  */
-async function searchWithDuckDuckGo(
+export async function searchWithDuckDuckGo(
 	query: string,
 	maxResults: number,
 ): Promise<SearchResult[]> {
