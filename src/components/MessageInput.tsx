@@ -40,14 +40,19 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
    * - Trims whitespace
    * - Clears input after send
    */
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (message.trim() && !disabled) {
-      onSendMessage(message.trim());
+  const sendCurrentMessage = () => {
+    const trimmed = message.trim();
+    if (trimmed && !disabled) {
+      onSendMessage(trimmed);
       setMessage('');
       setHistoryIndex(null);
       setDraftBeforeHistory(null);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    sendCurrentMessage();
   };
 
   /**
@@ -58,7 +63,7 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      sendCurrentMessage();
       return;
     }
 
@@ -160,7 +165,10 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
                 const val = e.target.value;
                 setMessage(val);
                 // Typing exits history navigation mode
-                if (historyIndex !== null) setHistoryIndex(null);
+                if (historyIndex !== null) {
+                  setHistoryIndex(null);
+                  setDraftBeforeHistory(null);
+                }
                 if (onDraftChange) onDraftChange(val);
               }}
               onKeyDown={handleKeyDown}

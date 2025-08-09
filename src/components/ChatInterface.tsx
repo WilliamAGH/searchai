@@ -12,7 +12,9 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
-import { useThrottle, useDebounce } from "../hooks/useDebounce";
+import { useDebounce } from "../hooks/useDebounce";
+// If a separate throttle hook exists, import it. Otherwise, use a lightweight inline throttle.
+import { useRef, useCallback } from "react";
 import { logger } from "../lib/logger";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageInput } from "./MessageInput";
@@ -339,26 +341,27 @@ export function ChatInterface({
 	 * - Prevents UI jank during streaming
 	 * - Only updates if mounted
 	 */
-	const throttledMessageUpdate = useThrottle(
-		React.useCallback((messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
-			// Only update state if component is still mounted
-			if (isMountedRef.current) {
-				setLocalMessages((prev) =>
-					prev.map((msg) =>
-						msg._id === messageId
-							? {
-									...msg,
-									content,
-									reasoning,
-									hasStartedContent: hasStarted,
-								}
-							: msg,
-					),
-				);
-			}
-		}, []),
-		50 // Throttle to max 20 updates per second
-	);
+  // Inline throttle to avoid incorrect import; 50ms minimum interval
+  const throttleRef = useRef<number>(0);
+  const throttledMessageUpdate = useCallback((messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
+    const now = Date.now();
+    if (now - throttleRef.current < 50) return;
+    throttleRef.current = now;
+    if (isMountedRef.current) {
+      setLocalMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId
+            ? {
+                ...msg,
+                content,
+                reasoning,
+                hasStartedContent: hasStarted,
+              }
+            : msg,
+        ),
+      );
+    }
+  }, [setLocalMessages]);
 
 	// Add abort controller for stream cancellation
 	const abortControllerRef = React.useRef<AbortController | null>(null);
@@ -420,7 +423,7 @@ export function ChatInterface({
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ query: message, maxResults: 5 }),
-				signal: abortControllerRef.current?.signal,
+                signal: abortControllerRef.current?.signal,
 			});
 			const searchDuration = Date.now() - searchStartTime;
 
@@ -459,12 +462,14 @@ export function ChatInterface({
 								title: string;
 								snippet: string;
 							}) => {
-								setSearchProgress({
-									stage: "scraping",
-									message: `Reading content from ${new URL(result.url).hostname}...`,
-									currentUrl: result.url,
-									urls: searchResults.slice(0, 3).map((r) => r.url),
-								});
+                let host = "unknown";
+                try { host = new URL(result.url).hostname; } catch { /* noop */ }
+                setSearchProgress({
+                  stage: "scraping",
+                  message: `Reading content from ${host}...`,
+                  currentUrl: result.url,
+                  urls: searchResults.slice(0, 3).map((r) => r.url),
+                });
 
 								try {
 									const scrapeUrl = resolveApi("/api/scrape");
@@ -1054,7 +1059,7 @@ export function ChatInterface({
 	 * - Sets public/private visibility
 	 * @param isPublic - Public visibility flag
 	 */
-	const handleShare = (privacy: "private" | "shared" | "public") => {
+  const handleShare = async (privacy: "private" | "shared" | "public") => {
 		if (!currentChatId) return;
 
 		if (typeof currentChatId === "string") {
@@ -1068,7 +1073,11 @@ export function ChatInterface({
 			);
 		} else {
 			// Handle Convex chat
-			updateChatPrivacy({ chatId: currentChatId, privacy });
+      try {
+        await updateChatPrivacy({ chatId: currentChatId, privacy });
+      } catch (e) {
+        logger.error("Failed to update privacy", e);
+      }
 		}
 		setShowShareModal(false);
 	};

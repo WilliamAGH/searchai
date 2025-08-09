@@ -342,7 +342,14 @@ http.route({
 						"URL:",
 						`${process.env.CONVEX_OPENAI_BASE_URL}/chat/completions`,
 					);
-					console.log("Body:", JSON.stringify(convexOpenAIBody, null, 2));
+            console.log("Body (redacted):", {
+              model: convexOpenAIBody.model,
+              messagesCount: convexOpenAIBody.messages?.length ?? 0,
+              sysPromptChars: (convexOpenAIBody.messages?.[0]?.content?.length) ?? 0,
+              userMsgChars: (convexOpenAIBody.messages?.[1]?.content?.length) ?? 0,
+              temperature: convexOpenAIBody.temperature,
+              max_tokens: convexOpenAIBody.max_tokens,
+            });
 
 					const response = await fetch(
 						`${process.env.CONVEX_OPENAI_BASE_URL}/chat/completions`,
@@ -455,7 +462,14 @@ http.route({
 
 			console.log("🤖 OPENROUTER REQUEST:");
 			console.log("URL:", "https://openrouter.ai/api/v1/chat/completions");
-			console.log("Body:", JSON.stringify(openRouterBody, null, 2));
+            console.log("Body (redacted):", {
+              model: openRouterBody.model,
+              messagesCount: openRouterBody.messages?.length ?? 0,
+              sysPromptChars: (openRouterBody.messages?.[0]?.content?.length) ?? 0,
+              temperature: openRouterBody.temperature,
+              max_tokens: openRouterBody.max_tokens,
+              stream: openRouterBody.stream,
+            });
 
             // Add timeout for the fetch request (90s)
             const controller = new AbortController();
@@ -654,6 +668,8 @@ http.route({
                         // CORS: endpoints are proxied locally during dev
                         "Access-Control-Allow-Origin": "*",
                         "Access-Control-Allow-Headers": "Content-Type",
+                        "Vary": "Origin",
+                        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
                     },
                 });
 			} else {

@@ -29,7 +29,12 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="signin-modal-title"
+    >
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -55,7 +60,7 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <h2 id="signin-modal-title" className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Sign In to SearchAI
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
@@ -66,21 +71,22 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
         <div className="w-full">
           <form
             className="flex flex-col gap-4"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
               setSubmitting(true);
               const formData = new FormData(e.target as HTMLFormElement);
               formData.set("flow", "signIn");
-              void signIn("password", formData).catch((error) => {
-                let toastTitle = "";
-                if (error.message.includes("Invalid password")) {
-                  toastTitle = "Invalid password. Please try again.";
-                } else {
-                  toastTitle = "Could not sign in. Please check your credentials.";
-                }
+              const result = await signIn("password", formData, { redirect: false } as any);
+              if ((result as any)?.error) {
+                const msg = String((result as any).error || "");
+                const toastTitle = msg.includes("Invalid password")
+                  ? "Invalid password. Please try again."
+                  : "Could not sign in. Please check your credentials.";
                 toast.error(toastTitle);
-                setSubmitting(false);
-              });
+              } else {
+                onClose();
+              }
+              setSubmitting(false);
             }}
           >
             <input
@@ -88,6 +94,7 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
               type="email"
               name="email"
               placeholder="Email"
+              autoComplete="email"
               required
             />
             <input
@@ -95,6 +102,7 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
               type="password"
               name="password"
               placeholder="Password"
+              autoComplete="current-password"
               required
             />
             <button className="w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-900" type="submit" disabled={submitting}>
@@ -121,7 +129,18 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
           <button
             type="button"
             className="w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => void signIn("anonymous")}
+            disabled={submitting}
+            onClick={async () => {
+              setSubmitting(true);
+              try {
+                await signIn("anonymous");
+                onClose();
+              } catch {
+                toast.error("Could not sign in anonymously. Please try again.");
+              } finally {
+                setSubmitting(false);
+              }
+            }}
           >
             Sign in anonymously
           </button>

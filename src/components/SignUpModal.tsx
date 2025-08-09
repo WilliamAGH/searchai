@@ -29,7 +29,12 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="signup-modal-title"
+    >
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -54,7 +59,7 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <h2 id="signup-modal-title" className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Create a SearchAI Account
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
@@ -65,35 +70,44 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
         <div className="w-full">
           <form
             className="flex flex-col gap-4"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
               setSubmitting(true);
-              const formData = new FormData(e.target as HTMLFormElement);
+              const form = e.currentTarget as HTMLFormElement;
+              const formData = new FormData(form);
               formData.set("flow", "signUp");
-              void signIn("password", formData).catch((error) => {
-                let toastTitle = "";
-                if (error.message.includes("Invalid password")) {
-                  toastTitle = "Invalid password. Please try again.";
-                } else {
-                  toastTitle = "Could not sign up. Please check your details.";
-                }
-                toast.error(toastTitle);
+              try {
+                await signIn("password", formData);
+                onClose();
+              } catch (error: any) {
+                const msg = error?.message?.includes("Invalid password")
+                  ? "Invalid password. Please try again."
+                  : "Could not sign up. Please check your details.";
+                toast.error(msg);
+              } finally {
                 setSubmitting(false);
-              });
+              }
             }}
           >
+            <label htmlFor="signup-email" className="sr-only">Email</label>
             <input
+              id="signup-email"
               className="w-full px-4 py-3 rounded-lg bg-background border border-input focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-shadow text-base dark:text-white"
               type="email"
               name="email"
               placeholder="Email"
+              autoComplete="email"
               required
             />
+            <label htmlFor="signup-password" className="sr-only">Password</label>
             <input
+              id="signup-password"
               className="w-full px-4 py-3 rounded-lg bg-background border border-input focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-shadow text-base dark:text-white"
               type="password"
               name="password"
               placeholder="Password"
+              autoComplete="new-password"
+              minLength={8}
               required
             />
             <button className="w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-900" type="submit" disabled={submitting}>
@@ -119,7 +133,18 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
           </div>
           <button 
             className="w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => void signIn("anonymous")}
+            disabled={submitting}
+            onClick={async () => {
+              setSubmitting(true);
+              try {
+                await signIn("anonymous");
+                onClose();
+              } catch {
+                toast.error("Could not sign in anonymously. Please try again.");
+              } finally {
+                setSubmitting(false);
+              }
+            }}
           >
             Sign in anonymously
           </button>
