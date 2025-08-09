@@ -2,7 +2,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 
-export const addMessage = mutation({
+
+export const addMessage = internalMutation({
 	args: {
 		chatId: v.id("chats"),
 		role: v.union(v.literal("user"), v.literal("assistant")),
@@ -10,9 +11,14 @@ export const addMessage = mutation({
 		isStreaming: v.optional(v.boolean()),
 		streamedContent: v.optional(v.string()),
 		thinking: v.optional(v.string()),
-		searchResults: v.optional(v.array(v.any())),
+		searchResults: v.optional(v.array(v.object({
+			title: v.string(),
+			url: v.string(),
+			snippet: v.string(),
+			relevanceScore: v.optional(v.number()),
+		}))),
 		sources: v.optional(v.array(v.string())),
-		reasoning: v.optional(v.any()),
+		reasoning: v.optional(v.string()),
 		searchMethod: v.optional(
 			v.union(
 				v.literal("serp"),
@@ -22,6 +28,7 @@ export const addMessage = mutation({
 			),
 		),
 		hasRealResults: v.optional(v.boolean()),
+		hasStartedContent: v.optional(v.boolean()),
 	},
 	handler: async (ctx, args) => {
 		const userId = await getAuthUserId(ctx);
@@ -117,16 +124,21 @@ export const updateMessageMetadata = mutation({
 	},
 });
 
-export const updateMessage = mutation({
+export const updateMessage = internalMutation({
 	args: {
 		messageId: v.id("messages"),
 		content: v.optional(v.string()),
 		streamedContent: v.optional(v.string()),
 		thinking: v.optional(v.string()),
 		isStreaming: v.optional(v.boolean()),
-		searchResults: v.optional(v.array(v.any())),
+		searchResults: v.optional(v.array(v.object({
+			title: v.string(),
+			url: v.string(),
+			snippet: v.string(),
+			relevanceScore: v.optional(v.number()),
+		}))),
 		sources: v.optional(v.array(v.string())),
-		reasoning: v.optional(v.any()),
+		reasoning: v.optional(v.string()),
 		searchMethod: v.optional(
 			v.union(
 				v.literal("serp"),
@@ -136,6 +148,7 @@ export const updateMessage = mutation({
 			),
 		),
 		hasRealResults: v.optional(v.boolean()),
+		hasStartedContent: v.optional(v.boolean()),
 	},
 	handler: async (ctx, { messageId, ...rest }) => {
 		await ctx.db.patch(messageId, { ...rest });
