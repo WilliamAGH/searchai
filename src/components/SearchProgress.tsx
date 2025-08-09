@@ -3,10 +3,10 @@ import React from 'react';
 function getSafeHostname(url: string): string {
   try {
     return new URL(url).hostname;
-  } catch (_) {
+  } catch {
     try {
       return new URL(`https://${url}`).hostname;
-    } catch (_) {
+    } catch {
       return '';
     }
   }
@@ -121,9 +121,9 @@ export function SearchProgress({ progress }: SearchProgressProps) {
           
           <div className="flex items-center gap-2 mt-3">
             <div className="flex space-x-1">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"></div>
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0ms]"></div>
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:100ms]"></div>
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:200ms]"></div>
             </div>
           </div>
         </div>
