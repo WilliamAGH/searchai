@@ -6,8 +6,8 @@
  */
 
 import { v } from "convex/values";
-import { action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { action, internalMutation } from "./_generated/server";
+import { api, internal } from "./_generated/api";
 
 // Ephemeral in-process cache for planner decisions (best-effort only)
 type PlanResult = {
@@ -19,7 +19,11 @@ type PlanResult = {
   reasons: string;
 };
 const planCache: Map<string, { expires: number; result: PlanResult }> = new Map();
-// Simple per-chat leaky bucket limiter: allow 6 calls per 60s per chat
+// Rate limiting + cache constants
+const PLAN_RATE_LIMIT = 6;
+const PLAN_RATE_WINDOW_MS = 60_000; // 60s
+const PLAN_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+// Simple per-chat leaky bucket limiter
 const planRate: Map<string, number[]> = new Map();
 
 /**
@@ -41,8 +45,28 @@ export const searchWeb = action({
 		query: v.string(),
 		maxResults: v.optional(v.number()),
 	},
+  returns: v.object({
+    results: v.array(
+      v.object({
+        title: v.string(),
+        url: v.string(),
+        snippet: v.string(),
+        relevanceScore: v.number(),
+      }),
+    ),
+    searchMethod: v.union(
+      v.literal("serp"),
+      v.literal("openrouter"),
+      v.literal("duckduckgo"),
+      v.literal("fallback"),
+    ),
+    hasRealResults: v.boolean(),
+  }),
 	handler: async (_ctx, args) => {
 		const maxResults = args.maxResults || 5;
+    if (args.query.trim().length === 0) {
+      return { results: [], searchMethod: "fallback" as const, hasRealResults: false };
+    }
 
 		// Try SERP API for DuckDuckGo first if available
 		if (process.env.SERP_API_KEY) {
@@ -54,7 +78,7 @@ export const searchWeb = action({
 				if (serpResults.length > 0) {
 					return {
 						results: serpResults,
-						searchMethod: "serp",
+						searchMethod: "serp" as const,
 						hasRealResults: true,
 					};
 				}
@@ -78,7 +102,7 @@ export const searchWeb = action({
 				if (openRouterResults.length > 0) {
 					return {
 						results: openRouterResults,
-						searchMethod: "openrouter",
+						searchMethod: "openrouter" as const,
 						hasRealResults: true,
 					};
 				}
@@ -100,7 +124,7 @@ export const searchWeb = action({
 			if (ddgResults.length > 0) {
 				return {
 					results: ddgResults,
-					searchMethod: "duckduckgo",
+					searchMethod: "duckduckgo" as const,
 					hasRealResults: ddgResults.some((r) => r.relevanceScore > 0.6),
 				};
 			}
@@ -124,7 +148,7 @@ export const searchWeb = action({
 
 		return {
 			results: fallbackResults,
-			searchMethod: "fallback",
+			searchMethod: "fallback" as const,
 			hasRealResults: false,
 		};
 	},
@@ -151,15 +175,19 @@ export const planSearch = action({
     reasons: v.string(),
   }),
   handler: async (ctx, args) => {
+    const now = Date.now();
+    // Clean up expired cache entries (best-effort)
+    for (const [k, v] of planCache) {
+      if (v.expires <= now) planCache.delete(k);
+    }
     // Cache key: chat + normalized message (first 200 chars)
     const normMsg = args.newMessage.toLowerCase().trim().slice(0, 200);
     const cacheKey = `${args.chatId}|${normMsg}`;
-    const now = Date.now();
     // Rate limit: retain timestamps within last 60s
     const bucket = planRate.get(String(args.chatId)) || [];
-    const windowStart = now - 60_000;
+    const windowStart = now - PLAN_RATE_WINDOW_MS;
     const pruned = bucket.filter((t) => t >= windowStart);
-    if (pruned.length >= 6) {
+    if (pruned.length >= PLAN_RATE_LIMIT) {
       // Too many plan calls; serve default plan (also cached)
       const fallback = {
         shouldSearch: true,
@@ -169,9 +197,9 @@ export const planSearch = action({
         decisionConfidence: 0.5,
         reasons: "rate_limited",
       } as PlanResult;
-      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: fallback });
+      planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: fallback });
       // telemetry
-      await recordMetric(ctx, 'planner_rate_limited', args.chatId);
+      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_rate_limited', chatId: args.chatId });
       return fallback;
     }
     // Record this attempt in the rate bucket
@@ -179,7 +207,7 @@ export const planSearch = action({
     planRate.set(String(args.chatId), pruned);
     const hit = planCache.get(cacheKey);
     if (hit && hit.expires > now) {
-      await recordMetric(ctx, 'planner_invoked', args.chatId);
+      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
       return hit.result;
     }
 
@@ -235,18 +263,18 @@ export const planSearch = action({
 
     // If no API key present, skip LLM planning
     if (!process.env.OPENROUTER_API_KEY) {
-      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
-      await recordMetric(ctx, 'planner_invoked', args.chatId);
+      planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: defaultPlan });
+      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
       return defaultPlan;
     }
 
     // Only call LLM if the topic boundary is ambiguous; otherwise save tokens
-    const borderline = jaccard >= 0.45 && jaccard <= 0.7;
-    if (!borderline) {
-      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
-      await recordMetric(ctx, 'planner_invoked', args.chatId);
-      return defaultPlan;
-    }
+      const borderline = jaccard >= 0.45 && jaccard <= 0.7;
+      if (!borderline) {
+        planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
+        await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
+        return defaultPlan;
+      }
 
     try {
       const prompt = {
@@ -276,8 +304,8 @@ export const planSearch = action({
       });
 
       if (!response.ok) {
-        planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
-        await recordMetric(ctx, 'planner_invoked', args.chatId);
+        planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: defaultPlan });
+        await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
         return defaultPlan;
       }
       const data = await response.json();
@@ -319,16 +347,16 @@ export const planSearch = action({
           decisionConfidence: Math.max(0, Math.min(1, plan.decisionConfidence)),
           reasons: serialize(plan.reasons).slice(0, 500),
         };
-        planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: finalPlan });
-        await recordMetric(ctx, 'planner_invoked', args.chatId);
+        planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: finalPlan });
+        await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
         return finalPlan;
       }
-      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
-      await recordMetric(ctx, 'planner_invoked', args.chatId);
+      planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: defaultPlan });
+      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
       return defaultPlan;
     } catch {
-      planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
-      await recordMetric(ctx, 'planner_invoked', args.chatId);
+      planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: defaultPlan });
+      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
       return defaultPlan;
     }
   },
@@ -343,22 +371,35 @@ export const planSearch = action({
  * @param name - Metric name
  * @param chatId - Optional chat ID
  */
-async function recordMetric(ctx: any, name: 'planner_invoked' | 'planner_rate_limited' | 'user_overrode_prompt' | 'new_chat_confirmed', chatId?: string) {
-  try {
-    const date = new Date().toISOString().slice(0,10); // YYYY-MM-DD
-    const existing = await ctx.db
-      .query('metrics')
-      .withIndex('by_name_and_date', (q: any) => q.eq('name', name).eq('date', date))
-      .first();
-    if (existing) {
-      await ctx.db.patch(existing._id, { count: (existing.count || 0) + 1 });
-    } else {
-      await ctx.db.insert('metrics', { name, date, chatId, count: 1 });
+export const recordMetric = internalMutation({
+  args: {
+    name: v.union(
+      v.literal('planner_invoked'),
+      v.literal('planner_rate_limited'),
+      v.literal('user_overrode_prompt'),
+      v.literal('new_chat_confirmed')
+    ),
+    chatId: v.optional(v.id('chats')),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      const date = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+      const existing = await ctx.db
+        .query('metrics')
+        .withIndex('by_name_and_date', (q) => q.eq('name', args.name).eq('date', date))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, { count: (existing.count || 0) + 1 });
+      } else {
+        await ctx.db.insert('metrics', { name: args.name, date, chatId: args.chatId, count: 1 });
+      }
+    } catch (e) {
+      console.warn('metrics failed', args.name, e);
     }
-  } catch (e) {
-    console.warn('metrics failed', name, e);
+    return null;
   }
-}
+});
 
 interface SearchResult {
 	title: string;
@@ -687,6 +728,11 @@ export async function searchWithDuckDuckGo(
  */
 export const scrapeUrl = action({
 	args: { url: v.string() },
+  returns: v.object({
+    title: v.string(),
+    content: v.string(),
+    summary: v.optional(v.string()),
+  }),
 	handler: async (
 		_,
 		args,
@@ -859,8 +905,9 @@ export const scrapeUrl = action({
 				timestamp: new Date().toISOString(),
 			});
 
-			const hostname = new URL(args.url).hostname;
-			const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      let hostname = "";
+      try { hostname = new URL(args.url).hostname; } catch { hostname = "unknown"; }
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
 			return {
 				title: hostname,
@@ -886,7 +933,7 @@ export const recordClientMetric = action({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await recordMetric(ctx, args.name, args.chatId);
+    await ctx.runMutation(internal.search.recordMetric, { name: args.name, chatId: args.chatId });
     return null;
   },
 });
