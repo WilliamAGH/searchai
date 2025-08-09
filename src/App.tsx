@@ -22,9 +22,9 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
-        <div className="min-h-screen flex flex-col">
-          <header className="sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30">
+      <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
+        <div className="h-screen flex flex-col">
+          <header className="flex-shrink-0 sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 {/* Mobile menu button */}
@@ -74,7 +74,7 @@ export default function App() {
             </div>
           </header>
           
-          <main className="flex-1 flex">
+          <main className="flex-1 flex overflow-hidden">
             <Authenticated>
               <ChatInterface 
                 isAuthenticated={true} 
