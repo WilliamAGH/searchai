@@ -21,16 +21,16 @@ const applicationTables = {
     title: v.string(),
     userId: v.optional(v.id("users")),
     shareId: v.optional(v.string()),
-    isShared: v.optional(v.boolean()),
-    isPublic: v.optional(v.boolean()),
+    publicId: v.optional(v.string()),
+    privacy: v.optional(v.union(v.literal("private"), v.literal("shared"), v.literal("public"))),
     createdAt: v.number(),
     updatedAt: v.number(),
-    // Rolling, compact summary of recent context for token efficiency
     rollingSummary: v.optional(v.string()),
     rollingSummaryUpdatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
-    .index("by_share_id", ["shareId"]),
+    .index("by_share_id", ["shareId"])
+    .index("by_public_id", ["publicId"]),
 
   /**
    * Messages table
