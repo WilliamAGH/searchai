@@ -300,8 +300,8 @@ export const generationStep = internalAction({
 		});
 		// Build full message history, excluding the current assistant message being generated
 		const messageHistory = messages
-			.filter((m) => m._id !== args.assistantMessageId)
-			.map((m) => ({
+			.filter((m: any) => m._id !== args.assistantMessageId)
+			.map((m: any) => ({
 				role: m.role,
 				content: m.content || "",
 			}));
