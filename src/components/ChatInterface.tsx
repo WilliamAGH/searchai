@@ -13,6 +13,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useThrottle, useDebounce } from "../hooks/useDebounce";
+import { logger } from "../lib/logger";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageInput } from "./MessageInput";
 import { MessageList } from "./MessageList";
@@ -128,8 +129,9 @@ export function ChatInterface({
 	const createChat = useMutation(api.chats.createChat);
 	const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
 	 const generateResponse = useAction(api.ai.generateStreamingResponse);
-	 const planSearch = useAction(api.search.planSearch);
+  const planSearch = useAction(api.search.planSearch);
 	 const recordClientMetric = useAction(api.search.recordClientMetric);
+  const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
   // no-op placeholder (removed summarizeRecent direct usage)
 
 	/**
@@ -200,6 +202,20 @@ export function ChatInterface({
 		return [];
 	}, [isAuthenticated, messages, localMessages, currentChatId]);
 
+  // Build user message history for terminal-like navigation (oldest -> newest)
+  const userHistory = React.useMemo(() => {
+    const list = currentMessages
+      .filter((m) => m.role === 'user')
+      .map((m) => m.content)
+      .filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
+    // De-duplicate consecutive duplicates
+    const deduped: string[] = [];
+    for (const s of list) {
+      if (deduped.length === 0 || deduped[deduped.length - 1] !== s) deduped.push(s);
+    }
+    return deduped;
+  }, [currentMessages]);
+
 	// Update URL when chat changes
 	useEffect(() => {
 		if (chatByOpaqueId) {
@@ -208,8 +224,26 @@ export function ChatInterface({
 			setCurrentChatId(chatByShareId._id);
 		} else if (chatByPublicId) {
 			setCurrentChatId(chatByPublicId._id);
+		} else if (!isAuthenticated && propChatId) {
+			// For unauthenticated users, check if the chatId from URL matches a local chat
+			const localChat = localChats.find(chat => chat._id === propChatId);
+			if (localChat) {
+				setCurrentChatId(localChat._id);
+			}
+		} else if (!isAuthenticated && propShareId) {
+			// For unauthenticated users, check if the shareId from URL matches a local chat
+			const localChat = localChats.find(chat => chat.shareId === propShareId);
+			if (localChat) {
+				setCurrentChatId(localChat._id);
+			}
+		} else if (!isAuthenticated && propPublicId) {
+			// For unauthenticated users, check if the publicId from URL matches a local chat
+			const localChat = localChats.find(chat => chat.publicId === propPublicId);
+			if (localChat) {
+				setCurrentChatId(localChat._id);
+			}
 		}
-	}, [chatByOpaqueId, chatByShareId, chatByPublicId]);
+	}, [chatByOpaqueId, chatByShareId, chatByPublicId, isAuthenticated, propChatId, propShareId, propPublicId, localChats]);
 
 	useEffect(() => {
 		const chat = allChats.find(c => c._id === currentChatId);
@@ -368,10 +402,10 @@ export function ChatInterface({
 			});
 
 			const searchUrl = resolveApi("/api/search");
-			console.log("🔍 SEARCH API REQUEST:");
-			console.log("URL:", searchUrl);
-			console.log("Method:", "POST");
-			console.log(
+			logger.debug("🔍 SEARCH API REQUEST:");
+			logger.debug("URL:", searchUrl);
+			logger.debug("Method:", "POST");
+			logger.debug(
 				"Body:",
 				JSON.stringify({ query: message, maxResults: 5 }, null, 2),
 			);
@@ -385,17 +419,17 @@ export function ChatInterface({
 			});
 			const searchDuration = Date.now() - searchStartTime;
 
-			console.log("🔍 SEARCH API RESPONSE:");
-			console.log("Status:", searchResponse.status);
-			console.log("Duration:", `${searchDuration}ms`);
-			console.log(
+			logger.debug("🔍 SEARCH API RESPONSE:");
+			logger.debug("Status:", searchResponse.status);
+			logger.debug("Duration:", `${searchDuration}ms`);
+			logger.debug(
 				"Headers:",
 				Object.fromEntries(searchResponse.headers.entries()),
 			);
 
 			if (searchResponse.ok) {
 				const searchData = await searchResponse.json();
-				console.log(
+				logger.debug(
 					"🔍 SEARCH API RESPONSE BODY:",
 					JSON.stringify(searchData, null, 2),
 				);
@@ -429,10 +463,10 @@ export function ChatInterface({
 
 								try {
 									const scrapeUrl = resolveApi("/api/scrape");
-									console.log("🌐 SCRAPE API REQUEST:");
-									console.log("URL:", scrapeUrl);
-									console.log("Method:", "POST");
-									console.log(
+									logger.debug("🌐 SCRAPE API REQUEST:");
+									logger.debug("URL:", scrapeUrl);
+									logger.debug("Method:", "POST");
+									logger.debug(
 										"Body:",
 										JSON.stringify({ url: result.url }, null, 2),
 									);
@@ -446,14 +480,14 @@ export function ChatInterface({
 									});
 									const scrapeDuration = Date.now() - scrapeStartTime;
 
-									console.log("🌐 SCRAPE API RESPONSE:");
-									console.log("Status:", scrapeResponse.status);
-									console.log("Duration:", `${scrapeDuration}ms`);
-									console.log("URL:", result.url);
+									logger.debug("🌐 SCRAPE API RESPONSE:");
+									logger.debug("Status:", scrapeResponse.status);
+									logger.debug("Duration:", `${scrapeDuration}ms`);
+									logger.debug("URL:", result.url);
 
 									if (scrapeResponse.ok) {
 										const content = await scrapeResponse.json();
-										console.log(
+										logger.debug(
 											"🌐 SCRAPE API RESPONSE BODY:",
 											JSON.stringify(content, null, 2),
 										);
@@ -1095,7 +1129,11 @@ export function ChatInterface({
       // Fetch a compact server-side summary from previous chat id
       const prevChatId = currentChatId;
       let summary = '';
-      // We could call a server summarize query here when needed.
+      try {
+        if (isAuthenticated && typeof prevChatId !== 'string' && prevChatId) {
+          summary = await summarizeRecentAction({ chatId: prevChatId, limit: 12 });
+        }
+      } catch {}
 
       // Fallback summary from local messages when unauthenticated
       if (!summary) {
@@ -1144,15 +1182,16 @@ export function ChatInterface({
     } catch {}
   }, 350);
 
-	// Auto-create first chat if none exists and not on a shared chat URL
+	// Auto-create first chat if none exists and not on a chat URL
 	useEffect(() => {
 		const path = window.location.pathname;
-		const isSharedChatUrl = path.match(/^\/chat\/[a-zA-Z0-9]+$/);
+		// Don't auto-create if we're on any chat URL (private, shared, or public)
+		const isChatUrl = path.match(/^\/(chat|s|p)\/[a-zA-Z0-9_]+$/);
 
-		if (!currentChatId && !isSharedChatUrl) {
+		if (!currentChatId && !isChatUrl && !propChatId && !propShareId && !propPublicId) {
 			handleNewChat();
 		}
-	}, [currentChatId, handleNewChat]);
+	}, [currentChatId, handleNewChat, propChatId, propShareId, propPublicId]);
 
 	const canShare =
 		currentMessages.length > 0 && typeof currentChatId === "string";
@@ -1229,6 +1268,7 @@ export function ChatInterface({
             onDraftChange={draftAnalyzer}
 						disabled={isGenerating || showFollowUpPrompt}
 						placeholder={isGenerating ? "AI is working..." : showFollowUpPrompt ? "Choose an option above..." : "Ask me anything..."}
+            history={userHistory}
 					/>
 				</div>
 			</div>
