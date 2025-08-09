@@ -74,7 +74,7 @@ const applicationTables = {
    * - Per-user customization
    */
   preferences: defineTable({
-    userId: v.string(),
+    userId: v.id("users"),
     theme: v.union(v.literal("light"), v.literal("dark"), v.literal("system")),
     searchEnabled: v.boolean(),
     maxSearchResults: v.number(),
