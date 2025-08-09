@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -124,12 +125,12 @@ export function MarkdownWithCitations({
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={(() => {
-                          const base = 'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline';
-                          const highlight = 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600';
-                          const normal = 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300';
-                          return `${base} ${isHighlighted ? highlight : normal}`;
-                        })()}
+                        className={clsx(
+                          'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline',
+                          isHighlighted
+                            ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300'
+                        )}
                         onMouseEnter={() => onCitationHover?.(url)}
                         onMouseLeave={() => onCitationHover?.(null)}
                         onClick={(e) => e.stopPropagation()}
@@ -186,12 +187,12 @@ export function MarkdownWithCitations({
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={(() => {
-                          const base = 'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline';
-                          const highlight = 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600';
-                          const normal = 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300';
-                          return `${base} ${isHighlighted ? highlight : normal}`;
-                        })()}
+                        className={clsx(
+                          'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline',
+                          isHighlighted
+                            ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300'
+                        )}
                         onMouseEnter={() => onCitationHover?.(url)}
                         onMouseLeave={() => onCitationHover?.(null)}
                         onClick={(e) => e.stopPropagation()}
