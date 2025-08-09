@@ -27,8 +27,13 @@ interface OpenRouterBody {
 }
 
 /**
- * Helper: Stream chunks from OpenRouter chat completions API with detailed logging.
- * Yields parsed SSE JSON payloads until [DONE]. Throws on HTTP or parsing errors.
+ * Stream chunks from OpenRouter API
+ * - Yields parsed SSE JSON payloads
+ * - Handles [DONE] signal
+ * - Detailed error logging
+ * - Throws on HTTP/parsing errors
+ * @param body - OpenRouter API request body
+ * @yields Parsed JSON chunks from stream
  */
 async function* streamOpenRouter(body: OpenRouterBody) {
 	console.log("🔄 OpenRouter streaming request initiated:", {
@@ -131,8 +136,13 @@ async function* streamOpenRouter(body: OpenRouterBody) {
 }
 
 /**
- * Public action: Append user message, create assistant placeholder, then
- * schedule streaming generation via an internal action.
+ * Generate streaming AI response
+ * - Adds user message to chat
+ * - Creates assistant placeholder
+ * - Schedules internal generation
+ * - Non-blocking async execution
+ * @param chatId - Chat to append to
+ * @param message - User's message text
  */
 export const generateStreamingResponse = action({
 	args: {
@@ -168,9 +178,16 @@ export const generateStreamingResponse = action({
 });
 
 /**
- * Internal action: Orchestrates search, scraping, context assembly, and
- * streaming AI generation. Streams partial content into the placeholder
- * assistant message and finalizes at the end.
+ * Internal generation orchestrator
+ * - Plans context-aware search
+ * - Scrapes top 3 results
+ * - Builds system prompt with sources
+ * - Streams response with 100ms batching
+ * - Updates rolling summary
+ * - Handles errors gracefully
+ * @param chatId - Chat context
+ * @param assistantMessageId - Message to update
+ * @param userMessage - User's query
  */
 export const generationStep = internalAction({
 	args: {
@@ -406,5 +423,25 @@ export const generationStep = internalAction({
 			isStreaming: false,
 			thinking: undefined, // Clear thinking state
 		});
+
+		// 9. Update rolling summary to reduce future planner tokens
+		try {
+			// Build compact summary from the most recent history (including the final response)
+			const summaryParts: string[] = [];
+			const recentForSummary = messageHistory.slice(-10);
+			for (const m of recentForSummary) {
+				summaryParts.push(`${m.role}: ${(m.content || '').slice(0, 200)}`);
+			}
+			if (responseContent) {
+				summaryParts.push(`assistant: ${responseContent.slice(0, 400)}`);
+			}
+			const compactSummary = summaryParts.join(" \n ").slice(0, 2000);
+			await ctx.runMutation(api.chats.updateRollingSummary, {
+				chatId: args.chatId,
+				summary: compactSummary,
+			});
+		} catch (e) {
+			console.warn("Failed to update rolling summary", e);
+		}
 	},
 });
