@@ -307,7 +307,13 @@ html.dark .prose code {
 }
 
 .animate-slide-up {
-  animation: slide-up 0.3s ease-out;
+  animation: slide-up 0.3s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up {
+    animation: none !important;
+  }
 }
 
 /* Hide scrollbar on message input textarea */
