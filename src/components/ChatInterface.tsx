@@ -130,6 +130,7 @@ export function ChatInterface({
 	 const generateResponse = useAction(api.ai.generateStreamingResponse);
 	 const planSearch = useAction(api.search.planSearch);
 	 const recordClientMetric = useAction(api.search.recordClientMetric);
+  // no-op placeholder (removed summarizeRecent direct usage)
 
 	/**
 	 * Generate unique share ID
@@ -1081,6 +1082,45 @@ export function ChatInterface({
 		}, 500);
 	}, [pendingMessage, handleNewChat]);
 
+  // Start new chat with summary: create chat, synthesize prompt with summary + question
+  const handleNewChatWithSummary = React.useCallback(async () => {
+    setShowFollowUpPrompt(false);
+    setPlannerHint(undefined);
+    const tempMessage = pendingMessage;
+    setPendingMessage("");
+
+    try {
+      // Create destination chat first
+      await handleNewChat();
+      // Fetch a compact server-side summary from previous chat id
+      const prevChatId = currentChatId;
+      let summary = '';
+      // We could call a server summarize query here when needed.
+
+      // Fallback summary from local messages when unauthenticated
+      if (!summary) {
+        const msgs = typeof prevChatId === 'string' ? localMessages.filter(m => m.chatId === prevChatId) : [];
+        const last = msgs.slice(-12);
+        summary = last.map(m => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content.slice(0,220)}`).join('\n');
+      }
+
+      // Compose first message for the new chat: include brief summary then question
+      const composed = summary
+        ? `Summary of previous conversation (for context):\n${summary}\n\nQuestion: ${tempMessage || ''}`
+        : (tempMessage || '');
+
+      setTimeout(() => {
+        if (composed) {
+          handleSendMessage(composed);
+        }
+      }, 450);
+    } catch (e) {
+      console.warn('New chat w/ summary failed', e);
+      // Fallback to normal new chat flow
+      await handleNewChatForFollowUp();
+    }
+  }, [pendingMessage, currentChatId, handleNewChatForFollowUp, handleNewChat, isAuthenticated, localMessages]);
+
   // Debounced draft analyzer: quick local heuristic, optional planner preflight (not blocking)
   const draftAnalyzer = useDebounce((draft: string) => {
     try {
@@ -1179,7 +1219,8 @@ export function ChatInterface({
 					<FollowUpPrompt
 						isOpen={showFollowUpPrompt}
 						onContinue={handleContinueChat}
-						onNewChat={handleNewChatForFollowUp}
+            onNewChat={handleNewChatForFollowUp}
+            onNewChatWithSummary={handleNewChatWithSummary}
 						hintReason={plannerHint?.reason}
 						hintConfidence={plannerHint?.confidence}
 					/>
