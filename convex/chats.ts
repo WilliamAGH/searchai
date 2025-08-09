@@ -92,20 +92,19 @@ export const getChatById = query({
 });
 
 export const getChatByOpaqueId = query({
- args: { chatId: v.string() },
+  args: { chatId: v.id("chats") },
   returns: v.union(v.any(), v.null()),
- handler: async (ctx, args) => {
-  const userId = await getAuthUserId(ctx);
-  // This is intentionally not using the index.
-  const chat = await ctx.db.query("chats").filter(q => q.eq(q.field("_id"), args.chatId)).first();
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const chat = await ctx.db.get(args.chatId);
 
-  if (!chat) return null;
+    if (!chat) return null;
 
-  // Allow access to chats without userId (anonymous chats) or user's own chats
-  if (chat.userId && chat.userId !== userId) return null;
+    // Allow access to chats without userId (anonymous chats) or user's own chats
+    if (chat.userId && chat.userId !== userId) return null;
 
-  return chat;
- },
+    return chat;
+  },
 });
 
 /**
@@ -240,6 +239,7 @@ export const updateRollingSummary = internalMutation({
  */
 export const summarizeRecent = query({
   args: { chatId: v.id("chats"), limit: v.optional(v.number()) },
+  returns: v.string(),
   handler: async (ctx, args) => {
     const limit = Math.max(1, Math.min(args.limit ?? 12, 40));
     const messages = await ctx.db
