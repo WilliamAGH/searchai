@@ -28,7 +28,7 @@ export function ChatSidebar({
 }: ChatSidebarProps) {
   if (!isOpen) {
     return (
-      <div className="w-12 border-r bg-muted/30 flex flex-col">
+      <div className="w-12 h-full border-r bg-muted/30 flex flex-col">
         <button
           onClick={onToggle}
           className="p-3 hover:bg-muted transition-colors"
@@ -52,7 +52,7 @@ export function ChatSidebar({
   }
 
   return (
-    <div className="w-full sm:w-80 border-r bg-muted/30 flex flex-col">
+    <div className="w-full sm:w-80 h-full border-r bg-muted/30 flex flex-col">
       <div className="p-3 sm:p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">Chats</h3>
