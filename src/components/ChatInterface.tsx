@@ -880,9 +880,9 @@ export function ChatInterface({
 	});
 
 	return (
-		<div className="flex-1 flex relative" {...swipeHandlers}>
+		<div className="flex-1 flex relative h-full overflow-hidden" {...swipeHandlers}>
 			{/* Desktop Sidebar */}
-			<div className="hidden lg:block">
+			<div className="hidden lg:block h-full">
 				<ChatSidebar
 					chats={allChats}
 					currentChatId={currentChatId}
@@ -904,7 +904,7 @@ export function ChatInterface({
 			/>
 
 
-			<div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
+			<div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full overflow-hidden">
 				<div className="flex-1 overflow-hidden">
 					<MessageList
 						messages={currentMessages}
@@ -915,11 +915,13 @@ export function ChatInterface({
 						currentChat={currentChat}
 					/>
 				</div>
-				<MessageInput
-					onSendMessage={handleSendMessage}
-					disabled={isGenerating}
-					placeholder={isGenerating ? "AI is working..." : "Ask me anything..."}
-				/>
+				<div className="flex-shrink-0">
+					<MessageInput
+						onSendMessage={handleSendMessage}
+						disabled={isGenerating}
+						placeholder={isGenerating ? "AI is working..." : "Ask me anything..."}
+					/>
+				</div>
 			</div>
 
 			<AuthModal
