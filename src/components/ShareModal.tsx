@@ -9,41 +9,21 @@
 import React, { useState } from 'react';
 
 interface ShareModalProps {
-  /** Modal visibility state */
   isOpen: boolean;
-  /** Close modal handler */
   onClose: () => void;
-  /** Share action handler */
-  onShare: (isPublic: boolean) => void;
-  /** Generated share URL */
+  onShare: (privacy: "private" | "shared" | "public") => void;
   shareUrl: string;
-  /** Current share state */
-  isShared: boolean;
-  /** Public indexing state */
-  isPublic: boolean;
+  privacy: "private" | "shared" | "public";
 }
 
-/**
- * Modal for sharing chat conversations
- * @param isOpen - Show/hide modal
- * @param onClose - Close handler
- * @param onShare - Share submission handler
- * @param shareUrl - URL to share
- * @param isShared - Already shared flag
- * @param isPublic - Public visibility flag
- */
-export function ShareModal({ isOpen, onClose, onShare, shareUrl, isShared, isPublic }: ShareModalProps) {
-  const [allowIndexing, setAllowIndexing] = useState(isPublic);
+export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: ShareModalProps) {
+  const [selectedPrivacy, setSelectedPrivacy] = useState<"private" | "shared" | "public">(privacy);
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
-  /**
-   * Handle share action
-   * - Passes indexing preference
-   */
   const handleShare = () => {
-    onShare(allowIndexing);
+    onShare(selectedPrivacy);
   };
 
   /**
@@ -59,18 +39,6 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, isShared, isPub
     } catch (error) {
       console.error('Failed to copy URL:', error);
     }
-  };
-
-  /**
-   * Get share status label
-   * - public: searchable
-   * - shared: link-only
-   * - private: not shared
-   */
-  const getShareStatus = () => {
-    if (isPublic) return 'public';
-    if (isShared) return 'shared';
-    return 'private';
   };
 
   return (
@@ -107,85 +75,55 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, isShared, isPub
           </p>
         </div>
 
-        {isShared ? (
-          <div className="space-y-4">
-            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-              <div className="flex items-center gap-2 mb-2">
-                <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                  Chat is {getShareStatus()}
-                </span>
-              </div>
-              <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                {isPublic 
-                  ? "This chat can be found in search results and accessed by anyone with the link."
-                  : "This chat can be accessed by anyone with the link but won't appear in search results."
-                }
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <label htmlFor="share-url-input" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Share URL
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Privacy Level</label>
+            <div className="flex flex-col space-y-2">
+              <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+                <input type="radio" name="privacy" value="private" checked={selectedPrivacy === 'private'} onChange={() => setSelectedPrivacy('private')} className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 focus:ring-emerald-500" />
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">Private</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Only you can see this chat.</div>
+                </div>
               </label>
+              <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+                <input type="radio" name="privacy" value="shared" checked={selectedPrivacy === 'shared'} onChange={() => setSelectedPrivacy('shared')} className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 focus:ring-emerald-500" />
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">Shared</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Anyone with the link can view. Not indexed.</div>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+                <input type="radio" name="privacy" value="public" checked={selectedPrivacy === 'public'} onChange={() => setSelectedPrivacy('public')} className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 focus:ring-emerald-500" />
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">Public</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Anyone can view and it may appear in search results.</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {(selectedPrivacy === 'shared' || selectedPrivacy === 'public') && (
+            <div className="space-y-3">
+              <label htmlFor="share-url-input" className="text-sm font-medium text-gray-700 dark:text-gray-300">Share URL</label>
               <div className="flex gap-2">
-                <input
-                  id="share-url-input"
-                  type="text"
-                  value={shareUrl}
-                  readOnly
-                  className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  aria-label="Shareable URL"
-                />
-                <button
-                  onClick={handleCopyUrl}
-                  className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-                  aria-label={copied ? "URL copied to clipboard" : "Copy share URL to clipboard"}
-                >
+                <input id="share-url-input" type="text" value={shareUrl} readOnly className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" aria-label="Shareable URL" />
+                <button onClick={handleCopyUrl} className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900" aria-label={copied ? "URL copied to clipboard" : "Copy share URL to clipboard"}>
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={allowIndexing}
-                  onChange={(e) => setAllowIndexing(e.target.checked)}
-                  className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 rounded focus:ring-emerald-500 dark:focus:ring-emerald-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">
-                    Allow this chat to appear in Google search results
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    When enabled, search engines can index and display this conversation
-                  </div>
-                </div>
-              </label>
-            </div>
+          )}
 
-            <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleShare}
-                className="flex-1 px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-              >
-                Share Chat
-              </button>
-            </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium">
+              Cancel
+            </button>
+            <button onClick={handleShare} className="flex-1 px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
+              Update Privacy
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
