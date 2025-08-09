@@ -1,3 +1,11 @@
+/**
+ * Authentication modal component
+ * - Overlay with backdrop blur
+ * - Contains SignInForm
+ * - Mobile responsive
+ * - Close on backdrop click
+ */
+
 import React from 'react';
 import { SignInForm } from '../SignInForm';
 
@@ -6,6 +14,12 @@ interface AuthModalProps {
   onClose: () => void;
 }
 
+/**
+ * Auth modal for sign-in/sign-up
+ * @param isOpen - Modal visibility state
+ * @param onClose - Close callback
+ * @returns Modal portal or null
+ */
 export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   if (!isOpen) return null;
 
@@ -20,6 +34,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       {/* Modal */}
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm sm:max-w-md w-full mx-4 p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <button
+          type="button"
+          aria-label="Close"
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
         >
