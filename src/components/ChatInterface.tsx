@@ -13,7 +13,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce, useThrottle } from "../hooks/useDebounce";
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useMemo } from "react";
 import { logger } from "../lib/logger";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageInput } from "./MessageInput";
@@ -156,7 +156,7 @@ export function ChatInterface({
 	 * - Random alphanumeric string
 	 * - Used for shareable chat URLs
 	 */
-	const generateShareId = React.useCallback(() => {
+	const generateShareId = useCallback(() => {
 		return `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
 	}, []);
 
@@ -169,7 +169,7 @@ export function ChatInterface({
 	 * @param previousMessages - Chat history
 	 * @returns true if topic changed significantly
 	 */
-	const isTopicChange = React.useCallback((newMessage: string, previousMessages: LocalMessage[]) => {
+	const isTopicChange = useCallback((newMessage: string, previousMessages: LocalMessage[]) => {
 		// Don't prompt if there are no previous messages or only one exchange
 		if (previousMessages.length < 2) return false;
 		
@@ -194,7 +194,7 @@ export function ChatInterface({
 	}, []);
 
 	// Get all chats (either from Convex or local storage)
-	const allChats = React.useMemo(() => {
+	const allChats = useMemo(() => {
 		if (isAuthenticated && chats) {
 			return chats;
 		} else if (!isAuthenticated) {
@@ -204,7 +204,7 @@ export function ChatInterface({
 	}, [isAuthenticated, chats, localChats]);
 
 	// Get current messages (either from Convex or local storage)
-	const currentMessages = React.useMemo(() => {
+	const currentMessages = useMemo(() => {
 		if (isAuthenticated && messages) {
 			return messages;
 		} else if (!isAuthenticated && typeof currentChatId === "string") {
@@ -214,7 +214,7 @@ export function ChatInterface({
 	}, [isAuthenticated, messages, localMessages, currentChatId]);
 
   // Build user message history for terminal-like navigation (oldest -> newest)
-  const userHistory = React.useMemo(() => {
+  const userHistory = useMemo(() => {
     const list = currentMessages
       .filter((m) => m.role === 'user')
       .map((m) => m.content)
@@ -286,7 +286,7 @@ export function ChatInterface({
 	}, [currentChatId, allChats]);
 
 	// Get current chat
-	const currentChat = React.useMemo(() => {
+	const currentChat = useMemo(() => {
 		if (typeof currentChatId === "string") {
 			return localChats.find((c) => c._id === currentChatId);
 		}
@@ -299,7 +299,7 @@ export function ChatInterface({
 	 * - Anon: creates local with share ID
 	 * - Updates URL for shareable chats
 	 */
-	const handleNewChat = React.useCallback(async () => {
+	const handleNewChat = useCallback(async () => {
 		try {
 			if (isAuthenticated) {
 				const chatId = await createChat({
@@ -330,9 +330,9 @@ export function ChatInterface({
 
 	// Function to call AI API directly for unauthenticated users
 	// Create a ref to track if component is mounted
-	const isMountedRef = React.useRef(true);
+	const isMountedRef = useRef(true);
 	
-	React.useEffect(() => {
+	useEffect(() => {
 		isMountedRef.current = true;
 		return () => {
 			isMountedRef.current = false;
@@ -363,10 +363,10 @@ export function ChatInterface({
   }, [setLocalMessages]), 50);
 
 	// Add abort controller for stream cancellation
-	const abortControllerRef = React.useRef<AbortController | null>(null);
+	const abortControllerRef = useRef<AbortController | null>(null);
 	
 	// Cleanup on unmount
-	React.useEffect(() => {
+	useEffect(() => {
 		return () => {
 			// Abort any ongoing streams when component unmounts
 			if (abortControllerRef.current) {
@@ -1087,7 +1087,7 @@ export function ChatInterface({
 	 * - Sends pending message
 	 * - Uses setTimeout for state sync
 	 */
-	const handleContinueChat = React.useCallback(() => {
+	const handleContinueChat = useCallback(() => {
 		setShowFollowUpPrompt(false);
 		setPlannerHint(undefined);
     // Telemetry: user chose to continue in current chat
@@ -1111,7 +1111,7 @@ export function ChatInterface({
 	 * - Waits 500ms for creation
 	 * - Sends pending message
 	 */
-	const handleNewChatForFollowUp = React.useCallback(async () => {
+	const handleNewChatForFollowUp = useCallback(async () => {
 		setShowFollowUpPrompt(false);
 		setPlannerHint(undefined);
 		const tempMessage = pendingMessage;
@@ -1132,7 +1132,7 @@ export function ChatInterface({
 	}, [pendingMessage, handleNewChat]);
 
   // Start new chat with summary: create chat, synthesize prompt with summary + question
-  const handleNewChatWithSummary = React.useCallback(async () => {
+  const handleNewChatWithSummary = useCallback(async () => {
     setShowFollowUpPrompt(false);
     setPlannerHint(undefined);
     const tempMessage = pendingMessage;
@@ -1198,7 +1198,7 @@ export function ChatInterface({
   }, 650);
 
   // Only forward drafts when meaningful and not generating
-  const handleDraftChange = React.useCallback((draft: string) => {
+  const handleDraftChange = useCallback((draft: string) => {
     if (isGenerating) return;
     if (draft.trim().length < 12) return; // avoid popping banner on very short drafts
     draftAnalyzer(draft);
