@@ -44,13 +44,15 @@ async function* streamOpenRouter(body: OpenRouterBody) {
 	});
 
 	try {
-		const response = await fetch(
+        const response = await fetch(
 			"https://openrouter.ai/api/v1/chat/completions",
 			{
 				method: "POST",
 				headers: {
 					Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
 					"Content-Type": "application/json",
+              "HTTP-Referer": "https://search-ai.io",
+              "X-Title": "SearchAI",
 				},
 				body: JSON.stringify({ ...body, stream: true }),
 			},
@@ -149,6 +151,7 @@ export const generateStreamingResponse = action({
 		chatId: v.id("chats"),
 		message: v.string(),
 	},
+  returns: v.null(),
 	handler: async (ctx, args) => {
 		// 1. Add user message to chat
 		await ctx.runMutation(internal.messages.addMessage, {
@@ -173,7 +176,8 @@ export const generateStreamingResponse = action({
 			chatId: args.chatId,
 			assistantMessageId,
 			userMessage: args.message,
-		});
+    });
+    return null;
 	},
 });
 
@@ -195,6 +199,7 @@ export const generationStep = internalAction({
 		assistantMessageId: v.id("messages"),
 		userMessage: v.string(),
 	},
+  returns: v.null(),
 	handler: async (ctx, args) => {
 		let searchResults: Array<{
 			title: string;
@@ -436,12 +441,13 @@ export const generationStep = internalAction({
 				summaryParts.push(`assistant: ${responseContent.slice(0, 400)}`);
 			}
 			const compactSummary = summaryParts.join(" \n ").slice(0, 2000);
-			await ctx.runMutation(api.chats.updateRollingSummary, {
-				chatId: args.chatId,
-				summary: compactSummary,
-			});
-		} catch (e) {
+      await ctx.runMutation(internal.chats.updateRollingSummary, {
+        chatId: args.chatId,
+        summary: compactSummary,
+      });
+    } catch (e) {
 			console.warn("Failed to update rolling summary", e);
 		}
+    return null;
 	},
 });
