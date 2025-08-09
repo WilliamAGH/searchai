@@ -12,7 +12,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
-import { useThrottle } from "../hooks/useDebounce";
+import { useThrottle, useDebounce } from "../hooks/useDebounce";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageInput } from "./MessageInput";
 import { MessageList } from "./MessageList";
@@ -32,6 +32,8 @@ interface LocalChat {
 	shareId?: string;
 	isShared?: boolean;
 	isPublic?: boolean;
+	privacy?: "private" | "shared" | "public";
+	publicId?: string;
 }
 
 interface LocalMessage {
@@ -58,25 +60,26 @@ export function ChatInterface({
 	isAuthenticated,
     isSidebarOpen = false,
     onToggleSidebar,
+    chatId: propChatId,
+    shareId: propShareId,
+    publicId: propPublicId,
 }: {
-	isAuthenticated: boolean;
+ isAuthenticated: boolean;
     isSidebarOpen?: boolean;
     onToggleSidebar?: () => void;
+    chatId?: string;
+    shareId?: string;
+    publicId?: string;
 }) {
-    // Use Convex site URL for HTTP API endpoints (unauthenticated users)
     const convexUrl = (import.meta as any).env?.VITE_CONVEX_URL || "";
-    // Replace .cloud with .site and normalize to remove trailing slashes
     const apiBase = convexUrl.replace('.convex.cloud', '.convex.site').replace(/\/+$/, '');
     
-    // Helper function to build API URLs without double slashes
     const resolveApi = (path: string) => {
         const segment = path.startsWith('/') ? path.slice(1) : path;
         return apiBase ? `${apiBase}/${segment}` : `/${segment}`;
     };
     
-	const [currentChatId, setCurrentChatId] = useState<
-		Id<"chats"> | string | null
-	>(null);
+ const [currentChatId, setCurrentChatId] = useState<Id<"chats"> | string | null>(null);
 	const [isGenerating, setIsGenerating] = useState(false);
 	const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
 	// Use prop if provided, otherwise use local state
@@ -90,6 +93,7 @@ export function ChatInterface({
 	const [pendingMessage, setPendingMessage] = useState<string>("");
 	const [plannerHint, setPlannerHint] = useState<{ reason?: string; confidence?: number } | undefined>(undefined);
 	const [lastPlannerCallAtByChat, setLastPlannerCallAtByChat] = useState<Record<string, number>>({});
+  const [lastDraftSeen, setLastDraftSeen] = useState<string>("");
 	const [searchProgress, setSearchProgress] = useState<{
 		stage: "searching" | "scraping" | "analyzing" | "generating";
 		message: string;
@@ -110,6 +114,10 @@ export function ChatInterface({
 	);
 
 	const chats = useQuery(api.chats.getUserChats);
+	const chatByOpaqueId = useQuery(api.chats.getChatByOpaqueId, propChatId ? { chatId: propChatId } : "skip");
+	const chatByShareId = useQuery(api.chats.getChatByShareId, propShareId ? { shareId: propShareId } : "skip");
+	const chatByPublicId = useQuery(api.chats.getChatByPublicId, propPublicId ? { publicId: propPublicId } : "skip");
+	
 	const messages = useQuery(
 		api.chats.getChatMessages,
 		currentChatId && typeof currentChatId !== "string"
@@ -118,9 +126,10 @@ export function ChatInterface({
 	);
 
 	const createChat = useMutation(api.chats.createChat);
-  const generateResponse = useAction(api.ai.generateStreamingResponse);
-  const planSearch = useAction(api.search.planSearch);
-  const recordClientMetric = useAction(api.search.recordClientMetric);
+	const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
+	 const generateResponse = useAction(api.ai.generateStreamingResponse);
+	 const planSearch = useAction(api.search.planSearch);
+	 const recordClientMetric = useAction(api.search.recordClientMetric);
 
 	/**
 	 * Generate unique share ID
@@ -170,42 +179,15 @@ export function ChatInterface({
 		return similarity < 0.2 || hasIndicator;
 	}, []);
 
-	// Update URL when chat changes
-	useEffect(() => {
-		if (currentChatId) {
-			const shareId =
-				typeof currentChatId === "string"
-					? localChats.find((c) => c._id === currentChatId)?.shareId
-					: null;
-
-			if (shareId) {
-				const url = new URL(window.location.href);
-				url.pathname = `/chat/${shareId}`;
-				window.history.replaceState({}, "", url.toString());
-			}
+	// Get all chats (either from Convex or local storage)
+	const allChats = React.useMemo(() => {
+		if (isAuthenticated && chats) {
+			return chats;
+		} else if (!isAuthenticated) {
+			return localChats;
 		}
-	}, [currentChatId, localChats]);
-
-	// Check URL for existing chat on load
-	useEffect(() => {
-		const path = window.location.pathname;
-		const chatMatch = path.match(/^\/chat\/([a-zA-Z0-9]+)$/);
-
-		if (chatMatch) {
-			const shareId = chatMatch[1];
-
-			if (!isAuthenticated) {
-				// Find local chat by shareId
-				const localChat = localChats.find((c) => c.shareId === shareId);
-				if (localChat) {
-					setCurrentChatId(localChat._id);
-					return;
-				}
-			}
-
-			// TODO: Handle authenticated user shared chats
-		}
-	}, [localChats, isAuthenticated]);
+		return [];
+	}, [isAuthenticated, chats, localChats]);
 
 	// Get current messages (either from Convex or local storage)
 	const currentMessages = React.useMemo(() => {
@@ -217,15 +199,45 @@ export function ChatInterface({
 		return [];
 	}, [isAuthenticated, messages, localMessages, currentChatId]);
 
-	// Get all chats (either from Convex or local storage)
-	const allChats = React.useMemo(() => {
-		if (isAuthenticated && chats) {
-			return chats;
-		} else if (!isAuthenticated) {
-			return localChats;
+	// Update URL when chat changes
+	useEffect(() => {
+		if (chatByOpaqueId) {
+			setCurrentChatId(chatByOpaqueId._id);
+		} else if (chatByShareId) {
+			setCurrentChatId(chatByShareId._id);
+		} else if (chatByPublicId) {
+			setCurrentChatId(chatByPublicId._id);
 		}
-		return [];
-	}, [isAuthenticated, chats, localChats]);
+	}, [chatByOpaqueId, chatByShareId, chatByPublicId]);
+
+	useEffect(() => {
+		const chat = allChats.find(c => c._id === currentChatId);
+		if (chat) {
+			let path = '';
+			if (chat.privacy === 'public' && chat.publicId) {
+				path = `/p/${chat.publicId}`;
+			} else if (chat.privacy === 'shared' && chat.shareId) {
+				path = `/s/${chat.shareId}`;
+			} else {
+				path = `/chat/${chat._id}`;
+			}
+			if (path !== window.location.pathname) {
+				window.history.pushState({}, '', path);
+			}
+		}
+	}, [currentChatId, allChats]);
+
+	useEffect(() => {
+		const chat = allChats.find(c => c._id === currentChatId);
+		const metaRobots = document.querySelector('meta[name="robots"]');
+		if (chat && metaRobots) {
+			if (chat.privacy === 'public') {
+				metaRobots.setAttribute('content', 'index, follow');
+			} else {
+				metaRobots.setAttribute('content', 'noindex, nofollow');
+			}
+		}
+	}, [currentChatId, allChats]);
 
 	// Get current chat
 	const currentChat = React.useMemo(() => {
@@ -258,14 +270,11 @@ export function ChatInterface({
 					updatedAt: Date.now(),
 					isLocal: true,
 					shareId,
+					publicId: generateShareId(), // Also generate a public ID
+					privacy: 'private',
 				};
 				setLocalChats((prev) => [newChat, ...prev]);
 				setCurrentChatId(newChat._id);
-
-				// Update URL immediately
-				const url = new URL(window.location.href);
-				url.pathname = `/chat/${shareId}`;
-				window.history.replaceState({}, "", url.toString());
 			}
 			setMessageCount(0);
 		} catch (error) {
@@ -1003,18 +1012,22 @@ export function ChatInterface({
 	 * - Sets public/private visibility
 	 * @param isPublic - Public visibility flag
 	 */
-	const handleShare = (isPublic: boolean) => {
-		if (!currentChat || typeof currentChatId !== "string") return;
+	const handleShare = (privacy: "private" | "shared" | "public") => {
+		if (!currentChatId) return;
 
-		// Update local chat sharing status
-		setLocalChats((prev) =>
-			prev.map((chat) =>
-				chat._id === currentChatId
-					? { ...chat, isShared: true, isPublic }
-					: chat,
-			),
-		);
-
+		if (typeof currentChatId === "string") {
+			// Handle local chat
+			setLocalChats((prev) =>
+				prev.map((chat) =>
+					chat._id === currentChatId
+						? { ...chat, privacy }
+						: chat,
+				),
+			);
+		} else {
+			// Handle Convex chat
+			updateChatPrivacy({ chatId: currentChatId, privacy });
+		}
 		setShowShareModal(false);
 	};
 
@@ -1067,6 +1080,29 @@ export function ChatInterface({
 			}
 		}, 500);
 	}, [pendingMessage, handleNewChat]);
+
+  // Debounced draft analyzer: quick local heuristic, optional planner preflight (not blocking)
+  const draftAnalyzer = useDebounce((draft: string) => {
+    try {
+      const val = draft.trim();
+      if (!val) return;
+      if (!currentChatId) return;
+      // Skip if identical draft recently
+      if (val.slice(0, 160) === lastDraftSeen) return;
+      setLastDraftSeen(val.slice(0, 160));
+
+      // Local heuristic only; do not call planner here (avoid extra latency)
+      const msgs = typeof currentChatId === 'string' ? localMessages.filter(m => m.chatId === currentChatId) : (messages || []);
+      if (msgs.length >= 2 && isTopicChange(val, msgs)) {
+        // Show advisory hint non-blocking if no prompt is currently visible
+        if (!showFollowUpPrompt) {
+          setPendingMessage(val);
+          setPlannerHint(undefined);
+          setShowFollowUpPrompt(true);
+        }
+      }
+    } catch {}
+  }, 350);
 
 	// Auto-create first chat if none exists and not on a shared chat URL
 	useEffect(() => {
@@ -1149,6 +1185,7 @@ export function ChatInterface({
 					/>
 					<MessageInput
 						onSendMessage={handleSendMessage}
+            onDraftChange={draftAnalyzer}
 						disabled={isGenerating || showFollowUpPrompt}
 						placeholder={isGenerating ? "AI is working..." : showFollowUpPrompt ? "Choose an option above..." : "Ask me anything..."}
 					/>
@@ -1177,12 +1214,11 @@ export function ChatInterface({
 				onClose={() => setShowShareModal(false)}
 				onShare={handleShare}
 				shareUrl={
-					currentChat?.shareId
-						? `${window.location.origin}/chat/${currentChat.shareId}`
-						: ""
+					currentChat?.privacy === 'public' && currentChat.publicId ? `${window.location.origin}/p/${currentChat.publicId}`
+					: currentChat?.privacy === 'shared' && currentChat.shareId ? `${window.location.origin}/s/${currentChat.shareId}`
+					: `${window.location.origin}/chat/${currentChat?._id}`
 				}
-				isShared={currentChat?.isShared || false}
-				isPublic={currentChat?.isPublic || false}
+				privacy={currentChat?.privacy || "private"}
 			/>
 		</div>
 	);
