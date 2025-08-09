@@ -1,0 +1,155 @@
+/* Fluid Typography System - Battle-tested approach used by major design systems */
+@layer base {
+  :root {
+    /* Fluid font sizes using clamp() - works on 100% of modern browsers */
+    --font-size-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --font-size-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
+    --font-size-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+    --font-size-lg: clamp(1.125rem, 1rem + 0.625vw, 1.25rem);
+    --font-size-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
+    --font-size-2xl: clamp(1.5rem, 1.3rem + 1vw, 1.875rem);
+    --font-size-3xl: clamp(1.875rem, 1.5rem + 1.875vw, 2.25rem);
+    --font-size-4xl: clamp(2.25rem, 1.8rem + 2.25vw, 3rem);
+    
+    /* Fluid spacing using clamp() */
+    --spacing-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.375rem);
+    --spacing-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+    --spacing-md: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+    --spacing-lg: clamp(1.5rem, 1.2rem + 1.5vw, 2rem);
+    --spacing-xl: clamp(2rem, 1.5rem + 2.5vw, 3rem);
+    --spacing-2xl: clamp(3rem, 2rem + 5vw, 4rem);
+    
+    /* Container widths */
+    --container-xs: 20rem;
+    --container-sm: 24rem;
+    --container-md: 28rem;
+    --container-lg: 32rem;
+    --container-xl: 36rem;
+    --container-2xl: 42rem;
+    --container-3xl: 48rem;
+    --container-4xl: 56rem;
+    --container-5xl: 64rem;
+    --container-6xl: 72rem;
+    --container-7xl: 80rem;
+  }
+}
+
+/* Intrinsic Layout System - Uses CSS Grid and Flexbox for automatic responsive behavior */
+@layer components {
+  /* Container query support for component-level responsiveness */
+  .responsive-container {
+    container-type: inline-size;
+  }
+  
+  /* Fluid grid that automatically adjusts columns based on available space */
+  .intrinsic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--spacing-md);
+  }
+  
+  /* Stack layout that automatically switches from horizontal to vertical */
+  .smart-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+  }
+  
+  .smart-stack > * {
+    flex: 1 1 20rem;
+  }
+  
+  /* Sidebar layout that automatically collapses on small screens */
+  .sidebar-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  
+  @media (min-width: 1024px) {
+    .sidebar-layout {
+      grid-template-columns: 16rem minmax(0, 1fr);
+    }
+  }
+  
+  @media (min-width: 1280px) {
+    .sidebar-layout {
+      grid-template-columns: 20rem minmax(0, 1fr);
+    }
+  }
+  
+  /* Content width limiter with padding */
+  .content-container {
+    width: min(100%, var(--container-7xl));
+    margin-inline: auto;
+    padding-inline: var(--spacing-md);
+  }
+  
+  /* Responsive text utilities */
+  .text-fluid-xs { font-size: var(--font-size-xs); }
+  .text-fluid-sm { font-size: var(--font-size-sm); }
+  .text-fluid-base { font-size: var(--font-size-base); }
+  .text-fluid-lg { font-size: var(--font-size-lg); }
+  .text-fluid-xl { font-size: var(--font-size-xl); }
+  .text-fluid-2xl { font-size: var(--font-size-2xl); }
+  .text-fluid-3xl { font-size: var(--font-size-3xl); }
+  .text-fluid-4xl { font-size: var(--font-size-4xl); }
+  
+  /* Responsive spacing utilities */
+  .p-fluid-xs { padding: var(--spacing-xs); }
+  .p-fluid-sm { padding: var(--spacing-sm); }
+  .p-fluid-md { padding: var(--spacing-md); }
+  .p-fluid-lg { padding: var(--spacing-lg); }
+  .p-fluid-xl { padding: var(--spacing-xl); }
+  .p-fluid-2xl { padding: var(--spacing-2xl); }
+  
+  /* Container queries for component responsiveness */
+  @container (min-width: 20rem) {
+    .cq\:text-sm { font-size: 0.875rem; }
+    .cq\:p-2 { padding: 0.5rem; }
+  }
+  
+  @container (min-width: 28rem) {
+    .cq\:text-base { font-size: 1rem; }
+    .cq\:p-4 { padding: 1rem; }
+  }
+  
+  @container (min-width: 36rem) {
+    .cq\:text-lg { font-size: 1.125rem; }
+    .cq\:p-6 { padding: 1.5rem; }
+  }
+  
+  /* Touch-friendly tap targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent layout shift with aspect ratios */
+  .aspect-container {
+    aspect-ratio: var(--aspect-ratio, 16 / 9);
+    width: 100%;
+    overflow: hidden;
+  }
+}
+
+/* Safe area insets for mobile devices */
+@supports (padding: max(0px)) {
+  .safe-top { padding-top: max(var(--spacing-md), env(safe-area-inset-top)); }
+  .safe-bottom { padding-bottom: max(var(--spacing-md), env(safe-area-inset-bottom)); }
+  .safe-left { padding-left: max(var(--spacing-md), env(safe-area-inset-left)); }
+  .safe-right { padding-right: max(var(--spacing-md), env(safe-area-inset-right)); }
+}
+
+/* High-performance animations */
+@media (prefers-reduced-motion: no-preference) {
+  .smooth-transition {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
