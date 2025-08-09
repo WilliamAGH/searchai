@@ -12,7 +12,6 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
-import { useDebounce } from "../hooks/useDebounce";
 // If a separate throttle hook exists, import it. Otherwise, use a lightweight inline throttle.
 import { useRef, useCallback } from "react";
 import { logger } from "../lib/logger";
@@ -22,8 +21,7 @@ import { MessageList } from "./MessageList";
 import { ShareModal } from "./ShareModal";
 import { MobileSidebar } from "./MobileSidebar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
-import { SignInModal } from "./SignInModal";
-import { SignUpModal } from "./SignUpModal";
+// Auth modals are centralized in App; ChatInterface requests them via callbacks
 import { useSwipeable } from 'react-swipeable';
 
 // Topic-change detection constants
@@ -77,6 +75,8 @@ export function ChatInterface({
     chatId: propChatId,
     shareId: propShareId,
     publicId: propPublicId,
+    onRequestSignUp,
+    onRequestSignIn: _onRequestSignIn,
 }: {
  isAuthenticated: boolean;
     isSidebarOpen?: boolean;
@@ -84,6 +84,8 @@ export function ChatInterface({
     chatId?: string;
     shareId?: string;
     publicId?: string;
+    onRequestSignUp?: () => void;
+    onRequestSignIn?: () => void;
 }) {
     const convexUrl = (import.meta as any).env?.VITE_CONVEX_URL || "";
     const apiBase = convexUrl.replace('.convex.cloud', '.convex.site').replace(/\/+$/, '');
@@ -100,8 +102,7 @@ export function ChatInterface({
 	const sidebarOpen = isSidebarOpen !== undefined ? isSidebarOpen : localSidebarOpen;
 	const handleToggleSidebar = onToggleSidebar || (() => setLocalSidebarOpen(!localSidebarOpen));
 	const [messageCount, setMessageCount] = useState(0);
-	const [showSignUpModal, setShowSignUpModal] = useState(false);
-	const [showSignInModal, setShowSignInModal] = useState(false);
+	// Auth modals are managed by the App; request via callbacks instead
 	const [showShareModal, setShowShareModal] = useState(false);
 	const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
 	const [pendingMessage, setPendingMessage] = useState<string>("");
@@ -924,7 +925,7 @@ export function ChatInterface({
 
 		// Check message limit for unauthenticated users
 		if (!isAuthenticated && messageCount >= 4) {
-			setShowSignUpModal(true);
+			onRequestSignUp?.();
 			return;
 		}
 
@@ -1296,22 +1297,7 @@ export function ChatInterface({
 				</div>
 			</div>
 
-			<SignUpModal
-				isOpen={showSignUpModal}
-				onClose={() => setShowSignUpModal(false)}
-				onSwitchToSignIn={() => {
-					setShowSignUpModal(false);
-					setShowSignInModal(true);
-				}}
-			/>
-			<SignInModal
-				isOpen={showSignInModal}
-				onClose={() => setShowSignInModal(false)}
-				onSwitchToSignUp={() => {
-					setShowSignInModal(false);
-					setShowSignUpModal(true);
-				}}
-			/>
+
 
 			<ShareModal
 				isOpen={showShareModal}
