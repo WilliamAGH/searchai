@@ -42,6 +42,22 @@ const http = httpRouter();
 
 // Add OPTIONS handler for CORS preflight
 http.route({
+    path: "/api/chat",
+    method: "OPTIONS",
+    handler: httpAction(async () => {
+        return new Response(null, {
+            status: 204,
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+            },
+        });
+    }),
+});
+
+// Add OPTIONS handler for CORS preflight
+http.route({
 	path: "/api/search",
 	method: "OPTIONS",
 	handler: httpAction(async () => {
@@ -100,6 +116,7 @@ http.route({
     const headers = new Headers(base.headers);
     headers.set("Access-Control-Allow-Origin", "*");
     headers.set("Access-Control-Allow-Headers", "Content-Type");
+    headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     headers.set("Cache-Control", "no-cache, no-transform");
     return new Response(base.body, { status: base.status, headers });
 	}),
