@@ -225,6 +225,32 @@ export const updateRollingSummary = mutation({
 });
 
 /**
+ * Summarize last N messages (cheap, server-side)
+ * - Returns a compact bullet summary for bootstrapping a new chat
+ */
+export const summarizeRecent = query({
+  args: { chatId: v.id("chats"), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = Math.max(1, Math.min(args.limit ?? 12, 40));
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+      .order("desc")
+      .take(limit);
+
+    const ordered = messages.reverse();
+    const lines: string[] = [];
+    for (const m of ordered) {
+      const role = m.role === 'assistant' ? 'Assistant' : m.role === 'user' ? 'User' : 'System';
+      const txt = (m.content || '').replace(/\s+/g, ' ').trim();
+      if (txt) lines.push(`- ${role}: ${txt.slice(0, 220)}`);
+      if (lines.length >= 12) break;
+    }
+    return lines.join("\n");
+  },
+});
+
+/**
  * Share chat publicly/privately
  * - Sets sharing flags
  * - Validates ownership
