@@ -6,7 +6,7 @@
  * - Mobile-responsive design
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -19,6 +19,19 @@ interface ShareModalProps {
 export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: ShareModalProps) {
   const [selectedPrivacy, setSelectedPrivacy] = useState<"private" | "shared" | "public">(privacy);
   const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setSelectedPrivacy(privacy);
+  }, [privacy]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current !== null) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -35,14 +48,19 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copyTimeoutRef.current = window.setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy URL:', error);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="share-modal-title"
+    >
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -67,7 +85,7 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
             </svg>
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">
+          <h2 id="share-modal-title" className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">
             Share this conversation
           </h2>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
@@ -107,7 +125,7 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
             <div className="space-y-3">
               <label htmlFor="share-url-input" className="text-sm font-medium text-gray-700 dark:text-gray-300">Share URL</label>
               <div className="flex gap-2">
-                <input id="share-url-input" type="text" value={shareUrl} readOnly className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" aria-label="Shareable URL" />
+                <input id="share-url-input" type="text" value={shareUrl} readOnly className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 <button onClick={handleCopyUrl} className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900" aria-label={copied ? "URL copied to clipboard" : "Copy share URL to clipboard"}>
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
