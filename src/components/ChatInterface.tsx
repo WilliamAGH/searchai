@@ -20,6 +20,7 @@ import { ShareModal } from "./ShareModal";
 import { MobileSidebar } from "./MobileSidebar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
 import { SignInModal } from "./SignInModal";
+import { SignUpModal } from "./SignUpModal";
 import { useSwipeable } from 'react-swipeable';
 
 interface LocalChat {
@@ -505,15 +506,16 @@ export function ChatInterface({
 			let systemPrompt = `You are a helpful AI assistant. `;
 
 			if (hasRealResults && searchContext) {
-				systemPrompt += `Use the following search results to inform your response. IMPORTANT: When citing sources, use the exact format [1], [2], etc. corresponding to the source numbers below. Place citations inline immediately after the relevant information.\n\n`;
+				systemPrompt += `Use the following search results to inform your response. IMPORTANT: When citing sources, use the domain name in brackets like [example.com] format. Place citations inline immediately after the relevant information.\n\n`;
 				systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
-				systemPrompt += `## Source References (USE THESE NUMBERS FOR CITATIONS):\n`;
+				systemPrompt += `## Source References (USE THESE DOMAIN CITATIONS):\n`;
 				searchResults.forEach(
 					(
 						result: { title: string; url: string; snippet: string },
-						idx: number,
+						_idx: number,
 					) => {
-						systemPrompt += `[${idx + 1}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
+						const domain = new URL(result.url).hostname.replace('www.', '');
+						systemPrompt += `[${domain}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
 					},
 				);
 			} else if (!hasRealResults && searchResults.length > 0) {
@@ -526,7 +528,7 @@ export function ChatInterface({
 				systemPrompt += `Web search is unavailable. Provide helpful responses based on your knowledge. `;
 			}
 
-            systemPrompt += `\n\nProvide clear, helpful responses. When you reference information from the search results, you MUST include citations using [1], [2], etc. format that corresponds to the source numbers above. Place citations immediately after the relevant statement. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;
+            systemPrompt += `\n\nProvide clear, helpful responses. When you reference information from the search results, you MUST include citations using the [domain.com] format shown above. Place citations immediately after the relevant statement. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;
 
 			// Get chat history for context
 			const chatHistory = localMessages
@@ -898,7 +900,7 @@ export function ChatInterface({
 			const cooldownPassed = Date.now() - lastAt >= CHAT_COOLDOWN_MS;
 			const shouldCallPlanner = shouldPlanBase && cooldownPassed;
 
-			if (shouldCallPlanner) {
+        if (shouldCallPlanner) {
       try {
         const plan = await planSearch({
           chatId: currentChatId,
@@ -916,7 +918,15 @@ export function ChatInterface({
         // If planner fails, fall back to heuristic below
         console.warn("planSearch failed, falling back to heuristic", e);
       }
-			}
+        } else {
+          // If we didn't call planner, still use local heuristic for big topic shifts
+          if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
+            setPendingMessage(content);
+            setPlannerHint(undefined);
+            setShowFollowUpPrompt(true);
+            return;
+          }
+        }
     } else {
       if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
         setPendingMessage(content);
