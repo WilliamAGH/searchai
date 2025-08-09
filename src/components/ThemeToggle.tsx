@@ -1,7 +1,7 @@
 import { useTheme } from './ThemeProvider';
 
 export function ThemeToggle() {
-  const { theme, setTheme, actualTheme } = useTheme();
+  const { setTheme, actualTheme } = useTheme();
 
   const toggleTheme = () => {
     // Simple toggle between light and dark
