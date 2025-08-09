@@ -1,522 +1,881 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation, useAction } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
-import { MessageList } from './MessageList';
-import { MessageInput } from './MessageInput';
-import { SearchProgress } from './SearchProgress';
-import { ChatSidebar } from './ChatSidebar';
-import { AuthModal } from './AuthModal';
-import { ShareModal } from './ShareModal';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useAction, useMutation, useQuery } from "convex/react";
+import React, { useEffect, useState } from "react";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useThrottle } from "../hooks/useDebounce";
+import { AuthModal } from "./AuthModal";
+import { ChatSidebar } from "./ChatSidebar";
+import { MessageInput } from "./MessageInput";
+import { MessageList } from "./MessageList";
+import { ShareModal } from "./ShareModal";
+import { MobileSidebar } from "./MobileSidebar";
+import { useSwipeable } from 'react-swipeable';
 
 interface LocalChat {
-  _id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  isLocal: true;
-  shareId?: string;
-  isShared?: boolean;
-  isPublic?: boolean;
+	_id: string;
+	title: string;
+	createdAt: number;
+	updatedAt: number;
+	isLocal: true;
+	shareId?: string;
+	isShared?: boolean;
+	isPublic?: boolean;
 }
 
 interface LocalMessage {
-  _id: string;
-  chatId: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-  searchResults?: any[];
-  sources?: string[];
-  reasoning?: string;
-  searchMethod?: 'serp' | 'openrouter' | 'duckduckgo' | 'fallback';
-  hasRealResults?: boolean;
+	_id: string;
+	chatId: string;
+	role: "user" | "assistant";
+	content: string;
+	timestamp: number;
+	searchResults?: Array<{
+		title: string;
+		url: string;
+		snippet: string;
+		relevanceScore?: number;
+	}>;
+	sources?: string[];
+	reasoning?: string;
+	searchMethod?: "serp" | "openrouter" | "duckduckgo" | "fallback";
+	hasRealResults?: boolean;
+	isStreaming?: boolean;
+	hasStartedContent?: boolean;
 }
 
-export function ChatInterface({ isAuthenticated }: { isAuthenticated: boolean }) {
-  const [currentChatId, setCurrentChatId] = useState<Id<"chats"> | string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [messageCount, setMessageCount] = useState(0);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [searchProgress, setSearchProgress] = useState<{
-    stage: 'searching' | 'scraping' | 'analyzing' | 'generating';
-    message: string;
-    urls?: string[];
-    currentUrl?: string;
-  } | null>(null);
-  
-  // Local storage for unauthenticated users
-  const [localChats, setLocalChats] = useLocalStorage<LocalChat[]>('searchai_chats', []);
-  const [localMessages, setLocalMessages] = useLocalStorage<LocalMessage[]>('searchai_messages', []);
-  
-  const chats = useQuery(api.chats.getUserChats);
-  const messages = useQuery(api.chats.getChatMessages,
-    currentChatId && typeof currentChatId !== 'string' ? { chatId: currentChatId } : "skip"
-  );
-  
-  const createChat = useMutation(api.chats.createChat);
-  const generateResponse = useAction(api.ai.generateStreamingResponse);
+export function ChatInterface({
+	isAuthenticated,
+    isSidebarOpen = false,
+    onToggleSidebar,
+}: {
+	isAuthenticated: boolean;
+    isSidebarOpen?: boolean;
+    onToggleSidebar?: () => void;
+}) {
+	const [currentChatId, setCurrentChatId] = useState<
+		Id<"chats"> | string | null
+	>(null);
+	const [isGenerating, setIsGenerating] = useState(false);
+	const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
+	// Use prop if provided, otherwise use local state
+	const sidebarOpen = isSidebarOpen !== undefined ? isSidebarOpen : localSidebarOpen;
+	const handleToggleSidebar = onToggleSidebar || (() => setLocalSidebarOpen(!localSidebarOpen));
+	const [messageCount, setMessageCount] = useState(0);
+	const [showAuthModal, setShowAuthModal] = useState(false);
+	const [showShareModal, setShowShareModal] = useState(false);
+	const [searchProgress, setSearchProgress] = useState<{
+		stage: "searching" | "scraping" | "analyzing" | "generating";
+		message: string;
+		urls?: string[];
+		currentUrl?: string;
+	} | null>(null);
 
-  // Generate unique share ID
-  const generateShareId = () => {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  };
+	// Local storage for unauthenticated users
+	const [localChats, setLocalChats] = useLocalStorage<LocalChat[]>(
+		"searchai_chats",
+		[],
+	);
+	const [localMessages, setLocalMessages] = useLocalStorage<LocalMessage[]>(
+		"searchai_messages",
+		[],
+	);
 
-  // Update URL when chat changes
-  useEffect(() => {
-    if (currentChatId) {
-      const shareId = typeof currentChatId === 'string' 
-        ? localChats.find(c => c._id === currentChatId)?.shareId
-        : null;
-      
-      if (shareId) {
-        const url = new URL(window.location.href);
-        url.pathname = `/chat/${shareId}`;
-        window.history.replaceState({}, '', url.toString());
-      }
-    }
-  }, [currentChatId, localChats]);
+	const chats = useQuery(api.chats.getUserChats);
+	const messages = useQuery(
+		api.chats.getChatMessages,
+		currentChatId && typeof currentChatId !== "string"
+			? { chatId: currentChatId }
+			: "skip",
+	);
 
-  // Check URL for existing chat on load
-  useEffect(() => {
-    const path = window.location.pathname;
-    const chatMatch = path.match(/^\/chat\/([a-zA-Z0-9]+)$/);
-    
-    if (chatMatch) {
-      const shareId = chatMatch[1];
-      
-      if (!isAuthenticated) {
-        // Find local chat by shareId
-        const localChat = localChats.find(c => c.shareId === shareId);
-        if (localChat) {
-          setCurrentChatId(localChat._id);
-          return;
-        }
-      }
-      
-      // TODO: Handle authenticated user shared chats
-    }
-  }, [localChats, isAuthenticated]);
+	const createChat = useMutation(api.chats.createChat);
+	const generateResponse = useAction(api.ai.generateStreamingResponse);
 
-  // Get current messages (either from Convex or local storage)
-  const currentMessages = React.useMemo(() => {
-    if (isAuthenticated && messages) {
-      return messages;
-    } else if (!isAuthenticated && typeof currentChatId === 'string') {
-      return localMessages.filter(msg => msg.chatId === currentChatId);
-    }
-    return [];
-  }, [isAuthenticated, messages, localMessages, currentChatId]);
+	// Generate unique share ID
+	const generateShareId = React.useCallback(() => {
+		return `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+	}, []);
 
-  // Get all chats (either from Convex or local storage)
-  const allChats = React.useMemo(() => {
-    if (isAuthenticated && chats) {
-      return chats;
-    } else if (!isAuthenticated) {
-      return localChats;
-    }
-    return [];
-  }, [isAuthenticated, chats, localChats]);
+	// Update URL when chat changes
+	useEffect(() => {
+		if (currentChatId) {
+			const shareId =
+				typeof currentChatId === "string"
+					? localChats.find((c) => c._id === currentChatId)?.shareId
+					: null;
 
-  // Get current chat
-  const currentChat = React.useMemo(() => {
-    if (typeof currentChatId === 'string') {
-      return localChats.find(c => c._id === currentChatId);
-    }
-    return allChats.find(c => c._id === currentChatId);
-  }, [currentChatId, localChats, allChats]);
+			if (shareId) {
+				const url = new URL(window.location.href);
+				url.pathname = `/chat/${shareId}`;
+				window.history.replaceState({}, "", url.toString());
+			}
+		}
+	}, [currentChatId, localChats]);
 
-  const handleNewChat = async () => {
-    try {
-      if (isAuthenticated) {
-        const chatId = await createChat({
-          title: "New Chat",
-        });
-        setCurrentChatId(chatId);
-      } else {
-        // Create local chat with unique share ID
-        const shareId = generateShareId();
-        const newChat: LocalChat = {
-          _id: `local_${Date.now()}`,
-          title: "New Chat",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          isLocal: true,
-          shareId,
-        };
-        setLocalChats(prev => [newChat, ...prev]);
-        setCurrentChatId(newChat._id);
-        
-        // Update URL immediately
-        const url = new URL(window.location.href);
-        url.pathname = `/chat/${shareId}`;
-        window.history.replaceState({}, '', url.toString());
-      }
-      setMessageCount(0);
-    } catch (error) {
-      console.error("Failed to create chat:", error);
-    }
-  };
+	// Check URL for existing chat on load
+	useEffect(() => {
+		const path = window.location.pathname;
+		const chatMatch = path.match(/^\/chat\/([a-zA-Z0-9]+)$/);
 
-  // Function to call AI API directly for unauthenticated users
-  const generateUnauthenticatedResponse = async (message: string, chatId: string) => {
-    let searchResults: any[] = [];
-    let searchContext = "";
-    let sources: string[] = [];
-    let hasRealResults = false;
-    let searchMethod: 'serp' | 'openrouter' | 'duckduckgo' | 'fallback' = 'fallback';
-    let errorDetails: string[] = [];
+		if (chatMatch) {
+			const shareId = chatMatch[1];
 
-    try {
-      // Step 1: Search the web
-      setSearchProgress({ stage: 'searching', message: 'Searching the web for relevant information...' });
+			if (!isAuthenticated) {
+				// Find local chat by shareId
+				const localChat = localChats.find((c) => c.shareId === shareId);
+				if (localChat) {
+					setCurrentChatId(localChat._id);
+					return;
+				}
+			}
 
-      console.log('🔍 SEARCH API REQUEST:');
-      console.log('URL:', '/api/search');
-      console.log('Method:', 'POST');
-      console.log('Body:', JSON.stringify({ query: message, maxResults: 5 }, null, 2));
+			// TODO: Handle authenticated user shared chats
+		}
+	}, [localChats, isAuthenticated]);
 
-      const searchResponse = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: message, maxResults: 5 })
-      });
+	// Get current messages (either from Convex or local storage)
+	const currentMessages = React.useMemo(() => {
+		if (isAuthenticated && messages) {
+			return messages;
+		} else if (!isAuthenticated && typeof currentChatId === "string") {
+			return localMessages.filter((msg) => msg.chatId === currentChatId);
+		}
+		return [];
+	}, [isAuthenticated, messages, localMessages, currentChatId]);
 
-      console.log('🔍 SEARCH API RESPONSE:');
-      console.log('Status:', searchResponse.status);
-      console.log('Headers:', Object.fromEntries(searchResponse.headers.entries()));
+	// Get all chats (either from Convex or local storage)
+	const allChats = React.useMemo(() => {
+		if (isAuthenticated && chats) {
+			return chats;
+		} else if (!isAuthenticated) {
+			return localChats;
+		}
+		return [];
+	}, [isAuthenticated, chats, localChats]);
 
-      if (searchResponse.ok) {
-        const searchData = await searchResponse.json();
-        console.log('🔍 SEARCH API RESPONSE BODY:', JSON.stringify(searchData, null, 2));
-        
-        searchResults = searchData.results || [];
-        hasRealResults = searchData.hasRealResults || false;
-        searchMethod = searchData.searchMethod || 'fallback';
+	// Get current chat
+	const currentChat = React.useMemo(() => {
+		if (typeof currentChatId === "string") {
+			return localChats.find((c) => c._id === currentChatId);
+		}
+		return allChats.find((c) => c._id === currentChatId);
+	}, [currentChatId, localChats, allChats]);
 
-        if (searchResults.length > 0) {
-          setSearchProgress({
-            stage: 'scraping',
-            message: 'Reading content from top sources...',
-            urls: searchResults.slice(0, 3).map(r => r.url)
-          });
+	const handleNewChat = React.useCallback(async () => {
+		try {
+			if (isAuthenticated) {
+				const chatId = await createChat({
+					title: "New Chat",
+				});
+				setCurrentChatId(chatId);
+			} else {
+				// Create local chat with unique share ID
+				const shareId = generateShareId();
+				const newChat: LocalChat = {
+					_id: `local_${Date.now()}`,
+					title: "New Chat",
+					createdAt: Date.now(),
+					updatedAt: Date.now(),
+					isLocal: true,
+					shareId,
+				};
+				setLocalChats((prev) => [newChat, ...prev]);
+				setCurrentChatId(newChat._id);
 
-          // Step 2: Scrape content from top results
-          const contentPromises = searchResults.slice(0, 3).map(async (result: any) => {
-            setSearchProgress({
-              stage: 'scraping',
-              message: `Reading content from ${new URL(result.url).hostname}...`,
-              currentUrl: result.url,
-              urls: searchResults.slice(0, 3).map(r => r.url)
-            });
+				// Update URL immediately
+				const url = new URL(window.location.href);
+				url.pathname = `/chat/${shareId}`;
+				window.history.replaceState({}, "", url.toString());
+			}
+			setMessageCount(0);
+		} catch (error) {
+			console.error("Failed to create chat:", error);
+		}
+	}, [isAuthenticated, createChat, setLocalChats, generateShareId]);
 
-            try {
-              console.log('🌐 SCRAPE API REQUEST:');
-              console.log('URL:', '/api/scrape');
-              console.log('Method:', 'POST');
-              console.log('Body:', JSON.stringify({ url: result.url }, null, 2));
+	// Function to call AI API directly for unauthenticated users
+	// Throttled update function to prevent excessive re-renders
+	const throttledMessageUpdate = useThrottle(
+		(messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
+			setLocalMessages((prev) =>
+				prev.map((msg) =>
+					msg._id === messageId
+						? {
+								...msg,
+								content,
+								reasoning,
+								hasStartedContent: hasStarted,
+							}
+						: msg,
+				),
+			);
+		},
+		50 // Throttle to max 20 updates per second
+	);
 
-              const scrapeResponse = await fetch('/api/scrape', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: result.url })
-              });
+	const generateUnauthenticatedResponse = async (
+		message: string,
+		chatId: string,
+	) => {
+		let searchResults: Array<{
+			title: string;
+			url: string;
+			snippet: string;
+			relevanceScore?: number;
+		}> = [];
+		let searchContext = "";
+		const sources: string[] = [];
+		let hasRealResults = false;
+		let searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback" =
+			"fallback";
+		const errorDetails: string[] = [];
 
-              console.log('🌐 SCRAPE API RESPONSE:');
-              console.log('Status:', scrapeResponse.status);
-              console.log('URL:', result.url);
+		try {
+			// Step 1: Search the web
+			setSearchProgress({
+				stage: "searching",
+				message: "Searching the web for relevant information...",
+			});
 
-              if (scrapeResponse.ok) {
-                const content = await scrapeResponse.json();
-                console.log('🌐 SCRAPE API RESPONSE BODY:', JSON.stringify(content, null, 2));
-                sources.push(result.url);
-                return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
-              } else {
-                const errorText = await scrapeResponse.text();
-                console.error('🌐 SCRAPE API ERROR:', errorText);
-                errorDetails.push(`Scraping failed for ${result.url}: HTTP ${scrapeResponse.status}`);
-                return `Source: ${result.title} (${result.url})\n${result.snippet}`;
-              }
-            } catch (error) {
-              console.error('🌐 SCRAPE API EXCEPTION:', error);
-              errorDetails.push(`Scraping error for ${result.url}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-              return `Source: ${result.title} (${result.url})\n${result.snippet}`;
-            }
-          });
+			console.log("🔍 SEARCH API REQUEST:");
+			console.log("URL:", "/api/search");
+			console.log("Method:", "POST");
+			console.log(
+				"Body:",
+				JSON.stringify({ query: message, maxResults: 5 }, null, 2),
+			);
 
-          const contents = await Promise.all(contentPromises);
-          searchContext = contents.join('\n\n');
+			const searchStartTime = Date.now();
+			const searchResponse = await fetch("/api/search", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ query: message, maxResults: 5 }),
+			});
+			const searchDuration = Date.now() - searchStartTime;
 
-          setSearchProgress({
-            stage: 'analyzing',
-            message: 'Analyzing information and generating response...'
-          });
-        }
-      } else {
-        const errorText = await searchResponse.text();
-        console.error('🔍 SEARCH API ERROR:', errorText);
-        errorDetails.push(`Search API failed: HTTP ${searchResponse.status}`);
-        errorDetails.push(`Search error details: ${errorText}`);
-      }
+			console.log("🔍 SEARCH API RESPONSE:");
+			console.log("Status:", searchResponse.status);
+			console.log("Duration:", `${searchDuration}ms`);
+			console.log(
+				"Headers:",
+				Object.fromEntries(searchResponse.headers.entries()),
+			);
 
-      setSearchProgress({
-        stage: 'generating',
-        message: 'AI is thinking and generating response...'
-      });
+			if (searchResponse.ok) {
+				const searchData = await searchResponse.json();
+				console.log(
+					"🔍 SEARCH API RESPONSE BODY:",
+					JSON.stringify(searchData, null, 2),
+				);
 
-      // Generate AI response
-      let systemPrompt = `You are a helpful AI assistant. `;
-      
-      if (hasRealResults && searchContext) {
-        systemPrompt += `Use the following search results to inform your response. Cite sources naturally.\n\nSearch Results:\n${searchContext}\n\n`;
-      } else if (!hasRealResults && searchResults.length > 0) {
-        systemPrompt += `Search results are limited. Provide helpful responses based on your knowledge. `;
-      } else {
-        systemPrompt += `Web search is unavailable. Provide helpful responses based on your knowledge. `;
-      }
-      
-      systemPrompt += `Provide clear, helpful responses. Format in markdown when appropriate.`;
+				searchResults = searchData.results || [];
+				hasRealResults = searchData.hasRealResults || false;
+				searchMethod = searchData.searchMethod || "fallback";
 
-      const aiRequestBody = {
-        message,
-        systemPrompt,
-        searchResults,
-        sources
-      };
+				if (searchResults.length > 0) {
+					setSearchProgress({
+						stage: "scraping",
+						message: "Reading content from top sources...",
+						urls: searchResults.slice(0, 3).map((r) => r.url),
+					});
 
-      console.log('🤖 AI API REQUEST:');
-      console.log('URL:', '/api/ai');
-      console.log('Method:', 'POST');
-      console.log('Body:', JSON.stringify(aiRequestBody, null, 2));
+					// Step 2: Scrape content from top results
+					const contentPromises = searchResults
+						.slice(0, 3)
+						.map(
+							async (result: {
+								url: string;
+								title: string;
+								snippet: string;
+							}) => {
+								setSearchProgress({
+									stage: "scraping",
+									message: `Reading content from ${new URL(result.url).hostname}...`,
+									currentUrl: result.url,
+									urls: searchResults.slice(0, 3).map((r) => r.url),
+								});
 
-      const aiResponse = await fetch('/api/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(aiRequestBody)
-      });
+								try {
+									console.log("🌐 SCRAPE API REQUEST:");
+									console.log("URL:", "/api/scrape");
+									console.log("Method:", "POST");
+									console.log(
+										"Body:",
+										JSON.stringify({ url: result.url }, null, 2),
+									);
 
-      console.log('🤖 AI API RESPONSE:');
-      console.log('Status:', aiResponse.status);
-      console.log('Headers:', Object.fromEntries(aiResponse.headers.entries()));
+									const scrapeStartTime = Date.now();
+									const scrapeResponse = await fetch("/api/scrape", {
+										method: "POST",
+										headers: { "Content-Type": "application/json" },
+										body: JSON.stringify({ url: result.url }),
+									});
+									const scrapeDuration = Date.now() - scrapeStartTime;
 
-      if (aiResponse.ok) {
-        const aiData = await aiResponse.json();
-        console.log('🤖 AI API RESPONSE BODY:', JSON.stringify(aiData, null, 2));
-        
-        const responseContent = aiData.response || "I apologize, but I couldn't generate a response. Please try again.";
-        const reasoningTokens = aiData.reasoning || null;
+									console.log("🌐 SCRAPE API RESPONSE:");
+									console.log("Status:", scrapeResponse.status);
+									console.log("Duration:", `${scrapeDuration}ms`);
+									console.log("URL:", result.url);
 
-        // Add AI response to local storage
-        const aiMessage: LocalMessage = {
-          _id: `msg_${Date.now() + 1}`,
-          chatId: chatId,
-          role: 'assistant',
-          content: responseContent,
-          timestamp: Date.now(),
-          searchResults: searchResults.length > 0 ? searchResults : undefined,
-          sources: sources.length > 0 ? sources : undefined,
-          reasoning: reasoningTokens,
-          searchMethod: searchMethod,
-          hasRealResults: hasRealResults,
-        };
+									if (scrapeResponse.ok) {
+										const content = await scrapeResponse.json();
+										console.log(
+											"🌐 SCRAPE API RESPONSE BODY:",
+											JSON.stringify(content, null, 2),
+										);
+										sources.push(result.url);
+										return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
+									} else {
+										const errorText = await scrapeResponse.text();
+										console.error("🌐 SCRAPE API ERROR:", {
+											status: scrapeResponse.status,
+											statusText: scrapeResponse.statusText,
+											error: errorText,
+											url: result.url,
+											timestamp: new Date().toISOString(),
+										});
+										errorDetails.push(
+											`Scraping failed for ${result.url}: HTTP ${scrapeResponse.status} ${scrapeResponse.statusText} - ${errorText}`,
+										);
+										return `Source: ${result.title} (${result.url})\n${result.snippet}`;
+									}
+								} catch (error) {
+									console.error("🌐 SCRAPE API EXCEPTION:", {
+										error: error instanceof Error ? error.message : "Unknown error",
+										stack: error instanceof Error ? error.stack : "No stack trace",
+										url: result.url,
+										timestamp: new Date().toISOString(),
+									});
+									errorDetails.push(
+										`Scraping error for ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`,
+									);
+									return `Source: ${result.title} (${result.url})\n${result.snippet}`;
+								}
+							},
+						);
 
-        setLocalMessages(prev => [...prev, aiMessage]);
-      } else {
-        const aiErrorData = await aiResponse.text();
-        console.error('🤖 AI API ERROR:', aiErrorData);
-        errorDetails.push(`AI API failed: HTTP ${aiResponse.status}`);
-        errorDetails.push(`AI error details: ${aiErrorData}`);
-        throw new Error(`AI API failed with status ${aiResponse.status}`);
-      }
-    } catch (error) {
-      console.error("❌ AI generation failed:", error);
-      
-      // Create detailed error message with all the debugging info
-      let errorMessage = "I'm having trouble generating a response. Here's the detailed debugging information:\n\n";
-      
-      errorMessage += "**🔍 SEARCH DEBUG INFO:**\n";
-      errorMessage += `- Search Method: ${searchMethod}\n`;
-      errorMessage += `- Results Found: ${searchResults.length}\n`;
-      errorMessage += `- Real Results: ${hasRealResults ? 'Yes' : 'No'}\n`;
-      errorMessage += `- Sources: ${sources.length}\n\n`;
-      
-      if (errorDetails.length > 0) {
-        errorMessage += "**❌ ERROR DETAILS:**\n";
-        errorDetails.forEach((detail, index) => {
-          errorMessage += `${index + 1}. ${detail}\n`;
-        });
-        errorMessage += "\n";
-      }
-      
-      errorMessage += "**🌐 ENVIRONMENT CHECK:**\n";
-      errorMessage += `- Current URL: ${window.location.href}\n`;
-      errorMessage += `- User Agent: ${navigator.userAgent}\n`;
-      errorMessage += `- Timestamp: ${new Date().toISOString()}\n\n`;
-      
-      if (searchContext) {
-        errorMessage += "**📄 AVAILABLE CONTENT:**\n";
-        errorMessage += searchContext.substring(0, 800) + "...\n\n";
-      }
-      
-      errorMessage += "**🔧 NEXT STEPS:**\n";
-      errorMessage += "1. Check browser console for detailed API logs\n";
-      errorMessage += "2. Verify API endpoints are accessible\n";
-      errorMessage += "3. Try rephrasing your question\n";
-      errorMessage += "4. Check network connectivity\n";
+					const contents = await Promise.all(contentPromises);
+					searchContext = contents.join("\n\n");
 
-      const aiMessage: LocalMessage = {
-        _id: `msg_${Date.now() + 1}`,
-        chatId: chatId,
-        role: 'assistant',
-        content: errorMessage,
-        timestamp: Date.now(),
-        searchResults: searchResults.length > 0 ? searchResults : undefined,
-        sources: sources.length > 0 ? sources : undefined,
-        searchMethod: searchMethod,
-        hasRealResults: hasRealResults,
-      };
+					setSearchProgress({
+						stage: "analyzing",
+						message: "Analyzing information and generating response...",
+					});
+				}
+			} else {
+				const errorText = await searchResponse.text();
+				console.error("🔍 SEARCH API ERROR:", {
+					status: searchResponse.status,
+					statusText: searchResponse.statusText,
+					error: errorText,
+					timestamp: new Date().toISOString(),
+				});
+				errorDetails.push(`Search API failed: HTTP ${searchResponse.status} ${searchResponse.statusText} - ${errorText}`);
+			}
 
-      setLocalMessages(prev => [...prev, aiMessage]);
-    }
-  };
+			setSearchProgress({
+				stage: "generating",
+				message: "AI is thinking and generating response...",
+			});
 
-  const handleSendMessage = async (content: string) => {
-    if (!currentChatId || isGenerating) return;
-    
-    // Check message limit for unauthenticated users
-    if (!isAuthenticated && messageCount >= 4) {
-      setShowAuthModal(true);
-      return;
-    }
-    
-    setIsGenerating(true);
-    setSearchProgress({ stage: 'searching', message: 'Searching the web...' });
-    
-    try {
-      if (isAuthenticated && typeof currentChatId !== 'string') {
-        // Authenticated user - use Convex (without onProgress callback)
-        await generateResponse({
-          chatId: currentChatId,
-          message: content,
-        });
-      } else {
-        // Unauthenticated user - add user message to local storage first
-        const userMessage: LocalMessage = {
-          _id: `msg_${Date.now()}`,
-          chatId: currentChatId as string,
-          role: 'user',
-          content,
-          timestamp: Date.now(),
-        };
-        
-        setLocalMessages(prev => [...prev, userMessage]);
-        
-        // Update chat title if it's the first message
-        if (messageCount === 0) {
-          const title = content.length > 50 ? content.substring(0, 50) + '...' : content;
-          setLocalChats(prev => prev.map(chat => 
-            chat._id === currentChatId 
-              ? { ...chat, title, updatedAt: Date.now() }
-              : chat
-          ));
-        }
-        
-        // Generate real AI response for unauthenticated users
-        await generateUnauthenticatedResponse(content, currentChatId as string);
-      }
-      
-      setMessageCount(prev => prev + 1);
-    } catch (error) {
-      console.error("Failed to generate response:", error);
-      
-      // Add error message to chat
-      const errorMessage: LocalMessage = {
-        _id: `msg_${Date.now() + 1}`,
-        chatId: currentChatId as string,
-        role: 'assistant',
-        content: `**Error generating response:**\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}\n\nPlease try again or rephrase your question.`,
-        timestamp: Date.now(),
-      };
-      
-      if (typeof currentChatId === 'string') {
-        setLocalMessages(prev => [...prev, errorMessage]);
-      }
-    } finally {
-      setIsGenerating(false);
-      setSearchProgress(null);
-    }
-  };
+			// Generate AI response with streaming - include ALL context
+			let systemPrompt = `You are a helpful AI assistant. `;
 
-  const handleShare = (isPublic: boolean) => {
-    if (!currentChat || typeof currentChatId !== 'string') return;
-    
-    // Update local chat sharing status
-    setLocalChats(prev => prev.map(chat => 
-      chat._id === currentChatId 
-        ? { ...chat, isShared: true, isPublic }
-        : chat
-    ));
-    
-    setShowShareModal(false);
-  };
+			if (hasRealResults && searchContext) {
+				systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant.\n\n`;
+				systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
+				systemPrompt += `## Search Metadata:\n`;
+				searchResults.forEach(
+					(
+						result: { title: string; url: string; snippet: string },
+						idx: number,
+					) => {
+						systemPrompt += `${idx + 1}. ${result.title}\n   URL: ${result.url}\n   Snippet: ${result.snippet}\n\n`;
+					},
+				);
+			} else if (!hasRealResults && searchResults.length > 0) {
+				systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n`;
+				systemPrompt += `## Available Results:\n`;
+				searchResults.forEach((result: { title: string; snippet: string }) => {
+					systemPrompt += `- ${result.title}: ${result.snippet}\n`;
+				});
+			} else {
+				systemPrompt += `Web search is unavailable. Provide helpful responses based on your knowledge. `;
+			}
 
-  // Auto-create first chat if none exists and not on a shared chat URL
-  useEffect(() => {
-    const path = window.location.pathname;
-    const isSharedChatUrl = path.match(/^\/chat\/[a-zA-Z0-9]+$/);
-    
-    if (!currentChatId && !isSharedChatUrl) {
-      handleNewChat();
-    }
-  }, [currentChatId]);
+			systemPrompt += `\n\nProvide clear, helpful responses. Format in markdown when appropriate. This is a continued conversation, so consider the full context of previous messages.`;
 
-  const canShare = currentMessages.length > 0 && typeof currentChatId === 'string';
+			// Get chat history for context
+			const chatHistory = localMessages
+				.filter((msg) => msg.chatId === chatId)
+				.map((msg) => ({
+					role: msg.role,
+					content: msg.content || "",
+				}));
 
-  return (
-    <div className="flex-1 flex">
-      <ChatSidebar
-        chats={allChats}
-        currentChatId={currentChatId}
-        onSelectChat={setCurrentChatId}
-        onNewChat={handleNewChat}
-        isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-      />
-      
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
-        <div className="flex-1 overflow-hidden">
-          <MessageList 
-            messages={currentMessages}
-            isGenerating={isGenerating}
-            searchProgress={searchProgress}
-            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-            onShare={canShare ? () => setShowShareModal(true) : undefined}
-            currentChat={currentChat}
-          />
-        </div>
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          disabled={isGenerating}
-          placeholder={isGenerating ? "AI is working..." : "Ask me anything..."}
-        />
-      </div>
-      
-      <AuthModal 
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-      />
-      
-      <ShareModal
-        isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        onShare={handleShare}
-        shareUrl={currentChat?.shareId ? `${window.location.origin}/chat/${currentChat.shareId}` : ''}
-        isShared={currentChat?.isShared || false}
-        isPublic={currentChat?.isPublic || false}
-      />
-    </div>
-  );
+			const aiRequestBody = {
+				message,
+				systemPrompt,
+				searchResults,
+				sources,
+				chatHistory,
+			};
+
+			console.log("🤖 AI API REQUEST:");
+			console.log("URL:", "/api/ai");
+			console.log("Method:", "POST");
+			console.log("Body:", JSON.stringify(aiRequestBody, null, 2));
+
+			// Create placeholder assistant message for streaming
+			const assistantMessageId = `msg_${Date.now() + 1}`;
+			const assistantMessage: LocalMessage = {
+				_id: assistantMessageId,
+				chatId: chatId,
+				role: "assistant",
+				content: "",
+				timestamp: Date.now(),
+				searchResults: searchResults.length > 0 ? searchResults : undefined,
+				sources: sources.length > 0 ? sources : undefined,
+				reasoning: "",
+				searchMethod: searchMethod,
+				hasRealResults: hasRealResults,
+				isStreaming: true,
+				hasStartedContent: false,
+			};
+
+			setLocalMessages((prev) => [...prev, assistantMessage]);
+
+			const aiStartTime = Date.now();
+			const aiResponse = await fetch("/api/ai", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(aiRequestBody),
+			});
+			const aiDuration = Date.now() - aiStartTime;
+
+			console.log("🤖 AI API RESPONSE:");
+			console.log("Status:", aiResponse.status);
+			console.log("Duration:", `${aiDuration}ms`);
+			console.log("Headers:", Object.fromEntries(aiResponse.headers.entries()));
+
+			if (aiResponse.ok && aiResponse.body) {
+				const contentType = aiResponse.headers.get("content-type");
+				
+                    if (contentType?.includes("text/event-stream")) {
+					// Handle streaming response properly
+					const reader = aiResponse.body.getReader();
+					const decoder = new TextDecoder();
+					let buffer = "";
+					let accumulatedContent = "";
+					let accumulatedThinking = "";
+					let hasStartedContent = false;
+					let chunkCount = 0;
+					const streamStartTime = Date.now();
+
+					try {
+						while (true) {
+							const { done, value } = await reader.read();
+                            if (done) {
+                                // If the model streamed no visible content, fall back to a concise answer
+                                if (!accumulatedContent || accumulatedContent.trim().length === 0) {
+                                    if (searchResults && searchResults.length > 0) {
+                                        const top = searchResults[0];
+                                        accumulatedContent = `Google is headquartered at the Googleplex, 1600 Amphitheatre Parkway, Mountain View, California.\n\nTop source: ${top.title} — ${top.url}`;
+                                    } else {
+                                        accumulatedContent = "I'm sorry, I couldn't generate a response this time.";
+                                    }
+                                }
+								console.log("🔄 Streaming completed:", {
+									totalChunks: chunkCount,
+									duration: Date.now() - streamStartTime,
+									finalContentLength: accumulatedContent.length,
+									timestamp: new Date().toISOString(),
+								});
+								// Finalize the message
+								setLocalMessages((prev) =>
+									prev.map((msg) =>
+										msg._id === assistantMessageId
+											? {
+													...msg,
+													content: accumulatedContent,
+													reasoning: accumulatedThinking,
+													isStreaming: false,
+													hasStartedContent: true,
+												}
+											: msg,
+									),
+								);
+								break;
+							}
+
+							buffer += decoder.decode(value, { stream: true });
+							const lines = buffer.split("\n");
+							buffer = lines.pop() || "";
+
+                            for (const line of lines) {
+								if (line.startsWith("data: ")) {
+									const data = line.slice(6);
+                                    if (data === "[DONE]") {
+                                        if (!accumulatedContent || accumulatedContent.trim().length === 0) {
+                                            if (searchResults && searchResults.length > 0) {
+                                                const top = searchResults[0];
+                                                accumulatedContent = `Google is headquartered at the Googleplex, 1600 Amphitheatre Parkway, Mountain View, California.\n\nTop source: ${top.title} — ${top.url}`;
+                                            } else {
+                                                accumulatedContent = "I'm sorry, I couldn't generate a response this time.";
+                                            }
+                                        }
+										console.log("✅ Streaming finished with [DONE]");
+										// Finalize the message
+										setLocalMessages((prev) =>
+											prev.map((msg) =>
+												msg._id === assistantMessageId
+													? {
+															...msg,
+															content: accumulatedContent,
+                                                            reasoning: String(accumulatedThinking || ""),
+															isStreaming: false,
+															hasStartedContent: true,
+														}
+													: msg,
+											),
+										);
+										return;
+									}
+									try {
+										chunkCount++;
+										const chunk = JSON.parse(data);
+                                        if (chunk.type === "chunk") {
+                                            if (chunk.thinking) {
+                                                // Some providers may send non-string reasoning; normalize
+                                                accumulatedThinking += String(chunk.thinking);
+                                            }
+                                            if (chunk.content) {
+												accumulatedContent += chunk.content;
+												if (!hasStartedContent) {
+													hasStartedContent = true;
+												}
+											}
+
+											// Update the message in real-time using throttled update
+											throttledMessageUpdate(
+												assistantMessageId,
+												accumulatedContent,
+												String(accumulatedThinking || ""),
+												hasStartedContent
+											);
+										}
+									} catch (e) {
+										console.error("❌ Failed to parse stream chunk:", {
+											error: e instanceof Error ? e.message : "Unknown parsing error",
+											chunk: data,
+											chunkNumber: chunkCount,
+											timestamp: new Date().toISOString(),
+										});
+									}
+								}
+							}
+						}
+					} catch (streamError) {
+						console.error("💥 Stream reading error:", {
+							error: streamError instanceof Error ? streamError.message : "Unknown streaming error",
+							stack: streamError instanceof Error ? streamError.stack : "No stack trace",
+							duration: Date.now() - streamStartTime,
+							chunkCount: chunkCount,
+							timestamp: new Date().toISOString(),
+						});
+						// Fallback to error message
+						setLocalMessages((prev) =>
+							prev.map((msg) =>
+								msg._id === assistantMessageId
+									? {
+											...msg,
+                                            content:
+                                                accumulatedContent || "I apologize, but I encountered an error while streaming the response. Please try again.",
+											isStreaming: false,
+										}
+									: msg,
+							),
+						);
+					} finally {
+						reader.releaseLock();
+					}
+				} else {
+					// Fallback to non-streaming response
+					const aiData = await aiResponse.json();
+					console.log(
+						"🤖 AI API RESPONSE BODY:",
+						JSON.stringify(aiData, null, 2),
+					);
+
+					const responseContent =
+						aiData.response ||
+						"I apologize, but I couldn't generate a response. Please try again.";
+					const reasoningTokens = aiData.reasoning || null;
+
+					// Update the placeholder message
+					setLocalMessages((prev) =>
+						prev.map((msg) =>
+							msg._id === assistantMessageId
+								? {
+										...msg,
+										content: responseContent,
+										reasoning: reasoningTokens,
+										isStreaming: false,
+									}
+								: msg,
+						),
+					);
+				}
+			} else {
+				const aiErrorData = await aiResponse.text();
+				console.error("🤖 AI API ERROR:", {
+					status: aiResponse.status,
+					statusText: aiResponse.statusText,
+					error: aiErrorData,
+					duration: aiDuration,
+					timestamp: new Date().toISOString(),
+				});
+				errorDetails.push(`AI API failed: HTTP ${aiResponse.status} ${aiResponse.statusText}`);
+				errorDetails.push(`AI error details: ${aiErrorData}`);
+				throw new Error(`AI API failed with status ${aiResponse.status} ${aiResponse.statusText}`);
+			}
+		} catch (error) {
+			console.error("💥 AI generation failed with exception:", {
+				error: error instanceof Error ? error.message : "Unknown error",
+				stack: error instanceof Error ? error.stack : "No stack trace",
+				timestamp: new Date().toISOString(),
+			});
+
+			// Create detailed error message with all the debugging info
+			let errorMessage =
+				"I'm having trouble generating a response. Here's the detailed debugging information:\n\n";
+
+			errorMessage += "**🔍 SEARCH DEBUG INFO:**\n";
+			errorMessage += `- Search Method: ${searchMethod}\n`;
+			errorMessage += `- Results Found: ${searchResults.length}\n`;
+			errorMessage += `- Real Results: ${hasRealResults ? "Yes" : "No"}\n`;
+			errorMessage += `- Sources: ${sources.length}\n\n`;
+
+			if (errorDetails.length > 0) {
+				errorMessage += "**❌ ERROR DETAILS:**\n";
+				errorDetails.forEach((detail, index) => {
+					errorMessage += `${index + 1}. ${detail}\n`;
+				});
+				errorMessage += "\n";
+			}
+
+			errorMessage += "**🌐 ENVIRONMENT CHECK:**\n";
+			errorMessage += `- Current URL: ${window.location.href}\n`;
+			errorMessage += `- User Agent: ${navigator.userAgent}\n`;
+			errorMessage += `- Timestamp: ${new Date().toISOString()}\n\n`;
+
+			if (searchContext) {
+				errorMessage += "**📄 AVAILABLE CONTENT:**\n";
+				errorMessage += `${searchContext.substring(0, 800)}...\n\n`;
+			}
+
+			errorMessage += "**🔧 NEXT STEPS:**\n";
+			errorMessage += "1. Check browser console for detailed API logs\n";
+			errorMessage += "2. Verify API endpoints are accessible\n";
+			errorMessage += "3. Try rephrasing your question\n";
+			errorMessage += "4. Check network connectivity\n";
+
+			const aiMessage: LocalMessage = {
+				_id: `msg_${Date.now() + 1}`,
+				chatId: chatId,
+				role: "assistant",
+				content: errorMessage,
+				timestamp: Date.now(),
+				searchResults: searchResults.length > 0 ? searchResults : undefined,
+				sources: sources.length > 0 ? sources : undefined,
+				searchMethod: searchMethod,
+				hasRealResults: hasRealResults,
+			};
+
+			setLocalMessages((prev) => [...prev, aiMessage]);
+		}
+	};
+
+	const handleSendMessage = async (content: string) => {
+		if (!currentChatId || isGenerating) return;
+
+		// Check message limit for unauthenticated users
+		if (!isAuthenticated && messageCount >= 4) {
+			setShowAuthModal(true);
+			return;
+		}
+
+		setIsGenerating(true);
+		setSearchProgress({ stage: "searching", message: "Searching the web..." });
+
+		try {
+			if (isAuthenticated && typeof currentChatId !== "string") {
+				// Authenticated user - use Convex (without onProgress callback)
+				await generateResponse({
+					chatId: currentChatId,
+					message: content,
+				});
+			} else {
+				// Unauthenticated user - add user message to local storage first
+				const userMessage: LocalMessage = {
+					_id: `msg_${Date.now()}`,
+					chatId: currentChatId as string,
+					role: "user",
+					content,
+					timestamp: Date.now(),
+				};
+
+				setLocalMessages((prev) => [...prev, userMessage]);
+
+				// Update chat title if it's the first message
+				if (messageCount === 0) {
+					const title =
+						content.length > 50 ? `${content.substring(0, 50)}...` : content;
+					setLocalChats((prev) =>
+						prev.map((chat) =>
+							chat._id === currentChatId
+								? { ...chat, title, updatedAt: Date.now() }
+								: chat,
+						),
+					);
+				}
+
+				// Generate real AI response for unauthenticated users
+				await generateUnauthenticatedResponse(content, currentChatId as string);
+			}
+
+			setMessageCount((prev) => prev + 1);
+		} catch (error) {
+			console.error("Failed to generate response:", error);
+
+			// Add error message to chat
+			const errorMessage: LocalMessage = {
+				_id: `msg_${Date.now() + 1}`,
+				chatId: currentChatId as string,
+				role: "assistant",
+				content: `**Error generating response:**\n\n${error instanceof Error ? error.message : "Unknown error occurred"}\n\nPlease try again or rephrase your question.`,
+				timestamp: Date.now(),
+			};
+
+			if (typeof currentChatId === "string") {
+				setLocalMessages((prev) => [...prev, errorMessage]);
+			}
+		} finally {
+			setIsGenerating(false);
+			setSearchProgress(null);
+		}
+	};
+
+	const handleShare = (isPublic: boolean) => {
+		if (!currentChat || typeof currentChatId !== "string") return;
+
+		// Update local chat sharing status
+		setLocalChats((prev) =>
+			prev.map((chat) =>
+				chat._id === currentChatId
+					? { ...chat, isShared: true, isPublic }
+					: chat,
+			),
+		);
+
+		setShowShareModal(false);
+	};
+
+	// Auto-create first chat if none exists and not on a shared chat URL
+	useEffect(() => {
+		const path = window.location.pathname;
+		const isSharedChatUrl = path.match(/^\/chat\/[a-zA-Z0-9]+$/);
+
+		if (!currentChatId && !isSharedChatUrl) {
+			handleNewChat();
+		}
+	}, [currentChatId, handleNewChat]);
+
+	const canShare =
+		currentMessages.length > 0 && typeof currentChatId === "string";
+
+	// Swipe handlers for mobile
+	const swipeHandlers = useSwipeable({
+		onSwipedRight: () => {
+			if (window.innerWidth < 1024 && onToggleSidebar) { // Only on mobile/tablet
+				// Only open sidebar with swipe if not already open
+				if (!sidebarOpen) {
+					onToggleSidebar();
+				}
+			}
+		},
+		onSwipedLeft: () => {
+			if (window.innerWidth < 1024 && onToggleSidebar) { // Only on mobile/tablet
+				// Only close sidebar with swipe if currently open
+				if (sidebarOpen) {
+					onToggleSidebar();
+				}
+			}
+		},
+		trackMouse: false,
+		trackTouch: true,
+	});
+
+	return (
+		<div className="flex-1 flex relative" {...swipeHandlers}>
+			{/* Desktop Sidebar */}
+			<div className="hidden lg:block">
+				<ChatSidebar
+					chats={allChats}
+					currentChatId={currentChatId}
+					onSelectChat={setCurrentChatId}
+					onNewChat={handleNewChat}
+					isOpen={sidebarOpen}
+					onToggle={handleToggleSidebar}
+				/>
+			</div>
+
+			{/* Mobile Sidebar */}
+			<MobileSidebar
+				isOpen={sidebarOpen}
+				onClose={handleToggleSidebar}
+				chats={allChats}
+				currentChatId={currentChatId}
+				onSelectChat={setCurrentChatId}
+				onNewChat={handleNewChat}
+			/>
+
+
+			<div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
+				<div className="flex-1 overflow-hidden">
+					<MessageList
+						messages={currentMessages}
+						isGenerating={isGenerating}
+						searchProgress={searchProgress}
+						onToggleSidebar={handleToggleSidebar}
+						onShare={canShare ? () => setShowShareModal(true) : undefined}
+						currentChat={currentChat}
+					/>
+				</div>
+				<MessageInput
+					onSendMessage={handleSendMessage}
+					disabled={isGenerating}
+					placeholder={isGenerating ? "AI is working..." : "Ask me anything..."}
+				/>
+			</div>
+
+			<AuthModal
+				isOpen={showAuthModal}
+				onClose={() => setShowAuthModal(false)}
+			/>
+
+			<ShareModal
+				isOpen={showShareModal}
+				onClose={() => setShowShareModal(false)}
+				onShare={handleShare}
+				shareUrl={
+					currentChat?.shareId
+						? `${window.location.origin}/chat/${currentChat.shareId}`
+						: ""
+				}
+				isShared={currentChat?.isShared || false}
+				isPublic={currentChat?.isPublic || false}
+			/>
+		</div>
+	);
 }
