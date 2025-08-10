@@ -14,7 +14,7 @@ import { BrowserRouter, Routes, Route, useParams, useLocation } from "react-rout
 import { ChatInterface } from "./components/ChatInterface";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SignInModal } from "./components/SignInModal";
 import { SignUpModal } from "./components/SignUpModal";
 
@@ -31,7 +31,7 @@ const ChatPage = () => {
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
 
   // Set per-route canonical and url metas
-  React.useEffect(() => {
+  useEffect(() => {
     const canonicalHref = window.location.origin + location.pathname + (location.search || "");
     let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!link) {
