@@ -925,8 +925,14 @@ export function ChatInterface({
 	 * - Updates chat title on first msg
 	 * @param content - Message content
 	 */
-	const handleSendMessage = async (content: string) => {
-		if (!currentChatId || isGenerating) return;
+    const handleSendMessage = async (content: string) => {
+        if (!currentChatId || isGenerating) return;
+        // If a follow-up prompt is visible, do not block normal send; dismiss it
+        if (showFollowUpPrompt) {
+          setShowFollowUpPrompt(false);
+          setPlannerHint(undefined);
+          setPendingMessage("");
+        }
 
 		// Check message limit for unauthenticated users
 		if (!isAuthenticated && messageCount >= 4) {
@@ -1211,6 +1217,12 @@ export function ChatInterface({
     draftAnalyzer(draft);
   }, [isGenerating, draftAnalyzer]);
 
+    // Ensure Enter key works normally even when the follow-up banner is visible
+    // If the user decides to send, auto-dismiss any existing prompt and proceed
+    useEffect(() => {
+      // no-op placeholder to keep linter satisfied if needed later
+    }, []);
+
 	// Auto-create first chat if none exists and not on a chat URL
 	useEffect(() => {
 		const path = window.location.pathname;
@@ -1282,15 +1294,19 @@ export function ChatInterface({
 						currentChat={currentChat}
 					/>
 				</div>
-				<div className="flex-shrink-0 relative">
-					<FollowUpPrompt
-						isOpen={showFollowUpPrompt}
-						onContinue={handleContinueChat}
+                <div className="flex-shrink-0 relative">
+                    {/* Spacer to prevent overlap with fixed banner */}
+                    {showFollowUpPrompt && (
+                      <div aria-hidden="true" className="h-12 sm:h-12"></div>
+                    )}
+                    <FollowUpPrompt
+                        isOpen={showFollowUpPrompt}
+                        onContinue={handleContinueChat}
             onNewChat={handleNewChatForFollowUp}
             onNewChatWithSummary={handleNewChatWithSummary}
-						hintReason={plannerHint?.reason}
-						hintConfidence={plannerHint?.confidence}
-					/>
+                        hintReason={plannerHint?.reason}
+                        hintConfidence={plannerHint?.confidence}
+                    />
                     <MessageInput
                         onSendMessage={handleSendMessage}
                         onDraftChange={handleDraftChange}
