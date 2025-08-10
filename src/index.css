@@ -242,6 +242,15 @@ body,
   min-height: 100dvh;
 }
 
+/* Respect device safe areas for full-bleed layouts */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  background-color: hsl(var(--background));
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

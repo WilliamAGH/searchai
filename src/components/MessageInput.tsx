@@ -45,6 +45,7 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
     if (trimmed && !disabled) {
       onSendMessage(trimmed);
       setMessage('');
+      onDraftChange?.('');
       setHistoryIndex(null);
       setDraftBeforeHistory(null);
     }
@@ -60,7 +61,8 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
    * - Enter: send message
    * - Shift+Enter: newline
    */
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.isComposing) return; // avoid sending mid-IME composition
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendCurrentMessage();
@@ -85,16 +87,16 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
         setHistoryIndex(idx);
         const next = history[idx] || '';
         setMessage(next);
-        if (onDraftChange) onDraftChange(next);
+        onDraftChange?.(next);
       } else {
         const idx = Math.max(0, historyIndex - 1);
         setHistoryIndex(idx);
         const next = history[idx] || '';
         setMessage(next);
-        if (onDraftChange) onDraftChange(next);
+        onDraftChange?.(next);
       }
       // Move caret to end after setting message
-      queueMicrotask(() => {
+      requestAnimationFrame(() => {
         const el = textareaRef.current;
         if (el) {
           const len = el.value.length;
@@ -113,8 +115,8 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
         setHistoryIndex(idx);
         const next = history[idx] || '';
         setMessage(next);
-        if (onDraftChange) onDraftChange(next);
-        queueMicrotask(() => {
+        onDraftChange?.(next);
+        requestAnimationFrame(() => {
           const el = textareaRef.current;
           if (el) {
             const len = el.value.length;
@@ -127,8 +129,8 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
         setHistoryIndex(null);
         setDraftBeforeHistory(null);
         setMessage(restore);
-        if (onDraftChange) onDraftChange(restore);
-        queueMicrotask(() => {
+        onDraftChange?.(restore);
+        requestAnimationFrame(() => {
           const el = textareaRef.current;
           if (el) {
             const len = el.value.length;
@@ -163,10 +165,8 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
       }
     };
     window.addEventListener('resize', handler);
-    window.addEventListener('orientationchange', handler as any);
     return () => {
       window.removeEventListener('resize', handler);
-      window.removeEventListener('orientationchange', handler as any);
     };
   }, []);
 
@@ -186,13 +186,14 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
                   setHistoryIndex(null);
                   setDraftBeforeHistory(null);
                 }
-                if (onDraftChange) onDraftChange(val);
+                onDraftChange?.(val);
               }}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
+              aria-label="Message input"
               disabled={disabled}
               rows={1}
-              className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-hidden message-input-textarea message-textarea"
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-y-auto message-input-textarea message-textarea"
             />
             <button
               type="submit"

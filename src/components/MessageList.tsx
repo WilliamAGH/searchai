@@ -211,7 +211,7 @@ export function MessageList({
           type="button"
           onClick={() => toggleCollapsed(id)}
           className="w-full text-left px-2 sm:px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 transition-colors touch-manipulation"
-          aria-expanded={!collapsed ? "true" : "false"}
+              aria-expanded={!collapsed}
           aria-label="Toggle sources display"
         >
           <div className="flex items-center justify-between gap-2">
@@ -237,42 +237,47 @@ export function MessageList({
         </button>
         {!collapsed && (
           <div className="mt-2 space-y-1 sm:space-y-2 max-w-full overflow-hidden">
-            {results.map((result) => (
-              <a 
-                key={result.url} 
-                href={result.url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className={clsx(
-                  'block p-2 rounded-lg bg-white dark:bg-gray-800 border transition-all duration-200 touch-manipulation overflow-hidden',
-                  hoveredCitationUrl === result.url
-                    ? 'border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 ring-2 ring-yellow-400 dark:ring-yellow-600'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 active:border-emerald-400 dark:active:border-emerald-500'
-                )}
-                onMouseEnter={() => setHoveredSourceUrl(result.url)}
-                onMouseLeave={() => setHoveredSourceUrl(null)}
-              >
-                <div className="flex items-start gap-2 max-w-full">
-                  {getFaviconUrl(result.url) ? (
-                    <img
-                      src={getFaviconUrl(result.url) as string}
-                      alt="Website favicon"
-                      width={14}
-                      height={14}
-                      className="w-3 h-3 sm:w-3.5 sm:h-3.5 mt-0.5 flex-shrink-0 object-contain rounded-sm"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : null}
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <div className="text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 truncate">{result.title}</div>
-                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 line-clamp-2 break-words">{result.snippet}</div>
-                    <div className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-500 truncate">{getSafeHostname(result.url) || result.url}</div>
+            {results.map((result) => {
+              const iconUrl = getFaviconUrl(result.url);
+              return (
+                <a 
+                  key={result.url} 
+                  href={result.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={clsx(
+                    'block p-2 rounded-lg bg-white dark:bg-gray-800 border transition-all duration-200 touch-manipulation overflow-hidden',
+                    hoveredCitationUrl === result.url
+                      ? 'border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 ring-2 ring-yellow-400 dark:ring-yellow-600'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-emerald-300 dark:hover:border-emerald-600 active:border-emerald-400 dark:active-border-emerald-500'
+                  )}
+                  onMouseEnter={() => setHoveredSourceUrl(result.url)}
+                  onMouseLeave={() => setHoveredSourceUrl(null)}
+                >
+                  <div className="flex items-start gap-2 max-w-full">
+                    {iconUrl ? (
+                      <img
+                        src={iconUrl}
+                        alt=""
+                        aria-hidden="true"
+                        loading="lazy"
+                        width={14}
+                        height={14}
+                        className="w-3 h-3 sm:w-3.5 sm:h-3.5 mt-0.5 flex-shrink-0 object-contain rounded-sm"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 truncate">{result.title}</div>
+                      <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 line-clamp-2 break-words">{result.snippet}</div>
+                      <div className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-500 truncate">{getSafeHostname(result.url) || result.url}</div>
+                    </div>
                   </div>
-                </div>
-              </a>
-            ))}
+                </a>
+              );
+            })}
           </div>
         )}
       </div>
@@ -330,7 +335,13 @@ export function MessageList({
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
                 </svg>
-                {currentChat?.privacy === 'private' ? 'Share' : (currentChat?.privacy === 'shared' ? 'Shared' : 'Public')}
+                {currentChat?.privacy === 'private'
+                  ? 'Share'
+                  : currentChat?.privacy === 'shared'
+                    ? 'Shared'
+                    : currentChat?.privacy === 'public'
+                      ? 'Public'
+                      : 'Share'}
               </button>
             </div>
           )}
