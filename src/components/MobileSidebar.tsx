@@ -17,7 +17,7 @@ interface MobileSidebarProps {
   onClose: () => void;
   chats: Chat[];
   currentChatId: Id<"chats"> | string | null;
-  onSelectChat: (chatId: Id<"chats"> | string) => void;
+  onSelectChat: (chatId: Id<"chats"> | string | null) => void;
   onNewChat: () => void;
   onDeleteLocalChat?: (chatId: string) => void;
   onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
@@ -156,7 +156,7 @@ export function MobileSidebar({
                           >
                             <button
                               onClick={() => {
-                                onSelectChat(chat._id as any);
+                                onSelectChat(chat._id);
                                 onClose();
                               }}
                               className={`flex-1 px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
@@ -187,7 +187,7 @@ export function MobileSidebar({
                                   )
                                     return;
                                   if (onRequestDeleteChat) {
-                                    onRequestDeleteChat(chat._id as any);
+                                    onRequestDeleteChat(chat._id);
                                   } else {
                                     if (typeof chat._id === "string") {
                                       onDeleteLocalChat?.(chat._id);
@@ -196,9 +196,13 @@ export function MobileSidebar({
                                     }
                                   }
                                   if (currentChatId === chat._id) {
-                                    onSelectChat(null as any);
+                                    onSelectChat(null);
                                   }
-                                } catch {}
+                                } catch (err) {
+                                  if ((import.meta as any)?.env?.DEV) {
+                                    console.warn("Chat deletion failed:", err);
+                                  }
+                                }
                               }}
                               className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                               title="Delete chat"
