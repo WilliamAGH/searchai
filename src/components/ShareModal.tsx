@@ -125,10 +125,18 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
             <div className="space-y-3">
               <label htmlFor="share-url-input" className="text-sm font-medium text-gray-700 dark:text-gray-300">Share URL</label>
               <div className="flex gap-2">
-                <input id="share-url-input" type="text" value={shareUrl} readOnly className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                <button onClick={handleCopyUrl} className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900" aria-label={copied ? "URL copied to clipboard" : "Copy share URL to clipboard"}>
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
+                {shareUrl ? (
+                  <>
+                    <input id="share-url-input" type="text" value={shareUrl} readOnly className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <button onClick={handleCopyUrl} className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900" aria-label={copied ? "URL copied to clipboard" : "Copy share URL to clipboard"}>
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    Link will be generated after updating privacy.
+                  </div>
+                )}
               </div>
             </div>
           )}

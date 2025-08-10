@@ -29,8 +29,6 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
   const emailInputRef = React.useRef<HTMLInputElement>(null);
   const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
 
-  if (!isOpen) return null;
-
   // Focus management and simple focus trap
   React.useEffect(() => {
     if (!isOpen) return;
@@ -84,6 +82,8 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
       previouslyFocusedRef.current?.focus?.();
     };
   }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <div
