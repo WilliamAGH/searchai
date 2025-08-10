@@ -69,7 +69,22 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# 5. Check for common issues
+# 5. Playwright smoke test (fail on console errors)
+echo "🕵️ Smoke test: ensuring no console errors..."
+if npx --no-install playwright --version > /dev/null 2>&1; then
+  # Run only the smoke test for speed. Playwright config starts a preview server.
+  npx --no-install playwright test -g smoke --reporter=line
+  if [ $? -ne 0 ]; then
+    echo "❌ Smoke test failed (console errors or network failures)."
+    echo "💡 Reproduce locally: npx playwright test -g smoke --reporter=line"
+    exit 1
+  fi
+else
+  echo "ℹ️  Playwright not installed. Skipping smoke test."
+  echo "   Install with: npm i -D @playwright/test && npx playwright install"
+fi
+
+# 6. Check for common issues
 echo "🔍 Checking for common issues..."
 
 # Check for console.logs in production code
