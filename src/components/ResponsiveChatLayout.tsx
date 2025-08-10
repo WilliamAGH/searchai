@@ -1,14 +1,5 @@
 import React, { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { Id } from '../../convex/_generated/dataModel';
-
-interface Chat {
-  _id: Id<"chats"> | string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  isLocal?: boolean;
-}
 
 interface ResponsiveChatLayoutProps {
   children: React.ReactNode;

@@ -153,8 +153,25 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
     }
   }, [message]);
 
+  // Recalculate textarea height on orientation/viewport changes
+  useEffect(() => {
+    const handler = () => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+      }
+    };
+    window.addEventListener('resize', handler);
+    window.addEventListener('orientationchange', handler as any);
+    return () => {
+      window.removeEventListener('resize', handler);
+      window.removeEventListener('orientationchange', handler as any);
+    };
+  }, []);
+
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 safe-bottom">
       <div className="max-w-4xl mx-auto p-3 sm:p-4">
         <form onSubmit={handleSubmit}>
           <div className="relative flex items-end">
@@ -182,7 +199,7 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
               aria-label="Send message"
               title="Send message"
               disabled={!message.trim() || disabled}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-colors"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-11 h-11 sm:w-8 sm:h-8 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-colors"
             >
               <svg 
                 className="w-3 h-3 text-white" 

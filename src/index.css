@@ -209,6 +209,37 @@
       "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
       "Source Code Pro", monospace !important;
   }
+
+  /* Dynamic viewport units to avoid mobile 100vh bugs */
+  .h-dvh {
+    height: 100dvh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+
+  /* Floating action button bottom offset with safe-area support */
+  .fab-bottom {
+    bottom: 5rem;
+  }
+  @supports (padding: max(0px)) {
+    .fab-bottom {
+      bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+  }
+
+  /* Prevent background rubber-band when inner container scrolls */
+  .overscroll-contain {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Ensure root fills the dynamic viewport */
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100dvh;
 }
 
 /* Custom scrollbar */

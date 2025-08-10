@@ -280,7 +280,7 @@ export function MessageList({
   };
 
   return (
-    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative overscroll-contain">
       {/* Scroll to bottom button */}
       {userHasScrolled && messages.length > 0 && (
         <button
@@ -288,7 +288,7 @@ export function MessageList({
             scrollToBottom();
             setUserHasScrolled(false);
           }}
-          className="fixed bottom-20 right-4 z-10 p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg transition-all transform hover:scale-105"
+          className="fixed right-4 z-10 p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg transition-all transform hover:scale-105 fab-bottom"
           aria-label="Scroll to bottom"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
