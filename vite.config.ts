@@ -62,7 +62,7 @@ window.addEventListener('message', async (message) => {
       },
     },
     chunkSizeWarningLimit: 600,
-    sourcemap: true,
+    sourcemap: mode !== "production",
   },
   server: {
     proxy: {
