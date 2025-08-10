@@ -6,6 +6,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.last-run.json
+trace.zip
+test-results
+coverage
 
 node_modules
 dist
