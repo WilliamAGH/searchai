@@ -41,36 +41,28 @@ window.addEventListener('message', async (message) => {
     },
   },
   build: {
+    // Conservative chunk splitting to keep React/runtime intact while
+    // extracting a few heavy but decoupled areas for caching.
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Split vendor chunks for better caching
-          if (id.includes("node_modules")) {
-            if (id.includes("react") || id.includes("react-dom")) {
-              return "react";
-            }
-            if (id.includes("convex")) {
-              return "convex";
-            }
-            if (
-              id.includes("@ai-sdk") ||
-              id.includes("openai") ||
-              id.includes("ai/")
-            ) {
-              return "ai";
-            }
-            if (id.includes("tailwind") || id.includes("@headlessui")) {
-              return "ui";
-            }
-            return "vendor";
-          }
+          if (!id.includes("node_modules")) return;
+          if (id.includes("convex")) return "convex";
+          if (
+            id.includes("@ai-sdk") ||
+            id.includes("openai") ||
+            id.includes("ai/")
+          )
+            return "ai";
+          if (id.includes("tailwind") || id.includes("@headlessui"))
+            return "ui";
+          // Do not force vendor/react chunks to avoid TDZ/cycle issues.
+          return undefined;
         },
       },
     },
     chunkSizeWarningLimit: 600,
     sourcemap: true,
-    // Use Vite's default esbuild minifier for better compatibility with React 19 and modern ESM.
-    // Custom Terser settings previously caused runtime regressions (TDZ errors) in production.
   },
   server: {
     proxy: {
