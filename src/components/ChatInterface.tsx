@@ -482,11 +482,10 @@ export function ChatInterface({
 
   // Get current chat
   const currentChat = useMemo(() => {
-    if (typeof currentChatId === "string") {
-      return localChats.find((c) => c._id === currentChatId);
-    }
-    return allChats.find((c) => c._id === currentChatId);
-  }, [currentChatId, localChats, allChats]);
+    if (!currentChatId) return undefined;
+    const idStr = String(currentChatId);
+    return allChats.find((c) => String(c._id) === idStr);
+  }, [currentChatId, allChats]);
 
   /**
    * Create new chat
@@ -1477,7 +1476,7 @@ export function ChatInterface({
     setShowFollowUpPrompt(false);
     setPlannerHint(undefined);
     // Telemetry: user chose to continue in current chat
-    if (isAuthenticated && typeof currentChatId !== "string") {
+    if (isAuthenticated && looksServerId(String(currentChatId))) {
       recordClientMetric({
         name: "user_overrode_prompt",
         chatId: currentChatId,
@@ -1509,7 +1508,7 @@ export function ChatInterface({
     const tempMessage = pendingMessage;
     setPendingMessage("");
     // Telemetry: user agreed to start new chat
-    if (isAuthenticated && typeof currentChatId !== "string") {
+    if (isAuthenticated && looksServerId(String(currentChatId))) {
       recordClientMetric({
         name: "new_chat_confirmed",
         chatId: currentChatId,
@@ -1543,7 +1542,11 @@ export function ChatInterface({
       const prevChatId = currentChatId;
       let summary = "";
       try {
-        if (isAuthenticated && typeof prevChatId !== "string" && prevChatId) {
+        if (
+          isAuthenticated &&
+          prevChatId &&
+          looksServerId(String(prevChatId))
+        ) {
           summary = await summarizeRecentAction({
             chatId: prevChatId,
             limit: 12,
@@ -1724,21 +1727,13 @@ export function ChatInterface({
   // Swipe handlers for mobile
   const swipeHandlers = useSwipeable({
     onSwipedRight: () => {
-      if (window.innerWidth < 1024 && onToggleSidebar) {
-        // Only on mobile/tablet
-        // Only open sidebar with swipe if not already open
-        if (!sidebarOpen) {
-          onToggleSidebar();
-        }
+      if (window.innerWidth < 1024) {
+        if (!sidebarOpen) handleToggleSidebar();
       }
     },
     onSwipedLeft: () => {
-      if (window.innerWidth < 1024 && onToggleSidebar) {
-        // Only on mobile/tablet
-        // Only close sidebar with swipe if currently open
-        if (sidebarOpen) {
-          onToggleSidebar();
-        }
+      if (window.innerWidth < 1024) {
+        if (sidebarOpen) handleToggleSidebar();
       }
     },
     trackMouse: false,
@@ -1790,7 +1785,9 @@ export function ChatInterface({
       {/* Mobile Sidebar */}
       <MobileSidebar
         isOpen={sidebarOpen}
-        onClose={handleToggleSidebar}
+        onClose={() => {
+          if (sidebarOpen) handleToggleSidebar();
+        }}
         chats={allChats}
         currentChatId={currentChatId}
         onSelectChat={setCurrentChatId}
@@ -1820,7 +1817,9 @@ export function ChatInterface({
             messages={currentMessages}
             isGenerating={isGenerating}
             searchProgress={searchProgress}
-            onToggleSidebar={handleToggleSidebar}
+            onToggleSidebar={() => {
+              if (!sidebarOpen) handleToggleSidebar();
+            }}
             onShare={canShare ? () => setShowShareModal(true) : undefined}
             currentChat={currentChat}
             onDeleteLocalMessage={(messageId) => {
