@@ -167,6 +167,14 @@ export function ChatInterface({
   const [plannerHint, setPlannerHint] = useState<
     { reason?: string; confidence?: number } | undefined
   >(undefined);
+  // Undo deletion state (chat/message)
+  const [undoBanner, setUndoBanner] = useState<null | {
+    type: "chat" | "message";
+    chatId?: Id<"chats"> | string;
+    messageId?: string;
+    expiresAt: number;
+  }>(null);
+  const _UNDO_TIMEOUT_MS = 5000;
   const [lastPlannerCallAtByChat, setLastPlannerCallAtByChat] = useState<
     Record<string, number>
   >({});
@@ -180,6 +188,8 @@ export function ChatInterface({
     urls?: string[];
     currentUrl?: string;
   } | null>(null);
+  const deleteChat = useMutation(api.chats.deleteChat);
+  const deleteMessage = useMutation(api.messages.deleteMessage);
 
   // Local storage for unauthenticated users (scoped per host to avoid env conflation)
   const storageNamespace = useMemo(
@@ -1721,6 +1731,26 @@ export function ChatInterface({
             setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
             setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
           }}
+          onRequestDeleteChat={(chatId) => {
+            if (typeof chatId === "string") {
+              setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
+              setLocalMessages((prev) =>
+                prev.filter((m) => m.chatId !== chatId),
+              );
+            } else {
+              // Schedule server deletion after undo window
+              setTimeout(async () => {
+                try {
+                  await deleteChat({ chatId });
+                } catch {}
+              }, 5000);
+            }
+            setUndoBanner({
+              type: "chat",
+              chatId,
+              expiresAt: Date.now() + 5000,
+            });
+          }}
           isOpen={sidebarOpen}
           onToggle={handleToggleSidebar}
         />
@@ -1738,6 +1768,19 @@ export function ChatInterface({
           setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
           setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
         }}
+        onRequestDeleteChat={(chatId) => {
+          if (typeof chatId === "string") {
+            setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
+            setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
+          } else {
+            setTimeout(async () => {
+              try {
+                await deleteChat({ chatId });
+              } catch {}
+            }, 5000);
+          }
+          setUndoBanner({ type: "chat", chatId, expiresAt: Date.now() + 5000 });
+        }}
       />
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full">
@@ -1754,6 +1797,27 @@ export function ChatInterface({
               setLocalMessages((prev) =>
                 prev.filter((m) => m._id !== messageId),
               );
+            }}
+            onRequestDeleteMessage={(messageId) => {
+              if (
+                messageId.startsWith("local_") ||
+                messageId.startsWith("msg_")
+              ) {
+                setLocalMessages((prev) =>
+                  prev.filter((m) => m._id !== messageId),
+                );
+              } else {
+                setTimeout(async () => {
+                  try {
+                    await deleteMessage({ messageId: messageId as any });
+                  } catch {}
+                }, 5000);
+              }
+              setUndoBanner({
+                type: "message",
+                messageId,
+                expiresAt: Date.now() + 5000,
+              });
             }}
           />
         </div>
@@ -1799,6 +1863,23 @@ export function ChatInterface({
                       ? "Public"
                       : "Share"}
               </button>
+            </div>
+          )}
+          {undoBanner && (
+            <div className="px-4 sm:px-6 mb-2 flex justify-center">
+              <div className="flex items-center gap-3 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <span>
+                  {undoBanner.type === "chat"
+                    ? "Chat deleted"
+                    : "Message deleted"}
+                </span>
+                <button
+                  onClick={() => setUndoBanner(null)}
+                  className="underline text-sm"
+                >
+                  Undo
+                </button>
+              </div>
             </div>
           )}
           <MessageInput
