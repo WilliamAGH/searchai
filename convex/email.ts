@@ -12,24 +12,56 @@ export const sendEmail = action({
   handler: async (ctx, args) => {
     const mailpitHost = process.env.MAILPIT_HOST;
     const apiAuth = process.env.MP_SEND_API_AUTH;
-    
+
     if (!mailpitHost || !apiAuth) {
       throw new Error("MailPit configuration missing");
     }
 
     try {
+      // Build payload per Mailpit Send API schema: TitleCase keys, structured objects
+      // https://mailpit.axllent.org/docs/api-v1/#send-message
+      const defaultFromEmail = "team@search-ai.io";
+      const defaultFromName = "SearchAI";
+
+      const rawFrom = args.from || `${defaultFromName} <${defaultFromEmail}>`;
+
+      // Parse "Name <email>" or plain email
+      let fromEmail = defaultFromEmail;
+      let fromName: string | undefined = defaultFromName;
+      const angleMatch = rawFrom.match(/^(.*)<\s*([^>]+)\s*>\s*$/);
+      if (angleMatch) {
+        fromName = angleMatch[1].trim() || undefined;
+        fromEmail = angleMatch[2].trim();
+      } else {
+        // If it's just an email address, keep name undefined
+        const emailLike = rawFrom.trim();
+        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailLike)) {
+          fromEmail = emailLike;
+          fromName = undefined;
+        }
+      }
+
+      const mailpitBody: Record<string, unknown> = {
+        From: {
+          Email: fromEmail,
+          ...(fromName ? { Name: fromName } : {}),
+        },
+        To: [
+          {
+            Email: args.to,
+          },
+        ],
+        Subject: args.subject,
+        HTML: args.html,
+      };
+
       const response = await fetch(`${mailpitHost}/api/v1/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Basic ${Buffer.from(apiAuth).toString('base64')}`,
+          Authorization: `Basic ${Buffer.from(apiAuth).toString("base64")}`,
         },
-        body: JSON.stringify({
-          from: args.from || "SearchAI <noreply@search-ai.io>",
-          to: [{ email: args.to }],
-          subject: args.subject,
-          html: args.html,
-        }),
+        body: JSON.stringify(mailpitBody),
       });
 
       if (!response.ok) {
@@ -41,7 +73,9 @@ export const sendEmail = action({
       return { success: true, messageId: result.ID };
     } catch (error) {
       console.error("Failed to send email:", error);
-      throw new Error(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to send email: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   },
 });
@@ -66,7 +100,7 @@ export const sendWelcomeEmail: any = action({
           </div>
           
           <div style="padding: 0 20px;">
-            <h2 style="color: #1f2937;">Hi ${args.userName || 'there'}! 👋</h2>
+            <h2 style="color: #1f2937;">Hi ${args.userName || "there"}! 👋</h2>
             
             <p>Thank you for joining SearchAI! You now have access to:</p>
             
