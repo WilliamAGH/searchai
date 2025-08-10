@@ -235,8 +235,20 @@ export const generationStep = internalAction({
 
       let aggregated: Array<{ title: string; url: string; snippet: string; relevanceScore?: number }> = [];
       if (plan.shouldSearch) {
+        // Augment queries with context keywords for better recall
+        const ctxTerms = Array.from(new Set((plan.contextSummary || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))).slice(0, 12);
+        const enrich = (q: string) => {
+          const base = (q || "").trim();
+          const missing: string[] = [];
+          const present = new Set(base.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+          for (const t of ctxTerms) {
+            if (!present.has(t) && missing.length < 4) missing.push(t);
+          }
+          return missing.length ? `${base} ${missing.join(' ')}` : base;
+        };
         for (const q of plan.queries) {
-          const res = await ctx.runAction(api.search.searchWeb, { query: q, maxResults: 5 });
+          const enriched = enrich(q).slice(0, 240);
+          const res = await ctx.runAction(api.search.searchWeb, { query: enriched, maxResults: 5 });
           const results = res.results || [];
           // Track last successful method for display
           if (results.length > 0) {
@@ -284,8 +296,10 @@ export const generationStep = internalAction({
               }
             });
           const contents = await Promise.all(contentPromises);
-          // Include planner summary at the top if present
-          searchContext = (plan.contextSummary ? `Conversation context:\n${plan.contextSummary}\n\n` : "") + contents.join("\n\n");
+          // Include planner summary at the top and the latest user message explicitly
+          const recentContext = plan.contextSummary ? `Conversation context:\n${plan.contextSummary}\n\n` : "";
+          const latest = args.userMessage ? `Latest question:\n${args.userMessage}\n\n` : "";
+          searchContext = `${recentContext}${latest}${contents.join("\n\n")}`;
 
           await ctx.runMutation(internal.messages.updateMessage, {
             messageId: args.assistantMessageId,
@@ -323,7 +337,7 @@ export const generationStep = internalAction({
 		
     if (hasRealResults && searchContext) {
 			systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant.\n\n`;
-			systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
+      systemPrompt += `## Conversation + Results Context\n${searchContext}\n\n`;
 			systemPrompt += `## Search Metadata:\n`;
 			searchResults.forEach((result: { title: string; url: string; snippet: string }, idx: number) => {
 				systemPrompt += `${idx + 1}. ${result.title}\n   URL: ${result.url}\n   Snippet: ${result.snippet}\n\n`;
@@ -334,8 +348,10 @@ export const generationStep = internalAction({
 			searchResults.forEach((result: { title: string; snippet: string }) => {
 				systemPrompt += `- ${result.title}: ${result.snippet}\n`;
 			});
-		} else {
-			systemPrompt = `You are a helpful AI assistant. Web search was not successful. Provide helpful responses based on your knowledge.`;
+    } else {
+      // Include conversation summary and latest message even if search failed
+      const noSearchCtx = searchContext ? `\n\nContext:\n${searchContext}` : "";
+      systemPrompt = `You are a helpful AI assistant. Web search was not successful. Provide helpful responses based on your knowledge.${noSearchCtx}`;
 		}
 		
 		systemPrompt += `\n\nProvide clear, helpful responses. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;

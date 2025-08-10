@@ -12,6 +12,46 @@ import { v } from "convex/values";
 import { action, mutation, query, internalMutation } from "./_generated/server";
 import { api } from "./_generated/api";
 
+// Shared summarization util (pure; can be imported by other Convex files)
+export function buildContextSummary(params: {
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content?: string; timestamp?: number }>;
+  rollingSummary?: string;
+  maxChars?: number;
+}): string {
+  const { messages, rollingSummary, maxChars = 1600 } = params;
+  const sanitize = (s?: string) => (s || "").replace(/\s+/g, " ").trim();
+  const recent = messages.slice(-14); // cap to last 14 turns for cost
+
+  // Collect last 2 user turns verbatim (truncated), then last assistant, then compact older
+  const lastUsers = [...recent].reverse().filter(m => m.role === 'user').slice(0, 2).reverse();
+  const lastAssistant = [...recent].reverse().find(m => m.role === 'assistant');
+
+  const lines: string[] = [];
+  if (rollingSummary) {
+    lines.push(sanitize(rollingSummary).slice(0, 800));
+  }
+  for (const m of lastUsers) {
+    const txt = sanitize(m.content).slice(0, 380);
+    if (txt) lines.push(`User: ${txt}`);
+  }
+  if (lastAssistant) {
+    const txt = sanitize(lastAssistant.content).slice(0, 380);
+    if (txt) lines.push(`Assistant: ${txt}`);
+  }
+  // Add compact one-liners for the rest, oldest to newest, skipping ones already included
+  const included = new Set(lines);
+  for (const m of recent) {
+    const txt = sanitize(m.content);
+    if (!txt) continue;
+    const line = `${m.role === 'assistant' ? 'Assistant' : m.role === 'user' ? 'User' : 'System'}: ${txt.slice(0, 220)}`;
+    if (!included.has(line)) {
+      lines.push(line);
+    }
+    if (lines.join(" \n ").length >= maxChars) break;
+  }
+  return lines.join(" \n ").slice(0, maxChars);
+}
+
 /**
  * Create new chat
  * - Generates unique share ID
@@ -243,7 +283,7 @@ export const summarizeRecent = query({
   args: { chatId: v.id("chats"), limit: v.optional(v.number()) },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const limit = Math.max(1, Math.min(args.limit ?? 12, 40));
+    const limit = Math.max(1, Math.min(args.limit ?? 14, 40));
     const q = ctx.db
       .query("messages")
       .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
@@ -254,14 +294,8 @@ export const summarizeRecent = query({
       if (buf.length >= limit) break;
     }
     const ordered = buf.reverse();
-    const lines: string[] = [];
-    for (const m of ordered) {
-      const role = m.role === 'assistant' ? 'Assistant' : m.role === 'user' ? 'User' : 'System';
-      const txt = (m.content || '').replace(/\s+/g, ' ').trim();
-      if (txt) lines.push(`- ${role}: ${txt.slice(0, 220)}`);
-      if (lines.length >= 12) break;
-    }
-    return lines.join("\n");
+    const chat = await ctx.db.get(args.chatId);
+    return buildContextSummary({ messages: ordered, rollingSummary: (chat as any)?.rollingSummary, maxChars: 1600 });
   },
 });
 
@@ -273,7 +307,7 @@ export const summarizeRecentAction = action({
   args: { chatId: v.id("chats"), limit: v.optional(v.number()) },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const lim = Math.max(1, Math.min(args.limit ?? 12, 40));
+    const lim = Math.max(1, Math.min(args.limit ?? 14, 40));
     // Load messages via query to respect auth and avoid using ctx.db in actions
     const all: Array<{
       role: 'user' | 'assistant' | 'system';
@@ -281,14 +315,8 @@ export const summarizeRecentAction = action({
       timestamp?: number;
     }> = await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId });
     const ordered = all.slice(-lim);
-    const lines: string[] = [];
-    for (const m of ordered) {
-      const role = m.role === 'assistant' ? 'Assistant' : m.role === 'user' ? 'User' : 'System';
-      const txt = (m.content || '').replace(/\s+/g, ' ').trim();
-      if (txt) lines.push(`- ${role}: ${txt.slice(0, 220)}`);
-      if (lines.length >= 12) break;
-    }
-    return lines.join("\n");
+    const chat = await ctx.runQuery(api.chats.getChatById, { chatId: args.chatId });
+    return buildContextSummary({ messages: ordered, rollingSummary: (chat as any)?.rollingSummary, maxChars: 1600 });
   },
 });
 

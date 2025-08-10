@@ -256,10 +256,10 @@ export const planSearch = action({
       return combined.slice(0, 220);
     };
 
-    // Simple lexical overlap heuristic with last user message
-    const last: any = recent.length > 0 ? recent[recent.length - 1] : undefined;
-    const lastContent = serialize(last?.content);
+    // Simple lexical overlap heuristic with the previous user message (exclude the immediate new message text)
     const newContent = serialize(args.newMessage);
+    const prevUser: any | undefined = [...recent].reverse().find((m: any) => m.role === "user" && serialize(m.content) !== newContent) || [...recent].reverse().find((m: any) => m.role === "user");
+    const lastContent = serialize(prevUser?.content);
     const a = new Set(tokenize(lastContent));
     const b = new Set(tokenize(newContent));
     const inter = new Set([...a].filter((x) => b.has(x)));
@@ -267,7 +267,7 @@ export const planSearch = action({
     const jaccard = inter.size / unionSize;
 
     // Time-based heuristic
-    const lastTs: number | undefined = typeof last?.timestamp === "number" ? last.timestamp : undefined;
+    const lastTs: number | undefined = typeof prevUser?.timestamp === "number" ? prevUser.timestamp : undefined;
     const minutesGap: number = lastTs ? Math.floor((Date.now() - lastTs) / 60000) : 0;
     const timeSuggestNew: boolean = minutesGap >= 120;
 
@@ -321,7 +321,7 @@ export const planSearch = action({
           {
             role: "system",
             content:
-              "You plan web searches for a conversational assistant. Return strict JSON only with fields: shouldSearch:boolean, contextSummary:string(<=500 tokens), queries:string[], suggestNewChat:boolean, decisionConfidence:number (0-1), reasons:string. Keep queries de-duplicated, concrete, and specific.",
+              "You plan web searches for a conversational assistant. Return strict JSON only with fields: shouldSearch:boolean, contextSummary:string(<=500 tokens), queries:string[], suggestNewChat:boolean, decisionConfidence:number (0-1), reasons:string. Each query MUST include the core terms from the new message and SHOULD include salient context keywords/entities when helpful. Keep queries de-duplicated, concrete, and specific.",
           },
           {
             role: "user",
