@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/husky.sh"
 
-npm run typecheck && npx lint-staged
+set -eu
+
+npm run typecheck && npx --no-install lint-staged
