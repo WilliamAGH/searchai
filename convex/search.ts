@@ -10,6 +10,12 @@ import { v } from "convex/values";
 import { action, internalMutation } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 
+// Tunables (override via env)
+const MAX_KWS = Math.max(1, Math.min(parseInt(process.env.PLANNER_MAX_KWS || "6", 10) || 6, 12));
+const MAX_EXTRAS = Math.max(1, Math.min(parseInt(process.env.PLANNER_MAX_EXTRAS || "4", 10) || 4, 8));
+const MAX_QUERIES = Math.max(1, Math.min(parseInt(process.env.PLANNER_MAX_QUERIES || "6", 10) || 6, 12));
+import { buildContextSummary } from "./chats";
+
 // Ephemeral in-process cache for planner decisions (best-effort only)
 type PlanResult = {
   shouldSearch: boolean;
@@ -233,7 +239,7 @@ export const planSearch = action({
     const STOP = new Set([
       'the','a','an','and','or','of','to','in','for','on','with','at','by','from','as','is','are','was','were','be','been','being','that','this','these','those','it','its','if','then','else','but','about','into','over','after','before','up','down','out','off','than','so','such','via'
     ]);
-    const extractKeywords = (text: string, max = 6) => {
+    const extractKeywords = (text: string, max = MAX_KWS) => {
       const freq = new Map<string, number>();
       for (const tok of tokenize(text)) {
         if (tok.length < 4) continue;
@@ -250,7 +256,7 @@ export const planSearch = action({
       const words = new Set(tokenize(base));
       const extras: string[] = [];
       for (const k of kws) {
-        if (!words.has(k) && extras.length < 4) extras.push(k);
+        if (!words.has(k) && extras.length < MAX_EXTRAS) extras.push(k);
       }
       const combined = extras.length ? `${base} ${extras.join(' ')}` : base;
       return combined.slice(0, 220);
@@ -271,17 +277,12 @@ export const planSearch = action({
     const minutesGap: number = lastTs ? Math.floor((Date.now() - lastTs) / 60000) : 0;
     const timeSuggestNew: boolean = minutesGap >= 120;
 
-    // Build a compact rolling summary (no external call)
-    let contextSummary = serialize(
-      recent
-        .map((m: any) => `${m.role}: ${serialize(m.content)}`)
-        .join(" \n ")
-        .slice(0, 1200),
-    );
-    if ((chat as any)?.rollingSummary) {
-      // Prepend a compact rolling summary to guide planning
-      contextSummary = `${serialize((chat as any).rollingSummary).slice(0, 800)} \n ${contextSummary}`.slice(0, 1600);
-    }
+    // DRY: Use shared summarizer (recency-weighted, includes rolling summary)
+    const contextSummary = buildContextSummary({
+      messages: recent.map((m: any) => ({ role: m.role, content: serialize(m.content), timestamp: m.timestamp })),
+      rollingSummary: (chat as any)?.rollingSummary,
+      maxChars: 1600,
+    });
 
     // Default plan if no LLM is available or JSON parsing fails
     const defaultPlan: PlanResult = {
@@ -378,11 +379,11 @@ export const planSearch = action({
             .filter((q) => q.length > 0)
             .slice(0, 6)
         ));
-        const keywordBag = extractKeywords(`${contextSummary} ${args.newMessage}`, 6);
+        const keywordBag = extractKeywords(`${contextSummary} ${args.newMessage}`, MAX_KWS);
         const augmented = baseList.map((q) => augmentQuery(q, keywordBag));
         // Ensure one query anchors on the exact new message + keywords
         const anchor = augmentQuery(args.newMessage, keywordBag);
-        const queries = Array.from(new Set([anchor, ...augmented])).slice(0, 6);
+        const queries = Array.from(new Set([anchor, ...augmented])).slice(0, MAX_QUERIES);
         const finalPlan = {
           shouldSearch: plan.shouldSearch,
           contextSummary: serialize(plan.contextSummary).slice(0, 2000),

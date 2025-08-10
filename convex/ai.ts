@@ -9,6 +9,7 @@
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { action, internalAction } from "./_generated/server";
+import { buildContextSummary } from "./chats";
 
 interface OpenRouterMessage {
 	role: string;
@@ -236,7 +237,21 @@ export const generationStep = internalAction({
       let aggregated: Array<{ title: string; url: string; snippet: string; relevanceScore?: number }> = [];
       if (plan.shouldSearch) {
         // Augment queries with context keywords for better recall
-        const ctxTerms = Array.from(new Set((plan.contextSummary || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))).slice(0, 12);
+        // Build a fresh, recency-weighted summary to extract terms (robust if planner summary is sparse)
+        const allMsgs = await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId });
+        const freshSummary = buildContextSummary({ messages: allMsgs as any, maxChars: 1200 });
+        const ctxTerms = Array.from(new Set((freshSummary || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))).slice(0, 18);
+        // Extract up to 2 quoted bigrams/trigrams for precision
+        const tokens = (freshSummary || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+        const ngrams = new Set<string>();
+        for (let i = 0; i < tokens.length - 1 && ngrams.size < 4; i++) {
+          const bi = `${tokens[i]} ${tokens[i+1]}`;
+          if (bi.split(" ").every(w => w.length > 2)) ngrams.add(`"${bi}"`);
+        }
+        for (let i = 0; i < tokens.length - 2 && ngrams.size < 6; i++) {
+          const tri = `${tokens[i]} ${tokens[i+1]} ${tokens[i+2]}`;
+          if (tri.split(" ").every(w => w.length > 2)) ngrams.add(`"${tri}"`);
+        }
         const enrich = (q: string) => {
           const base = (q || "").trim();
           const missing: string[] = [];
@@ -244,10 +259,20 @@ export const generationStep = internalAction({
           for (const t of ctxTerms) {
             if (!present.has(t) && missing.length < 4) missing.push(t);
           }
-          return missing.length ? `${base} ${missing.join(' ')}` : base;
+          // Add up to 2 quoted phrases when available
+          const phrases = Array.from(ngrams).slice(0, 2);
+          const suffix = [missing.join(' '), phrases.join(' ')].filter(Boolean).join(' ').trim();
+          return suffix ? `${base} ${suffix}` : base;
         };
         for (const q of plan.queries) {
-          const enriched = enrich(q).slice(0, 240);
+          // Add minimal operator hints for obvious intents (docs/GitHub/latest)
+          let enriched = enrich(q).slice(0, 240);
+          const lower = enriched.toLowerCase();
+          if (/sdk|api|reference|docs/.test(lower) && !/site:/.test(lower)) {
+            enriched += " site:docs.*";
+          } else if (/github|repo|source code|library/.test(lower) && !/site:/.test(lower)) {
+            enriched += " site:github.com";
+          }
           const res = await ctx.runAction(api.search.searchWeb, { query: enriched, maxResults: 5 });
           const results = res.results || [];
           // Track last successful method for display
@@ -267,7 +292,29 @@ export const generationStep = internalAction({
             byUrl.set(r.url, { title: r.title, url: r.url, snippet: r.snippet, relevanceScore: score });
           }
         }
+        // Lightweight rerank: prioritize overlap with latest user message + quoted phrases
+        const latest = (args.userMessage || '').toLowerCase();
+        const phraseSet = new Set(Array.from(ngrams));
+        const score = (r: { title: string; snippet: string; url: string; relevanceScore: number }) => {
+          const text = `${r.title} ${r.snippet}`.toLowerCase();
+          let s = r.relevanceScore || 0.5;
+          // Overlap with latest question tokens
+          const latestTokens = new Set(latest.split(/[^a-z0-9]+/).filter(Boolean));
+          let overlap = 0;
+          for (const t of latestTokens) if (t.length > 2 && text.includes(t)) overlap++;
+          s += Math.min(0.3, overlap * 0.03);
+          // Phrase match bonus
+          for (const p of phraseSet) if (p && text.includes((p as string).replace(/"/g, ''))) s += 0.1;
+          // Domain bonuses (official docs / gov / edu)
+          try {
+            const host = new URL(r.url).hostname;
+            if (/docs\./.test(host)) s += 0.1;
+            if (/\.gov$|\.edu$/.test(host)) s += 0.08;
+          } catch {}
+          return s;
+        };
         searchResults = Array.from(byUrl.values())
+          .map((r) => ({ ...r, relevanceScore: score(r as any) }))
           .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
           .slice(0, 7);
 
