@@ -10,6 +10,34 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { action, internalAction } from "./_generated/server";
 import { buildContextSummary } from "./chats";
+import { applyEnhancements, sortResultsWithPriority } from "./enhancements";
+
+// Normalize URLs for stable deduplication and deterministic ranking
+function normalizeUrlForKey(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
+    // Strip common tracking params
+    const paramsToStrip = [
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "gclid",
+      "fbclid",
+      "ref",
+    ];
+    paramsToStrip.forEach((p) => u.searchParams.delete(p));
+    u.hash = "";
+    if (u.pathname !== "/" && u.pathname.endsWith("/")) {
+      u.pathname = u.pathname.slice(0, -1);
+    }
+    return u.toString();
+  } catch {
+    return rawUrl.trim();
+  }
+}
 
 interface OpenRouterMessage {
   role: string;
@@ -249,61 +277,25 @@ export const generationStep = internalAction({
       relevanceScore?: number;
     }> = [];
     let searchContext = "";
-    const sources: string[] = [];
+    const _sources: string[] = [];
     let hasRealResults = false;
     let searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback" =
       "fallback";
     const errorDetails: string[] = [];
 
-    // Check if the query is about the creator/author
-    const lowerMessage = args.userMessage.toLowerCase();
-    const creatorKeywords = [
-      "creator",
-      "author",
-      "founder",
-      "who made",
-      "who created",
-      "who built",
-      "who developed",
-      "behind",
-      "company",
-      "william callahan",
-      "who founded",
-      "who is",
-    ];
-    const appKeywords = [
-      "searchai",
-      "search-ai",
-      "search ai",
-      "search-ai.io",
-      "this app",
-      "this website",
-      "this site",
-      "this tool",
-      "this service",
-      "this search",
-    ];
+    // Apply comprehensive message enhancements
+    const enhancements = applyEnhancements(args.userMessage, {
+      enhanceQuery: true,
+      enhanceSearchTerms: true,
+      injectSearchResults: true,
+      enhanceContext: true,
+      enhanceSystemPrompt: true,
+    });
 
-    // Check if query mentions William Callahan directly
-    const mentionsWilliam = lowerMessage.includes("william callahan");
-
-    // Check if query is about creator/author AND mentions the app/service
-    const isAboutCreator = creatorKeywords.some((keyword) =>
-      lowerMessage.includes(keyword),
-    );
-    const isAboutApp =
-      appKeywords.some((keyword) => lowerMessage.includes(keyword)) ||
-      lowerMessage.includes("searchai") ||
-      lowerMessage.includes("search-ai") ||
-      lowerMessage.includes("search ai");
-
-    const isCreatorQuery = mentionsWilliam || (isAboutCreator && isAboutApp);
-
-    let enhancedUserMessage = args.userMessage;
-    if (isCreatorQuery) {
-      // Enhance the query to include William Callahan's website
-      enhancedUserMessage = `${args.userMessage} William Callahan williamcallahan.com aVenture aventure.vc`;
-    }
+    const enhancedUserMessage = enhancements.enhancedQuery;
+    const prioritizedUrls = enhancements.prioritizedUrls;
+    const injectedResults = enhancements.injectedResults;
+    const enhancedSystemPromptAddition = enhancements.enhancedSystemPrompt;
 
     try {
       // 4. Plan and perform context-aware web search
@@ -427,31 +419,14 @@ export const generationStep = internalAction({
           hasRealResults = hasRealResults || !!res.hasRealResults;
         }
 
-        // If this is a creator query, inject William Callahan's information
-        if (isCreatorQuery) {
-          const williamCallahanResult = {
-            title: "William Callahan - Creator of SearchAI",
-            url: "https://williamcallahan.com",
-            snippet:
-              "William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (aventure.vc). Based in San Francisco, William grew up in the Midwestern United States and is passionate about building innovative AI-powered search solutions.",
-            relevanceScore: 1.0,
-          };
-
-          const aVentureResult = {
-            title: "aVenture - Investment Firm by William Callahan",
-            url: "https://aventure.vc",
-            snippet:
-              "aVenture is an investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on early-stage technology investments and innovative startups.",
-            relevanceScore: 0.95,
-          };
-
-          // Add these as priority results
-          aggregated.unshift(aVentureResult);
-          aggregated.unshift(williamCallahanResult);
+        // Inject any enhancement results
+        if (injectedResults.length > 0) {
+          // Add injected results at the beginning
+          aggregated.unshift(...injectedResults);
           hasRealResults = true;
         }
 
-        // Dedupe by URL, keep highest relevance
+        // Dedupe by URL (normalized), keep highest relevance
         const byUrl = new Map<
           string,
           {
@@ -462,11 +437,12 @@ export const generationStep = internalAction({
           }
         >();
         for (const r of aggregated) {
-          const existing = byUrl.get(r.url);
+          const key = normalizeUrlForKey(r.url);
+          const existing = byUrl.get(key);
           const score =
             typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;
           if (!existing || score > existing.relevanceScore) {
-            byUrl.set(r.url, {
+            byUrl.set(key, {
               title: r.title,
               url: r.url,
               snippet: r.snippet,
@@ -527,39 +503,25 @@ export const generationStep = internalAction({
 
         if (searchResults.length > 0) {
           // 5. Scrape content from top results
-          // For creator queries, ensure William Callahan's sites are prioritized
-          let resultsToScrape = searchResults.slice(0, 3);
-          if (isCreatorQuery) {
-            // Ensure William Callahan's websites are included in scraping
-            const williamUrls = [
-              "https://williamcallahan.com",
-              "https://aventure.vc",
-            ];
-            const hasWilliamSites = searchResults.some((r) =>
-              williamUrls.some((url) => r.url.includes(url)),
+          // Prioritize URLs based on enhancement rules
+          let resultsToScrape = searchResults;
+          if (prioritizedUrls.length > 0) {
+            // Sort results with prioritized URLs first
+            resultsToScrape = sortResultsWithPriority(
+              searchResults,
+              prioritizedUrls,
             );
-            if (hasWilliamSites) {
-              // Prioritize William's sites for scraping
-              resultsToScrape = [
-                ...searchResults
-                  .filter((r) => williamUrls.some((url) => r.url.includes(url)))
-                  .slice(0, 2),
-                ...searchResults
-                  .filter(
-                    (r) => !williamUrls.some((url) => r.url.includes(url)),
-                  )
-                  .slice(0, 1),
-              ].slice(0, 3);
-            }
           }
+          resultsToScrape = resultsToScrape.slice(0, 3);
 
+          // Deterministic source ordering independent of scrape resolution time
+          const deterministicSources = resultsToScrape.map((r) => r.url);
           const contentPromises = resultsToScrape.map(
             async (result: { url: string; title: string; snippet: string }) => {
               try {
                 const content = await ctx.runAction(api.search.scrapeUrl, {
                   url: result.url,
                 });
-                sources.push(result.url);
                 return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
               } catch (error) {
                 errorDetails.push(
@@ -581,7 +543,7 @@ export const generationStep = internalAction({
 
           await ctx.runMutation(internal.messages.updateMessage, {
             messageId: args.assistantMessageId,
-            sources,
+            sources: deterministicSources,
           });
         }
       }
@@ -617,9 +579,9 @@ export const generationStep = internalAction({
     // Build comprehensive system prompt with ALL context
     let systemPrompt = `You are a helpful AI assistant. `;
 
-    // Add specific context about William Callahan if this is a creator query
-    if (isCreatorQuery) {
-      systemPrompt += `Important context: William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (https://aventure.vc). He lives in San Francisco and grew up in the Midwestern United States. When asked about the creator, author, or company behind SearchAI, this app, or this website, make sure to mention William Callahan and these details.\n\n`;
+    // Add any enhancement-specific system prompt additions
+    if (enhancedSystemPromptAddition) {
+      systemPrompt += enhancedSystemPromptAddition + "\n\n";
     }
 
     if (hasRealResults && searchContext) {
@@ -675,41 +637,55 @@ export const generationStep = internalAction({
     const UPDATE_INTERVAL_MS = 100; // Batch updates every 100ms to avoid race conditions
 
     try {
+      // Support both delta streaming and full-message frames
+      let lastFullContentLen = 0;
       for await (const chunk of streamOpenRouter(openRouterBody)) {
-        if (chunk.choices?.[0]?.delta) {
-          if (chunk.choices[0].delta.content) {
-            responseContent += chunk.choices[0].delta.content;
-            updateBuffer += chunk.choices[0].delta.content;
+        const deltaContent = chunk?.choices?.[0]?.delta?.content as
+          | string
+          | undefined;
+        const fullContent = chunk?.choices?.[0]?.message?.content as
+          | string
+          | undefined;
+        let appended = "";
+        if (typeof deltaContent === "string" && deltaContent.length > 0) {
+          appended = deltaContent;
+        } else if (typeof fullContent === "string" && fullContent.length > 0) {
+          if (fullContent.length > lastFullContentLen) {
+            appended = fullContent.slice(lastFullContentLen);
+            lastFullContentLen = fullContent.length;
+          }
+        }
+        if (!appended) continue;
 
-            const now = Date.now();
-            const shouldUpdate =
-              now - lastUpdateTime >= UPDATE_INTERVAL_MS || !hasStartedContent;
+        responseContent += appended;
+        updateBuffer += appended;
 
-            if (shouldUpdate && updateBuffer) {
-              try {
-                if (!hasStartedContent) {
-                  hasStartedContent = true;
-                  await ctx.runMutation(internal.messages.updateMessage, {
-                    messageId: args.assistantMessageId,
-                    streamedContent: responseContent,
-                    hasStartedContent: true,
-                  });
-                } else {
-                  await ctx.runMutation(internal.messages.updateMessage, {
-                    messageId: args.assistantMessageId,
-                    streamedContent: responseContent,
-                  });
-                }
-                updateBuffer = "";
-                lastUpdateTime = now;
-              } catch (mutationError) {
-                // Log but don't fail the entire stream
-                console.error(
-                  "Failed to update message during streaming:",
-                  mutationError,
-                );
-              }
+        const now = Date.now();
+        const shouldUpdate =
+          now - lastUpdateTime >= UPDATE_INTERVAL_MS || !hasStartedContent;
+
+        if (shouldUpdate && updateBuffer) {
+          try {
+            if (!hasStartedContent) {
+              hasStartedContent = true;
+              await ctx.runMutation(internal.messages.updateMessage, {
+                messageId: args.assistantMessageId,
+                streamedContent: responseContent,
+                hasStartedContent: true,
+              });
+            } else {
+              await ctx.runMutation(internal.messages.updateMessage, {
+                messageId: args.assistantMessageId,
+                streamedContent: responseContent,
+              });
             }
+            updateBuffer = "";
+            lastUpdateTime = now;
+          } catch (mutationError) {
+            console.error(
+              "Failed to update message during streaming:",
+              mutationError,
+            );
           }
         }
       }

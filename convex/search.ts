@@ -256,7 +256,11 @@ export const planSearch = action({
     }
     // Cache key: chat + normalized message (first 200 chars)
     const normMsg = args.newMessage.toLowerCase().trim().slice(0, 200);
-    const cacheKey = `${args.chatId}|${normMsg}`;
+    // Strengthen cache key with message count to avoid over-hit on same prefix
+    const messageCountKey = (
+      await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId })
+    ).length;
+    const cacheKey = `${args.chatId}|${normMsg}|${messageCountKey}`;
     // Rate limit: retain timestamps within last 60s
     const bucket = planRate.get(String(args.chatId)) || [];
     const windowStart = now - PLAN_RATE_WINDOW_MS;
