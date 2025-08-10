@@ -977,10 +977,9 @@ export function ChatInterface({
         });
 				setLastPlannerCallAtByChat((prev) => ({ ...prev, [chatKey]: Date.now() }));
         if (plan?.suggestNewChat && (plan.decisionConfidence ?? 0) >= 0.6) {
-          setPendingMessage(content);
+          // Non-blocking banner: show suggestion but do not prevent sending
           setPlannerHint({ reason: plan.reasons, confidence: plan.decisionConfidence });
           setShowFollowUpPrompt(true);
-          return;
         }
       } catch (e) {
         // If planner fails, fall back to heuristic below
@@ -989,18 +988,16 @@ export function ChatInterface({
         } else {
           // If we didn't call planner, still use local heuristic for big topic shifts
           if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
-            setPendingMessage(content);
+            // Non-blocking banner: show suggestion but do not prevent sending
             setPlannerHint(undefined);
             setShowFollowUpPrompt(true);
-            return;
           }
         }
     } else if (!showFollowUpPrompt) {
       if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
-        setPendingMessage(content);
+        // Non-blocking banner for unauthenticated users too
         setPlannerHint(undefined);
         setShowFollowUpPrompt(true);
-        return;
       }
     }
 
@@ -1202,7 +1199,6 @@ export function ChatInterface({
       if (msgs.length >= 2 && isTopicChange(val, msgs)) {
         // Show advisory hint non-blocking if no prompt is currently visible
         if (!showFollowUpPrompt) {
-          setPendingMessage(val);
           setPlannerHint(undefined);
           setShowFollowUpPrompt(true);
         }
