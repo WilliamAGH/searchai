@@ -10,7 +10,7 @@
 import { Authenticated, Unauthenticated } from "convex/react";
 import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "sonner";
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams, useLocation } from "react-router-dom";
 import { ChatInterface } from "./components/ChatInterface";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -26,8 +26,27 @@ import { SignUpModal } from "./components/SignUpModal";
  */
 const ChatPage = () => {
   const { chatId, shareId, publicId } = useParams();
+  const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
+
+  // Set per-route canonical and url metas
+  React.useEffect(() => {
+    const canonicalHref = window.location.origin + location.pathname + (location.search || "");
+    let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      document.head.appendChild(link);
+    }
+    link.href = canonicalHref;
+
+    // Best-effort update for sharing metas
+    const og = document.querySelector<HTMLMetaElement>('meta[property="og:url"]');
+    if (og) og.setAttribute('content', canonicalHref);
+    const tw = document.querySelector<HTMLMetaElement>('meta[name="twitter:url"]');
+    if (tw) tw.setAttribute('content', canonicalHref);
+  }, [location.pathname, location.search]);
 
   return (
     <>

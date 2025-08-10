@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { logger } from "../lib/logger";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ interface ShareModalProps {
 export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: ShareModalProps) {
   const [selectedPrivacy, setSelectedPrivacy] = useState<"private" | "shared" | "public">(privacy);
   const [copied, setCopied] = useState(false);
-  const copyTimeoutRef = useRef<number | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -33,6 +34,15 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
       }
     };
   }, []);
+
+  // Clear copy feedback when closing the modal
+  useEffect(() => {
+    if (!isOpen && copyTimeoutRef.current !== null) {
+      clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = null;
+      setCopied(false);
+    }
+  }, [isOpen]);
 
   // Initial focus when opening
   useEffect(() => {
@@ -56,9 +66,12 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      copyTimeoutRef.current = window.setTimeout(() => setCopied(false), 2000);
+      if (copyTimeoutRef.current !== null) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy URL:', error);
+      logger.error('Failed to copy share URL', { error });
     }
   };
 
@@ -99,14 +112,17 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
             Share this conversation
           </h2>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
-            Make this chat accessible to anyone with the link
+            {selectedPrivacy === 'private' && 'Only you can access this chat.'}
+            {selectedPrivacy === 'shared' && 'Anyone with the link can view (not indexed).'}
+            {selectedPrivacy === 'public' && 'Publicly viewable and may appear in search results.'}
           </p>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Privacy Level</label>
-            <div className="flex flex-col space-y-2">
+            <fieldset>
+              <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">Privacy Level</legend>
+              <div className="mt-1 flex flex-col space-y-2">
               <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">
                 <input type="radio" name="privacy" value="private" checked={selectedPrivacy === 'private'} onChange={() => setSelectedPrivacy('private')} className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 focus:ring-emerald-500" />
                 <div>
@@ -128,7 +144,8 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
                   <div className="text-xs text-gray-500 dark:text-gray-400">Anyone can view and it may appear in search results.</div>
                 </div>
               </label>
-            </div>
+              </div>
+            </fieldset>
           </div>
 
           {(selectedPrivacy === 'shared' || selectedPrivacy === 'public') && (

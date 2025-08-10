@@ -28,6 +28,7 @@ interface MessageInputProps {
  * @param placeholder - Input placeholder text
  */
 export function MessageInput({ onSendMessage, disabled = false, placeholder = "Ask me anything...", onDraftChange, history = [] }: MessageInputProps) {
+  const MAX_TEXTAREA_HEIGHT = 200;
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Track navigation through history (index into `history`), null when not navigating
@@ -151,7 +152,7 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+      textarea.style.height = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT) + 'px';
     }
   }, [message]);
 
@@ -161,7 +162,7 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
       const textarea = textareaRef.current;
       if (textarea) {
         textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+        textarea.style.height = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT) + 'px';
       }
     };
     window.addEventListener('resize', handler);
@@ -193,6 +194,7 @@ export function MessageInput({ onSendMessage, disabled = false, placeholder = "A
               aria-label="Message input"
               disabled={disabled}
               rows={1}
+              autoComplete="off"
               className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-y-auto message-input-textarea message-textarea"
             />
             <button
