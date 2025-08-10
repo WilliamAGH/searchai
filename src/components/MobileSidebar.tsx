@@ -1,6 +1,8 @@
-import React, { Fragment } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { Id } from '../../convex/_generated/dataModel';
+import React, { Fragment } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Dialog, Transition } from "@headlessui/react";
+import { Id } from "../../convex/_generated/dataModel";
 
 interface Chat {
   _id: Id<"chats"> | string;
@@ -17,6 +19,7 @@ interface MobileSidebarProps {
   currentChatId: Id<"chats"> | string | null;
   onSelectChat: (chatId: Id<"chats"> | string) => void;
   onNewChat: () => void;
+  onDeleteLocalChat?: (chatId: string) => void;
 }
 
 export function MobileSidebar({
@@ -26,7 +29,9 @@ export function MobileSidebar({
   currentChatId,
   onSelectChat,
   onNewChat,
+  onDeleteLocalChat,
 }: MobileSidebarProps) {
+  const deleteChat = useMutation(api.chats.deleteChat);
   return (
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50 lg:hidden" onClose={onClose}>
@@ -69,25 +74,45 @@ export function MobileSidebar({
                     onClick={onClose}
                   >
                     <span className="sr-only">Close sidebar</span>
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="h-6 w-6 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth="1.5"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
               </Transition.Child>
-              
+
               <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-900 px-6 pb-2">
                 <div className="flex h-16 shrink-0 items-center">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <svg
+                        className="w-5 h-5 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
                       </svg>
                     </div>
                     <span className="text-lg font-semibold">SearchAI</span>
                   </div>
                 </div>
-                
+
                 <nav className="flex flex-1 flex-col">
                   <button
                     onClick={() => {
@@ -96,12 +121,22 @@ export function MobileSidebar({
                     }}
                     className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
                     </svg>
                     New Chat
                   </button>
-                  
+
                   <div className="space-y-1">
                     <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Recent Chats
@@ -113,26 +148,65 @@ export function MobileSidebar({
                     ) : (
                       <div className="space-y-1">
                         {chats.map((chat) => (
-                          <button
+                          <div
                             key={chat._id}
-                            onClick={() => {
-                              onSelectChat(chat._id as any);
-                              onClose();
-                            }}
-                            className={`w-full px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
-                              currentChatId === chat._id ? 'bg-gray-100 dark:bg-gray-800' : ''
-                            }`}
+                            className="flex items-center gap-2"
                           >
-                            <div className="font-medium truncate text-sm">{chat.title}</div>
-                            <div className="text-xs text-gray-500 flex items-center gap-1">
-                              {chat.isLocal && (
-                                <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded">
-                                  Local
-                                </span>
-                              )}
-                              {new Date(chat.updatedAt).toLocaleDateString()}
-                            </div>
-                          </button>
+                            <button
+                              onClick={() => {
+                                onSelectChat(chat._id as any);
+                                onClose();
+                              }}
+                              className={`flex-1 px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                                currentChatId === chat._id
+                                  ? "bg-gray-100 dark:bg-gray-800"
+                                  : ""
+                              }`}
+                            >
+                              <div className="font-medium truncate text-sm">
+                                {chat.title}
+                              </div>
+                              <div className="text-xs text-gray-500 flex items-center gap-1">
+                                {chat.isLocal && (
+                                  <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded">
+                                    Local
+                                  </span>
+                                )}
+                                {new Date(chat.updatedAt).toLocaleDateString()}
+                              </div>
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  if (typeof chat._id === "string") {
+                                    onDeleteLocalChat?.(chat._id);
+                                  } else {
+                                    await deleteChat({ chatId: chat._id });
+                                  }
+                                  if (currentChatId === chat._id) {
+                                    onSelectChat(null as any);
+                                  }
+                                } catch {}
+                              }}
+                              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                              title="Delete chat"
+                              aria-label="Delete chat"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-1-3H10a1 1 0 00-1 1v2h8V5a1 1 0 00-1-1z"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                         ))}
                       </div>
                     )}
