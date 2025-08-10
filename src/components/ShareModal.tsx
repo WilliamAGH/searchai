@@ -20,6 +20,7 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
   const [selectedPrivacy, setSelectedPrivacy] = useState<"private" | "shared" | "public">(privacy);
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<number | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     setSelectedPrivacy(privacy);
@@ -32,6 +33,13 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
       }
     };
   }, []);
+
+  // Initial focus when opening
+  useEffect(() => {
+    if (isOpen) {
+      closeBtnRef.current?.focus();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -60,6 +68,7 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
       role="dialog"
       aria-modal="true"
       aria-labelledby="share-modal-title"
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
     >
       {/* Backdrop */}
       <div 
@@ -70,6 +79,7 @@ export function ShareModal({ isOpen, onClose, onShare, shareUrl, privacy }: Shar
       {/* Modal */}
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm sm:max-w-md w-full mx-4 p-5 sm:p-6 border border-gray-200 dark:border-gray-700 font-serif dark:font-mono">
         <button
+          ref={closeBtnRef}
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           aria-label="Close"
