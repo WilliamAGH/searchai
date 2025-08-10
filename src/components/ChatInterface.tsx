@@ -1373,15 +1373,17 @@ export function ChatInterface({
 
 
 
-			<ShareModal
+                <ShareModal
 				isOpen={showShareModal}
 				onClose={() => setShowShareModal(false)}
 				onShare={handleShare}
-				shareUrl={
-					currentChat?.privacy === 'public' && currentChat.publicId ? `${window.location.origin}/p/${currentChat.publicId}`
-					: currentChat?.privacy === 'shared' && currentChat.shareId ? `${window.location.origin}/s/${currentChat.shareId}`
-					: `${window.location.origin}/chat/${currentChat?._id}`
-				}
+                shareUrl={
+                    currentChat?.privacy === 'public' && currentChat.publicId
+                      ? `${window.location.origin}/p?id=${currentChat.publicId}`
+                      : currentChat?.privacy === 'shared' && currentChat.shareId
+                        ? `${window.location.origin}/s?id=${currentChat.shareId}`
+                        : `${window.location.origin}/chat/${currentChat?._id}`
+                }
 				privacy={currentChat?.privacy || "private"}
 			/>
 		</div>

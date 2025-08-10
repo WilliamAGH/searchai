@@ -808,4 +808,159 @@ http.route({
  */
 auth.addHttpRoutes(http);
 
+/**
+ * Dynamic Open Graph pages for shared/public chats
+ * - GET /p?id=PUBLIC_ID   → indexable public share with per-chat OG
+ * - GET /s?id=SHARE_ID    → non-indexable shared link with per-chat OG
+ * These endpoints return minimal HTML with populated meta tags for crawlers,
+ * and immediately redirect human users to the SPA route on the primary domain.
+ */
+function buildOgHtml(params: {
+  siteUrl: string;
+  canonicalPath: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  indexable: boolean;
+}): string {
+  const { siteUrl, canonicalPath, title, description, imageUrl, indexable } = params;
+  const canonical = `${siteUrl}${canonicalPath}`;
+  const robots = indexable ? "index, follow" : "noindex, nofollow";
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <link rel="canonical" href="${canonical}" />
+    <meta name="description" content="${description}" />
+    <meta name="robots" content="${robots}" />
+
+    <meta property="og:site_name" content="SearchAI" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="${canonical}" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:image" content="${imageUrl}" />
+    <meta property="og:image:secure_url" content="${imageUrl}" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SearchAI - AI-Powered Web Search" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${description}" />
+    <meta name="twitter:image" content="${imageUrl}" />
+    <meta name="twitter:url" content="${canonical}" />
+  </head>
+  <body>
+    <noscript>
+      <p>This page contains social metadata for sharing. Open the chat at <a href="${canonical}">${canonical}</a>.</p>
+    </noscript>
+    <script>
+      // Redirect humans to SPA route
+      location.replace(${JSON.stringify(canonical)});
+    </script>
+  </body>
+ </html>`;
+}
+
+http.route({
+  path: "/p",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const publicId = url.searchParams.get("id");
+    const siteUrl = process.env.SITE_URL || "https://search-ai.io";
+    if (!publicId) {
+      return new Response("Missing id", { status: 400 });
+    }
+    try {
+      const chat = await ctx.runQuery(api.chats.getChatByPublicId, { publicId });
+      if (!chat) return new Response("Not found", { status: 404 });
+      if (chat.privacy !== "public") return new Response("Not public", { status: 403 });
+
+      // Prefer chat.title; fall back to generic
+      const title: string = (chat as any)?.title || "SearchAI Chat";
+      // Build a short description from rolling summary or server summary action
+      let description = (chat as any)?.rollingSummary || "A shared conversation on SearchAI.";
+      try {
+        const summary = await ctx.runAction(api.chats.summarizeRecentAction, { chatId: (chat as any)._id });
+        if (summary) description = summary;
+      } catch {}
+      description = String(description).replace(/\s+/g, " ").trim().slice(0, 200);
+
+      const imageUrl = `${siteUrl}/images/opengraph/searchai-io-og.png`;
+      const html = buildOgHtml({
+        siteUrl,
+        canonicalPath: `/p/${publicId}`,
+        title,
+        description,
+        imageUrl,
+        indexable: true,
+      });
+      return new Response(html, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          // Indexable
+          "X-Robots-Tag": "all",
+          "Cache-Control": "public, max-age=120, s-maxage=600",
+        },
+      });
+    } catch (e) {
+      console.error("/p OG endpoint error", e);
+      return new Response("Server error", { status: 500 });
+    }
+  }),
+});
+
+http.route({
+  path: "/s",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const shareId = url.searchParams.get("id");
+    const siteUrl = process.env.SITE_URL || "https://search-ai.io";
+    if (!shareId) {
+      return new Response("Missing id", { status: 400 });
+    }
+    try {
+      const chat = await ctx.runQuery(api.chats.getChatByShareId, { shareId });
+      if (!chat) return new Response("Not found", { status: 404 });
+      // Shared links are not indexable; only "public" should be indexed
+      const title: string = (chat as any)?.title || "Shared Chat";
+      let description = (chat as any)?.rollingSummary || "A shared conversation on SearchAI.";
+      try {
+        const summary = await ctx.runAction(api.chats.summarizeRecentAction, { chatId: (chat as any)._id });
+        if (summary) description = summary;
+      } catch {}
+      description = String(description).replace(/\s+/g, " ").trim().slice(0, 200);
+
+      const imageUrl = `${siteUrl}/images/opengraph/searchai-io-og.png`;
+      const html = buildOgHtml({
+        siteUrl,
+        canonicalPath: `/s/${shareId}`,
+        title,
+        description,
+        imageUrl,
+        indexable: false,
+      });
+      return new Response(html, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          // Block indexing for shared links
+          "X-Robots-Tag": "noindex, nofollow",
+          "Cache-Control": "private, max-age=120",
+        },
+      });
+    } catch (e) {
+      console.error("/s OG endpoint error", e);
+      return new Response("Server error", { status: 500 });
+    }
+  }),
+});
+
 export default http;

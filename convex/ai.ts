@@ -533,7 +533,7 @@ export const generationStep = internalAction({
 			messageId: args.assistantMessageId,
 			content: responseContent,
 			isStreaming: false,
-            thinking: null,      // Clear thinking state
+            // Clear thinking state by omitting the field (schema doesn't allow null)
 		});
 
 		// 9. Update rolling summary to reduce future planner tokens
