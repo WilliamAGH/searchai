@@ -7,6 +7,7 @@
  */
 
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { randomBytes, randomUUID } from "node:crypto";
 import { v } from "convex/values";
 import { action, mutation, query, internalMutation } from "./_generated/server";
 import { api } from "./_generated/api";
@@ -30,8 +31,9 @@ export const createChat = mutation({
 		const userId = await getAuthUserId(ctx);
 		const now = Date.now();
 
-		const shareId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-		const publicId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+		// Use strong, URL-safe IDs instead of Math.random
+		const shareId = (typeof randomUUID === 'function' ? randomUUID() : randomBytes(16).toString('hex')).replace(/-/g, '');
+		const publicId = (typeof randomUUID === 'function' ? randomUUID() : randomBytes(16).toString('hex')).replace(/-/g, '');
 
     return await ctx.db.insert("chats", {
 			title: args.title,
@@ -242,13 +244,16 @@ export const summarizeRecent = query({
   returns: v.string(),
   handler: async (ctx, args) => {
     const limit = Math.max(1, Math.min(args.limit ?? 12, 40));
-    const messages = await ctx.db
+    const q = ctx.db
       .query("messages")
       .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-      .order("desc")
-      .take(limit);
-
-    const ordered = messages.reverse();
+      .order("desc");
+    const buf: any[] = [];
+    for await (const m of q) {
+      buf.push(m);
+      if (buf.length >= limit) break;
+    }
+    const ordered = buf.reverse();
     const lines: string[] = [];
     for (const m of ordered) {
       const role = m.role === 'assistant' ? 'Assistant' : m.role === 'user' ? 'User' : 'System';

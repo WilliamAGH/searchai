@@ -200,7 +200,10 @@ export const planSearch = action({
       } as PlanResult;
       planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: fallback });
       // telemetry
-      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_rate_limited', chatId: args.chatId });
+      const _metricRateLimited: null = await ctx.runMutation(
+        internal.search.recordMetric,
+        { name: 'planner_rate_limited', chatId: args.chatId },
+      );
       return fallback;
     }
     // Record this attempt in the rate bucket
@@ -208,7 +211,10 @@ export const planSearch = action({
     planRate.set(String(args.chatId), pruned);
     const hit = planCache.get(cacheKey);
     if (hit && hit.expires > now) {
-      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
+      const _metricCacheHit: null = await ctx.runMutation(
+        internal.search.recordMetric,
+        { name: 'planner_invoked', chatId: args.chatId },
+      );
       return hit.result;
     }
 
@@ -265,7 +271,10 @@ export const planSearch = action({
     // If no API key present, skip LLM planning
     if (!process.env.OPENROUTER_API_KEY) {
       planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: defaultPlan });
-      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
+      const _metricNoApiKey: null = await ctx.runMutation(
+        internal.search.recordMetric,
+        { name: 'planner_invoked', chatId: args.chatId },
+      );
       return defaultPlan;
     }
 
@@ -273,7 +282,10 @@ export const planSearch = action({
       const borderline = jaccard >= 0.45 && jaccard <= 0.7;
       if (!borderline) {
         planCache.set(cacheKey, { expires: now + 3 * 60 * 1000, result: defaultPlan });
-        await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
+        const _metricNotBorderline: null = await ctx.runMutation(
+          internal.search.recordMetric,
+          { name: 'planner_invoked', chatId: args.chatId },
+        );
         return defaultPlan;
       }
 
@@ -306,7 +318,10 @@ export const planSearch = action({
 
       if (!response.ok) {
         planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: defaultPlan });
-        await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
+        const _metricBadResponse: null = await ctx.runMutation(
+          internal.search.recordMetric,
+          { name: 'planner_invoked', chatId: args.chatId },
+        );
         return defaultPlan;
       }
       const data = await response.json();
@@ -349,15 +364,24 @@ export const planSearch = action({
           reasons: serialize(plan.reasons).slice(0, 500),
         };
         planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: finalPlan });
-        await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
+        const _metricPlanned: null = await ctx.runMutation(
+          internal.search.recordMetric,
+          { name: 'planner_invoked', chatId: args.chatId },
+        );
         return finalPlan;
       }
       planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: defaultPlan });
-      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
+      const _metricParseFail: null = await ctx.runMutation(
+        internal.search.recordMetric,
+        { name: 'planner_invoked', chatId: args.chatId },
+      );
       return defaultPlan;
     } catch {
       planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: defaultPlan });
-      await ctx.runMutation(internal.search.recordMetric, { name: 'planner_invoked', chatId: args.chatId });
+      const _metricException: null = await ctx.runMutation(
+        internal.search.recordMetric,
+        { name: 'planner_invoked', chatId: args.chatId },
+      );
       return defaultPlan;
     }
   },
@@ -934,7 +958,10 @@ export const recordClientMetric = action({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await ctx.runMutation(internal.search.recordMetric, { name: args.name, chatId: args.chatId });
+    const _metricClient: null = await ctx.runMutation(
+      internal.search.recordMetric,
+      { name: args.name, chatId: args.chatId },
+    );
     return null;
   },
 });

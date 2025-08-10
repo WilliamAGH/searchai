@@ -34,6 +34,7 @@ const TOPIC_CHANGE_INDICATORS = [
 ];
 // Planner cooldown (ms)
 const CHAT_COOLDOWN_MS = 20_000;
+const DRAFT_MIN_LENGTH = 12;
 
 interface LocalChat {
 	_id: string;
@@ -128,10 +129,13 @@ export function ChatInterface({
 		{ debounceMs: 800 },
 	);
 
-	const chats = useQuery(api.chats.getUserChats);
+		// Only query Convex when authenticated and IDs are server-issued
+  const isServerChatId = (val?: string): val is Id<"chats"> => !!val && !val.startsWith("local_");
+
+		const chats = useQuery(api.chats.getUserChats, isAuthenticated ? undefined : "skip");
   const chatByOpaqueId = useQuery(
     api.chats.getChatByOpaqueId,
-    propChatId ? { chatId: propChatId as Id<"chats"> } : "skip"
+    isAuthenticated && isServerChatId(propChatId) ? { chatId: propChatId as Id<"chats"> } : "skip"
   );
 	const chatByShareId = useQuery(api.chats.getChatByShareId, propShareId ? { shareId: propShareId } : "skip");
 	const chatByPublicId = useQuery(api.chats.getChatByPublicId, propPublicId ? { publicId: propPublicId } : "skip");
@@ -156,9 +160,18 @@ export function ChatInterface({
 	 * - Random alphanumeric string
 	 * - Used for shareable chat URLs
 	 */
-	const generateShareId = useCallback(() => {
-		return `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-	}, []);
+		const generateShareId = useCallback(() => {
+      if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
+        return (crypto as any).randomUUID().replace(/-/g, '');
+      }
+      try {
+        const bytes = new Uint8Array(16);
+        (crypto as Crypto).getRandomValues(bytes);
+        return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+      } catch {}
+      // Fallback (lower entropy)
+      return `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+		}, []);
 
 	/**
 	 * Detect topic change between messages
@@ -267,9 +280,10 @@ export function ChatInterface({
 			} else {
 				path = `/chat/${chat._id}`;
 			}
-			if (path !== window.location.pathname) {
-				window.history.pushState({}, '', path);
-			}
+            if (path !== window.location.pathname) {
+                const method = window.history.state ? 'pushState' : 'replaceState';
+                (window.history as any)[method]({}, '', path);
+            }
 		}
 	}, [currentChatId, allChats]);
 
@@ -346,20 +360,14 @@ export function ChatInterface({
 	 * - Only updates if mounted
 	 */
   const throttledMessageUpdate = useThrottle(useCallback((messageId: string, content: string, reasoning: string, hasStarted: boolean) => {
-    if (isMountedRef.current) {
-      setLocalMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === messageId
-            ? {
-                ...msg,
-                content,
-                reasoning,
-                hasStartedContent: hasStarted,
-              }
-            : msg,
-        ),
-      );
-    }
+    if (!isMountedRef.current) return;
+    setLocalMessages((prev) => {
+      const idx = prev.findIndex((m) => m._id === messageId);
+      if (idx === -1) return prev;
+      const next = prev.slice();
+      next[idx] = { ...next[idx], content, reasoning, hasStartedContent: hasStarted };
+      return next;
+    });
   }, [setLocalMessages]), 50);
 
 	// Add abort controller for stream cancellation
@@ -412,10 +420,8 @@ export function ChatInterface({
 			logger.debug("🔍 SEARCH API REQUEST:");
 			logger.debug("URL:", searchUrl);
 			logger.debug("Method:", "POST");
-			logger.debug(
-				"Body:",
-				JSON.stringify({ query: message, maxResults: 5 }, null, 2),
-			);
+                // Avoid logging raw user input in dev
+                logger.debug("Body:", { queryLength: message.length, maxResults: 5 });
 
 			const searchStartTime = Date.now();
             const searchResponse = await fetch(searchUrl, {
@@ -429,10 +435,7 @@ export function ChatInterface({
 			logger.debug("🔍 SEARCH API RESPONSE:");
 			logger.debug("Status:", searchResponse.status);
 			logger.debug("Duration:", `${searchDuration}ms`);
-			logger.debug(
-				"Headers:",
-				Object.fromEntries(searchResponse.headers.entries()),
-			);
+                logger.debug("Headers: <omitted>");
 
 			if (searchResponse.ok) {
 				const searchData = await searchResponse.json();
@@ -475,10 +478,7 @@ export function ChatInterface({
 									logger.debug("🌐 SCRAPE API REQUEST:");
 									logger.debug("URL:", scrapeUrl);
 									logger.debug("Method:", "POST");
-									logger.debug(
-										"Body:",
-										JSON.stringify({ url: result.url }, null, 2),
-									);
+                            logger.debug("Body:", { urlLength: result.url?.length ?? 0 });
 
                                     const scrapeStartTime = Date.now();
             const scrapeResponse = await fetch(scrapeUrl, {
@@ -567,8 +567,9 @@ export function ChatInterface({
 						result: { title: string; url: string; snippet: string },
 						_idx: number,
 					) => {
-						const domain = new URL(result.url).hostname.replace('www.', '');
-						systemPrompt += `[${domain}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
+                    let domain = 'unknown';
+                    try { domain = new URL(result.url).hostname.replace('www.', ''); } catch {}
+                    systemPrompt += `[${domain}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
 					},
 				);
 			} else if (!hasRealResults && searchResults.length > 0) {
@@ -603,7 +604,13 @@ export function ChatInterface({
 			logger.debug("🤖 AI API REQUEST:");
 			logger.debug("URL:", aiUrl);
 			logger.debug("Method:", "POST");
-			logger.debug("Body:", JSON.stringify(aiRequestBody, null, 2));
+                // Do not log full bodies with user content/history
+                logger.debug("Body:", {
+                  messageLength: aiRequestBody.message.length,
+                  searchResults: aiRequestBody.searchResults?.length ?? 0,
+                  sources: aiRequestBody.sources?.length ?? 0,
+                  historySize: aiRequestBody.chatHistory?.length ?? 0,
+                });
 
 			// Create placeholder assistant message for streaming
 			const assistantMessageId = `msg_${Date.now() + 1}`;
@@ -1087,7 +1094,7 @@ export function ChatInterface({
 	 * - Sends pending message
 	 * - Uses setTimeout for state sync
 	 */
-	const handleContinueChat = useCallback(() => {
+    const handleContinueChat = useCallback(() => {
 		setShowFollowUpPrompt(false);
 		setPlannerHint(undefined);
     // Telemetry: user chose to continue in current chat
@@ -1103,7 +1110,7 @@ export function ChatInterface({
 				handleSendMessage(tempMessage);
 			}, 100);
 		}
-	}, [pendingMessage]);
+    }, [pendingMessage, isAuthenticated, currentChatId, recordClientMetric, handleSendMessage]);
 
 	/**
 	 * Start new chat for follow-up
@@ -1111,7 +1118,7 @@ export function ChatInterface({
 	 * - Waits 500ms for creation
 	 * - Sends pending message
 	 */
-	const handleNewChatForFollowUp = useCallback(async () => {
+    const handleNewChatForFollowUp = useCallback(async () => {
 		setShowFollowUpPrompt(false);
 		setPlannerHint(undefined);
 		const tempMessage = pendingMessage;
@@ -1129,7 +1136,7 @@ export function ChatInterface({
 				handleSendMessage(tempMessage);
 			}
 		}, 500);
-	}, [pendingMessage, handleNewChat]);
+    }, [pendingMessage, handleNewChat, isAuthenticated, currentChatId, recordClientMetric, handleSendMessage]);
 
   // Start new chat with summary: create chat, synthesize prompt with summary + question
   const handleNewChatWithSummary = useCallback(async () => {
@@ -1172,7 +1179,7 @@ export function ChatInterface({
       // Fallback to normal new chat flow
       await handleNewChatForFollowUp();
     }
-  }, [pendingMessage, currentChatId, handleNewChatForFollowUp, handleNewChat, isAuthenticated, localMessages]);
+  }, [pendingMessage, currentChatId, handleNewChatForFollowUp, handleNewChat, isAuthenticated, localMessages, summarizeRecentAction, handleSendMessage]);
 
   // Debounced draft analyzer: quick local heuristic, optional planner preflight (not blocking)
   const draftAnalyzer = useDebounce((draft: string) => {
@@ -1200,7 +1207,7 @@ export function ChatInterface({
   // Only forward drafts when meaningful and not generating
   const handleDraftChange = useCallback((draft: string) => {
     if (isGenerating) return;
-    if (draft.trim().length < 12) return; // avoid popping banner on very short drafts
+    if (draft.trim().length < DRAFT_MIN_LENGTH) return; // avoid popping banner on very short drafts
     draftAnalyzer(draft);
   }, [isGenerating, draftAnalyzer]);
 
