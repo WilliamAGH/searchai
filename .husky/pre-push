@@ -35,27 +35,39 @@ fi
 # 2. Convex deployment dry-run (CRITICAL - catches deployment failures!)
 echo "🔧 Testing Convex deployment..."
 # Use documented --typecheck=enable for strict validation
+set +e
 npx --no-install convex dev --once --typecheck=enable > /tmp/convex-deploy.log 2>&1
 CONVEX_EXIT_CODE=$?
+set -e
 if [ $CONVEX_EXIT_CODE -ne 0 ]; then
   echo "❌ CRITICAL: Convex deployment would fail!"
-  echo ""
-  echo "📋 Deployment errors:"
-  cat /tmp/convex-deploy.log | grep -E "(error|Error|failed)" | head -20
-  echo ""
-  echo "💡 Fix these issues before pushing:"
-  echo "   1. Remove any process.env usage from Convex functions"
-  echo "   2. Fix type mismatches in function signatures"
-  echo "   3. Ensure all imports are valid"
-  echo "   4. Run 'npx convex dev --once --typecheck=enable' locally to debug"
+  echo "📄 Log: /tmp/convex-deploy.log"
+  echo "🗂️  Changed files in convex/ (staged):"
+  git diff --name-only --cached -- convex 2>/dev/null | sed -n '1,50p' || true
+  echo "🗂️  Changed files in convex/ (unstaged):"
+  git diff --name-only -- convex 2>/dev/null | sed -n '1,50p' || true
+  echo "--- First 80 lines ---"
+  sed -n '1,80p' /tmp/convex-deploy.log || true
+  echo "--- Last 60 lines ---"
+  tail -60 /tmp/convex-deploy.log
+  echo "-------------------------------------"
+  echo "🔎 Notable errors:"
+  grep -nE "(TS[0-9]+|TypeError|ReferenceError|SyntaxError|error:|Error:|failed|Failure|Exception)" /tmp/convex-deploy.log | head -n 25 || true
+  echo "🔎 File references:"
+  grep -nE "convex/[A-Za-z0-9_./-]+\.ts[:)]" /tmp/convex-deploy.log | head -n 15 || true
+  echo "💡 Fix these issues before pushing. Reproduce: npx convex dev --once --typecheck=enable"
   exit 1
 fi
 
 # 3. Full test suite
 echo "🧪 Running full test suite..."
-npm test
-if [ $? -ne 0 ]; then
+npm test > /tmp/node-tests-prepush.log 2>&1 || TEST_EXIT=$?
+TEST_EXIT=${TEST_EXIT:-0}
+if [ $TEST_EXIT -ne 0 ]; then
   echo "❌ Tests failed!"
+  echo "📄 Log: /tmp/node-tests-prepush.log"
+  tail -40 /tmp/node-tests-prepush.log
+  echo "💡 Tip: run 'npm test' locally to reproduce."
   exit 1
 fi
 
@@ -73,10 +85,26 @@ fi
 echo "🕵️ Smoke test: ensuring no console errors..."
 if npx --no-install playwright --version > /dev/null 2>&1; then
   # Run only the smoke test for speed. Playwright config starts a preview server.
-  npx --no-install playwright test -g smoke --reporter=line
-  if [ $? -ne 0 ]; then
+  set +e
+  npx --no-install playwright test -g smoke --reporter=line | tee /tmp/playwright-smoke.log
+  PW_EXIT=${PIPESTATUS[0]}
+  set -e
+  if [ ${PW_EXIT:-0} -ne 0 ]; then
     echo "❌ Smoke test failed (console errors or network failures)."
-    echo "💡 Reproduce locally: npx playwright test -g smoke --reporter=line"
+    echo "📄 Log: /tmp/playwright-smoke.log"
+    # Surface the key error lines
+    grep -nE "(ReferenceError|TypeError|Error: |pageerror|requestfailed)" /tmp/playwright-smoke.log | head -n 10 || true
+    # Show available artifacts
+    TRACE_ZIP=$(find test-results -name trace.zip -type f -print -quit 2>/dev/null || true)
+    SCREENSHOT=$(find test-results -name 'test-failed-*.png' -type f -print -quit 2>/dev/null || true)
+    if [ -n "$TRACE_ZIP" ]; then
+      echo "🧭 Trace: $TRACE_ZIP"
+      echo "   Open with: npx playwright show-trace \"$TRACE_ZIP\""
+    fi
+    if [ -n "$SCREENSHOT" ]; then
+      echo "🖼️  Screenshot: $SCREENSHOT"
+    fi
+    echo "💡 Reproduce: npx playwright test -g smoke --reporter=line"
     exit 1
   fi
 else
