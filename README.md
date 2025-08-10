@@ -261,6 +261,7 @@ This ensures every search includes both the user’s latest intent and the most 
 | `CHAT_COOLDOWN_MS` | `45000` | Minimum time between planner calls per chat. |
 | `PROMPT_COOLDOWN_MS` | `180000` | Minimum time between banner suggestions per chat. |
 | `TOPIC_CHANGE_INDICATORS` | patterns | Explicit phrases (e.g., “switch to…”, “unrelated…”) that nudge detection. |
+
 - **VS Code TS issues**: Run `npm run clean:vscode` and restart TS server
 - **Auth issues**: Verify `SITE_URL` matches your deployment URL
 - **API failures**: Check Convex logs with `npx convex logs`
