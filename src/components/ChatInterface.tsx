@@ -563,6 +563,7 @@ export function ChatInterface({
   // Deterministic post-create send flow (replaces setTimeout-based races)
   const pendingSendRef = useRef<string | null>(null);
   const awaitingNewChatRef = useRef<boolean>(false);
+  const sendRef = useRef<null | ((m: string) => void)>(null);
   useEffect(() => {
     if (!awaitingNewChatRef.current) return;
     if (!currentChatId) return;
@@ -572,8 +573,8 @@ export function ChatInterface({
     awaitingNewChatRef.current = false;
     pendingSendRef.current = null;
     // Send into the newly created chat id (currentChatId is now set)
-    handleSendMessage(msg);
-  }, [currentChatId, handleSendMessage]);
+    sendRef.current?.(msg);
+  }, [currentChatId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1577,7 +1578,10 @@ export function ChatInterface({
     [isGenerating, draftAnalyzer],
   );
 
-  // (post-create send is handled directly via handleSendMessage in the effect above)
+  // Keep sendRef in sync with the latest handler after it's defined
+  useEffect(() => {
+    sendRef.current = handleSendMessage;
+  }, [handleSendMessage]);
 
   // Auto-create first chat if none exists and not on a chat URL
   useEffect(() => {

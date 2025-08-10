@@ -17,6 +17,7 @@ interface ChatSidebarProps {
   onSelectChat: (chatId: Id<"chats"> | string) => void;
   onNewChat: () => void;
   onDeleteLocalChat?: (chatId: string) => void;
+  onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
   isOpen: boolean;
   onToggle: () => void;
 }
@@ -27,6 +28,7 @@ export function ChatSidebar({
   onSelectChat,
   onNewChat,
   onDeleteLocalChat,
+  onRequestDeleteChat,
   isOpen,
   onToggle,
 }: ChatSidebarProps) {
@@ -150,11 +152,21 @@ export function ChatSidebar({
                 <button
                   onClick={async () => {
                     try {
-                      if (typeof chat._id === "string") {
-                        // Local chat deletion
-                        onDeleteLocalChat?.(chat._id);
+                      if (
+                        !window.confirm(
+                          "Delete this chat? This cannot be undone.",
+                        )
+                      )
+                        return;
+                      if (onRequestDeleteChat) {
+                        onRequestDeleteChat(chat._id as any);
                       } else {
-                        await deleteChat({ chatId: chat._id });
+                        if (typeof chat._id === "string") {
+                          // Local chat deletion
+                          onDeleteLocalChat?.(chat._id);
+                        } else {
+                          await deleteChat({ chatId: chat._id });
+                        }
                       }
                       if (currentChatId === chat._id) {
                         onSelectChat(null as any);

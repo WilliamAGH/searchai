@@ -20,6 +20,7 @@ interface MobileSidebarProps {
   onSelectChat: (chatId: Id<"chats"> | string) => void;
   onNewChat: () => void;
   onDeleteLocalChat?: (chatId: string) => void;
+  onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
 }
 
 export function MobileSidebar({
@@ -30,6 +31,7 @@ export function MobileSidebar({
   onSelectChat,
   onNewChat,
   onDeleteLocalChat,
+  onRequestDeleteChat,
 }: MobileSidebarProps) {
   const deleteChat = useMutation(api.chats.deleteChat);
   return (
@@ -178,10 +180,20 @@ export function MobileSidebar({
                             <button
                               onClick={async () => {
                                 try {
-                                  if (typeof chat._id === "string") {
-                                    onDeleteLocalChat?.(chat._id);
+                                  if (
+                                    !window.confirm(
+                                      "Delete this chat? This cannot be undone.",
+                                    )
+                                  )
+                                    return;
+                                  if (onRequestDeleteChat) {
+                                    onRequestDeleteChat(chat._id as any);
                                   } else {
-                                    await deleteChat({ chatId: chat._id });
+                                    if (typeof chat._id === "string") {
+                                      onDeleteLocalChat?.(chat._id);
+                                    } else {
+                                      await deleteChat({ chatId: chat._id });
+                                    }
                                   }
                                   if (currentChatId === chat._id) {
                                     onSelectChat(null as any);
