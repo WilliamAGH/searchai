@@ -1,5 +1,5 @@
 /**
- * Sign-up modal with email/password registration and anonymous sign-in
+ * Sign-up modal with email/password registration
  * - Creates new user accounts via Convex auth
  * - Provides switch to sign-in modal
  * - Dark mode optimized with proper button spacing
@@ -17,7 +17,7 @@ interface SignUpModalProps {
 }
 
 /**
- * Modal for user sign-up with email/password or anonymous auth
+ * Modal for user sign-up with email/password
  * @param isOpen - Controls modal visibility
  * @param onClose - Callback to close modal
  * @param onSwitchToSignIn - Callback to switch to sign-in modal
@@ -126,28 +126,7 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
               </button>
             </div>
           </form>
-          <div className="flex items-center justify-center my-4">
-            <hr className="my-4 grow border-gray-200 dark:border-gray-700" />
-            <span className="mx-4 text-gray-500 dark:text-gray-400">or</span>
-            <hr className="my-4 grow border-gray-200 dark:border-gray-700" />
-          </div>
-          <button 
-            className="w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={submitting}
-            onClick={async () => {
-              setSubmitting(true);
-              try {
-                await signIn("anonymous");
-                onClose();
-              } catch {
-                toast.error("Could not sign in anonymously. Please try again.");
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-          >
-            Sign in anonymously
-          </button>
+          {null}
         </div>
         
         <div className="mt-6 text-center">
