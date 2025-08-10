@@ -47,18 +47,18 @@ async function* streamOpenRouter(body: OpenRouterBody) {
 
 	try {
         const response = await fetch(
-			"https://openrouter.ai/api/v1/chat/completions",
-			{
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-					"Content-Type": "application/json",
-              "HTTP-Referer": "https://search-ai.io",
-              "X-Title": "SearchAI",
-				},
-				body: JSON.stringify({ ...body, stream: true }),
-			},
-		);
+            "https://openrouter.ai/api/v1/chat/completions",
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    "Content-Type": "application/json",
+              ...(process.env.SITE_URL ? { "HTTP-Referer": process.env.SITE_URL } : {}),
+              ...(process.env.SITE_TITLE ? { "X-Title": process.env.SITE_TITLE } : {}),
+                },
+                body: JSON.stringify({ ...body, stream: true }),
+            },
+        );
 
 		console.log("📊 OpenRouter response received:", {
 			status: response.status,
@@ -238,8 +238,9 @@ export const generationStep = internalAction({
       if (plan.shouldSearch) {
         // Augment queries with context keywords for better recall
         // Build a fresh, recency-weighted summary to extract terms (robust if planner summary is sparse)
-        const allMsgs = await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId });
-        const freshSummary = buildContextSummary({ messages: allMsgs as any, maxChars: 1200 });
+        const allMsgs: Array<{ role: 'user' | 'assistant' | 'system'; content?: string; timestamp?: number }> =
+          await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId });
+        const freshSummary = buildContextSummary({ messages: allMsgs, maxChars: 1200 });
         const ctxTerms = Array.from(new Set((freshSummary || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))).slice(0, 18);
         // Extract up to 2 quoted bigrams/trigrams for precision
         const tokens = (freshSummary || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
