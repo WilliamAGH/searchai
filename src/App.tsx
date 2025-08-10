@@ -34,13 +34,18 @@ import { SignUpModal } from "./components/SignUpModal";
 interface ChatPageProps {
   onRequestSignUp: () => void;
   onRequestSignIn: () => void;
+  isSidebarOpen: boolean;
+  onToggleSidebar: () => void;
 }
 
-function ChatPage({ onRequestSignUp, onRequestSignIn }: ChatPageProps) {
+function ChatPage({
+  onRequestSignUp,
+  onRequestSignIn,
+  isSidebarOpen,
+  onToggleSidebar,
+}: ChatPageProps) {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
   // Set per-route canonical and url metas
   useEffect(() => {
@@ -75,7 +80,7 @@ function ChatPage({ onRequestSignUp, onRequestSignIn }: ChatPageProps) {
         <ChatInterface
           isAuthenticated={true}
           isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={toggleSidebar}
+          onToggleSidebar={onToggleSidebar}
           chatId={chatId}
           shareId={shareId}
           publicId={publicId}
@@ -87,7 +92,7 @@ function ChatPage({ onRequestSignUp, onRequestSignIn }: ChatPageProps) {
         <ChatInterface
           isAuthenticated={false}
           isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={toggleSidebar}
+          onToggleSidebar={onToggleSidebar}
           chatId={chatId}
           shareId={shareId}
           publicId={publicId}
@@ -102,6 +107,7 @@ function ChatPage({ onRequestSignUp, onRequestSignIn }: ChatPageProps) {
 export default function App() {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const openSignUp = useCallback(() => {
     setShowSignInModal(false);
@@ -123,6 +129,29 @@ export default function App() {
             <header className="flex-shrink-0 sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[3.75rem] sm:h-16 flex items-center justify-between">
                 <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                  {/* Mobile menu button */}
+                  <button
+                    onClick={() => setIsSidebarOpen((prev) => !prev)}
+                    className="lg:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation"
+                    aria-label="Open chat menu"
+                    title="Open chat menu"
+                    type="button"
+                  >
+                    <svg
+                      className="w-5 h-5 text-gray-700 dark:text-gray-300"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 6h16M4 12h16M4 18h16"
+                      />
+                    </svg>
+                  </button>
+
                   <Link
                     to="/"
                     aria-label="Go home"
@@ -181,6 +210,8 @@ export default function App() {
                     <ChatPage
                       onRequestSignUp={openSignUp}
                       onRequestSignIn={openSignIn}
+                      isSidebarOpen={isSidebarOpen}
+                      onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
                     />
                   }
                 />
@@ -190,6 +221,8 @@ export default function App() {
                     <ChatPage
                       onRequestSignUp={openSignUp}
                       onRequestSignIn={openSignIn}
+                      isSidebarOpen={isSidebarOpen}
+                      onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
                     />
                   }
                 />
@@ -199,6 +232,8 @@ export default function App() {
                     <ChatPage
                       onRequestSignUp={openSignUp}
                       onRequestSignIn={openSignIn}
+                      isSidebarOpen={isSidebarOpen}
+                      onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
                     />
                   }
                 />
@@ -208,6 +243,8 @@ export default function App() {
                     <ChatPage
                       onRequestSignUp={openSignUp}
                       onRequestSignIn={openSignIn}
+                      isSidebarOpen={isSidebarOpen}
+                      onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
                     />
                   }
                 />
