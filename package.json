@@ -8,6 +8,7 @@
     "dev:frontend": "vite --open",
     "dev:backend": "convex dev",
     "build": "vite build",
+    "preview": "vite preview --strictPort --port 4173",
     "lint": "oxlint && tsc -p convex --noEmit --pretty false && tsc -p . --noEmit --pretty false && convex dev --once && vite build",
     "typecheck": "tsc -p . --noEmit --pretty false",
     "precommit:check": "npm run typecheck && npm test --silent && npm run build --silent",
@@ -15,6 +16,7 @@
     "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo '✅ Cleaned everything - run npm install'",
     "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo '✅ Cleaned VSCode caches - restart VSCode'",
     "test": "tsx ./tests/convex.search.spec.mjs && tsx ./tests/creator-detection.spec.mjs && tsx ./tests/enhancements.spec.mjs",
+    "test:smoke": "playwright test -g smoke --reporter=line",
     "prepare": "husky"
   },
   "dependencies": {
@@ -41,6 +43,7 @@
     "terser": "^5.43.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.54.2",
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
