@@ -394,9 +394,23 @@ html.dark .prose code {
 
 /* Message textarea sizing and scrollbar behavior (no inline styles) */
 .message-textarea {
-  min-height: 52px;
+  /* Ensure intrinsic line-height-based centering for single-line height */
+  min-height: 48px;
   max-height: 200px;
   -ms-overflow-style: none; /* IE/Edge legacy */
+}
+
+/* Normalize textarea vertical alignment and placeholder alignment */
+.message-textarea,
+.message-textarea::placeholder {
+  line-height: 1.5;
+}
+
+/* Ensure consistent padding-box sizing so text stays centered with auto-resize */
+.message-textarea {
+  box-sizing: border-box;
+  /* Slightly tighter horizontal letterspacing in dark mono to reduce perceived crowding */
+  letter-spacing: 0.01em;
 }
 
 /* Apply Firefox-specific scrollbar suppression only when supported */
