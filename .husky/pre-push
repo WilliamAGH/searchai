@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+# Husky v9: plain POSIX shell, no husky.sh sourcing
 # Exit on unset and any error
 set -eu
 
