@@ -24,17 +24,19 @@ import { FollowUpPrompt } from "./FollowUpPrompt";
 // Auth modals are centralized in App; ChatInterface requests them via callbacks
 import { useSwipeable } from 'react-swipeable';
 
-// Topic-change detection constants
-const TOPIC_CHANGE_SIMILARITY_THRESHOLD = 0.2;
-const TOPIC_CHANGE_MIN_WORD_LENGTH = 3;
+// Topic-change detection constants (made less sensitive)
+const TOPIC_CHANGE_SIMILARITY_THRESHOLD = 0.1; // require much lower overlap
+const TOPIC_CHANGE_MIN_WORD_LENGTH = 4; // ignore shorter words to reduce noise
+const PROMPT_MIN_WORDS = 16; // require substantive input before prompting
 const TOPIC_CHANGE_INDICATORS = [
-  /^(now|next|also|another|different|switch|change|new question)/i,
-  /^(what about|how about|tell me about)/i,
-  /^(unrelated|separate|different topic)/i,
+  /^(completely different|unrelated|separate topic|new subject)/i,
+  /^(switch to|change to|moving on to)/i,
+  /^(now let's talk about something else|different conversation)/i,
 ];
-// Planner cooldown (ms)
-const CHAT_COOLDOWN_MS = 20_000;
-const DRAFT_MIN_LENGTH = 12;
+// Planner and prompt cooldowns (ms)
+const CHAT_COOLDOWN_MS = 45_000; // reduce planner frequency
+const PROMPT_COOLDOWN_MS = 180_000; // show at most every 3m per chat
+const DRAFT_MIN_LENGTH = 20; // avoid premature draft triggers
 
 interface LocalChat {
 	_id: string;
@@ -108,7 +110,8 @@ export function ChatInterface({
 	const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
 	const [pendingMessage, setPendingMessage] = useState<string>("");
 	const [plannerHint, setPlannerHint] = useState<{ reason?: string; confidence?: number } | undefined>(undefined);
-	const [lastPlannerCallAtByChat, setLastPlannerCallAtByChat] = useState<Record<string, number>>({});
+    const [lastPlannerCallAtByChat, setLastPlannerCallAtByChat] = useState<Record<string, number>>({});
+    const [lastPromptAtByChat, setLastPromptAtByChat] = useState<Record<string, number>>({});
   const [lastDraftSeen, setLastDraftSeen] = useState<string>("");
 	const [searchProgress, setSearchProgress] = useState<{
 		stage: "searching" | "scraping" | "analyzing" | "generating";
@@ -199,11 +202,11 @@ export function ChatInterface({
 		const intersection = new Set([...newWords].filter(x => lastWords.has(x)));
 		const similarity = intersection.size / Math.max(newWords.size, lastWords.size);
 		
-		// If similarity is very low, it's likely a topic change
-		// Also check for explicit signals of new topics
-		const hasIndicator = TOPIC_CHANGE_INDICATORS.some(pattern => pattern.test(newMessage));
-		
-		return similarity < TOPIC_CHANGE_SIMILARITY_THRESHOLD || hasIndicator;
+    	// If similarity is very low AND we have explicit signals of new topics
+    	const hasIndicator = TOPIC_CHANGE_INDICATORS.some(pattern => pattern.test(newMessage));
+
+    	// Be conservative: require both conditions
+    	return similarity < TOPIC_CHANGE_SIMILARITY_THRESHOLD && hasIndicator;
 	}, []);
 
 	// Get all chats (either from Convex or local storage)
@@ -952,8 +955,8 @@ export function ChatInterface({
 			// Using module-level CHAT_COOLDOWN_MS constant
 			const contentTrim = content.trim();
 			const words = contentTrim.split(/\s+/).filter(Boolean);
-			const estTokens = Math.ceil(contentTrim.length / 4);
-			const cue = /^(now|next|also|another|different|switch|new question|unrelated)/i.test(contentTrim);
+			// Stricter cue detection matching our indicators
+			const cue = /^(completely different|unrelated|separate topic|new subject|switch to|change to|moving on to|now let's talk about something else|different conversation)/i.test(contentTrim);
 			let gapMinutes = 0;
 			try {
 				const prior = (messages || []).filter((m) => m.role === 'user');
@@ -962,7 +965,7 @@ export function ChatInterface({
 					gapMinutes = Math.floor((Date.now() - (lastUser as any).timestamp) / 60000);
 				}
 			} catch {}
-			const shouldPlanBase = estTokens >= 20 || words.length >= 10 || cue || gapMinutes >= 120;
+            const shouldPlanBase = cue || words.length >= PROMPT_MIN_WORDS || gapMinutes >= 180;
 			const chatKey = String(currentChatId);
 			const lastAt = lastPlannerCallAtByChat[chatKey] || 0;
 			const cooldownPassed = Date.now() - lastAt >= CHAT_COOLDOWN_MS;
@@ -976,10 +979,14 @@ export function ChatInterface({
           maxContextMessages: 10,
         });
 				setLastPlannerCallAtByChat((prev) => ({ ...prev, [chatKey]: Date.now() }));
-        if (plan?.suggestNewChat && (plan.decisionConfidence ?? 0) >= 0.6) {
-          // Non-blocking banner: show suggestion but do not prevent sending
-          setPlannerHint({ reason: plan.reasons, confidence: plan.decisionConfidence });
-          setShowFollowUpPrompt(true);
+            if (plan?.suggestNewChat && (plan.decisionConfidence ?? 0) >= 0.8 && words.length >= PROMPT_MIN_WORDS) {
+          const lastPromptAt = lastPromptAtByChat[chatKey] || 0;
+          if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
+            // Non-blocking banner: show suggestion but do not prevent sending
+            setPlannerHint({ reason: plan.reasons, confidence: plan.decisionConfidence });
+            setShowFollowUpPrompt(true);
+            setLastPromptAtByChat((prev) => ({ ...prev, [chatKey]: Date.now() }));
+          }
         }
       } catch (e) {
         // If planner fails, fall back to heuristic below
@@ -987,17 +994,27 @@ export function ChatInterface({
       }
         } else {
           // If we didn't call planner, still use local heuristic for big topic shifts
-          if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
-            // Non-blocking banner: show suggestion but do not prevent sending
-            setPlannerHint(undefined);
-            setShowFollowUpPrompt(true);
+          if (currentMessagesForChat.length >= 3 && words.length >= PROMPT_MIN_WORDS && isTopicChange(content, currentMessagesForChat)) {
+            const lastPromptAt = lastPromptAtByChat[chatKey] || 0;
+            if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
+              // Non-blocking banner: show suggestion but do not prevent sending
+              setPlannerHint(undefined);
+              setShowFollowUpPrompt(true);
+              setLastPromptAtByChat((prev) => ({ ...prev, [chatKey]: Date.now() }));
+            }
           }
         }
     } else if (!showFollowUpPrompt) {
-      if (currentMessagesForChat.length >= 2 && isTopicChange(content, currentMessagesForChat)) {
-        // Non-blocking banner for unauthenticated users too
-        setPlannerHint(undefined);
-        setShowFollowUpPrompt(true);
+      const wordsUnauth = content.trim().split(/\s+/).filter(Boolean);
+      if (currentMessagesForChat.length >= 3 && wordsUnauth.length >= PROMPT_MIN_WORDS && isTopicChange(content, currentMessagesForChat)) {
+        const chatKeyU = String(currentChatId);
+        const lastPromptAt = lastPromptAtByChat[chatKeyU] || 0;
+        if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
+          // Non-blocking banner for unauthenticated users too
+          setPlannerHint(undefined);
+          setShowFollowUpPrompt(true);
+          setLastPromptAtByChat((prev) => ({ ...prev, [chatKeyU]: Date.now() }));
+        }
       }
     }
 
@@ -1194,17 +1211,12 @@ export function ChatInterface({
       if (val.slice(0, 160) === lastDraftSeen) return;
       setLastDraftSeen(val.slice(0, 160));
 
-      // Local heuristic only; do not call planner here (avoid extra latency)
-      const msgs = typeof currentChatId === 'string' ? localMessages.filter(m => m.chatId === currentChatId) : (messages || []);
-      if (msgs.length >= 2 && isTopicChange(val, msgs)) {
-        // Show advisory hint non-blocking if no prompt is currently visible
-        if (!showFollowUpPrompt) {
-          setPlannerHint(undefined);
-          setShowFollowUpPrompt(true);
-        }
-      }
+      // Draft-time prompting disabled to reduce sensitivity and distraction
+      // We keep the analyzer for potential future lightweight metrics or previews.
+      const _msgs = typeof currentChatId === 'string' ? localMessages.filter(m => m.chatId === currentChatId) : (messages || []);
+      void _msgs;
     } catch {}
-  }, 650);
+  }, 1200);
 
   // Only forward drafts when meaningful and not generating
   const handleDraftChange = useCallback((draft: string) => {
