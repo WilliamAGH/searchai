@@ -16,6 +16,7 @@ import { useDebounce, useThrottle } from "../hooks/useDebounce";
 import { useRef, useCallback, useMemo } from "react";
 import { logger } from "../lib/logger";
 import { ChatSidebar } from "./ChatSidebar";
+import { looksChatId } from "../lib/utils";
 import { MessageInput } from "./MessageInput";
 import { MessageList } from "./MessageList";
 import { ShareModal } from "./ShareModal";
@@ -180,21 +181,63 @@ export function ChatInterface({
     currentUrl?: string;
   } | null>(null);
 
-  // Local storage for unauthenticated users
+  // Local storage for unauthenticated users (scoped per host to avoid env conflation)
+  const storageNamespace = useMemo(
+    () => `searchai:${window.location.host}`,
+    [],
+  );
+  const chatsStorageKey = useMemo(
+    () => `${storageNamespace}:chats`,
+    [storageNamespace],
+  );
+  const messagesStorageKey = useMemo(
+    () => `${storageNamespace}:messages`,
+    [storageNamespace],
+  );
+
   const [localChats, setLocalChats] = useLocalStorage<LocalChat[]>(
-    "searchai_chats",
+    chatsStorageKey,
     [],
     { debounceMs: 800 },
   );
   const [localMessages, setLocalMessages] = useLocalStorage<LocalMessage[]>(
-    "searchai_messages",
+    messagesStorageKey,
     [],
     { debounceMs: 800 },
   );
 
+  // Fallback: migrate legacy keys to namespaced keys (one-time, per origin)
+  useEffect(() => {
+    try {
+      const legacyChats = window.localStorage.getItem("searchai_chats");
+      const legacyMsgs = window.localStorage.getItem("searchai_messages");
+      const hasNew =
+        (localChats?.length ?? 0) > 0 || (localMessages?.length ?? 0) > 0;
+      if (!hasNew && (legacyChats || legacyMsgs)) {
+        if (legacyChats) {
+          try {
+            const parsed = JSON.parse(legacyChats);
+            if (Array.isArray(parsed)) setLocalChats(parsed);
+          } catch {}
+        }
+        if (legacyMsgs) {
+          try {
+            const parsed = JSON.parse(legacyMsgs);
+            if (Array.isArray(parsed)) setLocalMessages(parsed);
+          } catch {}
+        }
+        // Clear legacy keys after copying
+        try {
+          window.localStorage.removeItem("searchai_chats");
+          window.localStorage.removeItem("searchai_messages");
+        } catch {}
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Only query Convex when authenticated and IDs are server-issued
-  const looksServerId = (s?: string): s is Id<"chats"> =>
-    !!s && !s.startsWith("local_") && s.length > 10; // cheap sanity check
+  const looksServerId = looksChatId;
 
   const chats = useQuery(
     api.chats.getUserChats,
@@ -234,6 +277,11 @@ export function ChatInterface({
   // One-per-mount migration guards
   const migrationAttemptedRef = useRef(false);
   const migratingRef = useRef(false);
+  const MIGRATION_RETRY_KEY = useMemo(
+    () => `${storageNamespace}:migration_retry_at`,
+    [storageNamespace],
+  );
+  const MIGRATION_BACKOFF_MS = 10 * 60 * 1000; // 10 minutes
 
   /**
    * Generate unique share ID
@@ -1529,10 +1577,7 @@ export function ChatInterface({
     [isGenerating, draftAnalyzer],
   );
 
-  // Keep sendRef in sync with the latest handler (fixes post-create send)
-  useEffect(() => {
-    sendRef.current = handleSendMessage;
-  }, [handleSendMessage]);
+  // (post-create send is handled directly via handleSendMessage in the effect above)
 
   // Auto-create first chat if none exists and not on a chat URL
   useEffect(() => {
@@ -1553,11 +1598,17 @@ export function ChatInterface({
 
   const canShare = currentMessages.length > 0 && !!currentChatId;
 
-  // Migrate any existing local chats/messages after sign-in (once per mount)
+  // Migrate any existing local chats/messages after sign-in (once per mount, with backoff on failure)
   useEffect(() => {
     if (!isAuthenticated) return;
     if (!localChats || localChats.length === 0) return;
     if (migrationAttemptedRef.current || migratingRef.current) return;
+    // Respect failure backoff
+    try {
+      const retryStr = window.localStorage.getItem(MIGRATION_RETRY_KEY) || "0";
+      const retryAt = Number(retryStr) || 0;
+      if (Date.now() < retryAt) return;
+    } catch {}
 
     const run = async () => {
       try {
@@ -1601,6 +1652,13 @@ export function ChatInterface({
         setLocalMessages([] as any);
       } catch (e) {
         console.warn("Local chat migration failed; preserving local data", e);
+        // Set retry backoff
+        try {
+          window.localStorage.setItem(
+            MIGRATION_RETRY_KEY,
+            String(Date.now() + MIGRATION_BACKOFF_MS),
+          );
+        } catch {}
       } finally {
         migratingRef.current = false;
         // Even if it failed, don't spam attempts in a loop; user can refresh to retry
@@ -1654,6 +1712,11 @@ export function ChatInterface({
           currentChatId={currentChatId}
           onSelectChat={setCurrentChatId}
           onNewChat={handleNewChat}
+          onDeleteLocalChat={(chatId) => {
+            // Remove local chat and its messages
+            setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
+            setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
+          }}
           isOpen={sidebarOpen}
           onToggle={handleToggleSidebar}
         />
@@ -1667,6 +1730,10 @@ export function ChatInterface({
         currentChatId={currentChatId}
         onSelectChat={setCurrentChatId}
         onNewChat={handleNewChat}
+        onDeleteLocalChat={(chatId) => {
+          setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
+          setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
+        }}
       />
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full">
@@ -1678,6 +1745,12 @@ export function ChatInterface({
             onToggleSidebar={handleToggleSidebar}
             onShare={canShare ? () => setShowShareModal(true) : undefined}
             currentChat={currentChat}
+            onDeleteLocalMessage={(messageId) => {
+              // Delete a single local message by id
+              setLocalMessages((prev) =>
+                prev.filter((m) => m._id !== messageId),
+              );
+            }}
           />
         </div>
         <div className="flex-shrink-0 relative">
