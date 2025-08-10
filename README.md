@@ -303,6 +303,13 @@ npm test
 # - Tests include basic checks for search helpers and query-augmentation heuristics.
 ```
 
+### Playwright Smoke Test
+
+- Install dependencies once: `npm i -D @playwright/test` then `npx playwright install` to download browsers.
+- Serve the built app on <http://localhost:4173> via `npm run preview` (the Playwright config handles this automatically via `webServer`).
+- Run manually: `npx playwright test -g smoke --reporter=line` or `npm run test:smoke`.
+- The Husky pre-push hook runs this smoke test and fails the push if there are console errors or failed network requests on the home page.
+
 ## Troubleshooting
 
 - **Streaming issues**: Allow `*.convex.cloud` / `*.convex.site` in ad-blockers
