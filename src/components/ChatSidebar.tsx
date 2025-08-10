@@ -14,7 +14,7 @@ interface Chat {
 interface ChatSidebarProps {
   chats: Chat[];
   currentChatId: Id<"chats"> | string | null;
-  onSelectChat: (chatId: Id<"chats"> | string) => void;
+  onSelectChat: (chatId: Id<"chats"> | string | null) => void;
   onNewChat: () => void;
   onDeleteLocalChat?: (chatId: string) => void;
   onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
@@ -134,7 +134,7 @@ export function ChatSidebar({
             {chats.map((chat) => (
               <div key={chat._id} className="flex items-center gap-2 mb-1">
                 <button
-                  onClick={() => onSelectChat(chat._id as any)}
+                  onClick={() => onSelectChat(chat._id)}
                   className={`flex-1 p-3 rounded-lg text-left hover:bg-muted transition-colors ${
                     currentChatId === chat._id ? "bg-muted" : ""
                   }`}
@@ -159,7 +159,7 @@ export function ChatSidebar({
                       )
                         return;
                       if (onRequestDeleteChat) {
-                        onRequestDeleteChat(chat._id as any);
+                        onRequestDeleteChat(chat._id);
                       } else {
                         if (typeof chat._id === "string") {
                           // Local chat deletion
@@ -169,10 +169,12 @@ export function ChatSidebar({
                         }
                       }
                       if (currentChatId === chat._id) {
-                        onSelectChat(null as any);
+                        onSelectChat(null);
                       }
-                    } catch {
-                      // intentionally ignored
+                    } catch (err) {
+                      if ((import.meta as any)?.env?.DEV) {
+                        console.warn("Chat deletion failed:", err);
+                      }
                     }
                   }}
                   className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
