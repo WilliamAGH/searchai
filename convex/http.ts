@@ -13,6 +13,12 @@ import { api } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
 
+// Gate verbose logs in production
+const DEBUG_HTTP = process.env.DEBUG_HTTP === "1";
+const dlog = (...args: unknown[]) => {
+  if (DEBUG_HTTP) console.log(...args);
+};
+
 /**
  * Search result interface for type safety
  */
@@ -39,6 +45,7 @@ function corsResponse(body: string, status = 200) {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Max-Age": "600",
       Vary: "Origin",
     },
   });
@@ -63,13 +70,16 @@ const http = httpRouter();
 http.route({
   path: "/api/chat",
   method: "OPTIONS",
-  handler: httpAction(async () => {
+  handler: httpAction(async (_ctx, request) => {
+    const requested = request.headers.get("Access-Control-Request-Headers");
     return new Response(null, {
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": requested || "Content-Type",
+        "Access-Control-Max-Age": "600",
+        Vary: "Origin",
       },
     });
   }),
@@ -83,13 +93,16 @@ http.route({
 http.route({
   path: "/api/search",
   method: "OPTIONS",
-  handler: httpAction(async () => {
+  handler: httpAction(async (_ctx, request) => {
+    const requested = request.headers.get("Access-Control-Request-Headers");
     return new Response(null, {
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": requested || "Content-Type",
+        "Access-Control-Max-Age": "600",
+        Vary: "Origin",
       },
     });
   }),
@@ -98,13 +111,16 @@ http.route({
 http.route({
   path: "/api/scrape",
   method: "OPTIONS",
-  handler: httpAction(async () => {
+  handler: httpAction(async (_ctx, request) => {
+    const requested = request.headers.get("Access-Control-Request-Headers");
     return new Response(null, {
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": requested || "Content-Type",
+        "Access-Control-Max-Age": "600",
+        Vary: "Origin",
       },
     });
   }),
@@ -113,13 +129,16 @@ http.route({
 http.route({
   path: "/api/ai",
   method: "OPTIONS",
-  handler: httpAction(async () => {
+  handler: httpAction(async (_ctx, request) => {
+    const requested = request.headers.get("Access-Control-Request-Headers");
     return new Response(null, {
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": requested || "Content-Type",
+        "Access-Control-Max-Age": "600",
+        Vary: "Origin",
       },
     });
   }),
@@ -129,7 +148,19 @@ http.route({
   path: "/api/chat",
   method: "POST",
   handler: httpAction(async (_ctx, request) => {
-    const { messages } = await request.json();
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return corsResponse(JSON.stringify({ error: "Invalid JSON body" }), 400);
+    }
+    const { messages } = (payload as any) ?? {};
+    if (!Array.isArray(messages)) {
+      return corsResponse(
+        JSON.stringify({ error: "messages must be an array" }),
+        400,
+      );
+    }
     const result = await streamText({
       model: openai("gpt-4-turbo"),
       messages,
@@ -169,15 +200,12 @@ http.route({
       );
     }
 
-    console.log("🔍 SEARCH ENDPOINT CALLED:");
-    console.log("Query:", query);
-    console.log("Max Results:", maxResults);
-    console.log("Environment Variables Available:");
-    console.log(
-      "- SERP_API_KEY:",
-      process.env.SERP_API_KEY ? "SET" : "NOT SET",
-    );
-    console.log(
+    dlog("🔍 SEARCH ENDPOINT CALLED:");
+    dlog("Query:", query);
+    dlog("Max Results:", maxResults);
+    dlog("Environment Variables Available:");
+    dlog("- SERP_API_KEY:", process.env.SERP_API_KEY ? "SET" : "NOT SET");
+    dlog(
       "- OPENROUTER_API_KEY:",
       process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET",
     );
@@ -188,15 +216,11 @@ http.route({
         maxResults: maxResults || 5,
       });
 
-      console.log("🔍 SEARCH RESULT:", JSON.stringify(result, null, 2));
+      dlog("🔍 SEARCH RESULT:", JSON.stringify(result, null, 2));
 
       return corsResponse(JSON.stringify(result));
     } catch (error) {
       console.error("❌ SEARCH API ERROR:", error);
-      console.error(
-        "Error stack:",
-        error instanceof Error ? error.stack : "No stack trace",
-      );
 
       // Create fallback search results
       const fallbackResults = [
@@ -213,15 +237,13 @@ http.route({
         results: fallbackResults,
         searchMethod: "fallback",
         hasRealResults: false,
-        error: error instanceof Error ? error.message : "Search failed",
+        error: "Search failed",
         errorDetails: {
-          message: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : undefined,
           timestamp: new Date().toISOString(),
         },
       };
 
-      console.log(
+      dlog(
         "🔍 SEARCH FALLBACK RESPONSE:",
         JSON.stringify(errorResponse, null, 2),
       );
@@ -245,21 +267,17 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const { url } = await request.json();
 
-    console.log("🌐 SCRAPE ENDPOINT CALLED:");
-    console.log("URL:", url);
+    dlog("🌐 SCRAPE ENDPOINT CALLED:");
+    dlog("URL:", url);
 
     try {
       const result = await ctx.runAction(api.search.scrapeUrl, { url });
 
-      console.log("🌐 SCRAPE RESULT:", JSON.stringify(result, null, 2));
+      dlog("🌐 SCRAPE RESULT:", JSON.stringify(result, null, 2));
 
       return corsResponse(JSON.stringify(result));
     } catch (error) {
       console.error("❌ SCRAPE API ERROR:", error);
-      console.error(
-        "Error stack:",
-        error instanceof Error ? error.stack : "No stack trace",
-      );
 
       let hostname = "";
       try {
@@ -269,19 +287,14 @@ http.route({
       }
       const errorResponse = {
         title: hostname,
-        content: `Unable to fetch content from ${url}. Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        content: `Unable to fetch content from ${url}.`,
         summary: `Content unavailable from ${hostname}`,
         errorDetails: {
-          message: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : undefined,
           timestamp: new Date().toISOString(),
         },
       };
 
-      console.log(
-        "🌐 SCRAPE ERROR RESPONSE:",
-        JSON.stringify(errorResponse, null, 2),
-      );
+      dlog("🌐 SCRAPE ERROR RESPONSE:", JSON.stringify(errorResponse, null, 2));
 
       return corsResponse(JSON.stringify(errorResponse));
     }
@@ -305,25 +318,22 @@ http.route({
     const { message, systemPrompt, searchResults, sources, chatHistory } =
       await request.json();
 
-    console.log("🤖 AI ENDPOINT CALLED:");
-    console.log(
-      "Message length:",
-      typeof message === "string" ? message.length : 0,
-    );
-    console.log("System Prompt length:", systemPrompt?.length || 0);
-    console.log("Search Results count:", searchResults?.length || 0);
-    console.log("Sources count:", sources?.length || 0);
-    console.log("Chat History count:", chatHistory?.length || 0);
-    console.log("Environment Variables Available:");
-    console.log(
+    dlog("🤖 AI ENDPOINT CALLED:");
+    dlog("Message length:", typeof message === "string" ? message.length : 0);
+    dlog("System Prompt length:", systemPrompt?.length || 0);
+    dlog("Search Results count:", searchResults?.length || 0);
+    dlog("Sources count:", sources?.length || 0);
+    dlog("Chat History count:", chatHistory?.length || 0);
+    dlog("Environment Variables Available:");
+    dlog(
       "- OPENROUTER_API_KEY:",
       process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET",
     );
-    console.log(
+    dlog(
       "- CONVEX_OPENAI_API_KEY:",
       process.env.CONVEX_OPENAI_API_KEY ? "SET" : "NOT SET",
     );
-    console.log(
+    dlog(
       "- CONVEX_OPENAI_BASE_URL:",
       process.env.CONVEX_OPENAI_BASE_URL ? "SET" : "NOT SET",
     );
@@ -336,7 +346,7 @@ http.route({
     const SITE_TITLE = process.env.SITE_TITLE;
 
     if (!OPENROUTER_API_KEY) {
-      console.log("🤖 No OpenRouter API key, trying Convex OpenAI...");
+      dlog("🤖 No OpenRouter API key, trying Convex OpenAI...");
 
       // Try Convex OpenAI fallback
       if (CONVEX_OPENAI_API_KEY && CONVEX_OPENAI_BASE_URL) {
@@ -351,9 +361,9 @@ http.route({
             max_tokens: 2000,
           };
 
-          console.log("🤖 CONVEX OPENAI REQUEST:");
-          console.log("URL:", `${CONVEX_OPENAI_BASE_URL}/chat/completions`);
-          console.log("Body (redacted):", {
+          dlog("🤖 CONVEX OPENAI REQUEST:");
+          dlog("URL:", `${CONVEX_OPENAI_BASE_URL}/chat/completions`);
+          dlog("Body (redacted):", {
             model: convexOpenAIBody.model,
             messagesCount: convexOpenAIBody.messages?.length ?? 0,
             sysPromptChars:
@@ -375,15 +385,15 @@ http.route({
             },
           );
 
-          console.log("🤖 CONVEX OPENAI RESPONSE STATUS:", response.status);
-          console.log(
+          dlog("🤖 CONVEX OPENAI RESPONSE STATUS:", response.status);
+          dlog(
             "🤖 CONVEX OPENAI RESPONSE HEADERS:",
             Object.fromEntries(response.headers.entries()),
           );
 
           if (response.ok) {
             const data = await response.json();
-            console.log(
+            dlog(
               "🤖 CONVEX OPENAI RESPONSE BODY:",
               JSON.stringify(data, null, 2),
             );
@@ -398,7 +408,7 @@ http.route({
               sources,
             };
 
-            console.log(
+            dlog(
               "🤖 CONVEX OPENAI SUCCESS RESPONSE:",
               JSON.stringify(successResponse, null, 2),
             );
@@ -442,7 +452,7 @@ http.route({
         error: "No AI API keys configured",
       };
 
-      console.log(
+      dlog(
         "🤖 AI FALLBACK RESPONSE:",
         JSON.stringify(fallbackResponseObj, null, 2),
       );
@@ -451,7 +461,7 @@ http.route({
     }
 
     try {
-      console.log("🔄 Attempting OpenRouter API call with streaming...");
+      dlog("🔄 Attempting OpenRouter API call with streaming...");
 
       // Build message history including system prompt and chat history
       const messages = [
@@ -475,9 +485,9 @@ http.route({
         presence_penalty: 0,
       };
 
-      console.log("🤖 OPENROUTER REQUEST:");
-      console.log("URL:", "https://openrouter.ai/api/v1/chat/completions");
-      console.log("Body (redacted):", {
+      dlog("🤖 OPENROUTER REQUEST:");
+      dlog("URL:", "https://openrouter.ai/api/v1/chat/completions");
+      dlog("Body (redacted):", {
         model: openRouterBody.model,
         messagesCount: openRouterBody.messages?.length ?? 0,
         sysPromptChars: openRouterBody.messages?.[0]?.content?.length ?? 0,
@@ -507,8 +517,8 @@ http.route({
 
       clearTimeout(timeoutId);
 
-      console.log("📊 OpenRouter Response Status:", response.status);
-      console.log(
+      dlog("📊 OpenRouter Response Status:", response.status);
+      dlog(
         "📊 OpenRouter Response Headers:",
         Object.fromEntries(response.headers.entries()),
       );
@@ -526,7 +536,7 @@ http.route({
       }
 
       if (response.body) {
-        console.log("✅ OpenRouter streaming response started");
+        dlog("✅ OpenRouter streaming response started");
 
         /**
          * Create SSE stream with cleanup
@@ -542,6 +552,7 @@ http.route({
             }
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
+            const encoder = new TextEncoder();
             let buffer = "";
             let chunkCount = 0;
             let lastChunkTime = Date.now();
@@ -557,7 +568,7 @@ http.route({
               // SSE comment line; ignored by client parser but keeps connections alive
               try {
                 controller.enqueue(
-                  new TextEncoder().encode(`: keepalive ${Date.now()}\n\n`),
+                  encoder.encode(`: keepalive ${Date.now()}\n\n`),
                 );
               } catch {
                 // Controller might be closed, stop pinging
@@ -627,9 +638,7 @@ http.route({
                   if (line.startsWith("data: ")) {
                     const data = line.slice(6);
                     if (data === "[DONE]") {
-                      console.log(
-                        "✅ OpenRouter streaming finished with [DONE]",
-                      );
+                      dlog("✅ OpenRouter streaming finished with [DONE]");
                       isStreamActive = false;
                       controller.close();
                       cleanup();
@@ -649,7 +658,7 @@ http.route({
                         chunkNumber: chunkCount,
                       };
                       controller.enqueue(
-                        new TextEncoder().encode(
+                        encoder.encode(
                           `data: ${JSON.stringify(streamData)}\n\n`,
                         ),
                       );
@@ -659,7 +668,7 @@ http.route({
                           e instanceof Error
                             ? e.message
                             : "Unknown parsing error",
-                        chunk: data,
+                        chunkChars: data?.length ?? 0,
                         chunkNumber: chunkCount,
                       });
                     }
@@ -674,7 +683,7 @@ http.route({
                   error instanceof Error
                     ? error.message
                     : "Unknown streaming error",
-                stack: error instanceof Error ? error.stack : "No stack trace",
+                // omit stack in client-visible logs
                 timestamp: new Date().toISOString(),
               });
               try {
@@ -709,14 +718,14 @@ http.route({
     } catch (error) {
       console.error("💥 OPENROUTER FAILED with exception:", {
         error: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : "No stack trace",
+        // omit stack in client-visible logs
         timestamp: new Date().toISOString(),
       });
 
       // Try Convex OpenAI as backup
       if (CONVEX_OPENAI_API_KEY && CONVEX_OPENAI_BASE_URL) {
         try {
-          console.log("🤖 Trying Convex OpenAI fallback...");
+          dlog("🤖 Trying Convex OpenAI fallback...");
           const convexOpenAIBody = {
             model: "gpt-4.1-nano",
             messages: [
@@ -727,9 +736,17 @@ http.route({
             max_tokens: 2000,
           };
 
-          console.log("🤖 CONVEX OPENAI FALLBACK REQUEST:");
-          console.log("URL:", `${CONVEX_OPENAI_BASE_URL}/chat/completions`);
-          console.log("Body:", JSON.stringify(convexOpenAIBody, null, 2));
+          dlog("🤖 CONVEX OPENAI FALLBACK REQUEST:");
+          dlog("URL:", `${CONVEX_OPENAI_BASE_URL}/chat/completions`);
+          dlog("Body (redacted):", {
+            model: convexOpenAIBody.model,
+            messagesCount: convexOpenAIBody.messages?.length ?? 0,
+            sysPromptChars:
+              convexOpenAIBody.messages?.[0]?.content?.length ?? 0,
+            userMsgChars: convexOpenAIBody.messages?.[1]?.content?.length ?? 0,
+            temperature: convexOpenAIBody.temperature,
+            max_tokens: convexOpenAIBody.max_tokens,
+          });
 
           const fallbackResponse = await fetch(
             `${CONVEX_OPENAI_BASE_URL}/chat/completions`,
@@ -743,14 +760,14 @@ http.route({
             },
           );
 
-          console.log(
+          dlog(
             "🤖 CONVEX OPENAI FALLBACK RESPONSE STATUS:",
             fallbackResponse.status,
           );
 
           if (fallbackResponse.ok) {
             const fallbackData = await fallbackResponse.json();
-            console.log(
+            dlog(
               "🤖 CONVEX OPENAI FALLBACK RESPONSE BODY:",
               JSON.stringify(fallbackData, null, 2),
             );
@@ -765,7 +782,7 @@ http.route({
               sources,
             };
 
-            console.log(
+            dlog(
               "🤖 CONVEX OPENAI FALLBACK SUCCESS:",
               JSON.stringify(fallbackSuccessResponse, null, 2),
             );
@@ -788,8 +805,7 @@ http.route({
       }
 
       // Final fallback response with detailed error info
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const errorMessage = "AI processing failed";
       const fallbackResponse =
         searchResults && searchResults.length > 0
           ? `Based on the search results I found:\n\n${searchResults
@@ -801,8 +817,8 @@ http.route({
               .substring(
                 0,
                 1500,
-              )}...\n\n*Note: AI processing failed (${errorMessage}), but the above search results should help answer your question.*`
-          : `I'm having trouble generating a response right now.\n\n**Error details:** ${errorMessage}\n\nPlease try again, or search manually for "${message}" on:\n- [Google](https://www.google.com/search?q=${encodeURIComponent(message)})\n- [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(message)})`;
+              )}...\n\n*Note: AI processing is currently unavailable, but the above search results should help answer your question.*`
+          : `I'm having trouble generating a response right now.\n\nPlease try again later, or search manually for "${message}" on:\n- [Google](https://www.google.com/search?q=${encodeURIComponent(message)})\n- [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(message)})`;
 
       const finalErrorResponse = {
         response: fallbackResponse,
@@ -810,13 +826,11 @@ http.route({
         sources,
         error: errorMessage,
         errorDetails: {
-          message: errorMessage,
-          stack: error instanceof Error ? error.stack : undefined,
           timestamp: new Date().toISOString(),
         },
       };
 
-      console.log(
+      dlog(
         "🤖 AI FINAL ERROR RESPONSE:",
         JSON.stringify(finalErrorResponse, null, 2),
       );
