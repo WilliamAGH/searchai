@@ -534,10 +534,9 @@ export function shouldPrioritizeUrl(
 /**
  * Sort search results with prioritized URLs first
  */
-export function sortResultsWithPriority(
-  results: SearchResult[],
-  prioritizedUrls: string[],
-): SearchResult[] {
+export function sortResultsWithPriority<
+  T extends { url: string; relevanceScore?: number },
+>(results: T[], prioritizedUrls: string[]): T[] {
   return results.sort((a, b) => {
     const aPriority = shouldPrioritizeUrl(a.url, prioritizedUrls);
     const bPriority = shouldPrioritizeUrl(b.url, prioritizedUrls);
