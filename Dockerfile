@@ -27,6 +27,7 @@ COPY index.html ./
 # Copy source code and styles
 COPY src/ ./src/
 COPY convex/ ./convex/
+COPY public/ ./public/
 
 # Set build-time environment variables for Vite
 # Note: VITE_CONVEX_URL must be provided as a build argument
