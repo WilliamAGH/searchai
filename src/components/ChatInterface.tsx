@@ -1244,7 +1244,15 @@ export function ChatInterface({
    * @param content - Message content
    */
   const handleSendMessage = async (content: string) => {
-    if (!currentChatId || isGenerating) return;
+    // Don't send while an answer is already generating
+    if (isGenerating) return;
+    // If no chat is active yet, create one and queue this send
+    if (!currentChatId) {
+      pendingSendRef.current = content;
+      awaitingNewChatRef.current = true;
+      await handleNewChat();
+      return;
+    }
     // If a follow-up prompt is visible, do not block normal send; dismiss it
     if (showFollowUpPrompt) {
       setShowFollowUpPrompt(false);
