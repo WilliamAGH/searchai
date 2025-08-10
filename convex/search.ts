@@ -679,11 +679,12 @@ export async function searchWithSerpApiDuckDuckGo(
   maxResults: number,
 ): Promise<SearchResult[]> {
   const apiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${process.env.SERP_API_KEY}&hl=en&gl=us&num=${maxResults}`;
-  console.log("🔍 SERP API Request:", {
-    query,
+  const requestLog = {
+    queryLength: query.length,
     maxResults,
     timestamp: new Date().toISOString(),
-  });
+  };
+  console.log("🔍 SERP API Request:", requestLog);
 
   try {
     const response = await fetch(apiUrl, {
@@ -692,12 +693,14 @@ export async function searchWithSerpApiDuckDuckGo(
       },
     });
 
-    console.log("📊 SERP API Response:", {
+    const safeLog = {
       status: response.status,
       statusText: response.statusText,
       ok: response.ok,
-      url: apiUrl,
-    });
+      endpoint: "https://serpapi.com/search.json",
+      queryLength: query.length,
+    } as const;
+    console.log("📊 SERP API Response:", safeLog);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -705,9 +708,9 @@ export async function searchWithSerpApiDuckDuckGo(
       console.error("❌ SERP API Error Details:", {
         status: response.status,
         statusText: response.statusText,
-        errorText: errorText,
-        query: query,
-        maxResults: maxResults,
+        errorText,
+        queryLength: query.length,
+        maxResults,
         timestamp: new Date().toISOString(),
       });
       throw new Error(errorMessage);
@@ -717,7 +720,7 @@ export async function searchWithSerpApiDuckDuckGo(
     console.log("✅ SERP API Success:", {
       hasOrganic: !!data.organic_results,
       count: data.organic_results?.length || 0,
-      query: query,
+      queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
 
@@ -745,7 +748,7 @@ export async function searchWithSerpApiDuckDuckGo(
     }
 
     console.log("⚠️ SERP API No Results:", {
-      query,
+      queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
     return [];
@@ -753,7 +756,7 @@ export async function searchWithSerpApiDuckDuckGo(
     console.error("💥 SERP API Exception:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : "No stack trace",
-      query: query,
+      queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
     throw error;
@@ -877,12 +880,7 @@ interface DuckDuckGoResponse {
   Heading?: string;
 }
 
-interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-}
+// Duplicate interface removed (defined above)
 
 /**
  * Search via DuckDuckGo API
