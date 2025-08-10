@@ -40,6 +40,43 @@ window.addEventListener('message', async (message) => {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // Split vendor chunks for better caching
+          if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("react-dom")) {
+              return "react";
+            }
+            if (id.includes("convex")) {
+              return "convex";
+            }
+            if (
+              id.includes("@ai-sdk") ||
+              id.includes("openai") ||
+              id.includes("ai/")
+            ) {
+              return "ai";
+            }
+            if (id.includes("tailwind") || id.includes("@headlessui")) {
+              return "ui";
+            }
+            return "vendor";
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+    sourcemap: true,
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: false,
+        drop_debugger: true,
+      },
+    },
+  },
   server: {
     proxy: {
       "/api": {
