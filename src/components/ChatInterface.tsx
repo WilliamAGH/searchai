@@ -270,8 +270,8 @@ export function ChatInterface({
 
   const messages = useQuery(
     api.chats.getChatMessages,
-    currentChatId && typeof currentChatId !== "string"
-      ? { chatId: currentChatId }
+    currentChatId && looksServerId(String(currentChatId))
+      ? { chatId: currentChatId as Id<"chats"> }
       : "skip",
   );
 
@@ -1383,10 +1383,10 @@ export function ChatInterface({
     setSearchProgress({ stage: "searching", message: "Searching the web..." });
 
     try {
-      if (isAuthenticated && typeof currentChatId !== "string") {
+      if (isAuthenticated && looksServerId(String(currentChatId))) {
         // Authenticated user - use Convex (without onProgress callback)
         await generateResponse({
-          chatId: currentChatId,
+          chatId: currentChatId as Id<"chats">,
           message: content,
         });
       } else {
@@ -1763,7 +1763,7 @@ export function ChatInterface({
             setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
           }}
           onRequestDeleteChat={(chatId) => {
-            if (typeof chatId === "string") {
+            if (!looksServerId(String(chatId))) {
               setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
               setLocalMessages((prev) =>
                 prev.filter((m) => m.chatId !== chatId),
@@ -1772,7 +1772,7 @@ export function ChatInterface({
               // Schedule server deletion after undo window
               setTimeout(async () => {
                 try {
-                  await deleteChat({ chatId });
+                  await deleteChat({ chatId: chatId as Id<"chats"> });
                 } catch {}
               }, 5000);
             }
@@ -1800,13 +1800,13 @@ export function ChatInterface({
           setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
         }}
         onRequestDeleteChat={(chatId) => {
-          if (typeof chatId === "string") {
+          if (!looksServerId(String(chatId))) {
             setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
             setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
           } else {
             setTimeout(async () => {
               try {
-                await deleteChat({ chatId });
+                await deleteChat({ chatId: chatId as Id<"chats"> });
               } catch {}
             }, 5000);
           }
