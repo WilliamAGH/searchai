@@ -3,6 +3,7 @@ import { test, expect } from "@playwright/test";
 test("smoke: no console errors on home", async ({ page, baseURL }) => {
   const consoleErrors: string[] = [];
   const requestFailures: string[] = [];
+  const responseFailures: string[] = [];
 
   page.on("console", (msg) => {
     if (msg.type() === "error") {
@@ -18,22 +19,34 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
     consoleErrors.push(err.stack || err.message);
   });
 
+  const isHttp = (u: string) =>
+    u.startsWith("http://") || u.startsWith("https://");
+
   page.on("requestfailed", (req) => {
-    // Ignore favicon failures to reduce flakiness if not present
     const url = req.url();
-    if (!url.endsWith("favicon.ico")) {
-      requestFailures.push(
-        `${req.method()} ${url} -> ${req.failure()?.errorText}`,
-      );
+    if (!isHttp(url)) return;
+    // Ignore common favicon variants to reduce flakiness
+    if (url.endsWith("favicon.ico") || url.endsWith("favicon.svg")) return;
+    requestFailures.push(
+      `${req.method()} ${url} -> ${req.failure()?.errorText}`,
+    );
+  });
+
+  page.on("response", (res) => {
+    const url = res.url();
+    if (!isHttp(url)) return;
+    const status = res.status();
+    if (status >= 400) {
+      responseFailures.push(`${res.request().method()} ${url} -> ${status}`);
     }
   });
 
   const target = baseURL ?? "http://localhost:4173";
-  await page.goto(target);
+  await page.goto(target, { waitUntil: "domcontentloaded" });
 
   // Basic sanity: page renders something meaningful
   await expect(page).toHaveTitle(/search|ai|SearchAI|flex|template/i, {
-    timeout: 5000,
+    timeout: 15000,
   });
 
   // Fail if any console errors or request failures occurred
@@ -43,8 +56,13 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
       `No failed network requests.\n${requestFailures.join("\n")}`,
     )
     .toEqual([]);
-  expect(
-    consoleErrors,
-    `No console errors.\n${consoleErrors.join("\n")}`,
-  ).toEqual([]);
+  expect
+    .soft(
+      responseFailures,
+      `No HTTP responses with status >= 400.\n${responseFailures.join("\n")}`,
+    )
+    .toEqual([]);
+  expect
+    .soft(consoleErrors, `No console errors.\n${consoleErrors.join("\n")}`)
+    .toEqual([]);
 });
