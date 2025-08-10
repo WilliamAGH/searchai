@@ -66,12 +66,13 @@ interface OpenRouterBody {
  * @yields Parsed JSON chunks from stream
  */
 async function* streamOpenRouter(body: OpenRouterBody) {
-  console.log("🔄 OpenRouter streaming request initiated:", {
-    model: body.model,
-    messageCount: body.messages.length,
-    temperature: body.temperature,
-    max_tokens: body.max_tokens,
-  });
+  if (process.env.DEBUG_OPENROUTER)
+    console.log("🔄 OpenRouter streaming request initiated:", {
+      model: body.model,
+      messageCount: body.messages.length,
+      temperature: body.temperature,
+      max_tokens: body.max_tokens,
+    });
 
   try {
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -97,11 +98,12 @@ async function* streamOpenRouter(body: OpenRouterBody) {
       },
     );
 
-    console.log("📊 OpenRouter response received:", {
-      status: response.status,
-      statusText: response.statusText,
-      hasBody: !!response.body,
-    });
+    if (process.env.DEBUG_OPENROUTER)
+      console.log("📊 OpenRouter response received:", {
+        status: response.status,
+        statusText: response.statusText,
+        hasBody: !!response.body,
+      });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -126,7 +128,8 @@ async function* streamOpenRouter(body: OpenRouterBody) {
     let buffer = "";
     let chunkCount = 0;
 
-    console.log("✅ OpenRouter streaming started successfully");
+    if (process.env.DEBUG_OPENROUTER)
+      console.log("✅ OpenRouter streaming started successfully");
 
     try {
       while (true) {
@@ -148,18 +151,20 @@ async function* streamOpenRouter(body: OpenRouterBody) {
                 const parsedData = JSON.parse(data);
                 yield parsedData;
               } catch (e) {
-                console.error("❌ Failed to parse stream chunk at EOF:", {
-                  error:
-                    e instanceof Error ? e.message : "Unknown parsing error",
-                  chunk: data,
-                  chunkNumber: chunkCount,
-                });
+                if (process.env.DEBUG_OPENROUTER)
+                  console.error("❌ Failed to parse stream chunk at EOF:", {
+                    error:
+                      e instanceof Error ? e.message : "Unknown parsing error",
+                    chunk: data,
+                    chunkNumber: chunkCount,
+                  });
               }
             }
           }
-          console.log("🔄 OpenRouter streaming completed:", {
-            totalChunks: chunkCount,
-          });
+          if (process.env.DEBUG_OPENROUTER)
+            console.log("🔄 OpenRouter streaming completed:", {
+              totalChunks: chunkCount,
+            });
           break;
         }
 
@@ -171,7 +176,8 @@ async function* streamOpenRouter(body: OpenRouterBody) {
           if (line.startsWith("data: ")) {
             const data = line.slice(6);
             if (data === "[DONE]") {
-              console.log("✅ OpenRouter streaming finished with [DONE]");
+              if (process.env.DEBUG_OPENROUTER)
+                console.log("✅ OpenRouter streaming finished with [DONE]");
               return;
             }
             try {
@@ -179,11 +185,13 @@ async function* streamOpenRouter(body: OpenRouterBody) {
               const parsedData = JSON.parse(data);
               yield parsedData;
             } catch (e) {
-              console.error("❌ Failed to parse stream chunk:", {
-                error: e instanceof Error ? e.message : "Unknown parsing error",
-                chunk: data,
-                chunkNumber: chunkCount,
-              });
+              if (process.env.DEBUG_OPENROUTER)
+                console.error("❌ Failed to parse stream chunk:", {
+                  error:
+                    e instanceof Error ? e.message : "Unknown parsing error",
+                  chunk: data,
+                  chunkNumber: chunkCount,
+                });
             }
           }
         }
@@ -562,7 +570,7 @@ export const generationStep = internalAction({
       );
     }
 
-    // 6. Fetch chat history for context - include ALL previous messages
+    // 6. Fetch chat history for context - include recent messages only
     const messages: Array<{
       _id: import("./_generated/dataModel").Id<"messages">;
       role: "user" | "assistant" | "system";
@@ -570,9 +578,11 @@ export const generationStep = internalAction({
     }> = await ctx.runQuery(api.chats.getChatMessages, {
       chatId: args.chatId,
     });
-    // Build full message history, excluding the current assistant message being generated
+    // Build capped message history, excluding the current assistant message being generated
+    const MAX_HISTORY = 18; // cap to last ~9 user/assistant turns
     const messageHistory = messages
       .filter((m) => m._id !== args.assistantMessageId)
+      .slice(-MAX_HISTORY)
       .map((m) => ({
         role: m.role,
         content: m.content || "",
@@ -596,14 +606,17 @@ export const generationStep = internalAction({
       systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant.\n\n`;
       systemPrompt += `## Conversation + Results Context\n${searchContext}\n\n`;
       systemPrompt += `## Search Metadata:\n`;
-      searchResults.forEach(
-        (
-          result: { title: string; url: string; snippet: string },
-          idx: number,
-        ) => {
-          systemPrompt += `${idx + 1}. ${result.title}\n   URL: ${result.url}\n   Snippet: ${result.snippet}\n\n`;
-        },
-      );
+      searchResults
+        .slice(0, 5)
+        .forEach(
+          (
+            result: { title: string; url: string; snippet: string },
+            idx: number,
+          ) => {
+            const snippet = (result.snippet || "").slice(0, 240);
+            systemPrompt += `${idx + 1}. ${result.title}\n   URL: ${result.url}\n   Snippet: ${snippet}${snippet.length === 240 ? "..." : ""}\n\n`;
+          },
+        );
     } else if (!hasRealResults && searchResults.length > 0) {
       systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n`;
       systemPrompt += `## Available Results:\n`;
