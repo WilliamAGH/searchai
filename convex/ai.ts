@@ -618,7 +618,7 @@ export const generationStep = internalAction({
           },
         );
     } else if (!hasRealResults && searchResults.length > 0) {
-      systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n`;
+      systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge. IMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\n`;
       systemPrompt += `## Available Results:\n`;
       searchResults.forEach((result: { title: string; snippet: string }) => {
         systemPrompt += `- ${result.title}: ${result.snippet}\n`;

@@ -229,13 +229,56 @@ http.route({
         maxResults: maxResults || 5,
       });
 
-      // Inject any enhancement-provided results at the front
+      // Inject any enhancement-provided results at the front then de-duplicate by normalized URL
       let mergedResults = Array.isArray(result.results)
         ? [...result.results]
         : [];
       if (enh.injectedResults && enh.injectedResults.length > 0) {
         mergedResults.unshift(...enh.injectedResults);
       }
+      // Deduplicate by normalized URL, keep the entry with higher relevanceScore
+      const byUrl = new Map<
+        string,
+        { title: string; url: string; snippet: string; relevanceScore?: number }
+      >();
+      const normalize = (rawUrl: string) => {
+        try {
+          const u = new URL(rawUrl);
+          u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
+          [
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_term",
+            "utm_content",
+            "gclid",
+            "fbclid",
+            "ref",
+          ].forEach((p) => u.searchParams.delete(p));
+          u.hash = "";
+          if (u.pathname !== "/" && u.pathname.endsWith("/")) {
+            u.pathname = u.pathname.slice(0, -1);
+          }
+          return u.toString();
+        } catch {
+          return (rawUrl || "").trim();
+        }
+      };
+      for (const r of mergedResults) {
+        const key = normalize(r.url);
+        const prev = byUrl.get(key);
+        const curScore =
+          typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;
+        const prevScore =
+          typeof prev?.relevanceScore === "number"
+            ? prev.relevanceScore
+            : -Infinity;
+        if (!prev || curScore > prevScore) byUrl.set(key, r);
+      }
+      mergedResults = Array.from(byUrl.values()).map((r) => ({
+        ...r,
+        relevanceScore: r.relevanceScore ?? 0.5,
+      }));
       // If prioritization hints exist, sort with priority
       if (prioritizedUrls.length > 0 && mergedResults.length > 1) {
         mergedResults = sortResultsWithPriority(mergedResults, prioritizedUrls);
@@ -414,7 +457,7 @@ http.route({
           const convexOpenAIBody = {
             model: "gpt-4.1-nano",
             messages: [
-              { role: "system", content: systemPrompt },
+              { role: "system", content: effectiveSystemPrompt },
               { role: "user", content: message },
             ],
             temperature: 0.7,
@@ -822,7 +865,7 @@ http.route({
           const convexOpenAIBody = {
             model: "gpt-4.1-nano",
             messages: [
-              { role: "system", content: systemPrompt },
+              { role: "system", content: effectiveSystemPrompt },
               { role: "user", content: message },
             ],
             temperature: 0.7,
