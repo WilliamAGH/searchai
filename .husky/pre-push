@@ -1,5 +1,5 @@
-# Exit on any error
-set -e
+# Exit on unset and any error
+set -eu
 
 echo "🚀 Running comprehensive pre-push validation..."
 
@@ -33,7 +33,7 @@ fi
 # 2. Convex deployment dry-run (CRITICAL - catches deployment failures!)
 echo "🔧 Testing Convex deployment..."
 # Use documented --typecheck=enable for strict validation
-npx convex dev --once --typecheck=enable > /tmp/convex-deploy.log 2>&1
+npx --no-install convex dev --once --typecheck=enable > /tmp/convex-deploy.log 2>&1
 CONVEX_EXIT_CODE=$?
 if [ $CONVEX_EXIT_CODE -ne 0 ]; then
   echo "❌ CRITICAL: Convex deployment would fail!"
