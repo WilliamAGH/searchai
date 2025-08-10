@@ -9,6 +9,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { action, mutation, query, internalMutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
 
 // Shared summarization util (pure; can be imported by other Convex files)
@@ -429,6 +430,8 @@ export const importLocalChats = mutation({
         ),
         createdAt: v.number(),
         updatedAt: v.number(),
+        shareId: v.optional(v.string()),
+        publicId: v.optional(v.string()),
         messages: v.array(
           v.object({
             role: v.union(v.literal("user"), v.literal("assistant")),
@@ -461,8 +464,23 @@ export const importLocalChats = mutation({
 
     for (const ch of args.chats) {
       const now = Date.now();
-      const shareId = generateOpaqueId();
-      const publicId = generateOpaqueId();
+      // Try to preserve provided shareId/publicId when unique
+      let shareId = ch.shareId || generateOpaqueId();
+      if (ch.shareId) {
+        const existingShare = await ctx.db
+          .query("chats")
+          .withIndex("by_share_id", (q) => q.eq("shareId", ch.shareId!))
+          .unique();
+        if (existingShare) shareId = generateOpaqueId();
+      }
+      let publicId = ch.publicId || generateOpaqueId();
+      if (ch.publicId) {
+        const existingPublic = await ctx.db
+          .query("chats")
+          .withIndex("by_public_id", (q) => q.eq("publicId", ch.publicId!))
+          .unique();
+        if (existingPublic) publicId = generateOpaqueId();
+      }
 
       const chatId = await ctx.db.insert("chats", {
         title: ch.title || "New Chat",

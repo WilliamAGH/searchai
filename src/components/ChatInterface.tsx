@@ -231,6 +231,10 @@ export function ChatInterface({
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
   // no-op placeholder (removed summarizeRecent direct usage)
 
+  // One-per-mount migration guards
+  const migrationAttemptedRef = useRef(false);
+  const migratingRef = useRef(false);
+
   /**
    * Generate unique share ID
    * - Random alphanumeric string
@@ -1544,19 +1548,23 @@ export function ChatInterface({
 
   const canShare = currentMessages.length > 0 && !!currentChatId;
 
-  // Migrate any existing local chats/messages after sign-in (runs on every login if data exists)
+  // Migrate any existing local chats/messages after sign-in (once per mount)
   useEffect(() => {
     if (!isAuthenticated) return;
     if (!localChats || localChats.length === 0) return;
+    if (migrationAttemptedRef.current || migratingRef.current) return;
 
     const run = async () => {
       try {
+        migratingRef.current = true;
         const payload = localChats.map((chat) => ({
           localId: chat._id,
           title: chat.title || "New Chat",
           privacy: (chat as any).privacy || "private",
           createdAt: chat.createdAt,
           updatedAt: chat.updatedAt,
+          shareId: (chat as any).shareId,
+          publicId: (chat as any).publicId,
           messages: localMessages
             .filter((m) => m.chatId === chat._id)
             .map((m) => ({
@@ -1588,6 +1596,10 @@ export function ChatInterface({
         setLocalMessages([] as any);
       } catch (e) {
         console.warn("Local chat migration failed; preserving local data", e);
+      } finally {
+        migratingRef.current = false;
+        // Even if it failed, don't spam attempts in a loop; user can refresh to retry
+        migrationAttemptedRef.current = true;
       }
     };
 
