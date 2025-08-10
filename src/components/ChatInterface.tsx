@@ -24,6 +24,7 @@ import { MobileSidebar } from "./MobileSidebar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
 // Auth modals are centralized in App; ChatInterface requests them via callbacks
 import { useSwipeable } from "react-swipeable";
+import { useNavigate } from "react-router-dom";
 
 // Topic-change detection constants (made less sensitive)
 const TOPIC_CHANGE_SIMILARITY_THRESHOLD = 0.1; // require much lower overlap
@@ -190,6 +191,8 @@ export function ChatInterface({
   } | null>(null);
   const deleteChat = useMutation(api.chats.deleteChat);
   const deleteMessage = useMutation(api.messages.deleteMessage);
+  const navigate = useNavigate();
+  const userSelectedChatAtRef = useRef<number | null>(null);
 
   // Local storage for unauthenticated users (scoped per host to avoid env conflation)
   const storageNamespace = useMemo(
@@ -448,25 +451,24 @@ export function ChatInterface({
   const hasSetInitialUrlRef = useRef(false);
   useEffect(() => {
     const chat = allChats.find((c) => c._id === currentChatId);
-    if (chat) {
-      let path = "";
-      if (chat.privacy === "public" && chat.publicId) {
-        path = `/p/${chat.publicId}`;
-      } else if (chat.privacy === "shared" && chat.shareId) {
-        path = `/s/${chat.shareId}`;
+    if (!chat) return;
+    let path = "";
+    if (chat.privacy === "public" && chat.publicId) {
+      path = `/p/${chat.publicId}`;
+    } else if (chat.privacy === "shared" && chat.shareId) {
+      path = `/s/${chat.shareId}`;
+    } else {
+      path = `/chat/${chat._id}`;
+    }
+    if (path !== window.location.pathname) {
+      if (!hasSetInitialUrlRef.current) {
+        navigate(path, { replace: true });
+        hasSetInitialUrlRef.current = true;
       } else {
-        path = `/chat/${chat._id}`;
-      }
-      if (path !== window.location.pathname) {
-        if (!hasSetInitialUrlRef.current) {
-          window.history.replaceState({}, "", path);
-          hasSetInitialUrlRef.current = true;
-        } else {
-          window.history.pushState({}, "", path);
-        }
+        navigate(path);
       }
     }
-  }, [currentChatId, allChats]);
+  }, [currentChatId, allChats, navigate]);
 
   useEffect(() => {
     const chat = allChats.find((c) => c._id === currentChatId);
@@ -1627,22 +1629,43 @@ export function ChatInterface({
     sendRef.current = handleSendMessage;
   }, [handleSendMessage]);
 
-  // Auto-create first chat if none exists and not on a chat URL
+  // Auto-create first chat only if no chats exist and user hasn't selected/navigated
   useEffect(() => {
     const path = window.location.pathname;
-    // Don't auto-create if we're on any chat URL (private, shared, or public)
     const isChatUrl = path.match(/^\/(chat|s|p)\/[a-zA-Z0-9_]+$/);
+    const hasAny = Array.isArray(allChats) && allChats.length > 0;
+    const queriesResolved = isAuthenticated ? Array.isArray(chats) : true;
 
     if (
-      !currentChatId &&
-      !isChatUrl &&
-      !propChatId &&
-      !propShareId &&
-      !propPublicId
+      !queriesResolved ||
+      userSelectedChatAtRef.current ||
+      currentChatId ||
+      isChatUrl ||
+      propChatId ||
+      propShareId ||
+      propPublicId ||
+      hasAny
     ) {
-      handleNewChat();
+      return;
     }
-  }, [currentChatId, handleNewChat, propChatId, propShareId, propPublicId]);
+
+    const t = window.setTimeout(() => {
+      const stillHasNone = Array.isArray(allChats) && allChats.length === 0;
+      if (!userSelectedChatAtRef.current && !currentChatId && stillHasNone) {
+        handleNewChat();
+      }
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [
+    isAuthenticated,
+    chats,
+    allChats,
+    currentChatId,
+    propChatId,
+    propShareId,
+    propPublicId,
+    handleNewChat,
+  ]);
 
   const canShare = currentMessages.length > 0 && !!currentChatId;
 
