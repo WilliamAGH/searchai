@@ -45,14 +45,19 @@ async function* streamOpenRouter(body: OpenRouterBody) {
 		max_tokens: body.max_tokens,
 	});
 
-	try {
+    try {
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (!apiKey) {
+            throw new Error("Missing OPENROUTER_API_KEY; cannot call OpenRouter.");
+        }
         const response = await fetch(
             "https://openrouter.ai/api/v1/chat/completions",
             {
                 method: "POST",
                 headers: {
-                    Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    Authorization: `Bearer ${apiKey}`,
                     "Content-Type": "application/json",
+                    "Accept": "text/event-stream",
               ...(process.env.SITE_URL ? { "HTTP-Referer": process.env.SITE_URL } : {}),
               ...(process.env.SITE_TITLE ? { "X-Title": process.env.SITE_TITLE } : {}),
                 },

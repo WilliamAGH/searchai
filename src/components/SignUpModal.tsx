@@ -25,8 +25,65 @@ interface SignUpModalProps {
 export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalProps) {
   const { signIn } = useAuthActions();
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const emailInputRef = React.useRef<HTMLInputElement>(null);
+  const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
 
   if (!isOpen) return null;
+
+  // Focus management and simple focus trap
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+
+    // Focus the email input first if available, otherwise the dialog
+    const toFocus = emailInputRef.current || dialogRef.current;
+    toFocus?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const container = dialogRef.current;
+        if (!container) return;
+        const focusable = container.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+
+        if (e.shiftKey) {
+          // Reverse tab
+          if (active === first || !container.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          // Forward tab
+          if (active === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    const node = dialogRef.current;
+    node?.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      node?.removeEventListener('keydown', handleKeyDown);
+      // Restore focus to the element that was focused before opening
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [isOpen, onClose]);
 
   return (
     <div
@@ -34,6 +91,9 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
       role="dialog"
       aria-modal="true"
       aria-labelledby="signup-modal-title"
+      aria-describedby="signup-modal-description"
+      tabIndex={-1}
+      ref={dialogRef}
     >
       {/* Backdrop */}
       <div 
@@ -62,7 +122,7 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
           <h2 id="signup-modal-title" className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Create a SearchAI Account
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p id="signup-modal-description" className="text-gray-600 dark:text-gray-400">
             Create a free account to continue your conversation and save your chat history.
           </p>
         </div>
@@ -97,6 +157,7 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
               name="email"
               placeholder="Email"
               autoComplete="email"
+              ref={emailInputRef}
               required
             />
             <label htmlFor="signup-password" className="sr-only">Password</label>
