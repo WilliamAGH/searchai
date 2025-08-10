@@ -290,6 +290,7 @@ export const generationStep = internalAction({
       injectSearchResults: true,
       enhanceContext: true,
       enhanceSystemPrompt: true,
+      enhanceResponse: true,
     });
 
     const enhancedUserMessage = enhancements.enhancedQuery;
@@ -719,7 +720,19 @@ export const generationStep = internalAction({
       );
     }
 
-    // 8. Finalize the assistant message
+    // 8. Finalize the assistant message (apply response transformers if any)
+    if (
+      enhancements.responseTransformers &&
+      enhancements.responseTransformers.length > 0 &&
+      responseContent
+    ) {
+      for (const transform of enhancements.responseTransformers) {
+        try {
+          responseContent = transform(responseContent);
+        } catch {}
+      }
+    }
+
     await ctx.runMutation(internal.messages.updateMessage, {
       messageId: args.assistantMessageId,
       content: responseContent,

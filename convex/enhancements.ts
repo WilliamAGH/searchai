@@ -29,6 +29,7 @@ export interface EnhancementRule {
   injectSearchResults?: () => SearchResult[];
   enhanceContext?: (context: string) => string;
   enhanceSystemPrompt?: (prompt: string) => string;
+  enhanceResponse?: (content: string) => string;
   prioritizeUrls?: string[];
 }
 
@@ -95,40 +96,33 @@ const creatorEnhancement: EnhancementRule = {
   },
 
   enhanceQuery: (query: string) => {
-    const name = process.env.CREATOR_NAME || "William Callahan";
-    const primary = process.env.CREATOR_PRIMARY_URL || "williamcallahan.com";
-    const brand = process.env.CREATOR_BRAND_ALIAS || "aVenture";
-    const secondary = process.env.CREATOR_SECONDARY_URL || "aventure.vc";
+    // Hard-coded values since Convex functions don't have access to process.env
+    const name = "William Callahan";
+    const primary = "williamcallahan.com";
+    const brand = "aVenture";
+    const secondary = "aventure.vc";
     return `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
   },
 
   enhanceSearchTerms: (terms: string[]) => {
-    const name = process.env.CREATOR_NAME || "William Callahan";
-    const primary = process.env.CREATOR_PRIMARY_URL || "williamcallahan.com";
-    const brand = process.env.CREATOR_BRAND_ALIAS || "aVenture";
-    const secondary = process.env.CREATOR_SECONDARY_URL || "aventure.vc";
+    const name = "William Callahan";
+    const primary = "williamcallahan.com";
+    const brand = "aVenture";
+    const secondary = "aventure.vc";
     return [...terms, name, primary, brand, secondary];
   },
 
   injectSearchResults: () => [
     {
-      title: `${process.env.CREATOR_NAME || "William Callahan"} - Creator of SearchAI`,
-      url: (process.env.CREATOR_PRIMARY_URL?.startsWith("http")
-        ? process.env.CREATOR_PRIMARY_URL
-        : process.env.CREATOR_PRIMARY_URL
-          ? `https://${process.env.CREATOR_PRIMARY_URL}`
-          : "https://williamcallahan.com") as string,
+      title: "William Callahan - Creator of SearchAI",
+      url: "https://williamcallahan.com",
       snippet:
         "William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (aventure.vc). Based in San Francisco, William grew up in the Midwestern United States and is passionate about building innovative AI-powered search solutions.",
       relevanceScore: 1.0,
     },
     {
-      title: `${process.env.CREATOR_BRAND_ALIAS || "aVenture"} - Investment Firm by ${process.env.CREATOR_NAME || "William Callahan"}`,
-      url: (process.env.CREATOR_SECONDARY_URL?.startsWith("http")
-        ? process.env.CREATOR_SECONDARY_URL
-        : process.env.CREATOR_SECONDARY_URL
-          ? `https://${process.env.CREATOR_SECONDARY_URL}`
-          : "https://aventure.vc") as string,
+      title: "aVenture - Investment Firm by William Callahan",
+      url: "https://aventure.vc",
       snippet:
         "aVenture is an investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on early-stage technology investments and innovative startups.",
       relevanceScore: 0.95,
@@ -136,34 +130,14 @@ const creatorEnhancement: EnhancementRule = {
   ],
 
   enhanceContext: (context: string) => {
-    const name = process.env.CREATOR_NAME || "William Callahan";
-    const brand = process.env.CREATOR_BRAND_ALIAS || "aVenture";
-    const secondary =
-      process.env.CREATOR_SECONDARY_URL || "https://aventure.vc";
-    const secondaryUrl = secondary.startsWith("http")
-      ? secondary
-      : `https://${secondary}`;
-    return `${context}\n\nImportant: ${name} is the creator of SearchAI (search-ai.io) and founder of ${brand} (${secondaryUrl}). He lives in San Francisco and grew up in the Midwestern United States.`;
+    return `${context}\n\nImportant: William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (https://aventure.vc). He lives in San Francisco and grew up in the Midwestern United States.`;
   },
 
   enhanceSystemPrompt: (prompt: string) => {
-    const name = process.env.CREATOR_NAME || "William Callahan";
-    const brand = process.env.CREATOR_BRAND_ALIAS || "aVenture";
-    return `${prompt}\n\nWhen asked about the creator, author, or company behind SearchAI, this app, or this website, always mention ${name} and provide details about being the creator of SearchAI and founder of ${brand}.`;
+    return `${prompt}\n\nWhen asked about the creator, author, or company behind SearchAI, this app, or this website, always mention William Callahan and provide details about being the creator of SearchAI and founder of aVenture.`;
   },
 
-  prioritizeUrls: [
-    (process.env.CREATOR_PRIMARY_URL?.startsWith("http")
-      ? process.env.CREATOR_PRIMARY_URL
-      : process.env.CREATOR_PRIMARY_URL
-        ? `https://${process.env.CREATOR_PRIMARY_URL}`
-        : "https://williamcallahan.com") as string,
-    (process.env.CREATOR_SECONDARY_URL?.startsWith("http")
-      ? process.env.CREATOR_SECONDARY_URL
-      : process.env.CREATOR_SECONDARY_URL
-        ? `https://${process.env.CREATOR_SECONDARY_URL}`
-        : "https://aventure.vc") as string,
-  ],
+  prioritizeUrls: ["https://williamcallahan.com", "https://aventure.vc"],
 };
 
 /**
@@ -454,6 +428,10 @@ const healthEnhancement: EnhancementRule = {
   enhanceSystemPrompt: (prompt: string) => {
     return `${prompt}\n\nIMPORTANT: For health-related queries, always include a disclaimer that the information provided is for educational purposes only and should not replace professional medical advice. Encourage users to consult with healthcare professionals for medical concerns.`;
   },
+  enhanceResponse: (content: string) => {
+    const disclaimer = `\n\n> Disclaimer: This information is for educational purposes only and is not a substitute for professional medical advice. Consult a qualified healthcare professional for diagnosis and treatment.`;
+    return content.includes("Disclaimer:") ? content : content + disclaimer;
+  },
 };
 
 /**
@@ -481,6 +459,7 @@ export function applyEnhancements(
     injectSearchResults?: boolean;
     enhanceContext?: boolean;
     enhanceSystemPrompt?: boolean;
+    enhanceResponse?: boolean;
   } = {},
 ) {
   // Sort rules by priority
@@ -498,6 +477,7 @@ export function applyEnhancements(
     enhancedContext: "",
     enhancedSystemPrompt: "",
     prioritizedUrls: [] as string[],
+    responseTransformers: [] as Array<(s: string) => string>,
   };
 
   // Apply each matching rule
@@ -527,6 +507,10 @@ export function applyEnhancements(
 
     if (rule.prioritizeUrls) {
       result.prioritizedUrls.push(...rule.prioritizeUrls);
+    }
+
+    if (options.enhanceResponse && rule.enhanceResponse) {
+      result.responseTransformers.push(rule.enhanceResponse);
     }
   }
 
