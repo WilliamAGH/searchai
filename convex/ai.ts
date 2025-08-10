@@ -255,6 +255,56 @@ export const generationStep = internalAction({
       "fallback";
     const errorDetails: string[] = [];
 
+    // Check if the query is about the creator/author
+    const lowerMessage = args.userMessage.toLowerCase();
+    const creatorKeywords = [
+      "creator",
+      "author",
+      "founder",
+      "who made",
+      "who created",
+      "who built",
+      "who developed",
+      "behind",
+      "company",
+      "william callahan",
+      "who founded",
+      "who is",
+    ];
+    const appKeywords = [
+      "searchai",
+      "search-ai",
+      "search ai",
+      "search-ai.io",
+      "this app",
+      "this website",
+      "this site",
+      "this tool",
+      "this service",
+      "this search",
+    ];
+
+    // Check if query mentions William Callahan directly
+    const mentionsWilliam = lowerMessage.includes("william callahan");
+
+    // Check if query is about creator/author AND mentions the app/service
+    const isAboutCreator = creatorKeywords.some((keyword) =>
+      lowerMessage.includes(keyword),
+    );
+    const isAboutApp =
+      appKeywords.some((keyword) => lowerMessage.includes(keyword)) ||
+      lowerMessage.includes("searchai") ||
+      lowerMessage.includes("search-ai") ||
+      lowerMessage.includes("search ai");
+
+    const isCreatorQuery = mentionsWilliam || (isAboutCreator && isAboutApp);
+
+    let enhancedUserMessage = args.userMessage;
+    if (isCreatorQuery) {
+      // Enhance the query to include William Callahan's website
+      enhancedUserMessage = `${args.userMessage} William Callahan williamcallahan.com aVenture aventure.vc`;
+    }
+
     try {
       // 4. Plan and perform context-aware web search
       await ctx.runMutation(internal.messages.updateMessage, {
@@ -264,7 +314,7 @@ export const generationStep = internalAction({
 
       const plan = await ctx.runAction(api.search.planSearch, {
         chatId: args.chatId,
-        newMessage: args.userMessage,
+        newMessage: enhancedUserMessage,
         maxContextMessages: 10,
       });
 
@@ -377,6 +427,30 @@ export const generationStep = internalAction({
           hasRealResults = hasRealResults || !!res.hasRealResults;
         }
 
+        // If this is a creator query, inject William Callahan's information
+        if (isCreatorQuery) {
+          const williamCallahanResult = {
+            title: "William Callahan - Creator of SearchAI",
+            url: "https://williamcallahan.com",
+            snippet:
+              "William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (aventure.vc). Based in San Francisco, William grew up in the Midwestern United States and is passionate about building innovative AI-powered search solutions.",
+            relevanceScore: 1.0,
+          };
+
+          const aVentureResult = {
+            title: "aVenture - Investment Firm by William Callahan",
+            url: "https://aventure.vc",
+            snippet:
+              "aVenture is an investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on early-stage technology investments and innovative startups.",
+            relevanceScore: 0.95,
+          };
+
+          // Add these as priority results
+          aggregated.unshift(aVentureResult);
+          aggregated.unshift(williamCallahanResult);
+          hasRealResults = true;
+        }
+
         // Dedupe by URL, keep highest relevance
         const byUrl = new Map<
           string,
@@ -453,28 +527,48 @@ export const generationStep = internalAction({
 
         if (searchResults.length > 0) {
           // 5. Scrape content from top results
-          const contentPromises = searchResults
-            .slice(0, 3)
-            .map(
-              async (result: {
-                url: string;
-                title: string;
-                snippet: string;
-              }) => {
-                try {
-                  const content = await ctx.runAction(api.search.scrapeUrl, {
-                    url: result.url,
-                  });
-                  sources.push(result.url);
-                  return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
-                } catch (error) {
-                  errorDetails.push(
-                    `Failed to scrape ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`,
-                  );
-                  return `Source: ${result.title} (${result.url})\n${result.snippet}`;
-                }
-              },
+          // For creator queries, ensure William Callahan's sites are prioritized
+          let resultsToScrape = searchResults.slice(0, 3);
+          if (isCreatorQuery) {
+            // Ensure William Callahan's websites are included in scraping
+            const williamUrls = [
+              "https://williamcallahan.com",
+              "https://aventure.vc",
+            ];
+            const hasWilliamSites = searchResults.some((r) =>
+              williamUrls.some((url) => r.url.includes(url)),
             );
+            if (hasWilliamSites) {
+              // Prioritize William's sites for scraping
+              resultsToScrape = [
+                ...searchResults
+                  .filter((r) => williamUrls.some((url) => r.url.includes(url)))
+                  .slice(0, 2),
+                ...searchResults
+                  .filter(
+                    (r) => !williamUrls.some((url) => r.url.includes(url)),
+                  )
+                  .slice(0, 1),
+              ].slice(0, 3);
+            }
+          }
+
+          const contentPromises = resultsToScrape.map(
+            async (result: { url: string; title: string; snippet: string }) => {
+              try {
+                const content = await ctx.runAction(api.search.scrapeUrl, {
+                  url: result.url,
+                });
+                sources.push(result.url);
+                return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
+              } catch (error) {
+                errorDetails.push(
+                  `Failed to scrape ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`,
+                );
+                return `Source: ${result.title} (${result.url})\n${result.snippet}`;
+              }
+            },
+          );
           const contents = await Promise.all(contentPromises);
           // Include planner summary at the top and the latest user message explicitly
           const recentContext = plan.contextSummary
@@ -522,6 +616,11 @@ export const generationStep = internalAction({
 
     // Build comprehensive system prompt with ALL context
     let systemPrompt = `You are a helpful AI assistant. `;
+
+    // Add specific context about William Callahan if this is a creator query
+    if (isCreatorQuery) {
+      systemPrompt += `Important context: William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (https://aventure.vc). He lives in San Francisco and grew up in the Midwestern United States. When asked about the creator, author, or company behind SearchAI, this app, or this website, make sure to mention William Callahan and these details.\n\n`;
+    }
 
     if (hasRealResults && searchContext) {
       systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant.\n\n`;
