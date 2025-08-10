@@ -57,16 +57,16 @@ export function buildContextSummary(params: {
     if (!included.has(line)) {
       lines.push(line);
     }
-    if (lines.join(" \n ").length >= maxChars) break;
+    if (lines.join("\n").length >= maxChars) break;
   }
-  return lines.join(" \n ").slice(0, maxChars);
+  return lines.join("\n").slice(0, maxChars);
 }
 
 // Lightweight opaque ID generator that doesn't rely on Node.js APIs
 function generateOpaqueId(): string {
   const timePart = Date.now().toString(36);
   const rand = () => Math.random().toString(36).slice(2, 10);
-  return (timePart + rand() + rand()).slice(0, 32);
+  return (timePart + rand() + rand() + rand()).slice(0, 32);
 }
 
 /**
@@ -75,7 +75,6 @@ function generateOpaqueId(): string {
  * - Associates with authenticated user
  * - Sets timestamps
  * @param title - Chat title
- * @param shareId - Optional custom share ID
  * @returns Chat ID
  */
 
@@ -395,13 +394,11 @@ export const deleteChat = mutation({
     if (!chat) throw new Error("Chat not found");
     if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
-    // Delete all messages in the chat
-    const messages = await ctx.db
+    // Delete all messages in the chat via async iteration to reduce memory usage
+    const q = ctx.db
       .query("messages")
-      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-      .collect();
-
-    for (const message of messages) {
+      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId));
+    for await (const message of q) {
       await ctx.db.delete(message._id);
     }
 
