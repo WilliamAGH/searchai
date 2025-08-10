@@ -374,7 +374,22 @@ export function ChatInterface({
   }, [setLocalMessages]), 50);
 
 	// Add abort controller for stream cancellation
-	const abortControllerRef = useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Deterministic post-create send flow (replaces setTimeout-based races)
+  const pendingSendRef = useRef<string | null>(null);
+  const awaitingNewChatRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (!awaitingNewChatRef.current) return;
+    if (!currentChatId) return;
+    const msg = pendingSendRef.current;
+    if (!msg) return;
+    // Clear first to avoid re-entrancy
+    awaitingNewChatRef.current = false;
+    pendingSendRef.current = null;
+    // Send into the newly created chat id (currentChatId is now set)
+    handleSendMessage(msg);
+  }, [currentChatId]);
 	
 	// Cleanup on unmount
 	useEffect(() => {
@@ -1131,21 +1146,18 @@ export function ChatInterface({
 	 * - Uses setTimeout for state sync
 	 */
     const handleContinueChat = useCallback(() => {
-		setShowFollowUpPrompt(false);
-		setPlannerHint(undefined);
-    // Telemetry: user chose to continue in current chat
-    if (isAuthenticated && typeof currentChatId !== 'string') {
-      recordClientMetric({ name: 'user_overrode_prompt', chatId: currentChatId }).catch(() => {});
-    }
-		// Send the pending message in the current chat
-		if (pendingMessage) {
-			const tempMessage = pendingMessage;
-			setPendingMessage("");
-			// Use setTimeout to ensure state updates properly
-			setTimeout(() => {
-				handleSendMessage(tempMessage);
-			}, 100);
-		}
+      setShowFollowUpPrompt(false);
+      setPlannerHint(undefined);
+      // Telemetry: user chose to continue in current chat
+      if (isAuthenticated && typeof currentChatId !== 'string') {
+        recordClientMetric({ name: 'user_overrode_prompt', chatId: currentChatId }).catch(() => {});
+      }
+      // Send the pending message in the current chat
+      if (pendingMessage) {
+        const tempMessage = pendingMessage;
+        setPendingMessage("");
+        handleSendMessage(tempMessage);
+      }
     }, [pendingMessage, isAuthenticated, currentChatId, recordClientMetric, handleSendMessage]);
 
 	/**
@@ -1155,23 +1167,21 @@ export function ChatInterface({
 	 * - Sends pending message
 	 */
     const handleNewChatForFollowUp = useCallback(async () => {
-		setShowFollowUpPrompt(false);
-		setPlannerHint(undefined);
-		const tempMessage = pendingMessage;
-		setPendingMessage("");
-    // Telemetry: user agreed to start new chat
-    if (isAuthenticated && typeof currentChatId !== 'string') {
-      recordClientMetric({ name: 'new_chat_confirmed', chatId: currentChatId }).catch(() => {});
-    }
-		
-		// Create new chat and send message
-		await handleNewChat();
-		// Wait for the new chat to be created before sending the message
-		setTimeout(() => {
-			if (tempMessage) {
-				handleSendMessage(tempMessage);
-			}
-		}, 500);
+      setShowFollowUpPrompt(false);
+      setPlannerHint(undefined);
+      const tempMessage = pendingMessage;
+      setPendingMessage("");
+      // Telemetry: user agreed to start new chat
+      if (isAuthenticated && typeof currentChatId !== 'string') {
+        recordClientMetric({ name: 'new_chat_confirmed', chatId: currentChatId }).catch(() => {});
+      }
+
+      // Create new chat and send message
+      if (tempMessage) {
+        pendingSendRef.current = tempMessage;
+        awaitingNewChatRef.current = true;
+      }
+      await handleNewChat();
     }, [pendingMessage, handleNewChat, isAuthenticated, currentChatId, recordClientMetric, handleSendMessage]);
 
   // Start new chat with summary: create chat, synthesize prompt with summary + question
@@ -1205,11 +1215,11 @@ export function ChatInterface({
         ? `Summary of previous conversation (for context):\n${summary}\n\nQuestion: ${tempMessage || ''}`
         : (tempMessage || '');
 
-      setTimeout(() => {
-        if (composed) {
-          handleSendMessage(composed);
-        }
-      }, 450);
+      if (composed) {
+        pendingSendRef.current = composed;
+        awaitingNewChatRef.current = true;
+      }
+      await handleNewChat();
     } catch (e) {
       console.warn('New chat w/ summary failed', e);
       // Fallback to normal new chat flow

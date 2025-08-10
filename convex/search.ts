@@ -1,4 +1,4 @@
-"use node";
+// Note: This file runs in the default V8 runtime. Avoid Node-only APIs here.
 /**
  * Search functions
  * - Public web search providers (SERP, OpenRouter, DuckDuckGo)
@@ -11,10 +11,41 @@ import { action, internalMutation } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 
 // Tunables (override via env)
-const MAX_KWS = Math.max(1, Math.min(parseInt(process.env.PLANNER_MAX_KWS || "6", 10) || 6, 12));
-const MAX_EXTRAS = Math.max(1, Math.min(parseInt(process.env.PLANNER_MAX_EXTRAS || "4", 10) || 4, 8));
-const MAX_QUERIES = Math.max(1, Math.min(parseInt(process.env.PLANNER_MAX_QUERIES || "6", 10) || 6, 12));
+// Reserved for future keyword-based planning enhancements
+// const _MAX_KWS = Math.max(1, Math.min(parseInt(process.env.PLANNER_MAX_KWS || "6", 10) || 6, 12));
+// const _MAX_EXTRAS = Math.max(1, Math.min(parseInt(process.env.PLANNER_MAX_EXTRAS || "4", 10) || 4, 8));
 import { buildContextSummary } from "./chats";
+
+// Test-only helpers (no production references). Kept minimal and standalone.
+function __testTokenize(text: string): string[] {
+  return (text || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+function __testSerialize(s?: string): string {
+  return (s || "").replace(/\s+/g, " ").trim();
+}
+export function __extractKeywordsForTest(text: string, max: number): string[] {
+  const freq = new Map<string, number>();
+  for (const tok of __testTokenize(text)) {
+    if (tok.length < 4) continue;
+    freq.set(tok, (freq.get(tok) || 0) + 1);
+  }
+  const limit = Math.max(1, max | 0);
+  return Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([w]) => w);
+}
+export function __augmentQueryForTest(q: string, kws: string[], maxExtras: number): string {
+  const base = __testSerialize(q);
+  const words = new Set(__testTokenize(base));
+  const extras: string[] = [];
+  const cap = Math.max(1, maxExtras | 0);
+  for (const k of kws || []) {
+    if (!words.has(k) && extras.length < cap) extras.push(k);
+  }
+  const combined = extras.length ? `${base} ${extras.join(" ")}` : base;
+  return combined.slice(0, 220);
+}
 
 // Ephemeral in-process cache for planner decisions (best-effort only)
 type PlanResult = {
@@ -183,6 +214,27 @@ export const planSearch = action({
   }),
   handler: async (ctx, args) => {
     const now = Date.now();
+    // Short-circuit on empty input to avoid unnecessary planning/LLM calls
+    if (args.newMessage.trim().length === 0) {
+      const emptyPlan = {
+        shouldSearch: false,
+        contextSummary: "",
+        queries: [],
+        suggestNewChat: false,
+        decisionConfidence: 0.9,
+        reasons: "empty_input",
+      } as PlanResult;
+      // Cache under normalized empty key to prevent repeat work
+      const cacheKey = `${args.chatId}|`;
+      planCache.set(cacheKey, { expires: now + PLAN_CACHE_TTL_MS, result: emptyPlan });
+      // Best-effort metric
+      const _metricEmpty: null = await ctx.runMutation(
+        internal.search.recordMetric,
+        { name: 'planner_invoked', chatId: args.chatId },
+      );
+      void _metricEmpty;
+      return emptyPlan;
+    }
     // Clean up expired cache entries (best-effort)
     for (const [k, v] of planCache) {
       if (v.expires <= now) planCache.delete(k);
@@ -236,41 +288,24 @@ export const planSearch = action({
     const recent: any[] = messages.slice(Math.max(0, messages.length - maxContext));
     const serialize = (s: string | undefined) => (s || "").replace(/\s+/g, " ").trim();
     const tokenize = (t: string) => t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-    const STOP = new Set([
+    const tokSet = (s: string) => new Set(tokenize(s));
+    const jacc = (A: Set<string>, B: Set<string>) => {
+      const inter = new Set([...A].filter((x) => B.has(x))).size;
+      const uni = new Set([...A, ...B]).size || 1;
+      return inter / uni;
+    };
+    /* const _STOP = new Set([
       'the','a','an','and','or','of','to','in','for','on','with','at','by','from','as','is','are','was','were','be','been','being','that','this','these','those','it','its','if','then','else','but','about','into','over','after','before','up','down','out','off','than','so','such','via'
-    ]);
-    const extractKeywords = (text: string, max = MAX_KWS) => {
-      const freq = new Map<string, number>();
-      for (const tok of tokenize(text)) {
-        if (tok.length < 4) continue;
-        if (STOP.has(tok)) continue;
-        freq.set(tok, (freq.get(tok) || 0) + 1);
-      }
-      return Array.from(freq.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, max)
-        .map(([w]) => w);
-    };
-    const augmentQuery = (q: string, kws: string[]) => {
-      const base = serialize(q);
-      const words = new Set(tokenize(base));
-      const extras: string[] = [];
-      for (const k of kws) {
-        if (!words.has(k) && extras.length < MAX_EXTRAS) extras.push(k);
-      }
-      const combined = extras.length ? `${base} ${extras.join(' ')}` : base;
-      return combined.slice(0, 220);
-    };
+    ]); */
+    // (test helpers exported at top-level)
 
     // Simple lexical overlap heuristic with the previous user message (exclude the immediate new message text)
     const newContent = serialize(args.newMessage);
     const prevUser: any | undefined = [...recent].reverse().find((m: any) => m.role === "user" && serialize(m.content) !== newContent) || [...recent].reverse().find((m: any) => m.role === "user");
     const lastContent = serialize(prevUser?.content);
-    const a = new Set(tokenize(lastContent));
-    const b = new Set(tokenize(newContent));
-    const inter = new Set([...a].filter((x) => b.has(x)));
-    const unionSize = new Set([...a, ...b]).size || 1;
-    const jaccard = inter.size / unionSize;
+    const a = tokSet(lastContent);
+    const b = tokSet(newContent);
+    const jaccard = jacc(a, b);
 
     // Time-based heuristic
     const lastTs: number | undefined = typeof prevUser?.timestamp === "number" ? prevUser.timestamp : undefined;
@@ -285,7 +320,7 @@ export const planSearch = action({
     });
 
     // Default plan if no LLM is available or JSON parsing fails
-    const defaultPlan: PlanResult = {
+    let defaultPlan: PlanResult = {
       shouldSearch: true,
       contextSummary,
       queries: [args.newMessage],
@@ -293,6 +328,36 @@ export const planSearch = action({
       decisionConfidence: timeSuggestNew ? 0.85 : 0.65,
       reasons: `jaccard=${jaccard.toFixed(2)} gapMin=${minutesGap}`,
     };
+    // Diversify queries (MMR) from simple context-derived variants
+    try {
+      const ctxTokens = Array.from(tokSet(contextSummary)).filter((t) => t.length > 3).slice(0, 10);
+      const variants: string[] = [args.newMessage];
+      if (ctxTokens.length >= 2) variants.push(`${args.newMessage} ${ctxTokens[0]} ${ctxTokens[1]}`);
+      if (ctxTokens.length >= 4) variants.push(`${args.newMessage} ${ctxTokens[2]} ${ctxTokens[3]}`);
+      const Q = tokSet(args.newMessage);
+      const pool = Array.from(new Set(variants.map((q) => q.trim()).filter(Boolean)));
+      const selected: string[] = [];
+      const used = new Set<number>();
+      const lambda = 0.7;
+      while (selected.length < Math.min(4, pool.length)) {
+        let bestIdx = -1;
+        let bestScore = -Infinity;
+        for (let i = 0; i < pool.length; i++) {
+          if (used.has(i)) continue;
+          const cand = pool[i];
+          const C = tokSet(cand);
+          const rel = jacc(C, Q);
+          let nov = 1;
+          for (const s of selected) nov = Math.min(nov, 1 - jacc(C, tokSet(s)));
+          const score = lambda * rel + (1 - lambda) * nov;
+          if (score > bestScore) { bestScore = score; bestIdx = i; }
+        }
+        if (bestIdx === -1) break;
+        used.add(bestIdx);
+        selected.push(pool[bestIdx]);
+      }
+      if (selected.length > 0) defaultPlan.queries = selected;
+    } catch {}
 
     // If no API key present, skip LLM planning
     if (!process.env.OPENROUTER_API_KEY) {
@@ -372,18 +437,36 @@ export const planSearch = action({
         typeof (parsed as any).reasons === "string"
       ) {
         const plan = parsed as { shouldSearch: boolean; contextSummary: string; queries: string[]; suggestNewChat: boolean; decisionConfidence: number; reasons: string };
-        // Sanitize then deterministically augment queries with context keywords
+        // Sanitize and diversify via MMR
         const baseList = Array.from(new Set(
           plan.queries
             .map((q) => serialize(q))
             .filter((q) => q.length > 0)
             .slice(0, 6)
         ));
-        const keywordBag = extractKeywords(`${contextSummary} ${args.newMessage}`, MAX_KWS);
-        const augmented = baseList.map((q) => augmentQuery(q, keywordBag));
-        // Ensure one query anchors on the exact new message + keywords
-        const anchor = augmentQuery(args.newMessage, keywordBag);
-        const queries = Array.from(new Set([anchor, ...augmented])).slice(0, MAX_QUERIES);
+        const Q = tokSet(args.newMessage);
+        const pool = baseList;
+        const selected: string[] = [];
+        const used = new Set<number>();
+        const lambda = 0.7;
+        while (selected.length < Math.min(4, pool.length)) {
+          let bestIdx = -1;
+          let bestScore = -Infinity;
+          for (let i = 0; i < pool.length; i++) {
+            if (used.has(i)) continue;
+            const cand = pool[i];
+            const C = tokSet(cand);
+            const rel = jacc(C, Q);
+            let nov = 1;
+            for (const s of selected) nov = Math.min(nov, 1 - jacc(C, tokSet(s)));
+            const score = lambda * rel + (1 - lambda) * nov;
+            if (score > bestScore) { bestScore = score; bestIdx = i; }
+          }
+          if (bestIdx === -1) break;
+          used.add(bestIdx);
+          selected.push(pool[bestIdx]);
+        }
+        const queries = selected;
         const finalPlan = {
           shouldSearch: plan.shouldSearch,
           contextSummary: serialize(plan.contextSummary).slice(0, 2000),
@@ -795,6 +878,17 @@ export const scrapeUrl = action({
 		content: string;
 		summary?: string;
 	}> => {
+    // Short-TTL in-process cache to avoid repeat scrapes across adjacent queries
+    const SCRAPE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+    const globalAny: any = globalThis as any;
+    if (!globalAny.__scrapeCache) globalAny.__scrapeCache = new Map<string, { exp: number; val: { title: string; content: string; summary?: string } }>();
+    const cache: Map<string, { exp: number; val: { title: string; content: string; summary?: string } }> = globalAny.__scrapeCache;
+    const now = Date.now();
+    for (const [k, v] of cache) { if (v.exp <= now) cache.delete(k); }
+    const hit = cache.get(args.url);
+    if (hit && hit.exp > now) {
+      return hit.val;
+    }
 		console.log("🌐 Scraping URL initiated:", {
 			url: args.url,
 			timestamp: new Date().toISOString(),
@@ -942,7 +1036,8 @@ export const scrapeUrl = action({
 				content.substring(0, summaryLength) +
 				(content.length > summaryLength ? "..." : "");
 
-			const result = { title, content, summary };
+      const result = { title, content, summary };
+      cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
 			console.log("✅ Scraping completed successfully:", {
 				url: args.url,
 				resultLength: content.length,
@@ -963,11 +1058,13 @@ export const scrapeUrl = action({
       try { hostname = new URL(args.url).hostname; } catch { hostname = "unknown"; }
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-			return {
+      const val = {
 				title: hostname,
 				content: `Unable to fetch content from ${args.url}: ${errorMessage}`,
 				summary: `Content unavailable from ${hostname}`,
-			};
+      };
+      cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val });
+      return val;
 		}
 	},
 });

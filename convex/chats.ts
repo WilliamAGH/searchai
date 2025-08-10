@@ -7,7 +7,6 @@
  */
 
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { randomBytes, randomUUID } from "node:crypto";
 import { v } from "convex/values";
 import { action, mutation, query, internalMutation } from "./_generated/server";
 import { api } from "./_generated/api";
@@ -52,6 +51,13 @@ export function buildContextSummary(params: {
   return lines.join(" \n ").slice(0, maxChars);
 }
 
+// Lightweight opaque ID generator that doesn't rely on Node.js APIs
+function generateOpaqueId(): string {
+  const timePart = Date.now().toString(36);
+  const rand = () => Math.random().toString(36).slice(2, 10);
+  return (timePart + rand() + rand()).slice(0, 32);
+}
+
 /**
  * Create new chat
  * - Generates unique share ID
@@ -71,9 +77,9 @@ export const createChat = mutation({
 		const userId = await getAuthUserId(ctx);
 		const now = Date.now();
 
-		// Use strong, URL-safe IDs instead of Math.random
-		const shareId = (typeof randomUUID === 'function' ? randomUUID() : randomBytes(16).toString('hex')).replace(/-/g, '');
-		const publicId = (typeof randomUUID === 'function' ? randomUUID() : randomBytes(16).toString('hex')).replace(/-/g, '');
+    // Generate URL-safe opaque IDs without Node.js built-ins (V8 runtime safe)
+    const shareId = generateOpaqueId();
+    const publicId = generateOpaqueId();
 
     return await ctx.db.insert("chats", {
 			title: args.title,
@@ -306,7 +312,7 @@ export const summarizeRecent = query({
 export const summarizeRecentAction = action({
   args: { chatId: v.id("chats"), limit: v.optional(v.number()) },
   returns: v.string(),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<string> => {
     const lim = Math.max(1, Math.min(args.limit ?? 14, 40));
     // Load messages via query to respect auth and avoid using ctx.db in actions
     const all: Array<{
@@ -315,8 +321,9 @@ export const summarizeRecentAction = action({
       timestamp?: number;
     }> = await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId });
     const ordered = all.slice(-lim);
-    const chat = await ctx.runQuery(api.chats.getChatById, { chatId: args.chatId });
-    return buildContextSummary({ messages: ordered, rollingSummary: (chat as any)?.rollingSummary, maxChars: 1600 });
+    // Break type circularity by annotating the query result as unknown
+    const chatResult: unknown = await ctx.runQuery(api.chats.getChatById, { chatId: args.chatId });
+    return buildContextSummary({ messages: ordered, rollingSummary: (chatResult as any)?.rollingSummary, maxChars: 1600 });
   },
 });
 

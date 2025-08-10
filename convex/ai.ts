@@ -264,6 +264,8 @@ export const generationStep = internalAction({
           const suffix = [missing.join(' '), phrases.join(' ')].filter(Boolean).join(' ').trim();
           return suffix ? `${base} ${suffix}` : base;
         };
+        const currentYear = new Date().getFullYear();
+        const recencyCue = `${currentYear}`;
         for (const q of plan.queries) {
           // Add minimal operator hints for obvious intents (docs/GitHub/latest)
           let enriched = enrich(q).slice(0, 240);
@@ -272,6 +274,12 @@ export const generationStep = internalAction({
             enriched += " site:docs.*";
           } else if (/github|repo|source code|library/.test(lower) && !/site:/.test(lower)) {
             enriched += " site:github.com";
+          }
+          if (/whitepaper|paper|report|pdf/.test(lower) && !/filetype:pdf/.test(lower)) {
+            enriched += " filetype:pdf";
+          }
+          if (/latest|current|202[4-9]/.test(lower) === false) {
+            enriched += ` ${recencyCue}`;
           }
           const res = await ctx.runAction(api.search.searchWeb, { query: enriched, maxResults: 5 });
           const results = res.results || [];
@@ -305,11 +313,13 @@ export const generationStep = internalAction({
           s += Math.min(0.3, overlap * 0.03);
           // Phrase match bonus
           for (const p of phraseSet) if (p && text.includes((p as string).replace(/"/g, ''))) s += 0.1;
-          // Domain bonuses (official docs / gov / edu)
+          // Domain whitelist/blacklist: boost official docs, downweight content farms
           try {
             const host = new URL(r.url).hostname;
-            if (/docs\./.test(host)) s += 0.1;
-            if (/\.gov$|\.edu$/.test(host)) s += 0.08;
+            if (/docs\.|developer\.|learn\.|support\.|dev\./.test(host)) s += 0.12;
+            if (/\.gov$|\.edu$/.test(host)) s += 0.1;
+            if (/medium\.com$|quora\.com$|pinterest\.com$|slideshare\.net$/.test(host)) s -= 0.15;
+            if (/reddit\.com$|news\.ycombinator\.com$/.test(host)) s -= 0.05; // reduce chatter
           } catch {}
           return s;
         };
