@@ -5,14 +5,14 @@
  * - Handles hover highlighting between citations and sources
  */
 
-import React from 'react';
-import clsx from 'clsx';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
-import rehypeSanitize from 'rehype-sanitize';
-import { defaultSchema } from 'hast-util-sanitize';
-import type { Schema } from 'hast-util-sanitize';
+import React from "react";
+import clsx from "clsx";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
+import rehypeSanitize from "rehype-sanitize";
+import { defaultSchema } from "hast-util-sanitize";
+import type { Schema } from "hast-util-sanitize";
 
 interface MarkdownWithCitationsProps {
   content: string;
@@ -33,9 +33,9 @@ interface MarkdownWithCitationsProps {
 function getDomainFromUrl(url: string): string {
   try {
     const hostname = new URL(url).hostname;
-    return hostname.replace('www.', '');
+    return hostname.replace("www.", "");
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -43,12 +43,12 @@ export function MarkdownWithCitations({
   content,
   searchResults = [],
   hoveredSourceUrl,
-  onCitationHover
+  onCitationHover,
 }: MarkdownWithCitationsProps) {
   // Create a map of domains to URLs for quick lookup
   const domainToUrlMap = React.useMemo(() => {
     const map = new Map<string, string>();
-    searchResults.forEach(result => {
+    searchResults.forEach((result) => {
       const domain = getDomainFromUrl(result.url);
       if (domain) {
         map.set(domain, result.url);
@@ -61,7 +61,7 @@ export function MarkdownWithCitations({
   const processedContent = React.useMemo(() => {
     // Replace [domain.com] with custom markers that survive markdown processing
     const citationRegex = /\[([^\]]+(?:\.[^\]]+)+)\]/g;
-    
+
     const processed = content.replace(citationRegex, (match, domain) => {
       const url = domainToUrlMap.get(domain);
       if (url) {
@@ -78,16 +78,39 @@ export function MarkdownWithCitations({
     ...defaultSchema,
     tagNames: [
       ...(defaultSchema.tagNames ?? []),
-      'u', 'span',
-      'table','thead','tbody','tr','th','td',
-      'blockquote','hr','strong','em','del','br','p','ul','ol','li','pre','code','h1','h2','h3','h4','h5','h6'
+      "u",
+      "span",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "th",
+      "td",
+      "blockquote",
+      "hr",
+      "strong",
+      "em",
+      "del",
+      "br",
+      "p",
+      "ul",
+      "ol",
+      "li",
+      "pre",
+      "code",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
     ],
     attributes: {
       ...defaultSchema.attributes,
-      a: ['href', 'target', 'rel'],
-      code: ['className'],
-      span: ['className', 'data-url', 'data-domain']
-    }
+      a: ["href", "target", "rel"],
+      code: ["className"],
+      span: ["className", "data-url", "data-domain"],
+    },
   };
 
   return (
@@ -99,16 +122,20 @@ export function MarkdownWithCitations({
           <a {...props} target="_blank" rel="noopener noreferrer" />
         ),
         code: ({ _node, _inline, className, children, ...props }) => (
-          <code className={className} {...props}>{String(children)}</code>
+          <code className={className} {...props}>
+            {String(children)}
+          </code>
         ),
         p: ({ _node, _inline, children, ...props }) => {
-          const processChildren = (children: React.ReactNode): React.ReactNode => {
+          const processChildren = (
+            children: React.ReactNode,
+          ): React.ReactNode => {
             return React.Children.map(children, (child) => {
-              if (typeof child === 'string') {
+              if (typeof child === "string") {
                 // Process citation markers in text
                 const parts = child.split(/@@CITATION@@([^@]+)@@([^@]+)@@/);
                 const result: React.ReactNode[] = [];
-                
+
                 for (let i = 0; i < parts.length; i++) {
                   if (i % 3 === 0) {
                     // Regular text
@@ -118,7 +145,7 @@ export function MarkdownWithCitations({
                     const domain = parts[i];
                     const url = parts[i + 1];
                     const isHighlighted = hoveredSourceUrl === url;
-                    
+
                     result.push(
                       <a
                         key={`citation-${i}`}
@@ -126,35 +153,35 @@ export function MarkdownWithCitations({
                         target="_blank"
                         rel="noopener noreferrer"
                         className={clsx(
-                          'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline',
+                          "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
                           isHighlighted
-                            ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300'
+                            ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
                         )}
                         onMouseEnter={() => onCitationHover?.(url)}
                         onMouseLeave={() => onCitationHover?.(null)}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <span>{domain}</span>
-                        <svg 
-                          className="w-3 h-3 opacity-60" 
-                          fill="none" 
-                          stroke="currentColor" 
+                        <svg
+                          className="w-3 h-3 opacity-60"
+                          fill="none"
+                          stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
-                          <path 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            strokeWidth={2} 
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" 
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                           />
                         </svg>
-                      </a>
+                      </a>,
                     );
                     i++; // Skip the URL part as we've already processed it
                   }
                 }
-                
+
                 return result.length > 0 ? result : child;
               }
               return child;
@@ -164,13 +191,15 @@ export function MarkdownWithCitations({
           return <p {...props}>{processChildren(children)}</p>;
         },
         li: ({ _node, _inline, children, ...props }) => {
-          const processChildren = (children: React.ReactNode): React.ReactNode => {
+          const processChildren = (
+            children: React.ReactNode,
+          ): React.ReactNode => {
             return React.Children.map(children, (child) => {
-              if (typeof child === 'string') {
+              if (typeof child === "string") {
                 // Process citation markers in text
                 const parts = child.split(/@@CITATION@@([^@]+)@@([^@]+)@@/);
                 const result: React.ReactNode[] = [];
-                
+
                 for (let i = 0; i < parts.length; i++) {
                   if (i % 3 === 0) {
                     // Regular text
@@ -180,7 +209,7 @@ export function MarkdownWithCitations({
                     const domain = parts[i];
                     const url = parts[i + 1];
                     const isHighlighted = hoveredSourceUrl === url;
-                    
+
                     result.push(
                       <a
                         key={`citation-${i}`}
@@ -188,35 +217,35 @@ export function MarkdownWithCitations({
                         target="_blank"
                         rel="noopener noreferrer"
                         className={clsx(
-                          'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline',
+                          "inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
                           isHighlighted
-                            ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300'
+                            ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
                         )}
                         onMouseEnter={() => onCitationHover?.(url)}
                         onMouseLeave={() => onCitationHover?.(null)}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <span>{domain}</span>
-                        <svg 
-                          className="w-3 h-3 opacity-60" 
-                          fill="none" 
-                          stroke="currentColor" 
+                        <svg
+                          className="w-3 h-3 opacity-60"
+                          fill="none"
+                          stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
-                          <path 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            strokeWidth={2} 
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" 
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                           />
                         </svg>
-                      </a>
+                      </a>,
                     );
                     i++; // Skip the URL part as we've already processed it
                   }
                 }
-                
+
                 return result.length > 0 ? result : child;
               }
               return child;
@@ -224,7 +253,7 @@ export function MarkdownWithCitations({
           };
 
           return <li {...props}>{processChildren(children)}</li>;
-        }
+        },
       }}
     >
       {processedContent}

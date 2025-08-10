@@ -5,7 +5,7 @@
  * - Shows external link icon on hover
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 
 interface CitationRendererProps {
   content: string;
@@ -26,9 +26,9 @@ interface CitationRendererProps {
 function getDomainFromUrl(url: string): string {
   try {
     const hostname = new URL(url).hostname;
-    return hostname.replace('www.', '');
+    return hostname.replace("www.", "");
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -53,13 +53,14 @@ const CitationLink: React.FC<{
       target="_blank"
       rel="noopener noreferrer"
       className={`
-        inline-flex items-center gap-0.5 px-1 py-0.5 rounded-md text-xs font-medium
+        inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium
         transition-all duration-200 no-underline
-        ${isHighlighted 
-          ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600' 
-          : isHovered
-          ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30'
+        ${
+          isHighlighted
+            ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
+            : isHovered
+              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
         }
       `}
       onMouseEnter={() => {
@@ -76,17 +77,17 @@ const CitationLink: React.FC<{
     >
       <span>{domain}</span>
       {(isHovered || isHighlighted) && (
-        <svg 
-          className="w-3 h-3 opacity-60" 
-          fill="none" 
-          stroke="currentColor" 
+        <svg
+          className="w-3 h-3 opacity-60"
+          fill="none"
+          stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            strokeWidth={2} 
-            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" 
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
           />
         </svg>
       )}
@@ -104,14 +105,16 @@ export function CitationRenderer({
   content,
   searchResults = [],
   hoveredSourceUrl,
-  onCitationHover
+  onCitationHover,
 }: CitationRendererProps) {
-  const [processedContent, setProcessedContent] = useState<React.ReactNode[]>([]);
+  const [processedContent, setProcessedContent] = useState<React.ReactNode[]>(
+    [],
+  );
 
   // Create a map of domains to URLs for quick lookup
   const domainToUrlMap = React.useMemo(() => {
     const map = new Map<string, string>();
-    searchResults.forEach(result => {
+    searchResults.forEach((result) => {
       const domain = getDomainFromUrl(result.url);
       if (domain) {
         map.set(domain, result.url);
@@ -124,7 +127,7 @@ export function CitationRenderer({
   useEffect(() => {
     // Regular expression to match [domain.com] patterns
     const citationRegex = /\[([^\]]+(?:\.[^\]]+)+)\]/g;
-    
+
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
@@ -136,7 +139,7 @@ export function CitationRenderer({
         parts.push(
           <span key={`text-${keyIndex++}`}>
             {content.substring(lastIndex, match.index)}
-          </span>
+          </span>,
         );
       }
 
@@ -146,7 +149,7 @@ export function CitationRenderer({
       if (matchedUrl) {
         // Found a matching source - create interactive citation
         const isHighlighted = hoveredSourceUrl === matchedUrl;
-        
+
         parts.push(
           <CitationLink
             key={`citation-${keyIndex++}`}
@@ -158,14 +161,17 @@ export function CitationRenderer({
                 onCitationHover(hovering ? matchedUrl : null);
               }
             }}
-          />
+          />,
         );
       } else {
         // No matching source - render as plain text in brackets
         parts.push(
-          <span key={`plain-${keyIndex++}`} className="text-gray-500 dark:text-gray-400">
+          <span
+            key={`plain-${keyIndex++}`}
+            className="text-gray-500 dark:text-gray-400"
+          >
             [{citedDomain}]
-          </span>
+          </span>,
         );
       }
 
@@ -175,9 +181,7 @@ export function CitationRenderer({
     // Add remaining text after last citation
     if (lastIndex < content.length) {
       parts.push(
-        <span key={`text-${keyIndex++}`}>
-          {content.substring(lastIndex)}
-        </span>
+        <span key={`text-${keyIndex++}`}>{content.substring(lastIndex)}</span>,
       );
     }
 
@@ -187,7 +191,13 @@ export function CitationRenderer({
     }
 
     setProcessedContent(parts);
-  }, [content, searchResults, hoveredSourceUrl, domainToUrlMap, onCitationHover]);
+  }, [
+    content,
+    searchResults,
+    hoveredSourceUrl,
+    domainToUrlMap,
+    onCitationHover,
+  ]);
 
   return <>{processedContent}</>;
 }

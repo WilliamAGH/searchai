@@ -5,13 +5,13 @@
  * - Avoids direct DOM manipulation to prevent React reconciliation errors
  */
 
-import React, { useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
-import rehypeSanitize from 'rehype-sanitize';
-import { defaultSchema } from 'hast-util-sanitize';
-import type { Schema } from 'hast-util-sanitize';
+import React, { useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
+import rehypeSanitize from "rehype-sanitize";
+import { defaultSchema } from "hast-util-sanitize";
+import type { Schema } from "hast-util-sanitize";
 
 interface ContentWithCitationsProps {
   content: string;
@@ -32,9 +32,9 @@ interface ContentWithCitationsProps {
 function getDomainFromUrl(url: string): string {
   try {
     const hostname = new URL(url).hostname;
-    return hostname.replace('www.', '');
+    return hostname.replace("www.", "");
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -42,14 +42,14 @@ export function ContentWithCitations({
   content,
   searchResults = [],
   hoveredSourceUrl,
-  onCitationHover
+  onCitationHover,
 }: ContentWithCitationsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Create a map of domains to URLs for quick lookup
   const domainToUrlMap = React.useMemo(() => {
     const map = new Map<string, string>();
-    searchResults.forEach(result => {
+    searchResults.forEach((result) => {
       const domain = getDomainFromUrl(result.url);
       if (domain) {
         map.set(domain, result.url);
@@ -73,15 +73,37 @@ export function ContentWithCitations({
     ...defaultSchema,
     tagNames: [
       ...(defaultSchema.tagNames ?? []),
-      'u',
-      'table','thead','tbody','tr','th','td',
-      'blockquote','hr','strong','em','del','br','p','ul','ol','li','pre','code','h1','h2','h3','h4','h5','h6'
+      "u",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "th",
+      "td",
+      "blockquote",
+      "hr",
+      "strong",
+      "em",
+      "del",
+      "br",
+      "p",
+      "ul",
+      "ol",
+      "li",
+      "pre",
+      "code",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
     ],
     attributes: {
       ...defaultSchema.attributes,
-      a: ['href', 'target', 'rel'],
-      code: ['className']
-    }
+      a: ["href", "target", "rel"],
+      code: ["className"],
+    },
   };
 
   return (
@@ -91,12 +113,16 @@ export function ContentWithCitations({
         rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
         components={{
           a: ({ href, children, ...props }) => {
-            const url = String(href || '');
-            const isCitation = url && [...domainToUrlMap.values()].includes(url);
+            const url = String(href || "");
+            const isCitation =
+              url && [...domainToUrlMap.values()].includes(url);
             const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
-            const baseClass = 'inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium no-underline align-baseline transition-colors';
-            const normalClass = 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300';
-            const hiClass = 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600';
+            const baseClass =
+              "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium no-underline align-baseline transition-colors";
+            const normalClass =
+              "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300";
+            const hiClass =
+              "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600";
             return (
               <a
                 href={url}
@@ -113,8 +139,10 @@ export function ContentWithCitations({
             );
           },
           code: ({ className, children, ...props }) => (
-            <code className={className} {...props}>{String(children)}</code>
-          )
+            <code className={className} {...props}>
+              {String(children)}
+            </code>
+          ),
         }}
       >
         {processedContent}
