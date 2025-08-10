@@ -6,13 +6,14 @@ export default defineConfig({
   retries: 0,
   reporter: "list",
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:4173",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173",
     headless: true,
-    trace: "off",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   webServer: {
-    command: "npm run preview",
-    url: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:4173",
+    command: "vite preview --strictPort --port 4173 --host 127.0.0.1",
+    url: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173",
     reuseExistingServer: true,
     timeout: 60_000,
   },
