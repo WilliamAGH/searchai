@@ -564,7 +564,7 @@ export function ChatInterface({
       },
       [setLocalMessages],
     ),
-    50,
+    100,
   );
 
   // Add abort controller for stream cancellation
@@ -1597,11 +1597,7 @@ export function ChatInterface({
 
       // Draft-time prompting disabled to reduce sensitivity and distraction
       // We keep the analyzer for potential future lightweight metrics or previews.
-      const _msgs =
-        typeof currentChatId === "string"
-          ? localMessages.filter((m) => m.chatId === currentChatId)
-          : messages || [];
-      void _msgs;
+      // Reserved for future lightweight draft-time analysis (no-op by design).
     } catch {}
   }, 1200);
 

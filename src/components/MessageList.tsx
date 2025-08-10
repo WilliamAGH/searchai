@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useRef } from "react";
+import type { Id } from "../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import clsx from "clsx";
@@ -50,7 +51,7 @@ interface SearchResult {
 }
 
 interface Message {
-  _id?: string;
+  _id?: Id<"messages">;
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
@@ -522,11 +523,14 @@ export function MessageList({
                                 onDeleteLocalMessage?.(String(message._id));
                               } else {
                                 await deleteMessage({
-                                  messageId: message._id as any,
+                                  messageId: message._id!,
                                 });
                               }
                             }
-                          } catch {}
+                          } catch (err) {
+                            // TODO: route via src/lib/logger.ts and gate by env
+                            console.error("Failed to delete message", err);
+                          }
                         }}
                         className="text-xs text-gray-500 hover:text-red-600 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 rounded px-2 py-1"
                         title="Delete message"

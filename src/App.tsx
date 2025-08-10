@@ -31,14 +31,12 @@ import { SignUpModal } from "./components/SignUpModal";
  * - Controls sidebar visibility
  * - Handles navigation to home
  */
-type ChatPageProps = {
-  onRequestSignUp: () => void;
-  onRequestSignIn: () => void;
-};
-
-const ChatPage: React.FC<ChatPageProps> = ({
+const ChatPage = ({
   onRequestSignUp,
   onRequestSignIn,
+}: {
+  onRequestSignUp: () => void;
+  onRequestSignIn: () => void;
 }) => {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
@@ -73,7 +71,7 @@ const ChatPage: React.FC<ChatPageProps> = ({
   }, [location.pathname, location.search]);
 
   return (
-    <React.Fragment>
+    <>
       <Authenticated>
         <ChatInterface
           isAuthenticated={true}
@@ -98,7 +96,7 @@ const ChatPage: React.FC<ChatPageProps> = ({
           onRequestSignIn={onRequestSignIn}
         />
       </Unauthenticated>
-    </React.Fragment>
+    </>
   );
 };
 
