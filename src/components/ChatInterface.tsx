@@ -924,9 +924,32 @@ export function ChatInterface({
 
           // Listen for abort signal
           if (abortControllerRef.current) {
-            abortControllerRef.current.signal.addEventListener("abort", () => {
-              isReading = false;
-            });
+            abortControllerRef.current.signal.addEventListener(
+              "abort",
+              () => {
+                isReading = false;
+                // Gracefully finalize or remove the placeholder to avoid spinner hang
+                setLocalMessages((prev) => {
+                  const idx = prev.findIndex(
+                    (m) => m._id === assistantMessageId,
+                  );
+                  if (idx === -1) return prev;
+                  const next = prev.slice();
+                  const hadContent = !!next[idx].content?.trim();
+                  if (hadContent) {
+                    next[idx] = {
+                      ...next[idx],
+                      isStreaming: false,
+                      hasStartedContent: true,
+                    };
+                    return next;
+                  }
+                  next.splice(idx, 1);
+                  return next;
+                });
+              },
+              { once: true },
+            );
           }
 
           try {
@@ -1174,10 +1197,14 @@ export function ChatInterface({
         errorMessage += "\n";
       }
 
-      errorMessage += "**🌐 ENVIRONMENT CHECK:**\n";
-      errorMessage += `- Current URL: ${window.location.href}\n`;
-      errorMessage += `- User Agent: ${navigator.userAgent}\n`;
-      errorMessage += `- Timestamp: ${new Date().toISOString()}\n\n`;
+      // Environment diagnostics are dev-only to protect user privacy
+      if ((import.meta as any)?.env?.DEV) {
+        console.debug("ENV CHECK:", {
+          url: window.location.href,
+          ua: navigator.userAgent,
+          ts: new Date().toISOString(),
+        });
+      }
 
       if (searchContext) {
         errorMessage += "**📄 AVAILABLE CONTENT:**\n";
