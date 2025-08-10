@@ -33,6 +33,54 @@ const TOPIC_CHANGE_INDICATORS = [
   /^(switch to|change to|moving on to)/i,
   /^(now let's talk about something else|different conversation)/i,
 ];
+// Common stop words used when extracting lightweight keywords for search context
+const STOP_WORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "of",
+  "to",
+  "in",
+  "for",
+  "on",
+  "with",
+  "at",
+  "by",
+  "from",
+  "as",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "that",
+  "this",
+  "these",
+  "those",
+  "it",
+  "its",
+  "if",
+  "then",
+  "else",
+  "but",
+  "about",
+  "into",
+  "over",
+  "after",
+  "before",
+  "up",
+  "down",
+  "out",
+  "off",
+  "than",
+  "so",
+  "such",
+  "via",
+]);
 // Planner and prompt cooldowns (ms)
 const CHAT_COOLDOWN_MS = 45_000; // reduce planner frequency
 const PROMPT_COOLDOWN_MS = 180_000; // show at most every 3m per chat
@@ -209,7 +257,8 @@ export function ChatInterface({
    * Detect topic change between messages
    * - Uses lexical similarity (Jaccard index)
    * - Checks topic change indicators
-   * - Returns true if similarity < 0.2
+   * - Returns true only when similarity < TOPIC_CHANGE_SIMILARITY_THRESHOLD
+   *   AND an explicit topic-change indicator is present
    * @param newMessage - New message text
    * @param previousMessages - Chat history
    * @returns true if topic changed significantly
@@ -470,10 +519,7 @@ export function ChatInterface({
     sendRef.current?.(msg);
   }, [currentChatId]);
 
-  // Keep the ref updated with the latest handler to avoid TDZ issues
-  useEffect(() => {
-    sendRef.current = handleSendMessage;
-  });
+  // ref updater will be added after handleSendMessage is defined
 
   // Cleanup on unmount
   useEffect(() => {
@@ -537,56 +583,9 @@ export function ChatInterface({
           .toLowerCase()
           .split(/[^a-z0-9]+/)
           .filter(Boolean);
-      const STOP = new Set([
-        "the",
-        "a",
-        "an",
-        "and",
-        "or",
-        "of",
-        "to",
-        "in",
-        "for",
-        "on",
-        "with",
-        "at",
-        "by",
-        "from",
-        "as",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "being",
-        "that",
-        "this",
-        "these",
-        "those",
-        "it",
-        "its",
-        "if",
-        "then",
-        "else",
-        "but",
-        "about",
-        "into",
-        "over",
-        "after",
-        "before",
-        "up",
-        "down",
-        "out",
-        "off",
-        "than",
-        "so",
-        "such",
-        "via",
-      ]);
       const freq = new Map<string, number>();
       for (const t of kw(historyText + " " + message)) {
-        if (t.length < 4 || STOP.has(t)) continue;
+        if (t.length < 4 || STOP_WORDS.has(t)) continue;
         freq.set(t, (freq.get(t) || 0) + 1);
       }
       const top = Array.from(freq.entries())
@@ -820,7 +819,10 @@ export function ChatInterface({
       const aiStartTime = Date.now();
       const aiResponse = await fetch(aiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
         body: JSON.stringify(aiRequestBody),
         signal: abortControllerRef.current.signal,
       });
