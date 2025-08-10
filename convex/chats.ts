@@ -9,8 +9,8 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { action, mutation, query, internalMutation } from "./_generated/server";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { api } from "./_generated/api";
 
 // Shared summarization util (pure; can be imported by other Convex files)
 export function buildContextSummary(params: {
@@ -169,7 +169,6 @@ export const getChatByOpaqueId = query({
  * Get chat by share ID
  * - For shareable URLs
  * - Checks sharing permissions
- * @param shareId - Unique share identifier
  * @returns Chat or null
  */
 export const getChatByShareId = query({
@@ -403,6 +402,17 @@ export const deleteChat = mutation({
     }
 
     await ctx.db.delete(args.chatId);
+
+    // Best-effort: also invalidate planner cache for this chat
+    try {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.search.invalidatePlanCacheForChat,
+        {
+          chatId: args.chatId,
+        },
+      );
+    } catch {}
   },
 });
 
@@ -457,7 +467,7 @@ export const importLocalChats = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
 
-    const mappings: Array<{ localId: string; chatId: Id<"chats"> }> = [] as any;
+    const mappings: Array<{ localId: string; chatId: Id<"chats"> }> = [];
 
     for (const ch of args.chats) {
       const now = Date.now();
