@@ -24,7 +24,7 @@ import { SignUpModal } from "./components/SignUpModal";
  * - Controls sidebar visibility
  * - Handles navigation to home
  */
-const ChatPage = () => {
+const ChatPage = ({ onRequestSignUp, onRequestSignIn }: { onRequestSignUp: () => void; onRequestSignIn: () => void }) => {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -58,8 +58,8 @@ const ChatPage = () => {
           chatId={chatId}
           shareId={shareId}
           publicId={publicId}
-          onRequestSignUp={() => { setShowSignInModal(false); setShowSignUpModal(true); }}
-          onRequestSignIn={() => { setShowSignUpModal(false); setShowSignInModal(true); }}
+          onRequestSignUp={onRequestSignUp}
+          onRequestSignIn={onRequestSignIn}
         />
       </Authenticated>
       <Unauthenticated>
@@ -70,8 +70,8 @@ const ChatPage = () => {
           chatId={chatId}
           shareId={shareId}
           publicId={publicId}
-          onRequestSignUp={() => { setShowSignInModal(false); setShowSignUpModal(true); }}
-          onRequestSignIn={() => { setShowSignUpModal(false); setShowSignInModal(true); }}
+          onRequestSignUp={onRequestSignUp}
+          onRequestSignIn={onRequestSignIn}
         />
       </Unauthenticated>
     </>
@@ -131,10 +131,10 @@ export default function App() {
             
             <main className="flex-1 flex overflow-hidden">
               <Routes>
-                <Route path="/" element={<ChatPage />} />
-                <Route path="/chat/:chatId" element={<ChatPage />} />
-                <Route path="/s/:shareId" element={<ChatPage />} />
-                <Route path="/p/:publicId" element={<ChatPage />} />
+                <Route path="/" element={<ChatPage onRequestSignUp={() => { setShowSignInModal(false); setShowSignUpModal(true); }} onRequestSignIn={() => { setShowSignUpModal(false); setShowSignInModal(true); }} />} />
+                <Route path="/chat/:chatId" element={<ChatPage onRequestSignUp={() => { setShowSignInModal(false); setShowSignUpModal(true); }} onRequestSignIn={() => { setShowSignUpModal(false); setShowSignInModal(true); }} />} />
+                <Route path="/s/:shareId" element={<ChatPage onRequestSignUp={() => { setShowSignInModal(false); setShowSignUpModal(true); }} onRequestSignIn={() => { setShowSignUpModal(false); setShowSignInModal(true); }} />} />
+                <Route path="/p/:publicId" element={<ChatPage onRequestSignUp={() => { setShowSignInModal(false); setShowSignUpModal(true); }} onRequestSignIn={() => { setShowSignUpModal(false); setShowSignInModal(true); }} />} />
               </Routes>
             </main>
             
