@@ -1813,7 +1813,10 @@ export function ChatInterface({
         }}
         chats={allChats}
         currentChatId={currentChatId}
-        onSelectChat={setCurrentChatId}
+        onSelectChat={(id) => {
+          userSelectedChatAtRef.current = Date.now();
+          setCurrentChatId(id);
+        }}
         onNewChat={handleNewChat}
         onDeleteLocalChat={(chatId) => {
           setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
