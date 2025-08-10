@@ -97,11 +97,11 @@ export default function App() {
                     <SignOutButton />
                   </Authenticated>
                   <Unauthenticated>
-                    <button onClick={() => { setShowSignInModal(false); setShowSignUpModal(true); }} className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap">
+                    <button onClick={() => { setShowSignInModal(false); setShowSignUpModal(true); }} className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap dark:font-mono">
                       <span className="hidden sm:inline">Sign Up Free</span>
                       <span className="sm:hidden">Sign Up</span>
                     </button>
-                    <button onClick={() => { setShowSignUpModal(false); setShowSignInModal(true); }} className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap">
+                    <button onClick={() => { setShowSignUpModal(false); setShowSignInModal(true); }} className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap dark:font-mono">
                       Sign In
                     </button>
                   </Unauthenticated>

@@ -151,10 +151,18 @@
       "Source Code Pro", monospace !important;
   }
 
-  /* Buttons and UI elements use Inter for consistency */
-  button,
-  select {
+  /* Buttons and selects: Inter in light mode, mono in dark mode (inherit) */
+  html:not(.dark) button,
+  html:not(.dark) select {
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+  }
+
+  html.dark button,
+  html.dark select {
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace !important;
     font-size: 16px;
   }
 
