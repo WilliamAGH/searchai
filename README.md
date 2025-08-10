@@ -72,6 +72,8 @@ Notes:
 
 - Keep each environment’s `VITE_CONVEX_URL` aligned with the Convex deployment it should talk to. Do not reuse the same URL across dev/staging/prod.
 - After changing frontend env files, rebuild the app. After changing Convex runtime envs (via `npx convex env set`), re-deploy functions.
+- Before significant schema changes:
+  - Pull the latest schema: `npx convex schema pull`
 
 ### 3. Set Convex Environment Variables
 
@@ -305,7 +307,9 @@ npm test
 
 ### Playwright Smoke Test
 
-- Install dependencies once: `npm i -D @playwright/test` then `npx playwright install` to download browsers.
+- Install dependencies once: `npm i -D @playwright/test` then:
+  - macOS/Windows: `npx playwright install`
+  - Linux/CI: `npx playwright install --with-deps`
 - Serve the built app on <http://localhost:4173> via `npm run preview` (the Playwright config handles this automatically via `webServer`).
 - Run manually: `npx playwright test -g smoke --reporter=line` or `npm run test:smoke`.
 - The Husky pre-push hook runs this smoke test and fails the push if there are console errors or failed network requests on the home page.
