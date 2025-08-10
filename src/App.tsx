@@ -7,7 +7,7 @@
  * - Conditional rendering for auth/unauth users
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Authenticated, Unauthenticated } from "convex/react";
 import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "sonner";
@@ -31,12 +31,14 @@ import { SignUpModal } from "./components/SignUpModal";
  * - Controls sidebar visibility
  * - Handles navigation to home
  */
-const ChatPage = ({
-  onRequestSignUp,
-  onRequestSignIn,
-}: {
+type ChatPageProps = {
   onRequestSignUp: () => void;
   onRequestSignIn: () => void;
+};
+
+const ChatPage: React.FC<ChatPageProps> = ({
+  onRequestSignUp,
+  onRequestSignIn,
 }) => {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
@@ -45,9 +47,13 @@ const ChatPage = ({
 
   // Set per-route canonical and url metas
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (typeof window === "undefined") return;
     const canonicalHref =
       window.location.origin + location.pathname + (location.search || "");
-    let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    let link = document.querySelector(
+      'link[rel="canonical"]',
+    ) as HTMLLinkElement | null;
     if (!link) {
       link = document.createElement("link");
       link.setAttribute("rel", "canonical");
@@ -56,13 +62,13 @@ const ChatPage = ({
     link.href = canonicalHref;
 
     // Best-effort update for sharing metas
-    const og = document.querySelector<HTMLMetaElement>(
+    const og = document.querySelector(
       'meta[property="og:url"]',
-    );
+    ) as HTMLMetaElement | null;
     if (og) og.setAttribute("content", canonicalHref);
-    const tw = document.querySelector<HTMLMetaElement>(
+    const tw = document.querySelector(
       'meta[name="twitter:url"]',
-    );
+    ) as HTMLMetaElement | null;
     if (tw) tw.setAttribute("content", canonicalHref);
   }, [location.pathname, location.search]);
 
@@ -99,6 +105,16 @@ const ChatPage = ({
 export default function App() {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
+
+  const openSignUp = useCallback(() => {
+    setShowSignInModal(false);
+    setShowSignUpModal(true);
+  }, []);
+
+  const openSignIn = useCallback(() => {
+    setShowSignUpModal(false);
+    setShowSignInModal(true);
+  }, []);
 
   // Navigating home via <Link /> avoids full-page reloads in the SPA
 
@@ -142,20 +158,14 @@ export default function App() {
                   </Authenticated>
                   <Unauthenticated>
                     <button
-                      onClick={() => {
-                        setShowSignInModal(false);
-                        setShowSignUpModal(true);
-                      }}
+                      onClick={openSignUp}
                       className="px-3 sm:px-4 py-2 text-sm sm:text-base font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap dark:font-mono"
                     >
                       <span className="hidden sm:inline">Sign Up Free</span>
                       <span className="sm:hidden">Sign Up</span>
                     </button>
                     <button
-                      onClick={() => {
-                        setShowSignUpModal(false);
-                        setShowSignInModal(true);
-                      }}
+                      onClick={openSignIn}
                       className="px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap dark:font-mono"
                     >
                       Sign In
@@ -172,14 +182,8 @@ export default function App() {
                   path="/"
                   element={
                     <ChatPage
-                      onRequestSignUp={() => {
-                        setShowSignInModal(false);
-                        setShowSignUpModal(true);
-                      }}
-                      onRequestSignIn={() => {
-                        setShowSignUpModal(false);
-                        setShowSignInModal(true);
-                      }}
+                      onRequestSignUp={openSignUp}
+                      onRequestSignIn={openSignIn}
                     />
                   }
                 />
@@ -187,14 +191,8 @@ export default function App() {
                   path="/chat/:chatId"
                   element={
                     <ChatPage
-                      onRequestSignUp={() => {
-                        setShowSignInModal(false);
-                        setShowSignUpModal(true);
-                      }}
-                      onRequestSignIn={() => {
-                        setShowSignUpModal(false);
-                        setShowSignInModal(true);
-                      }}
+                      onRequestSignUp={openSignUp}
+                      onRequestSignIn={openSignIn}
                     />
                   }
                 />
@@ -202,14 +200,8 @@ export default function App() {
                   path="/s/:shareId"
                   element={
                     <ChatPage
-                      onRequestSignUp={() => {
-                        setShowSignInModal(false);
-                        setShowSignUpModal(true);
-                      }}
-                      onRequestSignIn={() => {
-                        setShowSignUpModal(false);
-                        setShowSignInModal(true);
-                      }}
+                      onRequestSignUp={openSignUp}
+                      onRequestSignIn={openSignIn}
                     />
                   }
                 />
@@ -217,14 +209,8 @@ export default function App() {
                   path="/p/:publicId"
                   element={
                     <ChatPage
-                      onRequestSignUp={() => {
-                        setShowSignInModal(false);
-                        setShowSignUpModal(true);
-                      }}
-                      onRequestSignIn={() => {
-                        setShowSignUpModal(false);
-                        setShowSignInModal(true);
-                      }}
+                      onRequestSignUp={openSignUp}
+                      onRequestSignIn={openSignIn}
                     />
                   }
                 />
