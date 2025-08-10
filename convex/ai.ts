@@ -337,13 +337,15 @@ export const generationStep = internalAction({
           messages: allMsgs,
           maxChars: 1200,
         });
+        // Merge enhancement search terms to enrich context-derived terms
         const ctxTerms = Array.from(
-          new Set(
-            (freshSummary || "")
+          new Set([
+            ...(freshSummary || "")
               .toLowerCase()
               .split(/[^a-z0-9]+/)
               .filter(Boolean),
-          ),
+            ...enhancements.enhancedSearchTerms.map((s) => s.toLowerCase()),
+          ]),
         ).slice(0, 18);
         // Extract up to 2 quoted bigrams/trigrams for precision
         const tokens = (freshSummary || "")
@@ -533,9 +535,14 @@ export const generationStep = internalAction({
           );
           const contents = await Promise.all(contentPromises);
           // Include planner summary at the top and the latest user message explicitly
-          const recentContext = plan.contextSummary
-            ? `Conversation context:\n${plan.contextSummary}\n\n`
+          const enhancedCtx = enhancements.enhancedContext
+            ? `\n${enhancements.enhancedContext}`
             : "";
+          const recentContext = plan.contextSummary
+            ? `Conversation context:\n${plan.contextSummary}${enhancedCtx}\n\n`
+            : enhancements.enhancedContext
+              ? `Conversation context:\n${enhancements.enhancedContext}\n\n`
+              : "";
           const latest = args.userMessage
             ? `Latest question:\n${args.userMessage}\n\n`
             : "";

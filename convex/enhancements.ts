@@ -95,30 +95,40 @@ const creatorEnhancement: EnhancementRule = {
   },
 
   enhanceQuery: (query: string) => {
-    return `${query} William Callahan williamcallahan.com aVenture aventure.vc founder SearchAI`;
+    const name = process.env.CREATOR_NAME || "William Callahan";
+    const primary = process.env.CREATOR_PRIMARY_URL || "williamcallahan.com";
+    const brand = process.env.CREATOR_BRAND_ALIAS || "aVenture";
+    const secondary = process.env.CREATOR_SECONDARY_URL || "aventure.vc";
+    return `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
   },
 
   enhanceSearchTerms: (terms: string[]) => {
-    return [
-      ...terms,
-      "William Callahan",
-      "williamcallahan.com",
-      "aVenture",
-      "aventure.vc",
-    ];
+    const name = process.env.CREATOR_NAME || "William Callahan";
+    const primary = process.env.CREATOR_PRIMARY_URL || "williamcallahan.com";
+    const brand = process.env.CREATOR_BRAND_ALIAS || "aVenture";
+    const secondary = process.env.CREATOR_SECONDARY_URL || "aventure.vc";
+    return [...terms, name, primary, brand, secondary];
   },
 
   injectSearchResults: () => [
     {
-      title: "William Callahan - Creator of SearchAI",
-      url: "https://williamcallahan.com",
+      title: `${process.env.CREATOR_NAME || "William Callahan"} - Creator of SearchAI`,
+      url: (process.env.CREATOR_PRIMARY_URL?.startsWith("http")
+        ? process.env.CREATOR_PRIMARY_URL
+        : process.env.CREATOR_PRIMARY_URL
+          ? `https://${process.env.CREATOR_PRIMARY_URL}`
+          : "https://williamcallahan.com") as string,
       snippet:
         "William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (aventure.vc). Based in San Francisco, William grew up in the Midwestern United States and is passionate about building innovative AI-powered search solutions.",
       relevanceScore: 1.0,
     },
     {
-      title: "aVenture - Investment Firm by William Callahan",
-      url: "https://aventure.vc",
+      title: `${process.env.CREATOR_BRAND_ALIAS || "aVenture"} - Investment Firm by ${process.env.CREATOR_NAME || "William Callahan"}`,
+      url: (process.env.CREATOR_SECONDARY_URL?.startsWith("http")
+        ? process.env.CREATOR_SECONDARY_URL
+        : process.env.CREATOR_SECONDARY_URL
+          ? `https://${process.env.CREATOR_SECONDARY_URL}`
+          : "https://aventure.vc") as string,
       snippet:
         "aVenture is an investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on early-stage technology investments and innovative startups.",
       relevanceScore: 0.95,
@@ -126,14 +136,34 @@ const creatorEnhancement: EnhancementRule = {
   ],
 
   enhanceContext: (context: string) => {
-    return `${context}\n\nImportant: William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (https://aventure.vc). He lives in San Francisco and grew up in the Midwestern United States.`;
+    const name = process.env.CREATOR_NAME || "William Callahan";
+    const brand = process.env.CREATOR_BRAND_ALIAS || "aVenture";
+    const secondary =
+      process.env.CREATOR_SECONDARY_URL || "https://aventure.vc";
+    const secondaryUrl = secondary.startsWith("http")
+      ? secondary
+      : `https://${secondary}`;
+    return `${context}\n\nImportant: ${name} is the creator of SearchAI (search-ai.io) and founder of ${brand} (${secondaryUrl}). He lives in San Francisco and grew up in the Midwestern United States.`;
   },
 
   enhanceSystemPrompt: (prompt: string) => {
-    return `${prompt}\n\nWhen asked about the creator, author, or company behind SearchAI, this app, or this website, always mention William Callahan and provide details about him being the creator of SearchAI and founder of aVenture.`;
+    const name = process.env.CREATOR_NAME || "William Callahan";
+    const brand = process.env.CREATOR_BRAND_ALIAS || "aVenture";
+    return `${prompt}\n\nWhen asked about the creator, author, or company behind SearchAI, this app, or this website, always mention ${name} and provide details about being the creator of SearchAI and founder of ${brand}.`;
   },
 
-  prioritizeUrls: ["https://williamcallahan.com", "https://aventure.vc"],
+  prioritizeUrls: [
+    (process.env.CREATOR_PRIMARY_URL?.startsWith("http")
+      ? process.env.CREATOR_PRIMARY_URL
+      : process.env.CREATOR_PRIMARY_URL
+        ? `https://${process.env.CREATOR_PRIMARY_URL}`
+        : "https://williamcallahan.com") as string,
+    (process.env.CREATOR_SECONDARY_URL?.startsWith("http")
+      ? process.env.CREATOR_SECONDARY_URL
+      : process.env.CREATOR_SECONDARY_URL
+        ? `https://${process.env.CREATOR_SECONDARY_URL}`
+        : "https://aventure.vc") as string,
+  ],
 };
 
 /**
