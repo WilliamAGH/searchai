@@ -229,14 +229,39 @@ export const planSearch = action({
 
     const recent: any[] = messages.slice(Math.max(0, messages.length - maxContext));
     const serialize = (s: string | undefined) => (s || "").replace(/\s+/g, " ").trim();
+    const tokenize = (t: string) => t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    const STOP = new Set([
+      'the','a','an','and','or','of','to','in','for','on','with','at','by','from','as','is','are','was','were','be','been','being','that','this','these','those','it','its','if','then','else','but','about','into','over','after','before','up','down','out','off','than','so','such','via'
+    ]);
+    const extractKeywords = (text: string, max = 6) => {
+      const freq = new Map<string, number>();
+      for (const tok of tokenize(text)) {
+        if (tok.length < 4) continue;
+        if (STOP.has(tok)) continue;
+        freq.set(tok, (freq.get(tok) || 0) + 1);
+      }
+      return Array.from(freq.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, max)
+        .map(([w]) => w);
+    };
+    const augmentQuery = (q: string, kws: string[]) => {
+      const base = serialize(q);
+      const words = new Set(tokenize(base));
+      const extras: string[] = [];
+      for (const k of kws) {
+        if (!words.has(k) && extras.length < 4) extras.push(k);
+      }
+      const combined = extras.length ? `${base} ${extras.join(' ')}` : base;
+      return combined.slice(0, 220);
+    };
 
     // Simple lexical overlap heuristic with last user message
     const last: any = recent.length > 0 ? recent[recent.length - 1] : undefined;
     const lastContent = serialize(last?.content);
     const newContent = serialize(args.newMessage);
-    const tokenize = (t: string) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
-    const a = tokenize(lastContent);
-    const b = tokenize(newContent);
+    const a = new Set(tokenize(lastContent));
+    const b = new Set(tokenize(newContent));
     const inter = new Set([...a].filter((x) => b.has(x)));
     const unionSize = new Set([...a, ...b]).size || 1;
     const jaccard = inter.size / unionSize;
@@ -346,15 +371,18 @@ export const planSearch = action({
         typeof (parsed as any).reasons === "string"
       ) {
         const plan = parsed as { shouldSearch: boolean; contextSummary: string; queries: string[]; suggestNewChat: boolean; decisionConfidence: number; reasons: string };
-        // Sanitize queries
-        const queries = Array.from(
-          new Set(
-            plan.queries
-              .map((q) => serialize(q))
-              .filter((q) => q.length > 0)
-              .slice(0, 6),
-          ),
-        );
+        // Sanitize then deterministically augment queries with context keywords
+        const baseList = Array.from(new Set(
+          plan.queries
+            .map((q) => serialize(q))
+            .filter((q) => q.length > 0)
+            .slice(0, 6)
+        ));
+        const keywordBag = extractKeywords(`${contextSummary} ${args.newMessage}`, 6);
+        const augmented = baseList.map((q) => augmentQuery(q, keywordBag));
+        // Ensure one query anchors on the exact new message + keywords
+        const anchor = augmentQuery(args.newMessage, keywordBag);
+        const queries = Array.from(new Set([anchor, ...augmented])).slice(0, 6);
         const finalPlan = {
           shouldSearch: plan.shouldSearch,
           contextSummary: serialize(plan.contextSummary).slice(0, 2000),

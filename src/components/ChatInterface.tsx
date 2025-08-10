@@ -427,12 +427,28 @@ export function ChatInterface({
                 logger.debug("Body:", { queryLength: message.length, maxResults: 5 });
 
 			const searchStartTime = Date.now();
+            // Build a context-aware query by appending a few keywords from recent history
+            const historyText = localMessages
+              .filter((m) => m.chatId === chatId)
+              .slice(-8)
+              .map((m) => (m.content || ''))
+              .join(' ');
+            const kw = (txt: string) => txt.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+            const STOP = new Set(['the','a','an','and','or','of','to','in','for','on','with','at','by','from','as','is','are','was','were','be','been','being','that','this','these','those','it','its','if','then','else','but','about','into','over','after','before','up','down','out','off','than','so','such','via']);
+            const freq = new Map<string, number>();
+            for (const t of kw(historyText + ' ' + message)) {
+              if (t.length < 4 || STOP.has(t)) continue;
+              freq.set(t, (freq.get(t) || 0) + 1);
+            }
+            const top = Array.from(freq.entries()).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([w])=>w);
+            const contextualQuery = `${message} ${top.join(' ')}`.trim().slice(0,220);
+
             const searchResponse = await fetch(searchUrl, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ query: message, maxResults: 5 }),
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: contextualQuery, maxResults: 5 }),
                 signal: abortControllerRef.current?.signal,
-			});
+            });
 			const searchDuration = Date.now() - searchStartTime;
 
 			logger.debug("🔍 SEARCH API RESPONSE:");
