@@ -73,7 +73,7 @@ const ChatPage: React.FC<ChatPageProps> = ({
   }, [location.pathname, location.search]);
 
   return (
-    <>
+    <React.Fragment>
       <Authenticated>
         <ChatInterface
           isAuthenticated={true}
@@ -98,7 +98,7 @@ const ChatPage: React.FC<ChatPageProps> = ({
           onRequestSignIn={onRequestSignIn}
         />
       </Unauthenticated>
-    </>
+    </React.Fragment>
   );
 };
 
