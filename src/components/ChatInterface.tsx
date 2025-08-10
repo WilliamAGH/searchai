@@ -193,8 +193,8 @@ export function ChatInterface({
   );
 
   // Only query Convex when authenticated and IDs are server-issued
-  const isServerChatId = (val?: string): val is Id<"chats"> =>
-    !!val && !val.startsWith("local_");
+  const looksServerId = (s?: string): s is Id<"chats"> =>
+    !!s && !s.startsWith("local_") && s.length > 10; // cheap sanity check
 
   const chats = useQuery(
     api.chats.getUserChats,
@@ -202,7 +202,7 @@ export function ChatInterface({
   );
   const chatByOpaqueId = useQuery(
     api.chats.getChatByOpaqueId,
-    isAuthenticated && isServerChatId(propChatId)
+    isAuthenticated && looksServerId(propChatId)
       ? { chatId: propChatId as Id<"chats"> }
       : "skip",
   );
@@ -387,6 +387,7 @@ export function ChatInterface({
     localChats,
   ]);
 
+  const hasSetInitialUrlRef = useRef(false);
   useEffect(() => {
     const chat = allChats.find((c) => c._id === currentChatId);
     if (chat) {
@@ -399,8 +400,12 @@ export function ChatInterface({
         path = `/chat/${chat._id}`;
       }
       if (path !== window.location.pathname) {
-        const method = window.history.state ? "pushState" : "replaceState";
-        (window.history as any)[method]({}, "", path);
+        if (!hasSetInitialUrlRef.current) {
+          window.history.replaceState({}, "", path);
+          hasSetInitialUrlRef.current = true;
+        } else {
+          window.history.pushState({}, "", path);
+        }
       }
     }
   }, [currentChatId, allChats]);
@@ -563,6 +568,14 @@ export function ChatInterface({
     const errorDetails: string[] = [];
 
     try {
+      // Create/replace abort controller for the full generation pipeline (search→scrape→AI)
+      if (abortControllerRef.current) {
+        try {
+          abortControllerRef.current.abort();
+        } catch {}
+      }
+      abortControllerRef.current = new AbortController();
+
       // Step 1: Search the web
       setSearchProgress({
         stage: "searching",
@@ -817,9 +830,6 @@ export function ChatInterface({
       };
 
       setLocalMessages((prev) => [...prev, assistantMessage]);
-
-      // Create new abort controller for this request
-      abortControllerRef.current = new AbortController();
 
       const aiStartTime = Date.now();
       const aiResponse = await fetch(aiUrl, {
@@ -1523,11 +1533,10 @@ export function ChatInterface({
     [isGenerating, draftAnalyzer],
   );
 
-  // Ensure Enter key works normally even when the follow-up banner is visible
-  // If the user decides to send, auto-dismiss any existing prompt and proceed
+  // Keep sendRef in sync with the latest handler (fixes post-create send)
   useEffect(() => {
-    // no-op placeholder to keep linter satisfied if needed later
-  }, []);
+    sendRef.current = handleSendMessage;
+  }, [handleSendMessage]);
 
   // Auto-create first chat if none exists and not on a chat URL
   useEffect(() => {
