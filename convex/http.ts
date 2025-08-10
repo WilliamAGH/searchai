@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { httpRouter } from "convex/server";
 import { api } from "./_generated/api";
+import { applyEnhancements, sortResultsWithPriority } from "./enhancements";
 import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
 
@@ -211,14 +212,46 @@ http.route({
     );
 
     try {
+      // Apply universal enhancements to anonymous search queries
+      const enh = applyEnhancements(String(query), {
+        enhanceQuery: true,
+        enhanceSearchTerms: true,
+        injectSearchResults: true,
+        enhanceContext: true,
+        enhanceSystemPrompt: true,
+      });
+
+      const enhancedQuery = enh.enhancedQuery || String(query);
+      const prioritizedUrls = enh.prioritizedUrls || [];
+
       const result = await ctx.runAction(api.search.searchWeb, {
-        query,
+        query: enhancedQuery,
         maxResults: maxResults || 5,
       });
 
-      dlog("🔍 SEARCH RESULT:", JSON.stringify(result, null, 2));
+      // Inject any enhancement-provided results at the front
+      let mergedResults = Array.isArray(result.results)
+        ? [...result.results]
+        : [];
+      if (enh.injectedResults && enh.injectedResults.length > 0) {
+        mergedResults.unshift(...enh.injectedResults);
+      }
+      // If prioritization hints exist, sort with priority
+      if (prioritizedUrls.length > 0 && mergedResults.length > 1) {
+        mergedResults = sortResultsWithPriority(mergedResults, prioritizedUrls);
+      }
 
-      return corsResponse(JSON.stringify(result));
+      const enhancedResult = {
+        ...result,
+        results: mergedResults,
+        hasRealResults:
+          result.hasRealResults || (mergedResults?.length ?? 0) > 0,
+        // Surface matched rules for debugging in dev if needed (non-breaking)
+      } as const;
+
+      dlog("🔍 SEARCH RESULT:", JSON.stringify(enhancedResult, null, 2));
+
+      return corsResponse(JSON.stringify(enhancedResult));
     } catch (error) {
       console.error("❌ SEARCH API ERROR:", error);
 
@@ -337,6 +370,33 @@ http.route({
       "- CONVEX_OPENAI_BASE_URL:",
       process.env.CONVEX_OPENAI_BASE_URL ? "SET" : "NOT SET",
     );
+
+    // Apply universal enhancements to anonymous AI generation as well
+    const enh = applyEnhancements(String(message || ""), {
+      enhanceQuery: false,
+      enhanceSearchTerms: false,
+      injectSearchResults: false,
+      enhanceContext: true,
+      enhanceSystemPrompt: true,
+      enhanceResponse: true, // Enable response transformations
+    });
+    const enhancedSystemPromptAddition = enh.enhancedSystemPrompt || "";
+    const enhancedContextAddition = enh.enhancedContext || "";
+
+    // Merge enhancement additions into provided system prompt
+    let effectiveSystemPrompt = String(
+      systemPrompt || "You are a helpful AI assistant.",
+    );
+    if (enhancedSystemPromptAddition) {
+      effectiveSystemPrompt += "\n\n" + enhancedSystemPromptAddition;
+    }
+    if (enhancedContextAddition) {
+      // Encourage bracketed domain citations for anonymous as well
+      effectiveSystemPrompt +=
+        "\n\nUse the following additional context when relevant. When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim." +
+        "\n\n" +
+        enhancedContextAddition;
+    }
 
     // Check if OpenRouter API key is available
     const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -467,7 +527,7 @@ http.route({
       const messages = [
         {
           role: "system",
-          content: `${systemPrompt}\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.`,
+          content: `${effectiveSystemPrompt}\n\nIMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.`,
         },
         ...(chatHistory || []),
         { role: "user", content: message },
@@ -601,6 +661,7 @@ http.route({
               }
             };
 
+            let fullResponse = "";
             try {
               while (isStreamActive) {
                 const { done, value } = await reader.read();
@@ -647,9 +708,12 @@ http.route({
                     try {
                       chunkCount++;
                       const chunk = JSON.parse(data);
+                      const chunkContent =
+                        chunk.choices?.[0]?.delta?.content || "";
+                      fullResponse += chunkContent;
                       const streamData = {
                         type: "chunk",
-                        content: chunk.choices?.[0]?.delta?.content || "",
+                        content: chunkContent,
                         thinking: chunk.choices?.[0]?.delta?.reasoning || "",
                         searchResults,
                         sources,
@@ -673,6 +737,35 @@ http.route({
                       });
                     }
                   }
+                }
+              }
+              // Apply response transformations after streaming completes
+              if (
+                fullResponse &&
+                enh.responseTransformers &&
+                enh.responseTransformers.length > 0
+              ) {
+                let transformedResponse = fullResponse;
+                for (const transform of enh.responseTransformers) {
+                  try {
+                    transformedResponse = transform(transformedResponse);
+                  } catch {}
+                }
+                // Send transformation as a final update if content changed
+                if (transformedResponse !== fullResponse) {
+                  const transformData = {
+                    type: "transformation",
+                    content: transformedResponse.slice(fullResponse.length),
+                    searchResults,
+                    sources,
+                    provider: "openrouter",
+                    model: "google/gemini-2.5-flash",
+                  };
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify(transformData)}\n\n`,
+                    ),
+                  );
                 }
               }
               // Normal completion
