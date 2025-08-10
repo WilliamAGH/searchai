@@ -603,7 +603,7 @@ export const generationStep = internalAction({
     }
 
     if (hasRealResults && searchContext) {
-      systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant.\n\n`;
+      systemPrompt += `Use the following search results to inform your response. Cite sources naturally when relevant. IMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\n`;
       systemPrompt += `## Conversation + Results Context\n${searchContext}\n\n`;
       systemPrompt += `## Search Metadata:\n`;
       searchResults
