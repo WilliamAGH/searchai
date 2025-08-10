@@ -487,7 +487,7 @@ export function applyEnhancements(
     }
 
     if (options.enhanceSearchTerms && rule.enhanceSearchTerms) {
-      const terms = rule.enhanceSearchTerms([]);
+      const terms = rule.enhanceSearchTerms(result.enhancedSearchTerms);
       result.enhancedSearchTerms.push(...terms);
     }
 
@@ -528,7 +528,22 @@ export function shouldPrioritizeUrl(
   url: string,
   prioritizedUrls: string[],
 ): boolean {
-  return prioritizedUrls.some((prioritized) => url.includes(prioritized));
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    return prioritizedUrls.some((p) => {
+      try {
+        const pu = new URL(p.startsWith("http") ? p : `https://${p}`);
+        const phost = pu.hostname.toLowerCase().replace(/^www\./, "");
+        return host === phost || u.origin === pu.origin;
+      } catch {
+        // Fallback to suffix match for non-URL inputs (e.g., domains)
+        return host.endsWith(p.toLowerCase().replace(/^www\./, ""));
+      }
+    });
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -537,7 +552,7 @@ export function shouldPrioritizeUrl(
 export function sortResultsWithPriority<
   T extends { url: string; relevanceScore?: number },
 >(results: T[], prioritizedUrls: string[]): T[] {
-  return results.sort((a, b) => {
+  return [...results].sort((a, b) => {
     const aPriority = shouldPrioritizeUrl(a.url, prioritizedUrls);
     const bPriority = shouldPrioritizeUrl(b.url, prioritizedUrls);
 
