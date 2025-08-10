@@ -233,9 +233,8 @@ export default function App() {
 
             <Toaster
               position="top-center"
-              // Work around a Sonner runtime TDZ issue in some bundlers/browsers
-              // by providing explicit icons so Sonner doesn't reference its
-              // internal SuccessIcon/InfoIcon/etc. before initialization.
+              // Provide explicit icons to avoid Sonner referencing its internal
+              // icon components before initialization in some bundlers.
               icons={{
                 success: (
                   <svg
