@@ -339,6 +339,28 @@ export function MessageList({
       ref={scrollContainerRef}
       className="flex-1 overflow-y-auto relative overscroll-contain"
     >
+      {/* Mobile menu button (always available on mobile) */}
+      <button
+        onClick={onToggleSidebar}
+        className="fixed left-3 top-3 z-20 lg:hidden p-2 rounded-lg bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 shadow-sm backdrop-blur touch-manipulation"
+        aria-label="Open chat menu"
+        title="Open chat menu"
+        type="button"
+      >
+        <svg
+          className="w-6 h-6 text-gray-800 dark:text-gray-200"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 6h16M4 12h16M4 18h16"
+          />
+        </svg>
+      </button>
       {/* Scroll to bottom button */}
       {userHasScrolled && messages.length > 0 && (
         <button

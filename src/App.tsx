@@ -31,13 +31,12 @@ import { SignUpModal } from "./components/SignUpModal";
  * - Controls sidebar visibility
  * - Handles navigation to home
  */
-const ChatPage = ({
-  onRequestSignUp,
-  onRequestSignIn,
-}: {
+interface ChatPageProps {
   onRequestSignUp: () => void;
   onRequestSignIn: () => void;
-}) => {
+}
+
+function ChatPage({ onRequestSignUp, onRequestSignIn }: ChatPageProps) {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -98,7 +97,7 @@ const ChatPage = ({
       </Unauthenticated>
     </>
   );
-};
+}
 
 export default function App() {
   const [showSignInModal, setShowSignInModal] = useState(false);
