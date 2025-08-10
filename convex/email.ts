@@ -10,7 +10,7 @@ export const sendEmail = action({
     html: v.string(),
     from: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     const mailpitHost = process.env.MAILPIT_HOST;
     const apiAuth = process.env.MP_SEND_API_AUTH;
 
