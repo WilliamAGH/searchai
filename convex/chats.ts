@@ -13,7 +13,11 @@ import { api } from "./_generated/api";
 
 // Shared summarization util (pure; can be imported by other Convex files)
 export function buildContextSummary(params: {
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content?: string; timestamp?: number }>;
+  messages: Array<{
+    role: "user" | "assistant" | "system";
+    content?: string;
+    timestamp?: number;
+  }>;
   rollingSummary?: string;
   maxChars?: number;
 }): string {
@@ -22,8 +26,14 @@ export function buildContextSummary(params: {
   const recent = messages.slice(-14); // cap to last 14 turns for cost
 
   // Collect last 2 user turns verbatim (truncated), then last assistant, then compact older
-  const lastUsers = [...recent].reverse().filter(m => m.role === 'user').slice(0, 2).reverse();
-  const lastAssistant = [...recent].reverse().find(m => m.role === 'assistant');
+  const lastUsers = [...recent]
+    .reverse()
+    .filter((m) => m.role === "user")
+    .slice(0, 2)
+    .reverse();
+  const lastAssistant = [...recent]
+    .reverse()
+    .find((m) => m.role === "assistant");
 
   const lines: string[] = [];
   if (rollingSummary) {
@@ -42,7 +52,7 @@ export function buildContextSummary(params: {
   for (const m of recent) {
     const txt = sanitize(m.content);
     if (!txt) continue;
-    const line = `${m.role === 'assistant' ? 'Assistant' : m.role === 'user' ? 'User' : 'System'}: ${txt.slice(0, 220)}`;
+    const line = `${m.role === "assistant" ? "Assistant" : m.role === "user" ? "User" : "System"}: ${txt.slice(0, 220)}`;
     if (!included.has(line)) {
       lines.push(line);
     }
@@ -69,28 +79,28 @@ function generateOpaqueId(): string {
  */
 
 export const createChat = mutation({
-	args: {
-		title: v.string(),
-	},
+  args: {
+    title: v.string(),
+  },
   returns: v.id("chats"),
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const now = Date.now();
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const now = Date.now();
 
     // Generate URL-safe opaque IDs without Node.js built-ins (V8 runtime safe)
     const shareId = generateOpaqueId();
     const publicId = generateOpaqueId();
 
     return await ctx.db.insert("chats", {
-			title: args.title,
-			userId: userId || undefined,
-			shareId,
-			publicId,
-			privacy: "private",
-			createdAt: now,
-			updatedAt: now,
-		});
-	},
+      title: args.title,
+      userId: userId || undefined,
+      shareId,
+      publicId,
+      privacy: "private",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
 });
 
 /**
@@ -100,20 +110,20 @@ export const createChat = mutation({
  * @returns Array of user's chats
  */
 export const getUserChats = query({
-	args: {},
+  args: {},
   returns: v.array(v.any()),
-	handler: async (ctx) => {
-		const userId = await getAuthUserId(ctx);
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
 
-		// Return empty array for unauthenticated users - they'll use local storage
-		if (!userId) return [];
+    // Return empty array for unauthenticated users - they'll use local storage
+    if (!userId) return [];
 
-		return await ctx.db
-			.query("chats")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
-			.order("desc")
-			.collect();
-	},
+    return await ctx.db
+      .query("chats")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .collect();
+  },
 });
 
 /**
@@ -124,19 +134,19 @@ export const getUserChats = query({
  * @returns Chat or null
  */
 export const getChatById = query({
-	args: { chatId: v.id("chats") },
+  args: { chatId: v.id("chats") },
   returns: v.union(v.any(), v.null()),
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const chat = await ctx.db.get(args.chatId);
 
-		if (!chat) return null;
+    if (!chat) return null;
 
-		// Allow access to chats without userId (anonymous chats) or user's own chats
-		if (chat.userId && chat.userId !== userId) return null;
+    // Allow access to chats without userId (anonymous chats) or user's own chats
+    if (chat.userId && chat.userId !== userId) return null;
 
     return chat;
- },
+  },
 });
 
 export const getChatByOpaqueId = query({
@@ -163,43 +173,43 @@ export const getChatByOpaqueId = query({
  * @returns Chat or null
  */
 export const getChatByShareId = query({
-	args: { shareId: v.string() },
+  args: { shareId: v.string() },
   returns: v.union(v.any(), v.null()),
-	handler: async (ctx, args) => {
-		const chat = await ctx.db
-			.query("chats")
-			.withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
       .unique();
 
-		if (!chat) return null;
+    if (!chat) return null;
 
-		// Only return shared or public chats
-		if (chat.privacy !== "shared" && chat.privacy !== "public") {
-			const userId = await getAuthUserId(ctx);
-			if (chat.userId !== userId) return null;
-		}
+    // Only return shared or public chats
+    if (chat.privacy !== "shared" && chat.privacy !== "public") {
+      const userId = await getAuthUserId(ctx);
+      if (chat.userId !== userId) return null;
+    }
 
-		return chat;
-	},
+    return chat;
+  },
 });
 
 export const getChatByPublicId = query({
-	args: { publicId: v.string() },
+  args: { publicId: v.string() },
   returns: v.union(v.any(), v.null()),
-	handler: async (ctx, args) => {
-		const chat = await ctx.db
-			.query("chats")
-			.withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
-			.unique();
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
+      .unique();
 
-		if (!chat) return null;
+    if (!chat) return null;
 
-		if (chat.privacy !== "public") {
-			return null;
-		}
+    if (chat.privacy !== "public") {
+      return null;
+    }
 
-		return chat;
-	},
+    return chat;
+  },
 });
 
 /**
@@ -210,23 +220,23 @@ export const getChatByPublicId = query({
  * @returns Array of messages
  */
 export const getChatMessages = query({
-	args: { chatId: v.id("chats") },
+  args: { chatId: v.id("chats") },
   returns: v.array(v.any()),
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const chat = await ctx.db.get(args.chatId);
 
-		if (!chat) return [];
+    if (!chat) return [];
 
-		// Allow access to chats without userId (anonymous chats) or user's own chats
-		if (chat.userId && chat.userId !== userId) return [];
+    // Allow access to chats without userId (anonymous chats) or user's own chats
+    if (chat.userId && chat.userId !== userId) return [];
 
-		return await ctx.db
-			.query("messages")
-			.withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-			.order("asc")
-			.collect();
-	},
+    return await ctx.db
+      .query("messages")
+      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+      .order("asc")
+      .collect();
+  },
 });
 
 /**
@@ -237,23 +247,23 @@ export const getChatMessages = query({
  * @param title - New title
  */
 export const updateChatTitle = mutation({
-	args: {
-		chatId: v.id("chats"),
-		title: v.string(),
-	},
+  args: {
+    chatId: v.id("chats"),
+    title: v.string(),
+  },
   returns: v.null(),
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const chat = await ctx.db.get(args.chatId);
 
-		if (!chat) throw new Error("Chat not found");
-		if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+    if (!chat) throw new Error("Chat not found");
+    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
-		await ctx.db.patch(args.chatId, {
-			title: args.title,
-			updatedAt: Date.now(),
-		});
-	},
+    await ctx.db.patch(args.chatId, {
+      title: args.title,
+      updatedAt: Date.now(),
+    });
+  },
 });
 
 /**
@@ -301,7 +311,11 @@ export const summarizeRecent = query({
     }
     const ordered = buf.reverse();
     const chat = await ctx.db.get(args.chatId);
-    return buildContextSummary({ messages: ordered, rollingSummary: (chat as any)?.rollingSummary, maxChars: 1600 });
+    return buildContextSummary({
+      messages: ordered,
+      rollingSummary: (chat as any)?.rollingSummary,
+      maxChars: 1600,
+    });
   },
 });
 
@@ -316,14 +330,20 @@ export const summarizeRecentAction = action({
     const lim = Math.max(1, Math.min(args.limit ?? 14, 40));
     // Load messages via query to respect auth and avoid using ctx.db in actions
     const all: Array<{
-      role: 'user' | 'assistant' | 'system';
+      role: "user" | "assistant" | "system";
       content?: string;
       timestamp?: number;
     }> = await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId });
     const ordered = all.slice(-lim);
     // Break type circularity by annotating the query result as unknown
-    const chatResult: unknown = await ctx.runQuery(api.chats.getChatById, { chatId: args.chatId });
-    return buildContextSummary({ messages: ordered, rollingSummary: (chatResult as any)?.rollingSummary, maxChars: 1600 });
+    const chatResult: unknown = await ctx.runQuery(api.chats.getChatById, {
+      chatId: args.chatId,
+    });
+    return buildContextSummary({
+      messages: ordered,
+      rollingSummary: (chatResult as any)?.rollingSummary,
+      maxChars: 1600,
+    });
   },
 });
 
@@ -335,23 +355,27 @@ export const summarizeRecentAction = action({
  * @param isPublic - Public visibility
  */
 export const updateChatPrivacy = mutation({
-	args: {
-		chatId: v.id("chats"),
-		privacy: v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
-	},
+  args: {
+    chatId: v.id("chats"),
+    privacy: v.union(
+      v.literal("private"),
+      v.literal("shared"),
+      v.literal("public"),
+    ),
+  },
   returns: v.null(),
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const chat = await ctx.db.get(args.chatId);
 
-		if (!chat) throw new Error("Chat not found");
-		if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+    if (!chat) throw new Error("Chat not found");
+    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
-		await ctx.db.patch(args.chatId, {
-			privacy: args.privacy,
-			updatedAt: Date.now(),
-		});
-	},
+    await ctx.db.patch(args.chatId, {
+      privacy: args.privacy,
+      updatedAt: Date.now(),
+    });
+  },
 });
 
 /**
@@ -361,25 +385,117 @@ export const updateChatPrivacy = mutation({
  * @param chatId - Chat database ID
  */
 export const deleteChat = mutation({
-	args: { chatId: v.id("chats") },
+  args: { chatId: v.id("chats") },
   returns: v.null(),
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const chat = await ctx.db.get(args.chatId);
 
-		if (!chat) throw new Error("Chat not found");
-		if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+    if (!chat) throw new Error("Chat not found");
+    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
-		// Delete all messages in the chat
-		const messages = await ctx.db
-			.query("messages")
-			.withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-			.collect();
+    // Delete all messages in the chat
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+      .collect();
 
-		for (const message of messages) {
-			await ctx.db.delete(message._id);
-		}
+    for (const message of messages) {
+      await ctx.db.delete(message._id);
+    }
 
-		await ctx.db.delete(args.chatId);
-	},
+    await ctx.db.delete(args.chatId);
+  },
+});
+
+/**
+ * Import locally stored chats/messages into the authenticated account
+ * - Creates chats for the current user
+ * - Replays messages preserving role/content/timestamps
+ * - Returns mapping from local IDs to newly created server chat IDs
+ */
+export const importLocalChats = mutation({
+  args: {
+    chats: v.array(
+      v.object({
+        localId: v.string(),
+        title: v.string(),
+        privacy: v.optional(
+          v.union(
+            v.literal("private"),
+            v.literal("shared"),
+            v.literal("public"),
+          ),
+        ),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        messages: v.array(
+          v.object({
+            role: v.union(v.literal("user"), v.literal("assistant")),
+            content: v.optional(v.string()),
+            timestamp: v.optional(v.number()),
+            // Optional metadata preserved when available
+            searchResults: v.optional(v.array(v.any())),
+            sources: v.optional(v.array(v.string())),
+            reasoning: v.optional(v.any()),
+            searchMethod: v.optional(
+              v.union(
+                v.literal("serp"),
+                v.literal("openrouter"),
+                v.literal("duckduckgo"),
+                v.literal("fallback"),
+              ),
+            ),
+            hasRealResults: v.optional(v.boolean()),
+          }),
+        ),
+      }),
+    ),
+  },
+  returns: v.array(v.object({ localId: v.string(), chatId: v.id("chats") })),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const mappings: Array<{ localId: string; chatId: Id<"chats"> }> = [] as any;
+
+    for (const ch of args.chats) {
+      const now = Date.now();
+      const shareId = generateOpaqueId();
+      const publicId = generateOpaqueId();
+
+      const chatId = await ctx.db.insert("chats", {
+        title: ch.title || "New Chat",
+        userId,
+        shareId,
+        publicId,
+        privacy: ch.privacy || "private",
+        createdAt: ch.createdAt || now,
+        updatedAt: ch.updatedAt || now,
+      });
+
+      // Insert messages in chronological order
+      const ordered = [...ch.messages].sort(
+        (a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0),
+      );
+      for (const m of ordered) {
+        await ctx.db.insert("messages", {
+          chatId,
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp ?? Date.now(),
+          // Preserve optional metadata when present
+          searchResults: m.searchResults as any,
+          sources: m.sources,
+          reasoning: m.reasoning as any,
+          searchMethod: m.searchMethod,
+          hasRealResults: m.hasRealResults,
+        });
+      }
+
+      mappings.push({ localId: ch.localId, chatId });
+    }
+
+    return mappings;
+  },
 });

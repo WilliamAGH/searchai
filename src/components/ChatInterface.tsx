@@ -224,6 +224,7 @@ export function ChatInterface({
 
   const createChat = useMutation(api.chats.createChat);
   const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
+  const importLocalChats = useMutation(api.chats.importLocalChats);
   const generateResponse = useAction(api.ai.generateStreamingResponse);
   const planSearch = useAction(api.search.planSearch);
   const recordClientMetric = useAction(api.search.recordClientMetric);
@@ -1542,6 +1543,63 @@ export function ChatInterface({
   }, [currentChatId, handleNewChat, propChatId, propShareId, propPublicId]);
 
   const canShare = currentMessages.length > 0 && !!currentChatId;
+
+  // Migrate any existing local chats/messages after sign-in (runs on every login if data exists)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!localChats || localChats.length === 0) return;
+
+    const run = async () => {
+      try {
+        const payload = localChats.map((chat) => ({
+          localId: chat._id,
+          title: chat.title || "New Chat",
+          privacy: (chat as any).privacy || "private",
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
+          messages: localMessages
+            .filter((m) => m.chatId === chat._id)
+            .map((m) => ({
+              role: m.role,
+              content: m.content,
+              timestamp: m.timestamp,
+              searchResults: m.searchResults,
+              sources: m.sources,
+              reasoning: m.reasoning,
+              searchMethod: m.searchMethod,
+              hasRealResults: m.hasRealResults,
+            })),
+        }));
+
+        if (payload.length === 0) return;
+
+        const mappings = await importLocalChats({ chats: payload });
+
+        // If currently viewing a local chat, switch to the imported server chat
+        if (typeof currentChatId === "string") {
+          const map = mappings.find((m: any) => m.localId === currentChatId);
+          if (map) {
+            setCurrentChatId(map.chatId);
+          }
+        }
+
+        // Clear local data after successful import
+        setLocalChats([]);
+        setLocalMessages([] as any);
+      } catch (e) {
+        console.warn("Local chat migration failed; preserving local data", e);
+      }
+    };
+
+    run();
+  }, [
+    isAuthenticated,
+    localChats,
+    localMessages,
+    importLocalChats,
+    setLocalChats,
+    setLocalMessages,
+  ]);
 
   // Swipe handlers for mobile
   const swipeHandlers = useSwipeable({
