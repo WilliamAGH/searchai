@@ -515,8 +515,6 @@ export function ChatInterface({
   // Deterministic post-create send flow (replaces setTimeout-based races)
   const pendingSendRef = useRef<string | null>(null);
   const awaitingNewChatRef = useRef<boolean>(false);
-  // Indirection to avoid TDZ on handleSendMessage (declared later)
-  const sendRef = useRef<null | ((m: string) => void)>(null);
   useEffect(() => {
     if (!awaitingNewChatRef.current) return;
     if (!currentChatId) return;
@@ -526,10 +524,8 @@ export function ChatInterface({
     awaitingNewChatRef.current = false;
     pendingSendRef.current = null;
     // Send into the newly created chat id (currentChatId is now set)
-    sendRef.current?.(msg);
-  }, [currentChatId]);
-
-  // ref updater will be added after handleSendMessage is defined
+    handleSendMessage(msg);
+  }, [currentChatId, handleSendMessage]);
 
   // Cleanup on unmount
   useEffect(() => {
