@@ -86,6 +86,7 @@ interface MessageListProps {
     currentUrl?: string;
   } | null;
   onDeleteLocalMessage?: (messageId: string) => void;
+  onRequestDeleteMessage?: (messageId: string) => void;
 }
 
 /**
@@ -105,6 +106,7 @@ export function MessageList({
   currentChat: _currentChat,
   searchProgress,
   onDeleteLocalMessage,
+  onRequestDeleteMessage,
 }: MessageListProps) {
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -505,14 +507,24 @@ export function MessageList({
                         onClick={async () => {
                           try {
                             if (
-                              String(message._id).startsWith("local_") ||
-                              String(message._id).startsWith("msg_")
-                            ) {
-                              onDeleteLocalMessage?.(String(message._id));
+                              !window.confirm(
+                                "Delete this message? This cannot be undone.",
+                              )
+                            )
+                              return;
+                            if (onRequestDeleteMessage) {
+                              onRequestDeleteMessage(String(message._id));
                             } else {
-                              await deleteMessage({
-                                messageId: message._id as any,
-                              });
+                              if (
+                                String(message._id).startsWith("local_") ||
+                                String(message._id).startsWith("msg_")
+                              ) {
+                                onDeleteLocalMessage?.(String(message._id));
+                              } else {
+                                await deleteMessage({
+                                  messageId: message._id as any,
+                                });
+                              }
                             }
                           } catch {}
                         }}
