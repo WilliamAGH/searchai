@@ -69,13 +69,8 @@ window.addEventListener('message', async (message) => {
     },
     chunkSizeWarningLimit: 600,
     sourcemap: true,
-    minify: "terser",
-    terserOptions: {
-      compress: {
-        drop_console: false,
-        drop_debugger: true,
-      },
-    },
+    // Use Vite's default esbuild minifier for better compatibility with React 19 and modern ESM.
+    // Custom Terser settings previously caused runtime regressions (TDZ errors) in production.
   },
   server: {
     proxy: {

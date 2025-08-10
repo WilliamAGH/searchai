@@ -1,6 +1,57 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/husky.sh"
 
+# Exit on unset and any error
 set -eu
 
-npm run typecheck && npx --no-install lint-staged
+echo "🔍 Running comprehensive pre-commit checks..."
+
+# 1. TypeScript type checking (catch type errors)
+echo "📝 TypeScript type check..."
+npm run typecheck
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript errors detected!"
+  exit 1
+fi
+
+# 2. Quick Vite build check (catches import/syntax errors early!)
+echo "🏗️ Quick build validation..."
+npm run build --silent > /tmp/build-check.log 2>&1
+BUILD_EXIT_CODE=$?
+if [ $BUILD_EXIT_CODE -ne 0 ]; then
+  echo "❌ Build failed! This would break deployment."
+  echo "📋 Build errors:"
+  tail -20 /tmp/build-check.log
+  exit 1
+fi
+
+# 3. Convex deployment validation (catch deployment issues!)
+echo "🚀 Validating Convex deployment..."
+# Use documented --typecheck=enable flag for strict checking
+npx --no-install convex dev --once --typecheck=enable > /tmp/convex-check.log 2>&1
+CONVEX_EXIT_CODE=$?
+if [ $CONVEX_EXIT_CODE -ne 0 ] || grep -E "(error|Error|failed|process\.env)" /tmp/convex-check.log > /dev/null; then
+  echo "❌ Convex deployment validation failed!"
+  echo "💡 Common issues to check:"
+  echo "   ✗ process.env usage in Convex functions (use hard-coded values)"
+  echo "   ✗ Type mismatches in function signatures"
+  echo "   ✗ Import errors or missing dependencies"
+  echo ""
+  echo "📋 Error details:"
+  grep -E "(error|Error|failed)" /tmp/convex-check.log | head -10
+  exit 1
+fi
+
+# 4. Lint staged files (auto-fix issues)
+echo "🧹 Linting staged files..."
+npx --no-install lint-staged
+
+# 5. Quick test run (ensure tests pass)
+echo "🧪 Running tests..."
+npm test --silent
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed! Fix tests before committing."
+  exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"

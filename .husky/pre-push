@@ -1,6 +1,86 @@
-#!/usr/bin/env sh
-. "$(dirname "$0")/_/husky.sh"
+# Exit on any error
+set -e
 
-set -eu
+echo "🚀 Running comprehensive pre-push validation..."
 
-npm run precommit:check
+# 1. Full production build (catches ALL issues!)
+echo "🏗️ Full production build validation..."
+npm run build > /tmp/full-build.log 2>&1
+BUILD_EXIT_CODE=$?
+if [ $BUILD_EXIT_CODE -ne 0 ]; then
+  echo "❌ Production build failed!"
+  echo "📋 Build errors:"
+  tail -30 /tmp/full-build.log
+  echo ""
+  echo "💡 Run 'npm run build' locally to debug"
+  exit 1
+fi
+
+# 2. Full TypeScript check (including Convex)
+echo "📝 Full TypeScript validation..."
+npx --no-install tsc -p . --noEmit --pretty false
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript errors in main project!"
+  exit 1
+fi
+
+npx --no-install tsc -p convex --noEmit --pretty false
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript errors in Convex functions!"
+  exit 1
+fi
+
+# 2. Convex deployment dry-run (CRITICAL - catches deployment failures!)
+echo "🔧 Testing Convex deployment..."
+# Use documented --typecheck=enable for strict validation
+npx convex dev --once --typecheck=enable > /tmp/convex-deploy.log 2>&1
+CONVEX_EXIT_CODE=$?
+if [ $CONVEX_EXIT_CODE -ne 0 ]; then
+  echo "❌ CRITICAL: Convex deployment would fail!"
+  echo ""
+  echo "📋 Deployment errors:"
+  cat /tmp/convex-deploy.log | grep -E "(error|Error|failed)" | head -20
+  echo ""
+  echo "💡 Fix these issues before pushing:"
+  echo "   1. Remove any process.env usage from Convex functions"
+  echo "   2. Fix type mismatches in function signatures"
+  echo "   3. Ensure all imports are valid"
+  echo "   4. Run 'npx convex dev --once --typecheck=enable' locally to debug"
+  exit 1
+fi
+
+# 3. Full test suite
+echo "🧪 Running full test suite..."
+npm test
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed!"
+  exit 1
+fi
+
+# 4. Build validation
+echo "🏗️ Validating production build..."
+npm run build --silent > /tmp/build.log 2>&1
+if [ $? -ne 0 ]; then
+  echo "❌ Build failed!"
+  echo "Check build errors:"
+  tail -20 /tmp/build.log
+  exit 1
+fi
+
+# 5. Check for common issues
+echo "🔍 Checking for common issues..."
+
+# Check for console.logs in production code
+if grep -r "console\.log" --include="*.ts" --include="*.tsx" convex/ src/ | grep -v "^//" | grep -v "tests/" > /dev/null; then
+  echo "⚠️  Warning: console.log statements found in production code"
+  echo "Consider removing these before deployment:"
+  grep -r "console\.log" --include="*.ts" --include="*.tsx" convex/ src/ | grep -v "^//" | grep -v "tests/" | head -5
+fi
+
+# Check for TODO comments
+TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX" --include="*.ts" --include="*.tsx" convex/ src/ | wc -l)
+if [ $TODO_COUNT -gt 0 ]; then
+  echo "📝 Note: $TODO_COUNT TODO/FIXME comments found"
+fi
+
+echo "✅ All pre-push checks passed! Safe to push."
