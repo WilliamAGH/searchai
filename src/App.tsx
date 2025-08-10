@@ -17,6 +17,7 @@ import {
   Route,
   useParams,
   useLocation,
+  Link,
 } from "react-router-dom";
 import { ChatInterface } from "./components/ChatInterface";
 import { ThemeProvider } from "./components/ThemeProvider";
@@ -99,9 +100,7 @@ export default function App() {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
 
-  const handleHomeClick = () => {
-    window.location.href = "/";
-  };
+  // Navigating home via <Link /> avoids full-page reloads in the SPA
 
   return (
     <ThemeProvider>
@@ -111,9 +110,8 @@ export default function App() {
             <header className="flex-shrink-0 sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[3.75rem] sm:h-16 flex items-center justify-between">
                 <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
-                  <button
-                    type="button"
-                    onClick={handleHomeClick}
+                  <Link
+                    to="/"
                     aria-label="Go home"
                     className="w-7 h-7 sm:w-9 sm:h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-md flex items-center justify-center hover:from-emerald-600 hover:to-teal-700 transition-colors"
                   >
@@ -130,7 +128,7 @@ export default function App() {
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                       />
                     </svg>
-                  </button>
+                  </Link>
                   <h1 className="text-xl sm:text-2xl font-semibold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent hover:from-emerald-600 hover:to-teal-600 dark:hover:from-emerald-400 dark:hover:to-teal-400 transition-all">
                     SearchAI
                   </h1>
