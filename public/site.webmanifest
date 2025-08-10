@@ -1,6 +1,13 @@
 {
   "name": "SearchAI",
   "short_name": "SearchAI",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
