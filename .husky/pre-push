@@ -7,12 +7,11 @@ echo "🚀 Running comprehensive pre-push validation..."
 
 # 1. Full production build (catches ALL issues!)
 echo "🏗️ Full production build validation..."
-npm run build > /tmp/full-build.log 2>&1
-BUILD_EXIT_CODE=$?
-if [ $BUILD_EXIT_CODE -ne 0 ]; then
+FULL_BUILD_LOG="$(mktemp -t full-build.XXXXXX.log)"
+if ! npm run build > "$FULL_BUILD_LOG" 2>&1; then
   echo "❌ Production build failed!"
   echo "📋 Build errors:"
-  tail -30 /tmp/full-build.log
+  tail -30 "$FULL_BUILD_LOG"
   echo ""
   echo "💡 Run 'npm run build' locally to debug"
   exit 1
@@ -20,26 +19,21 @@ fi
 
 # 2. Full TypeScript check (including Convex)
 echo "📝 Full TypeScript validation..."
-npx --no-install tsc -p . --noEmit --pretty false
-if [ $? -ne 0 ]; then
+if ! npx --no-install tsc -p . --noEmit --pretty false; then
   echo "❌ TypeScript errors in main project!"
   exit 1
 fi
 
-npx --no-install tsc -p convex --noEmit --pretty false
-if [ $? -ne 0 ]; then
+if ! npx --no-install tsc -p convex --noEmit --pretty false; then
   echo "❌ TypeScript errors in Convex functions!"
   exit 1
 fi
 
 # 2. Convex deployment dry-run (CRITICAL - catches deployment failures!)
 echo "🔧 Testing Convex deployment..."
+CONVEX_LOG="$(mktemp -t convex-deploy.XXXXXX.log)"
 # Use documented --typecheck=enable for strict validation
-set +e
-npx --no-install convex dev --once --typecheck=enable > /tmp/convex-deploy.log 2>&1
-CONVEX_EXIT_CODE=$?
-set -e
-if [ $CONVEX_EXIT_CODE -ne 0 ]; then
+if ! npx --no-install convex dev --once --typecheck=enable > "$CONVEX_LOG" 2>&1; then
   echo "❌ CRITICAL: Convex deployment would fail!"
   echo "📄 Log: /tmp/convex-deploy.log"
   echo "🗂️  Changed files in convex/ (staged):"
@@ -47,14 +41,14 @@ if [ $CONVEX_EXIT_CODE -ne 0 ]; then
   echo "🗂️  Changed files in convex/ (unstaged):"
   git diff --name-only -- convex 2>/dev/null | sed -n '1,50p' || true
   echo "--- First 80 lines ---"
-  sed -n '1,80p' /tmp/convex-deploy.log || true
+  sed -n '1,80p' "$CONVEX_LOG" || true
   echo "--- Last 60 lines ---"
-  tail -60 /tmp/convex-deploy.log
+  tail -60 "$CONVEX_LOG"
   echo "-------------------------------------"
   echo "🔎 Notable errors:"
-  grep -nE "(TS[0-9]+|TypeError|ReferenceError|SyntaxError|error:|Error:|failed|Failure|Exception)" /tmp/convex-deploy.log | head -n 25 || true
+  grep -niE "(TS[0-9]+|TypeError|ReferenceError|SyntaxError|error|failed|fatal|Failure|Exception)" "$CONVEX_LOG" | head -n 25 || true
   echo "🔎 File references:"
-  grep -nE "convex/[A-Za-z0-9_./-]+\.ts[:)]" /tmp/convex-deploy.log | head -n 15 || true
+  grep -nE "convex/[A-Za-z0-9_./-]+\.ts[:)]" "$CONVEX_LOG" | head -n 15 || true
   echo "💡 Fix these issues before pushing. Reproduce: npx convex dev --once --typecheck=enable"
   exit 1
 fi
@@ -71,29 +65,18 @@ if [ $TEST_EXIT -ne 0 ]; then
   exit 1
 fi
 
-# 4. Build validation
-echo "🏗️ Validating production build..."
-npm run build --silent > /tmp/build.log 2>&1
-if [ $? -ne 0 ]; then
-  echo "❌ Build failed!"
-  echo "Check build errors:"
-  tail -20 /tmp/build.log
-  exit 1
-fi
+# Removed duplicate build; Step 1 already validates production build.
 
 # 5. Playwright smoke test (fail on console errors)
 echo "🕵️ Smoke test: ensuring no console errors..."
 if npx --no-install playwright --version > /dev/null 2>&1; then
   # Run only the smoke test for speed. Playwright config starts a preview server.
-  set +e
-  npx --no-install playwright test -g smoke --reporter=line | tee /tmp/playwright-smoke.log
-  PW_EXIT=${PIPESTATUS[0]}
-  set -e
-  if [ ${PW_EXIT:-0} -ne 0 ]; then
+  PW_LOG="$(mktemp -t playwright-smoke.XXXXXX.log)"
+  if ! npx --no-install playwright test -g smoke --reporter=line > "$PW_LOG" 2>&1; then
     echo "❌ Smoke test failed (console errors or network failures)."
-    echo "📄 Log: /tmp/playwright-smoke.log"
+    echo "📄 Log: $PW_LOG"
     # Surface the key error lines
-    grep -nE "(ReferenceError|TypeError|Error: |pageerror|requestfailed)" /tmp/playwright-smoke.log | head -n 10 || true
+    grep -nE "(ReferenceError|TypeError|Error: |pageerror|requestfailed)" "$PW_LOG" | head -n 10 || true
     # Show available artifacts
     TRACE_ZIP=$(find test-results -name trace.zip -type f -print -quit 2>/dev/null || true)
     SCREENSHOT=$(find test-results -name 'test-failed-*.png' -type f -print -quit 2>/dev/null || true)
@@ -115,11 +98,13 @@ fi
 # 6. Check for common issues
 echo "🔍 Checking for common issues..."
 
-# Check for console.logs in production code
-if grep -r "console\.log" --include="*.ts" --include="*.tsx" convex/ src/ | grep -v "^//" | grep -v "tests/" > /dev/null; then
+# Check for console.logs in production code (ignore comments/tests/generated)
+if grep -R -nE '^\s*console\.log\(' --include="*.ts" --include="*.tsx" convex/ src/ \
+  | grep -vE '/(__tests__|tests|__mocks__|stories|_generated)/' > /dev/null; then
   echo "⚠️  Warning: console.log statements found in production code"
   echo "Consider removing these before deployment:"
-  grep -r "console\.log" --include="*.ts" --include="*.tsx" convex/ src/ | grep -v "^//" | grep -v "tests/" | head -5
+  grep -R -nE '^\s*console\.log\(' --include="*.ts" --include="*.tsx" convex/ src/ \
+    | grep -vE '/(__tests__|tests|__mocks__|stories|_generated)/' | head -5
 fi
 
 # Check for TODO comments
