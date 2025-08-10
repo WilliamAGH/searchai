@@ -151,10 +151,10 @@
       "Source Code Pro", monospace !important;
   }
 
-  /* Buttons and selects: Inter in light mode, mono in dark mode (inherit) */
+  /* Buttons and selects: match light mode body (serif) for consistency */
   html:not(.dark) button,
   html:not(.dark) select {
-    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
     font-size: 16px;
   }
 
