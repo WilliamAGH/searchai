@@ -389,7 +389,7 @@ export function ChatInterface({
     pendingSendRef.current = null;
     // Send into the newly created chat id (currentChatId is now set)
     handleSendMessage(msg);
-  }, [currentChatId]);
+  }, [currentChatId, handleSendMessage]);
 	
 	// Cleanup on unmount
 	useEffect(() => {
@@ -1192,9 +1192,7 @@ export function ChatInterface({
     setPendingMessage("");
 
     try {
-      // Create destination chat first
-      await handleNewChat();
-      // Fetch a compact server-side summary from previous chat id
+      // Snapshot the chat we want to summarize BEFORE creating a new one
       const prevChatId = currentChatId;
       let summary = '';
       try {
@@ -1219,6 +1217,7 @@ export function ChatInterface({
         pendingSendRef.current = composed;
         awaitingNewChatRef.current = true;
       }
+      // Create destination chat ONCE; effect will send composed into it
       await handleNewChat();
     } catch (e) {
       console.warn('New chat w/ summary failed', e);

@@ -104,6 +104,7 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
       {/* Modal */}
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm sm:max-w-md w-full mx-4 p-6 sm:p-8 border border-gray-200 dark:border-gray-700">
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           aria-label="Close modal"
@@ -130,6 +131,7 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
         <div className="w-full">
           <form
             className="flex flex-col gap-4"
+            aria-busy={submitting}
             onSubmit={async (e) => {
               e.preventDefault();
               setSubmitting(true);
@@ -139,8 +141,12 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
               try {
                 await signIn("password", formData);
                 onClose();
-              } catch (error: any) {
-                const msg = error?.message?.includes("Invalid password")
+              } catch (error: unknown) {
+                const message =
+                  typeof error === "object" && error && "message" in error && typeof (error as any).message === "string"
+                    ? (error as any).message as string
+                    : "";
+                const msg = message.includes("Invalid password")
                   ? "Invalid password. Please try again."
                   : "Could not sign up. Please check your details.";
                 toast.error(msg);
@@ -187,7 +193,7 @@ export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalPr
               </button>
             </div>
           </form>
-          {null}
+          
         </div>
         
         <div className="mt-6 text-center">

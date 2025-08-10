@@ -10,7 +10,7 @@ export const addMessage = internalMutation({
 		content: v.optional(v.string()),
 		isStreaming: v.optional(v.boolean()),
 		streamedContent: v.optional(v.string()),
-		thinking: v.optional(v.string()),
+        thinking: v.optional(v.union(v.string(), v.null())),
 		searchResults: v.optional(v.array(v.object({
 			title: v.string(),
 			url: v.string(),
@@ -129,7 +129,7 @@ export const updateMessage = internalMutation({
 		messageId: v.id("messages"),
 		content: v.optional(v.string()),
 		streamedContent: v.optional(v.string()),
-		thinking: v.optional(v.string()),
+        thinking: v.optional(v.union(v.string(), v.null())),
 		isStreaming: v.optional(v.boolean()),
 		searchResults: v.optional(v.array(v.object({
 			title: v.string(),

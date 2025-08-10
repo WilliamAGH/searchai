@@ -96,18 +96,40 @@ async function* streamOpenRouter(body: OpenRouterBody) {
 
 		console.log("✅ OpenRouter streaming started successfully");
 
-		try {
-			while (true) {
+        try {
+            while (true) {
 				const { done, value } = await reader.read();
 				if (done) {
-					console.log("🔄 OpenRouter streaming completed:", {
-						totalChunks: chunkCount,
-					});
-					break;
+                    // Flush remaining decoder state and process leftover buffer
+                    buffer += decoder.decode(new Uint8Array(0), { stream: false });
+                    const lines = buffer.split(/\r?\n/);
+                    buffer = "";
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            const data = line.slice(6);
+                            if (data === "[DONE]") {
+                                console.log("✅ OpenRouter streaming finished with [DONE]");
+                                return;
+                            }
+                            try {
+                                chunkCount++;
+                                const parsedData = JSON.parse(data);
+                                yield parsedData;
+                            } catch (e) {
+                                console.error("❌ Failed to parse stream chunk at EOF:", {
+                                    error: e instanceof Error ? e.message : "Unknown parsing error",
+                                    chunk: data,
+                                    chunkNumber: chunkCount,
+                                });
+                            }
+                        }
+                    }
+                    console.log("🔄 OpenRouter streaming completed:", { totalChunks: chunkCount });
+                    break;
 				}
 
-				buffer += decoder.decode(value, { stream: true });
-				const lines = buffer.split("\n");
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split(/\r?\n/);
 				buffer = lines.pop() || "";
 
 				for (const line of lines) {
@@ -159,12 +181,17 @@ export const generateStreamingResponse = action({
 		message: v.string(),
 	},
   returns: v.null(),
-	handler: async (ctx, args) => {
-		// 1. Add user message to chat
+    handler: async (ctx, args) => {
+        // Ignore empty or whitespace-only input
+        const trimmed = args.message.trim();
+        if (!trimmed) {
+            return null;
+        }
+        // 1. Add user message to chat
 		await ctx.runMutation(internal.messages.addMessage, {
 			chatId: args.chatId,
 			role: "user",
-			content: args.message,
+            content: trimmed,
 		});
 
 		// 2. Create a placeholder message for the assistant's response
@@ -179,10 +206,10 @@ export const generateStreamingResponse = action({
 		);
 
 		// 3. Start the generation process without blocking
-		await ctx.scheduler.runAfter(0, internal.ai.generationStep, {
+        await ctx.scheduler.runAfter(0, internal.ai.generationStep, {
 			chatId: args.chatId,
 			assistantMessageId,
-			userMessage: args.message,
+            userMessage: trimmed,
     });
     return null;
 	},
@@ -330,7 +357,7 @@ export const generationStep = internalAction({
           return s;
         };
         searchResults = Array.from(byUrl.values())
-          .map((r) => ({ ...r, relevanceScore: score(r as any) }))
+          .map((r) => ({ ...r, relevanceScore: score(r) }))
           .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
           .slice(0, 7);
 
@@ -378,13 +405,13 @@ export const generationStep = internalAction({
 		}
 
 		// 6. Fetch chat history for context - include ALL previous messages
-		const messages = await ctx.runQuery(api.chats.getChatMessages, {
-			chatId: args.chatId,
-		});
+        const messages: Array<{ _id: import("./_generated/dataModel").Id<"messages">; role: "user" | "assistant" | "system"; content?: string }> = await ctx.runQuery(api.chats.getChatMessages, {
+            chatId: args.chatId,
+        });
 		// Build full message history, excluding the current assistant message being generated
-		const messageHistory = messages
-			.filter((m: any) => m._id !== args.assistantMessageId)
-			.map((m: any) => ({
+        const messageHistory = messages
+            .filter((m) => m._id !== args.assistantMessageId)
+            .map((m) => ({
 				role: m.role,
 				content: m.content || "",
 			}));
@@ -502,11 +529,11 @@ export const generationStep = internalAction({
 		}
 
 		// 8. Finalize the assistant message
-		await ctx.runMutation(internal.messages.updateMessage, {
+        await ctx.runMutation(internal.messages.updateMessage, {
 			messageId: args.assistantMessageId,
 			content: responseContent,
 			isStreaming: false,
-			thinking: undefined, // Clear thinking state
+            thinking: null,      // Clear thinking state
 		});
 
 		// 9. Update rolling summary to reduce future planner tokens
