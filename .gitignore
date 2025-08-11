@@ -10,6 +10,7 @@ lerna-debug.log*
 trace.zip
 test-results
 coverage
+*.bak
 
 node_modules
 dist
