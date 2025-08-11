@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
@@ -49,24 +55,32 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.add(theme);
   }, [theme]);
 
-  const setTheme = async (newTheme: Theme) => {
-    // Update state immediately for instant UI response
-    setThemeState(newTheme);
-    localStorage.setItem("theme", newTheme);
+  const setTheme = React.useCallback(
+    async (newTheme: Theme) => {
+      // Update state immediately for instant UI response
+      setThemeState(newTheme);
+      localStorage.setItem("theme", newTheme);
 
-    // Only update user preferences if authenticated
-    if (isAuthenticated) {
-      try {
-        await updatePrefs({ theme: newTheme });
-      } catch (error) {
-        // Log error if it occurs for authenticated users
-        console.error("Failed to save theme preference:", error);
+      // Only update user preferences if authenticated
+      if (isAuthenticated) {
+        try {
+          await updatePrefs({ theme: newTheme });
+        } catch (error) {
+          // Log error if it occurs for authenticated users
+          console.error("Failed to save theme preference:", error);
+        }
       }
-    }
-  };
+    },
+    [isAuthenticated, updatePrefs],
+  );
+
+  const contextValue = useMemo(
+    () => ({ theme, setTheme, actualTheme: theme as Theme }),
+    [theme, setTheme],
+  );
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, actualTheme: theme }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );
