@@ -8,13 +8,23 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { logger } from "../lib/logger";
+import { copyToClipboard } from "../lib/clipboard";
 
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onShare: (privacy: "private" | "shared" | "public") => void;
+  onShare: (
+    privacy: "private" | "shared" | "public",
+  ) => Promise<{ shareId?: string; publicId?: string } | void>;
   shareUrl: string;
   privacy: "private" | "shared" | "public";
+  /** Optional machine-readable Markdown .txt URL */
+  llmTxtUrl?: string;
+  /** IDs for building LLM/export URLs when toggling */
+  shareId?: string;
+  publicId?: string;
+  /** Base URL for export endpoint, e.g., https://*.convex.site/api/exportChat */
+  exportBase?: string;
 }
 
 export function ShareModal({
@@ -23,9 +33,13 @@ export function ShareModal({
   onShare,
   shareUrl,
   privacy,
+  llmTxtUrl,
+  shareId,
+  publicId: _publicId,
+  exportBase,
 }: ShareModalProps) {
   const [selectedPrivacy, setSelectedPrivacy] = useState<
-    "private" | "shared" | "public"
+    "private" | "shared" | "public" | "llm"
   >(privacy);
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,27 +73,57 @@ export function ShareModal({
     }
   }, [isOpen]);
 
-  const handleShare = React.useCallback(() => {
-    onShare(selectedPrivacy);
+  const handleShare = React.useCallback(async () => {
+    // Map LLM to shared privacy when persisting
+    const effective = selectedPrivacy === "llm" ? "shared" : selectedPrivacy;
+    await onShare(effective as "private" | "shared" | "public");
   }, [onShare, selectedPrivacy]);
 
-  /**
-   * Copy URL to clipboard
-   * - Shows feedback for 2s
-   * - Handles clipboard API errors
-   */
-  const handleCopyUrl = React.useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      if (copyTimeoutRef.current !== null) {
-        clearTimeout(copyTimeoutRef.current);
-      }
-      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      logger.error("Failed to copy share URL", { error });
+  // Compute the single URL we show/copy based on selected option
+  const displayUrl = React.useMemo(() => {
+    if (selectedPrivacy === "llm") {
+      if (llmTxtUrl) return llmTxtUrl;
+      if (exportBase && shareId)
+        return `${exportBase}?shareId=${encodeURIComponent(shareId)}&format=txt`;
+      return "";
     }
-  }, [shareUrl]);
+    return shareUrl || "";
+  }, [selectedPrivacy, llmTxtUrl, exportBase, shareId, shareUrl]);
+
+  // Copy the currently displayed URL
+  const handleCopyUrl = React.useCallback(async () => {
+    // If selecting LLM/Shared/Public, ensure it's published/shared before copying
+    const effective = selectedPrivacy === "llm" ? "shared" : selectedPrivacy;
+    const maybe = await onShare(effective as "private" | "shared" | "public");
+    let url = displayUrl;
+    if (!url && effective === "shared") {
+      const sid =
+        (maybe as unknown as { shareId?: string })?.shareId || shareId;
+      if (sid && exportBase) {
+        url =
+          selectedPrivacy === "llm"
+            ? `${exportBase}?shareId=${encodeURIComponent(sid)}&format=txt`
+            : `${window.location.origin}/s/${sid}`;
+      }
+    }
+    if (!url && effective === "public") {
+      const pid = (maybe as unknown as { publicId?: string })?.publicId;
+      if (pid) url = `${window.location.origin}/p/${pid}`;
+    }
+    if (!url) return;
+    try {
+      const ok = await copyToClipboard(url);
+      if (ok) {
+        setCopied(true);
+        if (copyTimeoutRef.current !== null) {
+          clearTimeout(copyTimeoutRef.current);
+        }
+        copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+      }
+    } catch (error) {
+      logger.error("Failed to share/copy URL", { error });
+    }
+  }, [displayUrl, onShare, selectedPrivacy, exportBase, shareId]);
 
   const handleDialogKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -107,6 +151,7 @@ export function ShareModal({
     () => setSelectedPrivacy("public"),
     [],
   );
+  const selectLlm = React.useCallback(() => setSelectedPrivacy("llm"), []);
 
   if (!isOpen) return null;
 
@@ -176,6 +221,8 @@ export function ShareModal({
               "Anyone with the link can view (not indexed)."}
             {selectedPrivacy === "public" &&
               "Publicly viewable and may appear in search results."}
+            {selectedPrivacy === "llm" &&
+              "LLM-friendly link; same visibility as Shared (not indexed)."}
           </p>
         </div>
 
@@ -249,25 +296,51 @@ export function ShareModal({
                     </div>
                   </div>
                 </label>
+                <label
+                  className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  aria-label="LLM Link"
+                >
+                  <input
+                    type="radio"
+                    name="privacy"
+                    value="llm"
+                    checked={selectedPrivacy === "llm"}
+                    onChange={selectLlm}
+                    className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      LLM Link (Markdown .txt)
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Same visibility as Shared, formatted for LLMs; not
+                      indexed.
+                    </div>
+                  </div>
+                </label>
               </div>
             </fieldset>
           </div>
 
-          {(selectedPrivacy === "shared" || selectedPrivacy === "public") && (
+          {(selectedPrivacy === "shared" ||
+            selectedPrivacy === "public" ||
+            selectedPrivacy === "llm") && (
             <div className="space-y-3">
               <label
                 htmlFor="share-url-input"
                 className="text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Share URL
+                {selectedPrivacy === "llm"
+                  ? "LLM Link (Markdown .txt)"
+                  : "Share URL"}
               </label>
               <div className="flex gap-2">
-                {shareUrl ? (
+                {displayUrl ? (
                   <>
                     <input
                       id="share-url-input"
                       type="text"
-                      value={shareUrl}
+                      value={displayUrl}
                       readOnly
                       className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
@@ -277,7 +350,7 @@ export function ShareModal({
                       aria-label={
                         copied
                           ? "URL copied to clipboard"
-                          : "Copy share URL to clipboard"
+                          : "Copy URL to clipboard"
                       }
                     >
                       {copied ? "Copied!" : "Copy"}
@@ -285,7 +358,9 @@ export function ShareModal({
                   </>
                 ) : (
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Link will be generated after updating privacy.
+                    {selectedPrivacy === "llm"
+                      ? "LLM link will be generated after updating privacy."
+                      : "Link will be generated after updating privacy."}
                   </div>
                 )}
               </div>
@@ -300,7 +375,10 @@ export function ShareModal({
               Cancel
             </button>
             <button
-              onClick={handleShare}
+              onClick={async () => {
+                await handleShare();
+                onClose();
+              }}
               className="flex-1 px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
             >
               Update Privacy
