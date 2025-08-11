@@ -46,6 +46,7 @@ function ChatPage({
 }: ChatPageProps) {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
+  const chatKey = chatId ?? shareId ?? publicId ?? "root";
 
   // Set per-route canonical and url metas
   useEffect(() => {
@@ -78,6 +79,7 @@ function ChatPage({
     <>
       <Authenticated>
         <ChatInterface
+          key={chatKey}
           isAuthenticated={true}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={onToggleSidebar}
@@ -90,6 +92,7 @@ function ChatPage({
       </Authenticated>
       <Unauthenticated>
         <ChatInterface
+          key={chatKey}
           isAuthenticated={false}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={onToggleSidebar}
@@ -155,7 +158,7 @@ export default function App() {
                   <Link
                     to="/"
                     aria-label="Go home"
-                    className="w-7 h-7 sm:w-9 sm:h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-md flex items-center justify-center hover:from-emerald-600 hover:to-teal-700 transition-colors"
+                    className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-md flex items-center justify-center hover:from-emerald-600 hover:to-teal-700 transition-colors"
                   >
                     <svg
                       className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white"
@@ -171,28 +174,28 @@ export default function App() {
                       />
                     </svg>
                   </Link>
-                  <h1 className="text-xl sm:text-2xl font-semibold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent hover:from-emerald-600 hover:to-teal-600 dark:hover:from-emerald-400 dark:hover:to-teal-400 transition-all">
+                  <span className="text-lg font-semibold !normal-case tracking-normal text-gray-900 dark:text-white truncate max-w-[40vw]">
                     SearchAI
-                  </h1>
+                  </span>
                   <span className="hidden sm:inline-block text-sm sm:text-base bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 px-2.5 py-0.5 rounded-full font-medium hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors">
                     search-ai.io
                   </span>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-2">
+                <div className="flex items-center gap-2.5 sm:gap-4">
                   <Authenticated>
                     <SignOutButton />
                   </Authenticated>
                   <Unauthenticated>
                     <button
                       onClick={openSignUp}
-                      className="px-3 sm:px-4 py-2 text-sm sm:text-base font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap dark:font-mono"
+                      className="inline-flex h-9 items-center justify-center px-3 sm:px-4 text-sm sm:text-base font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap dark:font-mono"
                     >
                       <span className="hidden sm:inline">Sign Up Free</span>
                       <span className="sm:hidden">Sign Up</span>
                     </button>
                     <button
                       onClick={openSignIn}
-                      className="px-3 sm:px-4 py-2 text-sm sm:text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap dark:font-mono"
+                      className="hidden sm:inline-flex h-9 items-center justify-center px-3 sm:px-4 text-sm sm:text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap dark:font-mono"
                     >
                       Sign In
                     </button>
@@ -209,7 +212,7 @@ export default function App() {
                   element={
                     <ChatPage
                       onRequestSignUp={openSignUp}
-                      onRequestSignIn={openSignIn}
+                      onReuestSignIn={openSignIn}
                       isSidebarOpen={isSidebarOpen}
                       onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
                     />
