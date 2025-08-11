@@ -1,23 +1,57 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["import", "typescript", "unicorn", "react"],
+  "plugins": [
+    "import",
+    "typescript",
+    "unicorn",
+    "react",
+    "jsx-a11y",
+    "promise",
+    "vitest",
+    "react-perf"
+  ],
   "env": {
     "browser": true,
     "node": true
   },
   "settings": {},
   "rules": {
-    "eqeqeq": "warn",
+    "eqeqeq": "error",
+    "no-eval": "error",
+    "no-debugger": "error",
+    "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
+
     "import/no-cycle": "error",
     "import/order": "off",
-    "react/rules-of-hooks": "error",
-    "react/exhaustive-deps": "error",
+    "import/no-duplicates": "error",
+
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-non-null-assertion": "warn",
+
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "error",
     "react/self-closing-comp": [
       "error",
       {
         "html": false
       }
-    ]
+    ],
+    "react/jsx-no-target-blank": "error",
+    "react/jsx-key": "error",
+
+    "react-perf/jsx-no-new-function-as-prop": "warn",
+    "react-perf/jsx-no-new-array-as-prop": "warn",
+    "react-perf/jsx-no-new-object-as-prop": "warn",
+
+    "jsx-a11y/anchor-is-valid": "warn",
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/no-aria-hidden-on-focusable": "error",
+
+    "promise/no-return-await": "error",
+    "promise/catch-or-return": "warn",
+
+    "unicorn/no-array-reduce": "warn",
+    "unicorn/prefer-node-protocol": "error"
   },
   "ignorePatterns": [
     "dist/**",
