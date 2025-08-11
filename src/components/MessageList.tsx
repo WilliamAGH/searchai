@@ -16,7 +16,10 @@ import { SearchProgress } from "./SearchProgress";
 import { ReasoningDisplay } from "./ReasoningDisplay";
 import { ContentWithCitations } from "./ContentWithCitations";
 import { CopyButton } from "./CopyButton";
-import { extractPlainText } from "../lib/clipboard";
+import {
+  extractPlainText,
+  formatConversationWithSources,
+} from "../lib/clipboard";
 
 /**
  * Extract hostname from URL safely
@@ -536,7 +539,18 @@ export function MessageList({
                     </div>
                     <div className="flex items-center gap-2">
                       <CopyButton
-                        text={extractPlainText(message.content)}
+                        text={
+                          message.role === "assistant"
+                            ? formatConversationWithSources([
+                                {
+                                  role: message.role,
+                                  content: message.content,
+                                  searchResults: message.searchResults,
+                                  sources: message.sources,
+                                },
+                              ])
+                            : extractPlainText(message.content)
+                        }
                         size="sm"
                         title="Copy message"
                         ariaLabel="Copy message to clipboard"

@@ -29,10 +29,7 @@ import { ShareModal } from "./ShareModal";
 import { MobileSidebar } from "./MobileSidebar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
 import { CopyButton } from "./CopyButton";
-import {
-  extractPlainText,
-  formatConversationWithSources,
-} from "../lib/clipboard";
+import { formatConversationWithSources } from "../lib/clipboard";
 // Auth modals are centralized in App; ChatInterface requests them via callbacks
 import { useSwipeable } from "react-swipeable";
 import { useNavigate } from "react-router-dom";
