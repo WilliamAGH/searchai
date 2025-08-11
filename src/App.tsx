@@ -212,7 +212,7 @@ export default function App() {
                   element={
                     <ChatPage
                       onRequestSignUp={openSignUp}
-                      onReuestSignIn={openSignIn}
+                      onRequestSignIn={openSignIn}
                       isSidebarOpen={isSidebarOpen}
                       onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
                     />
