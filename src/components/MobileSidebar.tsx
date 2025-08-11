@@ -118,6 +118,9 @@ export function MobileSidebar({
                 <nav className="flex flex-1 flex-col">
                   <button
                     onClick={() => {
+                      console.log(
+                        "🖱️ New Chat button clicked in MobileSidebar",
+                      );
                       onNewChat();
                       onClose();
                     }}
