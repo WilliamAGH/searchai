@@ -1,4 +1,4 @@
-import React, { Fragment } from "react";
+import React, { Fragment, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Dialog, Transition } from "@headlessui/react";
@@ -34,9 +34,16 @@ export function MobileSidebar({
   onRequestDeleteChat,
 }: MobileSidebarProps) {
   const deleteChat = useMutation(api.chats.deleteChat);
+  // Ensure Headless UI Dialog has a stable initial focusable element on open
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50 lg:hidden" onClose={onClose}>
+      <Dialog
+        as="div"
+        className="relative z-50 lg:hidden"
+        onClose={onClose}
+        initialFocus={closeButtonRef}
+      >
         <Transition.Child
           as={Fragment}
           enter="transition-opacity ease-linear duration-300"
@@ -59,7 +66,10 @@ export function MobileSidebar({
             leaveFrom="translate-x-0"
             leaveTo="-translate-x-full"
           >
-            <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
+            <Dialog.Panel
+              tabIndex={-1}
+              className="relative mr-16 flex w-full max-w-xs flex-1"
+            >
               <Transition.Child
                 as={Fragment}
                 enter="ease-in-out duration-300"
@@ -74,6 +84,7 @@ export function MobileSidebar({
                     type="button"
                     className="-m-2.5 p-2.5"
                     onClick={onClose}
+                    ref={closeButtonRef}
                   >
                     <span className="sr-only">Close sidebar</span>
                     <svg
