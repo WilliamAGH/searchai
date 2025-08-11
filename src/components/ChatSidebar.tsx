@@ -88,48 +88,7 @@ export function ChatSidebar({
   );
 
   if (!isOpen) {
-    return (
-      <div className="w-12 h-full border-r bg-muted/30 flex flex-col">
-        <button
-          onClick={onToggle}
-          className="p-3 hover:bg-muted transition-colors"
-          title="Open sidebar"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
-        </button>
-        <button
-          onClick={onNewChat}
-          className="p-3 hover:bg-muted transition-colors mt-2"
-          title="New chat"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </button>
-      </div>
-    );
+    return null;
   }
 
   return (
