@@ -33,6 +33,7 @@ import { extractPlainText } from "../lib/clipboard";
 // Auth modals are centralized in App; ChatInterface requests them via callbacks
 import { useSwipeable } from "react-swipeable";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 // Topic-change detection constants (made less sensitive)
 const TOPIC_CHANGE_SIMILARITY_THRESHOLD = 0.1; // require much lower overlap
@@ -162,9 +163,7 @@ export function ChatInterface({
       logger.debug("🧹 ChatInterface unmounted");
     };
   }, []);
-  const convexUrl =
-    (import.meta as unknown as { env?: { VITE_CONVEX_URL?: string } }).env
-      ?.VITE_CONVEX_URL || "";
+  const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
   const apiBase = convexUrl
     .replace(".convex.cloud", ".convex.site")
     .replace(/\/+$/, "");
@@ -175,30 +174,18 @@ export function ChatInterface({
   };
 
   // Lightweight fetch JSON helper with retry/backoff for transient failures
+  type RetryInit = RequestInit & { retry?: number; retryDelayMs?: number };
   const fetchJsonWithRetry = useCallback(
-    async (
-      url: string,
-      init: RequestInit & { retry?: number; retryDelayMs?: number } = {},
-    ) => {
-      const {
-        retry = 2,
-        retryDelayMs = 500,
-        ...opts
-      } = init as unknown as {
-        retry?: number;
-        retryDelayMs?: number;
-        signal?: AbortSignal;
-      } & RequestInit;
+    async (url: string, init: RetryInit = {}) => {
+      const { retry = 2, retryDelayMs = 500, ...opts } = init;
       let attempt = 0;
       let lastErr: unknown = null;
       // Do not reuse an aborted signal across retries
-      const baseSignal: AbortSignal | undefined = (
-        init as unknown as { signal?: AbortSignal }
-      )?.signal;
+      const baseSignal: AbortSignal | undefined = init?.signal;
       while (attempt <= retry) {
         try {
           const controller = new AbortController();
-          const onAbort = () => controller.abort();
+          const onAbort: EventListener = () => controller.abort();
           if (baseSignal) {
             if (baseSignal.aborted)
               throw new DOMException("Aborted", "AbortError");
@@ -217,7 +204,7 @@ export function ChatInterface({
             attempt++;
             continue;
           }
-          baseSignal?.removeEventListener?.("abort", onAbort as EventListener);
+          baseSignal?.removeEventListener("abort", onAbort);
           return res;
         } catch (err) {
           lastErr = err;
@@ -1030,6 +1017,12 @@ export function ChatInterface({
           error: errorText,
           timestamp: new Date().toISOString(),
         });
+        // User-visible failure reason for final search retry failure
+        try {
+          toast.error(
+            `Web search failed: HTTP ${searchResponse.status} ${searchResponse.statusText}`,
+          );
+        } catch {}
         errorDetails.push(
           `Search API failed: HTTP ${searchResponse.status} ${searchResponse.statusText} - ${errorText}`,
         );
@@ -1430,7 +1423,7 @@ export function ChatInterface({
       }
 
       // Environment diagnostics are dev-only to protect user privacy
-      if ((import.meta as unknown as { env?: { DEV?: boolean } })?.env?.DEV) {
+      if (import.meta.env.DEV) {
         console.info("ENV CHECK:", {
           url: window.location.href,
           ua: navigator.userAgent,
