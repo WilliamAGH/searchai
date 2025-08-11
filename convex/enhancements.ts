@@ -10,6 +10,54 @@
 
 // Enhancement system - no convex values needed here
 
+// Extract URLs and domains from user message
+export function extractUrlsFromMessage(message: string): string[] {
+  // Regex to match URLs and domains
+  const urlRegex =
+    /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,})/g;
+  const matches = message.match(urlRegex) || [];
+
+  // Convert all matches to proper URLs
+  const urls: string[] = [];
+  for (const match of matches) {
+    if (match.startsWith("http")) {
+      urls.push(match);
+    } else if (match.startsWith("www.")) {
+      urls.push(`https://${match}`);
+    } else {
+      // For domains, create a search URL
+      urls.push(`https://${match}`);
+    }
+  }
+
+  return [...new Set(urls)]; // Deduplicate
+}
+
+// Create search results from user-provided URLs
+export function createUserProvidedSearchResults(
+  urls: string[],
+): SearchResult[] {
+  return urls.map((url) => {
+    try {
+      const parsedUrl = new URL(url);
+      return {
+        title: `User-provided source: ${parsedUrl.hostname}`,
+        url: url,
+        snippet: "Source explicitly mentioned by user in their query",
+        relevanceScore: 0.95, // High relevance score to prioritize these sources
+      };
+    } catch {
+      // If URL parsing fails, return a minimal result
+      return {
+        title: `User-provided source: ${url}`,
+        url: url,
+        snippet: "Source explicitly mentioned by user in their query",
+        relevanceScore: 0.95,
+      };
+    }
+  });
+}
+
 /**
  * Enhancement rule that can modify various aspects of the message pipeline
  */
