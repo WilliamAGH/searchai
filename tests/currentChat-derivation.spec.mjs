@@ -10,7 +10,9 @@ function deriveCurrentChat(currentChatId, allChats) {
 function expectEqual(a, b, label) {
   const ok = JSON.stringify(a) === JSON.stringify(b);
   if (!ok) {
-    throw new Error(label + `\nExpected: ${JSON.stringify(b)}\nGot: ${JSON.stringify(a)}`);
+    throw new Error(
+      label + `\nExpected: ${JSON.stringify(b)}\nGot: ${JSON.stringify(a)}`,
+    );
   }
 }
 
@@ -20,10 +22,20 @@ function expectEqual(a, b, label) {
     { _id: "abc123serverid", title: "Server A" },
   ];
 
-  expectEqual(deriveCurrentChat("local_1", chats)?.title, "Local A", "Local chat id matches");
-  expectEqual(deriveCurrentChat("abc123serverid", chats)?.title, "Server A", "Server chat id matches");
-  expectEqual(deriveCurrentChat(null, chats), undefined, "Null currentChatId returns undefined");
-  console.log("✅ currentChat derivation tests passed");
+  expectEqual(
+    deriveCurrentChat("local_1", chats)?.title,
+    "Local A",
+    "Local chat id matches",
+  );
+  expectEqual(
+    deriveCurrentChat("abc123serverid", chats)?.title,
+    "Server A",
+    "Server chat id matches",
+  );
+  expectEqual(
+    deriveCurrentChat(null, chats),
+    undefined,
+    "Null currentChatId returns undefined",
+  );
+  console.info("✅ currentChat derivation tests passed");
 })();
-
-

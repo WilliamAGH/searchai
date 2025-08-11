@@ -6,7 +6,7 @@
  */
 function detectCreatorQuery(userMessage) {
   const lowerMessage = userMessage.toLowerCase();
-  
+
   const creatorKeywords = [
     "creator",
     "author",
@@ -21,7 +21,7 @@ function detectCreatorQuery(userMessage) {
     "who founded",
     "who is",
   ];
-  
+
   const appKeywords = [
     "searchai",
     "search-ai",
@@ -34,10 +34,10 @@ function detectCreatorQuery(userMessage) {
     "this service",
     "this search",
   ];
-  
+
   // Check if query mentions William Callahan directly
   const mentionsWilliam = lowerMessage.includes("william callahan");
-  
+
   // Check if query is about creator/author AND mentions the app/service
   const isAboutCreator = creatorKeywords.some((keyword) =>
     lowerMessage.includes(keyword),
@@ -47,9 +47,9 @@ function detectCreatorQuery(userMessage) {
     lowerMessage.includes("searchai") ||
     lowerMessage.includes("search-ai") ||
     lowerMessage.includes("search ai");
-  
+
   const isCreatorQuery = mentionsWilliam || (isAboutCreator && isAboutApp);
-  
+
   return isCreatorQuery;
 }
 
@@ -75,8 +75,8 @@ const testCases = [
   { query: "Company behind SearchAI", shouldMatch: true },
   { query: "Who is responsible for this app?", shouldMatch: true },
   { query: "Founder of search-ai", shouldMatch: true },
-  
-  // Should NOT match - unrelated queries  
+
+  // Should NOT match - unrelated queries
   { query: "What is SearchAI?", shouldMatch: false },
   { query: "How does this work?", shouldMatch: false },
   { query: "Search for William Shakespeare", shouldMatch: false },
@@ -95,71 +95,82 @@ const testCases = [
  * Run all tests
  */
 async function runTests() {
-  console.log("Testing creator query detection...\n");
-  console.log("=".repeat(60));
-  
+  console.info("Testing creator query detection...\n");
+  console.info("=".repeat(60));
+
   let passed = 0;
   let failed = 0;
   const failures = [];
-  
+
   for (const testCase of testCases) {
     const result = detectCreatorQuery(testCase.query);
     const isCorrect = result === testCase.shouldMatch;
-    
+
     if (isCorrect) {
       passed++;
-      console.log(`✅ ${testCase.shouldMatch ? "MATCH" : "NO MATCH"}: "${testCase.query}"`);
+      console.info(
+        `✅ ${testCase.shouldMatch ? "MATCH" : "NO MATCH"}: "${testCase.query}"`,
+      );
     } else {
       failed++;
       failures.push(testCase);
-      console.log(`❌ EXPECTED ${testCase.shouldMatch ? "MATCH" : "NO MATCH"} but got ${result ? "MATCH" : "NO MATCH"}: "${testCase.query}"`);
+      console.info(
+        `❌ EXPECTED ${testCase.shouldMatch ? "MATCH" : "NO MATCH"} but got ${result ? "MATCH" : "NO MATCH"}: "${testCase.query}"`,
+      );
     }
   }
-  
-  console.log("\n" + "=".repeat(60));
-  console.log(`\nResults: ${passed} passed, ${failed} failed out of ${testCases.length} tests`);
-  
+
+  console.info("\n" + "=".repeat(60));
+  console.info(
+    `\nResults: ${passed} passed, ${failed} failed out of ${testCases.length} tests`,
+  );
+
   if (failed > 0) {
     console.error("\n❌ Failed test cases:");
-    failures.forEach(tc => {
-      console.error(`  - "${tc.query}" (expected ${tc.shouldMatch ? "match" : "no match"})`);
+    failures.forEach((tc) => {
+      console.error(
+        `  - "${tc.query}" (expected ${tc.shouldMatch ? "match" : "no match"})`,
+      );
     });
     throw new Error(`${failed} test(s) failed`);
   }
-  
-  console.log("\n✅ All creator detection tests passed!");
+
+  console.info("\n✅ All creator detection tests passed!");
 }
 
 /**
  * Test that enhanced queries include William Callahan's information
  */
 async function testQueryEnhancement() {
-  console.log("\n" + "=".repeat(60));
-  console.log("Testing query enhancement...\n");
-  
+  console.info("\n" + "=".repeat(60));
+  console.info("Testing query enhancement...\n");
+
   const testQueries = [
     "Who created SearchAI?",
     "Tell me about the founder of this app",
     "Who is William Callahan?",
   ];
-  
+
   for (const query of testQueries) {
     const isCreator = detectCreatorQuery(query);
     if (isCreator) {
       const enhanced = `${query} William Callahan williamcallahan.com aVenture aventure.vc`;
-      const includesInfo = enhanced.includes("williamcallahan.com") && 
-                          enhanced.includes("aventure.vc");
-      
+      const includesInfo =
+        enhanced.includes("williamcallahan.com") &&
+        enhanced.includes("aventure.vc");
+
       if (includesInfo) {
-        console.log(`✅ Query properly enhanced: "${query.substring(0, 30)}..."`);
+        console.info(
+          `✅ Query properly enhanced: "${query.substring(0, 30)}..."`,
+        );
       } else {
         console.error(`❌ Query enhancement failed for: "${query}"`);
         throw new Error("Query enhancement test failed");
       }
     }
   }
-  
-  console.log("\n✅ Query enhancement tests passed!");
+
+  console.info("\n✅ Query enhancement tests passed!");
 }
 
 /**
@@ -169,8 +180,8 @@ async function testQueryEnhancement() {
   try {
     await runTests();
     await testQueryEnhancement();
-    console.log("\n" + "=".repeat(60));
-    console.log("✅ All creator detection tests completed successfully!");
+    console.info("\n" + "=".repeat(60));
+    console.info("✅ All creator detection tests completed successfully!");
   } catch (error) {
     console.error("\n❌ Test suite failed:", error.message);
     process.exit(1);
