@@ -377,8 +377,21 @@ export const updateChatPrivacy = mutation({
     if (!chat) throw new Error("Chat not found");
     if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
+    // Ensure share/public IDs exist when moving to shared/public for legacy rows
+    let shareId = (chat as unknown as { shareId?: string }).shareId;
+    let publicId = (chat as unknown as { publicId?: string }).publicId;
+    if (args.privacy === "shared" && !shareId) {
+      shareId = generateOpaqueId();
+    }
+    if (args.privacy === "public" && !publicId) {
+      publicId = generateOpaqueId();
+    }
+
     await ctx.db.patch(args.chatId, {
       privacy: args.privacy,
+      // Only set ids if newly generated (preserve existing values)
+      ...(shareId && !(chat as any).shareId ? { shareId } : {}),
+      ...(publicId && !(chat as any).publicId ? { publicId } : {}),
       updatedAt: Date.now(),
     });
   },
@@ -529,5 +542,94 @@ export const importLocalChats = mutation({
     }
 
     return mappings;
+  },
+});
+
+/**
+ * Publish a chat without authentication (anonymous share)
+ * - Inserts a chat with undefined userId
+ * - Ensures unique shareId/publicId (preserves provided when unique)
+ * - Inserts provided messages chronologically
+ */
+export const publishAnonymousChat = mutation({
+  args: {
+    title: v.string(),
+    shareId: v.optional(v.string()),
+    publicId: v.optional(v.string()),
+    privacy: v.union(v.literal("shared"), v.literal("public")),
+    messages: v.array(
+      v.object({
+        role: v.union(v.literal("user"), v.literal("assistant")),
+        content: v.optional(v.string()),
+        timestamp: v.optional(v.number()),
+        searchResults: v.optional(v.array(v.any())),
+        sources: v.optional(v.array(v.string())),
+        reasoning: v.optional(v.any()),
+        searchMethod: v.optional(
+          v.union(
+            v.literal("serp"),
+            v.literal("openrouter"),
+            v.literal("duckduckgo"),
+            v.literal("fallback"),
+          ),
+        ),
+        hasRealResults: v.optional(v.boolean()),
+      }),
+    ),
+  },
+  returns: v.object({
+    chatId: v.id("chats"),
+    shareId: v.string(),
+    publicId: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    // Ensure unique IDs, preserve when available
+    let shareId = args.shareId || generateOpaqueId();
+    if (args.shareId) {
+      const existingShare = await ctx.db
+        .query("chats")
+        .withIndex("by_share_id", (q) => q.eq("shareId", args.shareId ?? ""))
+        .unique();
+      if (existingShare) shareId = generateOpaqueId();
+    }
+    let publicId = args.publicId || generateOpaqueId();
+    if (args.publicId) {
+      const existingPublic = await ctx.db
+        .query("chats")
+        .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId ?? ""))
+        .unique();
+      if (existingPublic) publicId = generateOpaqueId();
+    }
+
+    const now = Date.now();
+    const chatId = await ctx.db.insert("chats", {
+      title: args.title || "Shared Chat",
+      userId: undefined,
+      shareId,
+      publicId,
+      privacy: args.privacy,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Insert messages in chronological order
+    const ordered = [...args.messages].sort(
+      (a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0),
+    );
+    for (const m of ordered) {
+      await ctx.db.insert("messages", {
+        chatId,
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp ?? Date.now(),
+        searchResults: m.searchResults,
+        sources: m.sources,
+        reasoning: m.reasoning as any,
+        searchMethod: m.searchMethod as any,
+        hasRealResults: m.hasRealResults,
+      });
+    }
+
+    return { chatId, shareId, publicId };
   },
 });
