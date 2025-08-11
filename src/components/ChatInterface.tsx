@@ -140,6 +140,20 @@ export function ChatInterface({
   onRequestSignUp?: () => void;
   onRequestSignIn?: () => void;
 }) {
+  console.log("💬 ChatInterface rendered with props:", {
+    isAuthenticated,
+    propChatId,
+    propShareId,
+    propPublicId,
+    isSidebarOpen,
+  });
+
+  // Log when the component is unmounted
+  useEffect(() => {
+    return () => {
+      console.log("🧹 ChatInterface unmounted");
+    };
+  }, []);
   const convexUrl = (import.meta as any).env?.VITE_CONVEX_URL || "";
   const apiBase = convexUrl
     .replace(".convex.cloud", ".convex.site")
@@ -153,7 +167,14 @@ export function ChatInterface({
   const [currentChatId, setCurrentChatId] = useState<
     Id<"chats"> | string | null
   >(null);
+  console.log("🔄 ChatInterface currentChatId state:", currentChatId);
+
+  // Add a useEffect to monitor currentChatId changes
+  useEffect(() => {
+    console.log("🔄 currentChatId state updated:", currentChatId);
+  }, [currentChatId]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
   // Use prop if provided, otherwise use local state
   const sidebarOpen =
@@ -388,7 +409,15 @@ export function ChatInterface({
     if (isAuthenticated && messages) {
       return messages;
     } else if (!isAuthenticated && typeof currentChatId === "string") {
-      return localMessages.filter((msg) => msg.chatId === currentChatId);
+      const filtered = localMessages.filter(
+        (msg) => msg.chatId === currentChatId,
+      );
+      console.log("📨 Filtered local messages for current chat:", {
+        currentChatId,
+        totalLocalMessages: localMessages.length,
+        filteredMessages: filtered.length,
+      });
+      return filtered;
     }
     return [];
   }, [isAuthenticated, messages, localMessages, currentChatId]);
@@ -410,32 +439,61 @@ export function ChatInterface({
 
   // Update URL when chat changes
   useEffect(() => {
-    if (chatByOpaqueId) {
-      setCurrentChatId(chatByOpaqueId._id);
-    } else if (chatByShareId) {
-      setCurrentChatId(chatByShareId._id);
-    } else if (chatByPublicId) {
-      setCurrentChatId(chatByPublicId._id);
-    } else if (!isAuthenticated && propChatId) {
-      // For unauthenticated users, check if the chatId from URL matches a local chat
-      const localChat = localChats.find((chat) => chat._id === propChatId);
-      if (localChat) {
-        setCurrentChatId(localChat._id);
+    // Don't override currentChatId if user just initiated a chat change
+    const recentUserAction =
+      userSelectedChatAtRef.current &&
+      Date.now() - userSelectedChatAtRef.current < 1000;
+
+    if (recentUserAction) {
+      console.log("🚫 Skipping URL override due to recent user action");
+      return;
+    }
+
+    // Only process when we have actual data changes, not on every render
+    let newChatId: string | null = null;
+
+    // Priority order: server queries first, then URL params, then local
+    if (isAuthenticated) {
+      if (chatByOpaqueId && chatByOpaqueId._id !== currentChatId) {
+        newChatId = chatByOpaqueId._id;
+      } else if (chatByShareId && chatByShareId._id !== currentChatId) {
+        newChatId = chatByShareId._id;
+      } else if (chatByPublicId && chatByPublicId._id !== currentChatId) {
+        newChatId = chatByPublicId._id;
+      } else if (
+        propChatId &&
+        looksServerId(propChatId) &&
+        propChatId !== currentChatId
+      ) {
+        newChatId = propChatId;
       }
-    } else if (!isAuthenticated && propShareId) {
-      // For unauthenticated users, check if the shareId from URL matches a local chat
-      const localChat = localChats.find((chat) => chat.shareId === propShareId);
-      if (localChat) {
-        setCurrentChatId(localChat._id);
+    } else {
+      // For unauthenticated users, check URL params against local chats
+      if (propChatId) {
+        const localChat = localChats.find((chat) => chat._id === propChatId);
+        if (localChat && localChat._id !== currentChatId) {
+          newChatId = localChat._id;
+        }
+      } else if (propShareId) {
+        const localChat = localChats.find(
+          (chat) => chat.shareId === propShareId,
+        );
+        if (localChat && localChat._id !== currentChatId) {
+          newChatId = localChat._id;
+        }
+      } else if (propPublicId) {
+        const localChat = localChats.find(
+          (chat) => chat.publicId === propPublicId,
+        );
+        if (localChat && localChat._id !== currentChatId) {
+          newChatId = localChat._id;
+        }
       }
-    } else if (!isAuthenticated && propPublicId) {
-      // For unauthenticated users, check if the publicId from URL matches a local chat
-      const localChat = localChats.find(
-        (chat) => chat.publicId === propPublicId,
-      );
-      if (localChat) {
-        setCurrentChatId(localChat._id);
-      }
+    }
+
+    if (newChatId && newChatId !== currentChatId) {
+      console.log("🔄 Setting currentChatId from URL/data:", newChatId);
+      setCurrentChatId(newChatId);
     }
   }, [
     chatByOpaqueId,
@@ -446,27 +504,35 @@ export function ChatInterface({
     propShareId,
     propPublicId,
     localChats,
+    currentChatId,
   ]);
 
   const hasSetInitialUrlRef = useRef(false);
   useEffect(() => {
-    const chat = allChats.find((c) => c._id === currentChatId);
-    if (!chat) return;
-    let path = "";
-    if (chat.privacy === "public" && chat.publicId) {
-      path = `/p/${chat.publicId}`;
-    } else if (chat.privacy === "shared" && chat.shareId) {
-      path = `/s/${chat.shareId}`;
-    } else {
-      path = `/chat/${chat._id}`;
-    }
-    if (path !== window.location.pathname) {
-      if (!hasSetInitialUrlRef.current) {
-        navigate(path, { replace: true });
-        hasSetInitialUrlRef.current = true;
+    if (!currentChatId) return;
+    const chat = allChats.find((c) => String(c._id) === String(currentChatId));
+
+    if (chat) {
+      let path = "";
+      if (chat.privacy === "public" && chat.publicId) {
+        path = `/p/${chat.publicId}`;
+      } else if (chat.privacy === "shared" && chat.shareId) {
+        path = `/s/${chat.shareId}`;
       } else {
-        navigate(path);
+        path = `/chat/${chat._id}`;
       }
+      if (path !== window.location.pathname) {
+        if (!hasSetInitialUrlRef.current) {
+          navigate(path, { replace: true });
+          hasSetInitialUrlRef.current = true;
+        } else {
+          navigate(path);
+        }
+      }
+    } else {
+      // Fallback for a newly created chat that is not yet in `allChats`
+      const path = `/chat/${currentChatId}`;
+      if (path !== window.location.pathname) navigate(path);
     }
   }, [currentChatId, allChats, navigate]);
 
@@ -486,7 +552,16 @@ export function ChatInterface({
   const currentChat = useMemo(() => {
     if (!currentChatId) return undefined;
     const idStr = String(currentChatId);
-    return allChats.find((c) => String(c._id) === idStr);
+    const foundChat = allChats.find((c) => String(c._id) === idStr);
+    console.log(
+      "🗨️ ChatInterface currentChat:",
+      foundChat,
+      "currentChatId:",
+      currentChatId,
+      "allChats length:",
+      allChats.length,
+    );
+    return foundChat;
   }, [currentChatId, allChats]);
 
   /**
@@ -495,14 +570,38 @@ export function ChatInterface({
    * - Anon: creates local with share ID
    * - Updates URL for shareable chats
    */
-  const handleNewChat = useCallback(async () => {
+  const handleNewChat = useCallback(async (): Promise<string | null> => {
+    console.log("🔍 handleNewChat called", { isAuthenticated, isCreatingChat });
     try {
+      if (isCreatingChat) {
+        console.log("⚠️ Already creating chat, returning early");
+        return null;
+      }
+      setIsCreatingChat(true);
+      console.log("🔄 Setting isCreatingChat to true");
+      // Mark that the user explicitly initiated a chat change
+      userSelectedChatAtRef.current = Date.now();
+      console.log(
+        "📌 Marked user selected chat at:",
+        userSelectedChatAtRef.current,
+      );
+      let newChatId: string | null = null;
+
       if (isAuthenticated) {
+        console.log("🔐 Authenticated user, creating Convex chat");
         const chatId = await createChat({
           title: "New Chat",
         });
+        newChatId = String(chatId);
+        console.log("✅ Convex chat created:", chatId);
         setCurrentChatId(chatId);
+        console.log("🔄 setCurrentChatId called with:", chatId);
+        navigate(`/chat/${chatId}`);
+        console.log("🧭 navigate called with:", `/chat/${chatId}`);
+        setMessageCount(0);
+        console.log("🔢 setMessageCount reset to 0");
       } else {
+        console.log("👤 Unauthenticated user, creating local chat");
         // Create local chat with unique share ID
         const shareId = generateShareId();
         const newChat: LocalChat = {
@@ -516,13 +615,45 @@ export function ChatInterface({
           privacy: "private",
         };
         setLocalChats((prev) => [newChat, ...prev]);
+        console.log("✅ Local chat created:", newChat._id);
         setCurrentChatId(newChat._id);
+        console.log("🔄 setCurrentChatId called with:", newChat._id);
+        navigate(`/chat/${newChat._id}`);
+        console.log("🧭 navigate called with:", `/chat/${newChat._id}`);
+        newChatId = newChat._id;
+        setMessageCount(0);
+        console.log("🔢 setMessageCount reset to 0");
       }
-      setMessageCount(0);
+
+      console.log("🏁 handleNewChat completed, returning:", newChatId);
+      return newChatId;
     } catch (error) {
-      console.error("Failed to create chat:", error);
+      console.error("💥 Failed to create chat:", error);
+      setIsCreatingChat(false);
     }
-  }, [isAuthenticated, createChat, setLocalChats, generateShareId]);
+    console.log("🏁 handleNewChat returning null");
+    return null;
+  }, [
+    isCreatingChat,
+    isAuthenticated,
+    createChat,
+    setLocalChats,
+    generateShareId,
+    navigate,
+    setMessageCount,
+  ]);
+
+  // Always clear creating state once navigate/selection occurs
+  useEffect(() => {
+    console.log("🔄 useEffect: Clear creating state triggered", {
+      isCreatingChat,
+      currentChatId,
+    });
+    if (isCreatingChat && currentChatId) {
+      console.log("✅ Clearing isCreatingChat state");
+      setIsCreatingChat(false);
+    }
+  }, [isCreatingChat, currentChatId]);
 
   // Function to call AI API directly for unauthenticated users
   // Create a ref to track if component is mounted
@@ -576,6 +707,11 @@ export function ChatInterface({
   const awaitingNewChatRef = useRef<boolean>(false);
   const sendRef = useRef<null | ((m: string) => void)>(null);
   useEffect(() => {
+    console.log("🔄 useEffect: Deterministic post-create send flow triggered", {
+      awaitingNewChatRef: awaitingNewChatRef.current,
+      currentChatId,
+      pendingSendRef: pendingSendRef.current,
+    });
     if (!awaitingNewChatRef.current) return;
     if (!currentChatId) return;
     const msg = pendingSendRef.current;
@@ -584,6 +720,7 @@ export function ChatInterface({
     awaitingNewChatRef.current = false;
     pendingSendRef.current = null;
     // Send into the newly created chat id (currentChatId is now set)
+    console.log("📤 Sending pending message:", msg);
     sendRef.current?.(msg);
   }, [currentChatId]);
 
@@ -1245,10 +1382,15 @@ export function ChatInterface({
    * @param content - Message content
    */
   const handleSendMessage = async (content: string) => {
+    console.log("🚀 handleSendMessage called with:", content);
     // Don't send while an answer is already generating
-    if (isGenerating) return;
+    if (isGenerating) {
+      console.log("⚠️ Already generating, skipping send");
+      return;
+    }
     // If no chat is active yet, create one and queue this send
     if (!currentChatId) {
+      console.log("📝 No current chat, queueing message and creating new chat");
       pendingSendRef.current = content;
       awaitingNewChatRef.current = true;
       await handleNewChat();
@@ -1256,6 +1398,7 @@ export function ChatInterface({
     }
     // If a follow-up prompt is visible, do not block normal send; dismiss it
     if (showFollowUpPrompt) {
+      console.log("-dismissing follow-up prompt");
       setShowFollowUpPrompt(false);
       setPlannerHint(undefined);
       setPendingMessage("");
@@ -1631,6 +1774,17 @@ export function ChatInterface({
 
   // Auto-create first chat only if no chats exist and user hasn't selected/navigated
   useEffect(() => {
+    console.log("🔄 useEffect: Auto-create first chat triggered", {
+      allChatsLength: Array.isArray(allChats) ? allChats.length : "not array",
+      currentChatId,
+      userSelectedChatAtRef: userSelectedChatAtRef.current,
+      propChatId,
+      propShareId,
+      propPublicId,
+      isAuthenticated,
+      chatsLength: Array.isArray(chats) ? chats.length : "not array",
+    });
+
     const path = window.location.pathname;
     const isChatUrl = path.match(/^\/(chat|s|p)\/[a-zA-Z0-9_]+$/);
     const hasAny = Array.isArray(allChats) && allChats.length > 0;
@@ -1646,12 +1800,14 @@ export function ChatInterface({
       propPublicId ||
       hasAny
     ) {
+      console.log("⏭️ Skipping auto-create chat due to existing conditions");
       return;
     }
 
     const t = window.setTimeout(() => {
       const stillHasNone = Array.isArray(allChats) && allChats.length === 0;
       if (!userSelectedChatAtRef.current && !currentChatId && stillHasNone) {
+        console.log("🤖 Auto-creating new chat");
         handleNewChat();
       }
     }, 600);
@@ -1840,6 +1996,7 @@ export function ChatInterface({
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full">
         <div className="flex-1 flex flex-col min-h-0">
           <MessageList
+            key={String(currentChatId)}
             messages={currentMessages}
             isGenerating={isGenerating}
             searchProgress={searchProgress}
@@ -1890,29 +2047,72 @@ export function ChatInterface({
             hintReason={plannerHint?.reason}
             hintConfidence={plannerHint?.confidence}
           />
-          {/* Persistent Share control aligned with input */}
+          {/* Persistent controls aligned with input */}
           {canShare && (
             <div className="px-4 sm:px-6 mb-2 flex justify-end">
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                title="Share this conversation"
-                type="button"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    console.log("🖱️ New Chat button clicked in MessageList");
+                    handleNewChat();
+                  }}
+                  disabled={isCreatingChat}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={
+                    isCreatingChat ? "Creating new chat..." : "Start a new chat"
+                  }
+                  type="button"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                  />
-                </svg>
-              </button>
+                  {isCreatingChat ? (
+                    <svg
+                      className="w-5 h-5 animate-spin"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path d="M12 2v6l4 2" />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-5 h-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  title="Share this conversation"
+                  type="button"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
           {undoBanner && (
