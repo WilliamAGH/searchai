@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * LocalStorage hook with debounced persistence.
@@ -33,7 +33,7 @@ export function useLocalStorage<T>(
     latestRef.current = storedValue;
   }, [storedValue]);
 
-  const persist = React.useCallback(() => {
+  const persist = useCallback(() => {
     try {
       window.localStorage.setItem(key, JSON.stringify(latestRef.current));
     } catch (error) {

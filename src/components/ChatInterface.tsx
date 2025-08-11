@@ -243,12 +243,159 @@ export function ChatInterface({
   // Use prop if provided, otherwise use local state
   const sidebarOpen =
     isSidebarOpen !== undefined ? isSidebarOpen : localSidebarOpen;
-  const handleToggleSidebar =
-    onToggleSidebar || (() => setLocalSidebarOpen(!localSidebarOpen));
+  const handleToggleSidebar = useCallback(() => {
+    if (onToggleSidebar) {
+      onToggleSidebar();
+    } else {
+      setLocalSidebarOpen(!localSidebarOpen);
+    }
+  }, [onToggleSidebar, localSidebarOpen]);
   const [messageCount, setMessageCount] = useState(0);
   // Auth modals are managed by the App; request via callbacks instead
   const [showShareModal, setShowShareModal] = useState(false);
   const handleCloseShareModal = useCallback(() => setShowShareModal(false), []);
+  const handleOpenShareModal = useCallback(() => setShowShareModal(true), []);
+  const handleSetUndoBannerNull = useCallback(() => setUndoBanner(null), []);
+
+  // Local storage for unauthenticated users (scoped per host to avoid env conflation)
+  const storageNamespace = useMemo(
+    () => `searchai:${window.location.host}`,
+    [],
+  );
+  const chatsStorageKey = useMemo(
+    () => `${storageNamespace}:chats`,
+    [storageNamespace],
+  );
+  const messagesStorageKey = useMemo(
+    () => `${storageNamespace}:messages`,
+    [storageNamespace],
+  );
+
+  const [localChats, setLocalChats] = useLocalStorage<LocalChat[]>(
+    chatsStorageKey,
+    [],
+    { debounceMs: 800 },
+  );
+  const [localMessages, setLocalMessages] = useLocalStorage<LocalMessage[]>(
+    messagesStorageKey,
+    [],
+    { debounceMs: 800 },
+  );
+
+  // Convex hooks and utilities
+  const navigate = useNavigate();
+  const userSelectedChatAtRef = useRef<number | null>(null);
+  const looksServerId = looksChatId;
+
+  // Convex mutations and actions
+  const deleteChat = useMutation(api.chats.deleteChat);
+  const deleteMessage = useMutation(api.messages.deleteMessage);
+  const createChat = useMutation(api.chats.createChat);
+  const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
+  const importLocalChats = useMutation(api.chats.importLocalChats);
+  const generateResponse = useAction(api.ai.generateStreamingResponse);
+  const planSearch = useAction(api.search.planSearch);
+  const recordClientMetric = useAction(api.search.recordClientMetric);
+  const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
+
+  // Convex queries
+  const chats = useQuery(
+    api.chats.getUserChats,
+    isAuthenticated ? undefined : "skip",
+  );
+  const chatByOpaqueId = useQuery(
+    api.chats.getChatByOpaqueId,
+    isAuthenticated && looksServerId(propChatId)
+      ? { chatId: propChatId as Id<"chats"> }
+      : "skip",
+  );
+  const chatByShareId = useQuery(
+    api.chats.getChatByShareId,
+    propShareId ? { shareId: propShareId } : "skip",
+  );
+  const chatByPublicId = useQuery(
+    api.chats.getChatByPublicId,
+    propPublicId ? { publicId: propPublicId } : "skip",
+  );
+  const messages = useQuery(
+    api.chats.getChatMessages,
+    currentChatId && looksServerId(String(currentChatId))
+      ? { chatId: currentChatId as Id<"chats"> }
+      : "skip",
+  );
+
+  // Callbacks for sidebar operations
+  const handleMobileSidebarClose = useCallback(() => {
+    if (sidebarOpen) handleToggleSidebar();
+  }, [sidebarOpen, handleToggleSidebar]);
+
+  const handleMobileSidebarSelectChat = useCallback(
+    (id: Id<"chats"> | string) => {
+      userSelectedChatAtRef.current = Date.now();
+      setCurrentChatId(id);
+    },
+    [],
+  );
+
+  // Callbacks for deleting local chats
+  const handleDeleteLocalChat = useCallback(
+    (chatId: string) => {
+      setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
+      setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
+    },
+    [setLocalChats, setLocalMessages],
+  );
+
+  // Callbacks for requesting chat deletion
+  const handleRequestDeleteChat = useCallback(
+    (chatId: Id<"chats"> | string) => {
+      if (!looksServerId(String(chatId))) {
+        setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
+        setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
+      } else {
+        setTimeout(async () => {
+          try {
+            await deleteChat({ chatId: chatId as Id<"chats"> });
+          } catch {}
+        }, 5000);
+      }
+      setUndoBanner({
+        type: "chat",
+        chatId,
+        expiresAt: Date.now() + 5000,
+      });
+    },
+    [setLocalChats, setLocalMessages, deleteChat, looksServerId],
+  );
+
+  // Callbacks for deleting messages
+  const handleDeleteLocalMessage = useCallback(
+    (messageId: string) => {
+      setLocalMessages((prev) => prev.filter((m) => m._id !== messageId));
+    },
+    [setLocalMessages],
+  );
+
+  const handleRequestDeleteMessage = useCallback(
+    (messageId: string) => {
+      if (messageId.startsWith("local_") || messageId.startsWith("msg_")) {
+        setLocalMessages((prev) => prev.filter((m) => m._id !== messageId));
+      } else {
+        setTimeout(async () => {
+          try {
+            await deleteMessage({ messageId: messageId as Id<"messages"> });
+          } catch {}
+        }, 5000);
+      }
+      setUndoBanner({
+        type: "message",
+        messageId,
+        expiresAt: Date.now() + 5000,
+      });
+    },
+    [setLocalMessages, deleteMessage],
+  );
+
   const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string>("");
   const [plannerHint, setPlannerHint] = useState<
@@ -275,35 +422,6 @@ export function ChatInterface({
     urls?: string[];
     currentUrl?: string;
   } | null>(null);
-  const deleteChat = useMutation(api.chats.deleteChat);
-  const deleteMessage = useMutation(api.messages.deleteMessage);
-  const navigate = useNavigate();
-  const userSelectedChatAtRef = useRef<number | null>(null);
-
-  // Local storage for unauthenticated users (scoped per host to avoid env conflation)
-  const storageNamespace = useMemo(
-    () => `searchai:${window.location.host}`,
-    [],
-  );
-  const chatsStorageKey = useMemo(
-    () => `${storageNamespace}:chats`,
-    [storageNamespace],
-  );
-  const messagesStorageKey = useMemo(
-    () => `${storageNamespace}:messages`,
-    [storageNamespace],
-  );
-
-  const [localChats, setLocalChats] = useLocalStorage<LocalChat[]>(
-    chatsStorageKey,
-    [],
-    { debounceMs: 800 },
-  );
-  const [localMessages, setLocalMessages] = useLocalStorage<LocalMessage[]>(
-    messagesStorageKey,
-    [],
-    { debounceMs: 800 },
-  );
 
   // Fallback: migrate legacy keys to namespaced keys (one-time, per origin)
   useEffect(() => {
@@ -335,43 +453,7 @@ export function ChatInterface({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Only query Convex when authenticated and IDs are server-issued
-  const looksServerId = looksChatId;
-
-  const chats = useQuery(
-    api.chats.getUserChats,
-    isAuthenticated ? undefined : "skip",
-  );
-  const chatByOpaqueId = useQuery(
-    api.chats.getChatByOpaqueId,
-    isAuthenticated && looksServerId(propChatId)
-      ? { chatId: propChatId as Id<"chats"> }
-      : "skip",
-  );
-  const chatByShareId = useQuery(
-    api.chats.getChatByShareId,
-    propShareId ? { shareId: propShareId } : "skip",
-  );
-  const chatByPublicId = useQuery(
-    api.chats.getChatByPublicId,
-    propPublicId ? { publicId: propPublicId } : "skip",
-  );
-
-  const messages = useQuery(
-    api.chats.getChatMessages,
-    currentChatId && looksServerId(String(currentChatId))
-      ? { chatId: currentChatId as Id<"chats"> }
-      : "skip",
-  );
-
-  const createChat = useMutation(api.chats.createChat);
-  const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
-  const importLocalChats = useMutation(api.chats.importLocalChats);
-  const generateResponse = useAction(api.ai.generateStreamingResponse);
-  const planSearch = useAction(api.search.planSearch);
-  const recordClientMetric = useAction(api.search.recordClientMetric);
-  const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
-  // no-op placeholder (removed summarizeRecent direct usage)
+  // Migration guards and related state moved here for clarity
 
   // One-per-mount migration guards
   const migrationAttemptedRef = useRef(false);
@@ -717,6 +799,12 @@ export function ChatInterface({
     setMessageCount,
   ]);
 
+  // Callback for new chat button
+  const handleNewChatButton = useCallback(() => {
+    logger.debug("🖱️ New Chat button clicked in MessageList");
+    handleNewChat();
+  }, [handleNewChat]);
+
   // Always clear creating state once navigate/selection occurs
   useEffect(() => {
     logger.debug("🔄 useEffect: Clear creating state triggered", {
@@ -820,645 +908,658 @@ export function ChatInterface({
    * @param message - User's message
    * @param chatId - Local chat ID
    */
-  const generateUnauthenticatedResponse = async (
-    message: string,
-    chatId: string,
-  ) => {
-    let searchResults: Array<{
-      title: string;
-      url: string;
-      snippet: string;
-      relevanceScore?: number;
-    }> = [];
-    let searchContext = "";
-    const sources: string[] = [];
-    let hasRealResults = false;
-    let searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback" =
-      "fallback";
-    const errorDetails: string[] = [];
+  const generateUnauthenticatedResponse = useCallback(
+    async (message: string, chatId: string) => {
+      let searchResults: Array<{
+        title: string;
+        url: string;
+        snippet: string;
+        relevanceScore?: number;
+      }> = [];
+      let searchContext = "";
+      const sources: string[] = [];
+      let hasRealResults = false;
+      let searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback" =
+        "fallback";
+      const errorDetails: string[] = [];
 
-    try {
-      // Create/replace abort controller for the full generation pipeline (search→scrape→AI)
-      if (abortControllerRef.current) {
-        try {
-          abortControllerRef.current.abort();
-        } catch {}
-      }
-      abortControllerRef.current = new AbortController();
+      try {
+        // Create/replace abort controller for the full generation pipeline (search→scrape→AI)
+        if (abortControllerRef.current) {
+          try {
+            abortControllerRef.current.abort();
+          } catch {}
+        }
+        abortControllerRef.current = new AbortController();
 
-      // Step 1: Search the web
-      setSearchProgress({
-        stage: "searching",
-        message: "Searching the web for relevant information...",
-      });
+        // Step 1: Search the web
+        setSearchProgress({
+          stage: "searching",
+          message: "Searching the web for relevant information...",
+        });
 
-      const searchUrl = resolveApi("/api/search");
-      logger.debug("🔍 SEARCH API REQUEST:");
-      logger.debug("URL:", searchUrl);
-      logger.debug("Method:", "POST");
-      // Avoid logging raw user input in dev
-      logger.debug("Body:", { queryLength: message.length, maxResults: 5 });
+        const searchUrl = resolveApi("/api/search");
+        logger.debug("🔍 SEARCH API REQUEST:");
+        logger.debug("URL:", searchUrl);
+        logger.debug("Method:", "POST");
+        // Avoid logging raw user input in dev
+        logger.debug("Body:", { queryLength: message.length, maxResults: 5 });
 
-      const searchStartTime = Date.now();
-      // Build a context-aware query by appending a few keywords from recent history
-      const historyText = localMessages
-        .filter((m) => m.chatId === chatId)
-        .slice(-8)
-        .map((m) => m.content || "")
-        .join(" ");
-      const kw = (txt: string) =>
-        txt
-          .toLowerCase()
-          .split(/[^a-z0-9]+/)
-          .filter(Boolean);
-      const freq = new Map<string, number>();
-      for (const t of kw(historyText + " " + message)) {
-        if (t.length < 4 || STOP_WORDS.has(t)) continue;
-        freq.set(t, (freq.get(t) || 0) + 1);
-      }
-      const top = Array.from(freq.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 4)
-        .map(([w]) => w);
-      const contextualQuery = `${message} ${top.join(" ")}`
-        .trim()
-        .slice(0, 220);
+        const searchStartTime = Date.now();
+        // Build a context-aware query by appending a few keywords from recent history
+        const historyText = localMessages
+          .filter((m) => m.chatId === chatId)
+          .slice(-8)
+          .map((m) => m.content || "")
+          .join(" ");
+        const kw = (txt: string) =>
+          txt
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .filter(Boolean);
+        const freq = new Map<string, number>();
+        for (const t of kw(historyText + " " + message)) {
+          if (t.length < 4 || STOP_WORDS.has(t)) continue;
+          freq.set(t, (freq.get(t) || 0) + 1);
+        }
+        const top = Array.from(freq.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .map(([w]) => w);
+        const contextualQuery = `${message} ${top.join(" ")}`
+          .trim()
+          .slice(0, 220);
 
-      const searchResponse = await fetchJsonWithRetry(searchUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: contextualQuery, maxResults: 5 }),
-        signal: abortControllerRef.current?.signal,
-        retry: 2,
-        retryDelayMs: 400,
-      });
-      const searchDuration = Date.now() - searchStartTime;
+        const searchResponse = await fetchJsonWithRetry(searchUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: contextualQuery, maxResults: 5 }),
+          signal: abortControllerRef.current?.signal,
+          retry: 2,
+          retryDelayMs: 400,
+        });
+        const searchDuration = Date.now() - searchStartTime;
 
-      logger.debug("🔍 SEARCH API RESPONSE:");
-      logger.debug("Status:", searchResponse.status);
-      logger.debug("Duration:", `${searchDuration}ms`);
-      logger.debug("Headers: <omitted>");
+        logger.debug("🔍 SEARCH API RESPONSE:");
+        logger.debug("Status:", searchResponse.status);
+        logger.debug("Duration:", `${searchDuration}ms`);
+        logger.debug("Headers: <omitted>");
 
-      if (searchResponse.ok) {
-        const searchData = await searchResponse.json();
-        logger.debug(
-          "🔍 SEARCH API RESPONSE BODY:",
-          JSON.stringify(searchData, null, 2),
-        );
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          logger.debug(
+            "🔍 SEARCH API RESPONSE BODY:",
+            JSON.stringify(searchData, null, 2),
+          );
 
-        searchResults = searchData.results || [];
-        hasRealResults = searchData.hasRealResults || false;
-        searchMethod = searchData.searchMethod || "fallback";
+          searchResults = searchData.results || [];
+          hasRealResults = searchData.hasRealResults || false;
+          searchMethod = searchData.searchMethod || "fallback";
 
-        if (searchResults.length > 0) {
-          setSearchProgress({
-            stage: "scraping",
-            message: "Reading content from top sources...",
-            urls: searchResults.slice(0, 3).map((r) => r.url),
-          });
+          if (searchResults.length > 0) {
+            setSearchProgress({
+              stage: "scraping",
+              message: "Reading content from top sources...",
+              urls: searchResults.slice(0, 3).map((r) => r.url),
+            });
 
-          // Step 2: Scrape content from top results
-          const contentPromises = searchResults
-            .slice(0, 3)
-            .map(
-              async (result: {
-                url: string;
-                title: string;
-                snippet: string;
-              }) => {
-                let host = "unknown";
-                try {
-                  host = new URL(result.url).hostname;
-                } catch {
-                  /* noop */
-                }
-                setSearchProgress({
-                  stage: "scraping",
-                  message: `Reading content from ${host}...`,
-                  currentUrl: result.url,
-                  urls: searchResults.slice(0, 3).map((r) => r.url),
-                });
-
-                try {
-                  const scrapeUrl = resolveApi("/api/scrape");
-                  logger.debug("🌐 SCRAPE API REQUEST:");
-                  logger.debug("URL:", scrapeUrl);
-                  logger.debug("Method:", "POST");
-                  logger.debug("Body:", { urlLength: result.url?.length ?? 0 });
-
-                  const scrapeStartTime = Date.now();
-                  const scrapeResponse = await fetchJsonWithRetry(scrapeUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ url: result.url }),
-                    signal: abortControllerRef.current?.signal,
-                    retry: 1,
-                    retryDelayMs: 300,
+            // Step 2: Scrape content from top results
+            const contentPromises = searchResults
+              .slice(0, 3)
+              .map(
+                async (result: {
+                  url: string;
+                  title: string;
+                  snippet: string;
+                }) => {
+                  let host = "unknown";
+                  try {
+                    host = new URL(result.url).hostname;
+                  } catch {
+                    /* noop */
+                  }
+                  setSearchProgress({
+                    stage: "scraping",
+                    message: `Reading content from ${host}...`,
+                    currentUrl: result.url,
+                    urls: searchResults.slice(0, 3).map((r) => r.url),
                   });
-                  const scrapeDuration = Date.now() - scrapeStartTime;
 
-                  logger.debug("🌐 SCRAPE API RESPONSE:");
-                  logger.debug("Status:", scrapeResponse.status);
-                  logger.debug("Duration:", `${scrapeDuration}ms`);
-                  logger.debug("URL:", result.url);
+                  try {
+                    const scrapeUrl = resolveApi("/api/scrape");
+                    logger.debug("🌐 SCRAPE API REQUEST:");
+                    logger.debug("URL:", scrapeUrl);
+                    logger.debug("Method:", "POST");
+                    logger.debug("Body:", {
+                      urlLength: result.url?.length ?? 0,
+                    });
 
-                  if (scrapeResponse.ok) {
-                    const content = await scrapeResponse.json();
-                    logger.debug(
-                      "🌐 SCRAPE API RESPONSE BODY:",
-                      JSON.stringify(content, null, 2),
-                    );
-                    sources.push(result.url);
-                    return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
-                  } else {
-                    const errorText = await scrapeResponse.text();
-                    console.error("🌐 SCRAPE API ERROR:", {
-                      status: scrapeResponse.status,
-                      statusText: scrapeResponse.statusText,
-                      error: errorText,
+                    const scrapeStartTime = Date.now();
+                    const scrapeResponse = await fetchJsonWithRetry(scrapeUrl, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ url: result.url }),
+                      signal: abortControllerRef.current?.signal,
+                      retry: 1,
+                      retryDelayMs: 300,
+                    });
+                    const scrapeDuration = Date.now() - scrapeStartTime;
+
+                    logger.debug("🌐 SCRAPE API RESPONSE:");
+                    logger.debug("Status:", scrapeResponse.status);
+                    logger.debug("Duration:", `${scrapeDuration}ms`);
+                    logger.debug("URL:", result.url);
+
+                    if (scrapeResponse.ok) {
+                      const content = await scrapeResponse.json();
+                      logger.debug(
+                        "🌐 SCRAPE API RESPONSE BODY:",
+                        JSON.stringify(content, null, 2),
+                      );
+                      sources.push(result.url);
+                      return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
+                    } else {
+                      const errorText = await scrapeResponse.text();
+                      console.error("🌐 SCRAPE API ERROR:", {
+                        status: scrapeResponse.status,
+                        statusText: scrapeResponse.statusText,
+                        error: errorText,
+                        url: result.url,
+                        timestamp: new Date().toISOString(),
+                      });
+                      errorDetails.push(
+                        `Scraping failed for ${result.url}: HTTP ${scrapeResponse.status} ${scrapeResponse.statusText} - ${errorText}`,
+                      );
+                      return `Source: ${result.title} (${result.url})\n${result.snippet}`;
+                    }
+                  } catch (error) {
+                    console.error("🌐 SCRAPE API EXCEPTION:", {
+                      error:
+                        error instanceof Error
+                          ? error.message
+                          : "Unknown error",
+                      stack:
+                        error instanceof Error ? error.stack : "No stack trace",
                       url: result.url,
                       timestamp: new Date().toISOString(),
                     });
                     errorDetails.push(
-                      `Scraping failed for ${result.url}: HTTP ${scrapeResponse.status} ${scrapeResponse.statusText} - ${errorText}`,
+                      `Scraping error for ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`,
                     );
                     return `Source: ${result.title} (${result.url})\n${result.snippet}`;
                   }
-                } catch (error) {
-                  console.error("🌐 SCRAPE API EXCEPTION:", {
-                    error:
-                      error instanceof Error ? error.message : "Unknown error",
-                    stack:
-                      error instanceof Error ? error.stack : "No stack trace",
-                    url: result.url,
+                },
+              );
+
+            const contents = await Promise.all(contentPromises);
+            searchContext = contents.join("\n\n");
+
+            setSearchProgress({
+              stage: "analyzing",
+              message: "Analyzing information and generating response...",
+            });
+          }
+        } else {
+          const errorText = await searchResponse.text();
+          console.error("🔍 SEARCH API ERROR:", {
+            status: searchResponse.status,
+            statusText: searchResponse.statusText,
+            error: errorText,
+            timestamp: new Date().toISOString(),
+          });
+          // User-visible failure reason for final search retry failure
+          try {
+            toast.error(
+              `Web search failed: HTTP ${searchResponse.status} ${searchResponse.statusText}`,
+            );
+          } catch {}
+          errorDetails.push(
+            `Search API failed: HTTP ${searchResponse.status} ${searchResponse.statusText} - ${errorText}`,
+          );
+        }
+
+        setSearchProgress({
+          stage: "generating",
+          message: "AI is thinking and generating response...",
+        });
+
+        // Generate AI response with streaming - include ALL context
+        let systemPrompt = `You are a helpful AI assistant. `;
+
+        if (hasRealResults && searchContext) {
+          systemPrompt += `Use the following search results to inform your response. IMPORTANT: When citing sources, use the domain name in brackets like [example.com] format. Place citations inline immediately after the relevant information.\n\n`;
+          systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
+          systemPrompt += `## Source References (USE THESE DOMAIN CITATIONS):\n`;
+          searchResults.forEach(
+            (
+              result: { title: string; url: string; snippet: string },
+              _idx: number,
+            ) => {
+              let domain = "unknown";
+              try {
+                domain = new URL(result.url).hostname.replace("www.", "");
+              } catch {}
+              systemPrompt += `[${domain}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
+            },
+          );
+        } else if (!hasRealResults && searchResults.length > 0) {
+          systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n`;
+          systemPrompt += `## Available Results:\n`;
+          searchResults.forEach(
+            (result: { title: string; snippet: string }) => {
+              systemPrompt += `- ${result.title}: ${result.snippet}\n`;
+            },
+          );
+        } else {
+          systemPrompt += `Web search is unavailable. Provide helpful responses based on your knowledge. `;
+        }
+
+        systemPrompt += `\n\nProvide clear, helpful responses. When you reference information from the search results, you MUST include citations using the [domain.com] format shown above. Place citations immediately after the relevant statement. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;
+
+        // Get chat history for context
+        const chatHistory = localMessages
+          .filter((msg) => msg.chatId === chatId)
+          .map((msg) => ({
+            role: msg.role,
+            content: msg.content || "",
+          }));
+
+        const aiRequestBody = {
+          message,
+          systemPrompt,
+          searchResults,
+          sources,
+          chatHistory,
+        };
+
+        const aiUrl = resolveApi("/api/ai");
+        logger.debug("🤖 AI API REQUEST:");
+        logger.debug("URL:", aiUrl);
+        logger.debug("Method:", "POST");
+        // Do not log full bodies with user content/history
+        logger.debug("Body:", {
+          messageLength: aiRequestBody.message.length,
+          searchResults: aiRequestBody.searchResults?.length ?? 0,
+          sources: aiRequestBody.sources?.length ?? 0,
+          historySize: aiRequestBody.chatHistory?.length ?? 0,
+        });
+
+        // Create placeholder assistant message for streaming
+        const assistantMessageId = `msg_${Date.now() + 1}`;
+        const assistantMessage: LocalMessage = {
+          _id: assistantMessageId,
+          chatId: chatId,
+          role: "assistant",
+          content: "",
+          timestamp: Date.now(),
+          searchResults: searchResults.length > 0 ? searchResults : undefined,
+          sources: sources.length > 0 ? sources : undefined,
+          reasoning: "",
+          searchMethod: searchMethod,
+          hasRealResults: hasRealResults,
+          isStreaming: true,
+          hasStartedContent: false,
+        };
+
+        setLocalMessages((prev) => [...prev, assistantMessage]);
+
+        const aiStartTime = Date.now();
+        const aiResponse = await fetch(aiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify(aiRequestBody),
+          signal: abortControllerRef.current.signal,
+        });
+        const aiDuration = Date.now() - aiStartTime;
+
+        logger.debug("🤖 AI API RESPONSE:");
+        logger.debug("Status:", aiResponse.status);
+        logger.debug("Duration:", `${aiDuration}ms`);
+        logger.debug(
+          "Headers:",
+          Object.fromEntries(aiResponse.headers.entries()),
+        );
+
+        if (aiResponse.ok && aiResponse.body) {
+          const contentType = aiResponse.headers.get("content-type");
+
+          if (contentType?.includes("text/event-stream")) {
+            // Handle streaming response properly
+            const reader = aiResponse.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let accumulatedContent = "";
+            let accumulatedThinking = "";
+            let hasStartedContent = false;
+            let chunkCount = 0;
+            const streamStartTime = Date.now();
+
+            let isReading = true;
+
+            // Listen for abort signal
+            if (abortControllerRef.current) {
+              abortControllerRef.current.signal.addEventListener(
+                "abort",
+                () => {
+                  isReading = false;
+                  // Gracefully finalize or remove the placeholder to avoid spinner hang
+                  setLocalMessages((prev) => {
+                    const idx = prev.findIndex(
+                      (m) => m._id === assistantMessageId,
+                    );
+                    if (idx === -1) return prev;
+                    const next = prev.slice();
+                    const hadContent = !!next[idx].content?.trim();
+                    if (hadContent) {
+                      next[idx] = {
+                        ...next[idx],
+                        isStreaming: false,
+                        hasStartedContent: true,
+                      };
+                      return next;
+                    }
+                    next.splice(idx, 1);
+                    return next;
+                  });
+                },
+                { once: true },
+              );
+            }
+
+            try {
+              while (isReading && isMountedRef.current) {
+                const { done, value } = await reader.read();
+                if (done) {
+                  // If the model streamed no visible content, fall back to a concise answer
+                  if (
+                    !accumulatedContent ||
+                    accumulatedContent.trim().length === 0
+                  ) {
+                    if (searchResults && searchResults.length > 0) {
+                      const topFew = searchResults
+                        .slice(0, 3)
+                        .map((r) => `- ${r.title} — ${r.url}`)
+                        .join("\n");
+                      accumulatedContent = `I'm sorry, I couldn't complete the streamed response. Here are top sources that may help:\n\n${topFew}`;
+                    } else {
+                      accumulatedContent =
+                        "I'm sorry, I couldn't generate a response this time.";
+                    }
+                  }
+                  logger.debug("🔄 Streaming completed:", {
+                    totalChunks: chunkCount,
+                    duration: Date.now() - streamStartTime,
+                    finalContentLength: accumulatedContent.length,
                     timestamp: new Date().toISOString(),
                   });
-                  errorDetails.push(
-                    `Scraping error for ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`,
-                  );
-                  return `Source: ${result.title} (${result.url})\n${result.snippet}`;
-                }
-              },
-            );
-
-          const contents = await Promise.all(contentPromises);
-          searchContext = contents.join("\n\n");
-
-          setSearchProgress({
-            stage: "analyzing",
-            message: "Analyzing information and generating response...",
-          });
-        }
-      } else {
-        const errorText = await searchResponse.text();
-        console.error("🔍 SEARCH API ERROR:", {
-          status: searchResponse.status,
-          statusText: searchResponse.statusText,
-          error: errorText,
-          timestamp: new Date().toISOString(),
-        });
-        // User-visible failure reason for final search retry failure
-        try {
-          toast.error(
-            `Web search failed: HTTP ${searchResponse.status} ${searchResponse.statusText}`,
-          );
-        } catch {}
-        errorDetails.push(
-          `Search API failed: HTTP ${searchResponse.status} ${searchResponse.statusText} - ${errorText}`,
-        );
-      }
-
-      setSearchProgress({
-        stage: "generating",
-        message: "AI is thinking and generating response...",
-      });
-
-      // Generate AI response with streaming - include ALL context
-      let systemPrompt = `You are a helpful AI assistant. `;
-
-      if (hasRealResults && searchContext) {
-        systemPrompt += `Use the following search results to inform your response. IMPORTANT: When citing sources, use the domain name in brackets like [example.com] format. Place citations inline immediately after the relevant information.\n\n`;
-        systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
-        systemPrompt += `## Source References (USE THESE DOMAIN CITATIONS):\n`;
-        searchResults.forEach(
-          (
-            result: { title: string; url: string; snippet: string },
-            _idx: number,
-          ) => {
-            let domain = "unknown";
-            try {
-              domain = new URL(result.url).hostname.replace("www.", "");
-            } catch {}
-            systemPrompt += `[${domain}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
-          },
-        );
-      } else if (!hasRealResults && searchResults.length > 0) {
-        systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n`;
-        systemPrompt += `## Available Results:\n`;
-        searchResults.forEach((result: { title: string; snippet: string }) => {
-          systemPrompt += `- ${result.title}: ${result.snippet}\n`;
-        });
-      } else {
-        systemPrompt += `Web search is unavailable. Provide helpful responses based on your knowledge. `;
-      }
-
-      systemPrompt += `\n\nProvide clear, helpful responses. When you reference information from the search results, you MUST include citations using the [domain.com] format shown above. Place citations immediately after the relevant statement. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;
-
-      // Get chat history for context
-      const chatHistory = localMessages
-        .filter((msg) => msg.chatId === chatId)
-        .map((msg) => ({
-          role: msg.role,
-          content: msg.content || "",
-        }));
-
-      const aiRequestBody = {
-        message,
-        systemPrompt,
-        searchResults,
-        sources,
-        chatHistory,
-      };
-
-      const aiUrl = resolveApi("/api/ai");
-      logger.debug("🤖 AI API REQUEST:");
-      logger.debug("URL:", aiUrl);
-      logger.debug("Method:", "POST");
-      // Do not log full bodies with user content/history
-      logger.debug("Body:", {
-        messageLength: aiRequestBody.message.length,
-        searchResults: aiRequestBody.searchResults?.length ?? 0,
-        sources: aiRequestBody.sources?.length ?? 0,
-        historySize: aiRequestBody.chatHistory?.length ?? 0,
-      });
-
-      // Create placeholder assistant message for streaming
-      const assistantMessageId = `msg_${Date.now() + 1}`;
-      const assistantMessage: LocalMessage = {
-        _id: assistantMessageId,
-        chatId: chatId,
-        role: "assistant",
-        content: "",
-        timestamp: Date.now(),
-        searchResults: searchResults.length > 0 ? searchResults : undefined,
-        sources: sources.length > 0 ? sources : undefined,
-        reasoning: "",
-        searchMethod: searchMethod,
-        hasRealResults: hasRealResults,
-        isStreaming: true,
-        hasStartedContent: false,
-      };
-
-      setLocalMessages((prev) => [...prev, assistantMessage]);
-
-      const aiStartTime = Date.now();
-      const aiResponse = await fetch(aiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "text/event-stream",
-        },
-        body: JSON.stringify(aiRequestBody),
-        signal: abortControllerRef.current.signal,
-      });
-      const aiDuration = Date.now() - aiStartTime;
-
-      logger.debug("🤖 AI API RESPONSE:");
-      logger.debug("Status:", aiResponse.status);
-      logger.debug("Duration:", `${aiDuration}ms`);
-      logger.debug(
-        "Headers:",
-        Object.fromEntries(aiResponse.headers.entries()),
-      );
-
-      if (aiResponse.ok && aiResponse.body) {
-        const contentType = aiResponse.headers.get("content-type");
-
-        if (contentType?.includes("text/event-stream")) {
-          // Handle streaming response properly
-          const reader = aiResponse.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let accumulatedContent = "";
-          let accumulatedThinking = "";
-          let hasStartedContent = false;
-          let chunkCount = 0;
-          const streamStartTime = Date.now();
-
-          let isReading = true;
-
-          // Listen for abort signal
-          if (abortControllerRef.current) {
-            abortControllerRef.current.signal.addEventListener(
-              "abort",
-              () => {
-                isReading = false;
-                // Gracefully finalize or remove the placeholder to avoid spinner hang
-                setLocalMessages((prev) => {
-                  const idx = prev.findIndex(
-                    (m) => m._id === assistantMessageId,
-                  );
-                  if (idx === -1) return prev;
-                  const next = prev.slice();
-                  const hadContent = !!next[idx].content?.trim();
-                  if (hadContent) {
-                    next[idx] = {
-                      ...next[idx],
-                      isStreaming: false,
-                      hasStartedContent: true,
-                    };
-                    return next;
+                  // Finalize the message only if component is still mounted
+                  if (isMountedRef.current) {
+                    setLocalMessages((prev) =>
+                      prev.map((msg) =>
+                        msg._id === assistantMessageId
+                          ? {
+                              ...msg,
+                              content: accumulatedContent,
+                              reasoning: accumulatedThinking,
+                              isStreaming: false,
+                              hasStartedContent: true,
+                            }
+                          : msg,
+                      ),
+                    );
                   }
-                  next.splice(idx, 1);
-                  return next;
-                });
-              },
-              { once: true },
-            );
-          }
-
-          try {
-            while (isReading && isMountedRef.current) {
-              const { done, value } = await reader.read();
-              if (done) {
-                // If the model streamed no visible content, fall back to a concise answer
-                if (
-                  !accumulatedContent ||
-                  accumulatedContent.trim().length === 0
-                ) {
-                  if (searchResults && searchResults.length > 0) {
-                    const topFew = searchResults
-                      .slice(0, 3)
-                      .map((r) => `- ${r.title} — ${r.url}`)
-                      .join("\n");
-                    accumulatedContent = `I'm sorry, I couldn't complete the streamed response. Here are top sources that may help:\n\n${topFew}`;
-                  } else {
-                    accumulatedContent =
-                      "I'm sorry, I couldn't generate a response this time.";
-                  }
+                  break;
                 }
-                logger.debug("🔄 Streaming completed:", {
-                  totalChunks: chunkCount,
-                  duration: Date.now() - streamStartTime,
-                  finalContentLength: accumulatedContent.length,
-                  timestamp: new Date().toISOString(),
-                });
-                // Finalize the message only if component is still mounted
-                if (isMountedRef.current) {
-                  setLocalMessages((prev) =>
-                    prev.map((msg) =>
-                      msg._id === assistantMessageId
-                        ? {
-                            ...msg,
-                            content: accumulatedContent,
-                            reasoning: accumulatedThinking,
-                            isStreaming: false,
-                            hasStartedContent: true,
-                          }
-                        : msg,
-                    ),
-                  );
-                }
-                break;
-              }
 
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split("\n");
-              buffer = lines.pop() || "";
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
 
-              for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                  const data = line.slice(6);
-                  if (data === "[DONE]") {
-                    if (
-                      !accumulatedContent ||
-                      accumulatedContent.trim().length === 0
-                    ) {
-                      if (searchResults && searchResults.length > 0) {
-                        const topFew = searchResults
-                          .slice(0, 3)
-                          .map((r) => `- ${r.title} — ${r.url}`)
-                          .join("\n");
-                        accumulatedContent = `I'm sorry, I couldn't complete the streamed response. Here are top sources that may help:\n\n${topFew}`;
-                      } else {
-                        accumulatedContent =
-                          "I'm sorry, I couldn't generate a response this time.";
-                      }
-                    }
-                    logger.debug("✅ Streaming finished with [DONE]");
-                    // Finalize the message only if component is still mounted
-                    if (isMountedRef.current) {
-                      setLocalMessages((prev) =>
-                        prev.map((msg) =>
-                          msg._id === assistantMessageId
-                            ? {
-                                ...msg,
-                                content: accumulatedContent,
-                                reasoning: String(accumulatedThinking || ""),
-                                isStreaming: false,
-                                hasStartedContent: true,
-                              }
-                            : msg,
-                        ),
-                      );
-                    }
-                    return;
-                  }
-                  try {
-                    chunkCount++;
-                    const chunk = JSON.parse(data);
-                    if (chunk.type === "chunk") {
-                      if (chunk.thinking) {
-                        // Some providers may send non-string reasoning; normalize
-                        accumulatedThinking += String(chunk.thinking);
-                      }
-                      if (chunk.content) {
-                        accumulatedContent += chunk.content;
-                        if (!hasStartedContent) {
-                          hasStartedContent = true;
+                for (const line of lines) {
+                  if (line.startsWith("data: ")) {
+                    const data = line.slice(6);
+                    if (data === "[DONE]") {
+                      if (
+                        !accumulatedContent ||
+                        accumulatedContent.trim().length === 0
+                      ) {
+                        if (searchResults && searchResults.length > 0) {
+                          const topFew = searchResults
+                            .slice(0, 3)
+                            .map((r) => `- ${r.title} — ${r.url}`)
+                            .join("\n");
+                          accumulatedContent = `I'm sorry, I couldn't complete the streamed response. Here are top sources that may help:\n\n${topFew}`;
+                        } else {
+                          accumulatedContent =
+                            "I'm sorry, I couldn't generate a response this time.";
                         }
                       }
-
-                      // Update the message in real-time using throttled update
-                      throttledMessageUpdate(
-                        assistantMessageId,
-                        accumulatedContent,
-                        String(accumulatedThinking || ""),
-                        hasStartedContent,
-                      );
+                      logger.debug("✅ Streaming finished with [DONE]");
+                      // Finalize the message only if component is still mounted
+                      if (isMountedRef.current) {
+                        setLocalMessages((prev) =>
+                          prev.map((msg) =>
+                            msg._id === assistantMessageId
+                              ? {
+                                  ...msg,
+                                  content: accumulatedContent,
+                                  reasoning: String(accumulatedThinking || ""),
+                                  isStreaming: false,
+                                  hasStartedContent: true,
+                                }
+                              : msg,
+                          ),
+                        );
+                      }
+                      return;
                     }
-                  } catch (e) {
-                    console.error("❌ Failed to parse stream chunk:", {
-                      error:
-                        e instanceof Error
-                          ? e.message
-                          : "Unknown parsing error",
-                      chunk: data,
-                      chunkNumber: chunkCount,
-                      timestamp: new Date().toISOString(),
-                    });
+                    try {
+                      chunkCount++;
+                      const chunk = JSON.parse(data);
+                      if (chunk.type === "chunk") {
+                        if (chunk.thinking) {
+                          // Some providers may send non-string reasoning; normalize
+                          accumulatedThinking += String(chunk.thinking);
+                        }
+                        if (chunk.content) {
+                          accumulatedContent += chunk.content;
+                          if (!hasStartedContent) {
+                            hasStartedContent = true;
+                          }
+                        }
+
+                        // Update the message in real-time using throttled update
+                        throttledMessageUpdate(
+                          assistantMessageId,
+                          accumulatedContent,
+                          String(accumulatedThinking || ""),
+                          hasStartedContent,
+                        );
+                      }
+                    } catch (e) {
+                      console.error("❌ Failed to parse stream chunk:", {
+                        error:
+                          e instanceof Error
+                            ? e.message
+                            : "Unknown parsing error",
+                        chunk: data,
+                        chunkNumber: chunkCount,
+                        timestamp: new Date().toISOString(),
+                      });
+                    }
                   }
                 }
               }
-            }
-          } catch (streamError) {
-            // Check if error is due to abort
-            if (
-              streamError instanceof Error &&
-              streamError.name === "AbortError"
-            ) {
-              logger.debug(
-                "Stream aborted (component unmounted or navigation)",
-              );
-              return; // Don't show error message for intentional aborts
-            }
+            } catch (streamError) {
+              // Check if error is due to abort
+              if (
+                streamError instanceof Error &&
+                streamError.name === "AbortError"
+              ) {
+                logger.debug(
+                  "Stream aborted (component unmounted or navigation)",
+                );
+                return; // Don't show error message for intentional aborts
+              }
 
-            console.error("💥 Stream reading error:", {
-              error:
-                streamError instanceof Error
-                  ? streamError.message
-                  : "Unknown streaming error",
-              stack:
-                streamError instanceof Error
-                  ? streamError.stack
-                  : "No stack trace",
-              duration: Date.now() - streamStartTime,
-              chunkCount: chunkCount,
-              timestamp: new Date().toISOString(),
-            });
-            // Fallback to error message only if component is still mounted
+              console.error("💥 Stream reading error:", {
+                error:
+                  streamError instanceof Error
+                    ? streamError.message
+                    : "Unknown streaming error",
+                stack:
+                  streamError instanceof Error
+                    ? streamError.stack
+                    : "No stack trace",
+                duration: Date.now() - streamStartTime,
+                chunkCount: chunkCount,
+                timestamp: new Date().toISOString(),
+              });
+              // Fallback to error message only if component is still mounted
+              if (isMountedRef.current) {
+                setLocalMessages((prev) =>
+                  prev.map((msg) =>
+                    msg._id === assistantMessageId
+                      ? {
+                          ...msg,
+                          content:
+                            accumulatedContent ||
+                            "I apologize, but I encountered an error while streaming the response. Please try again.",
+                          isStreaming: false,
+                        }
+                      : msg,
+                  ),
+                );
+              }
+            } finally {
+              reader.releaseLock();
+            }
+          } else {
+            // Fallback to non-streaming response
+            const aiData = await aiResponse.json();
+            logger.debug(
+              "🤖 AI API RESPONSE BODY:",
+              JSON.stringify(aiData, null, 2),
+            );
+
+            const responseContent =
+              aiData.response ||
+              "I apologize, but I couldn't generate a response. Please try again.";
+            const reasoningTokens = aiData.reasoning || null;
+
+            // Update the placeholder message only if component is still mounted
             if (isMountedRef.current) {
               setLocalMessages((prev) =>
                 prev.map((msg) =>
                   msg._id === assistantMessageId
                     ? {
                         ...msg,
-                        content:
-                          accumulatedContent ||
-                          "I apologize, but I encountered an error while streaming the response. Please try again.",
+                        content: responseContent,
+                        reasoning: reasoningTokens,
                         isStreaming: false,
                       }
                     : msg,
                 ),
               );
             }
-          } finally {
-            reader.releaseLock();
           }
         } else {
-          // Fallback to non-streaming response
-          const aiData = await aiResponse.json();
-          logger.debug(
-            "🤖 AI API RESPONSE BODY:",
-            JSON.stringify(aiData, null, 2),
+          const aiErrorData = await aiResponse.text();
+          console.error("🤖 AI API ERROR:", {
+            status: aiResponse.status,
+            statusText: aiResponse.statusText,
+            error: aiErrorData,
+            duration: aiDuration,
+            timestamp: new Date().toISOString(),
+          });
+          errorDetails.push(
+            `AI API failed: HTTP ${aiResponse.status} ${aiResponse.statusText}`,
           );
-
-          const responseContent =
-            aiData.response ||
-            "I apologize, but I couldn't generate a response. Please try again.";
-          const reasoningTokens = aiData.reasoning || null;
-
-          // Update the placeholder message only if component is still mounted
-          if (isMountedRef.current) {
-            setLocalMessages((prev) =>
-              prev.map((msg) =>
-                msg._id === assistantMessageId
-                  ? {
-                      ...msg,
-                      content: responseContent,
-                      reasoning: reasoningTokens,
-                      isStreaming: false,
-                    }
-                  : msg,
-              ),
-            );
-          }
+          errorDetails.push(`AI error details: ${aiErrorData}`);
+          throw new Error(
+            `AI API failed with status ${aiResponse.status} ${aiResponse.statusText}`,
+          );
         }
-      } else {
-        const aiErrorData = await aiResponse.text();
-        console.error("🤖 AI API ERROR:", {
-          status: aiResponse.status,
-          statusText: aiResponse.statusText,
-          error: aiErrorData,
-          duration: aiDuration,
+      } catch (error) {
+        // Check if error is due to abort
+        if (error instanceof Error && error.name === "AbortError") {
+          logger.debug("Request aborted (component unmounted or navigation)");
+          return; // Don't show error message for intentional aborts
+        }
+
+        console.error("💥 AI generation failed with exception:", {
+          error: error instanceof Error ? error.message : "Unknown error",
+          stack: error instanceof Error ? error.stack : "No stack trace",
           timestamp: new Date().toISOString(),
         });
-        errorDetails.push(
-          `AI API failed: HTTP ${aiResponse.status} ${aiResponse.statusText}`,
-        );
-        errorDetails.push(`AI error details: ${aiErrorData}`);
-        throw new Error(
-          `AI API failed with status ${aiResponse.status} ${aiResponse.statusText}`,
-        );
+
+        // Create detailed error message with all the debugging info
+        let errorMessage =
+          "I'm having trouble generating a response. Here's the detailed debugging information:\n\n";
+
+        errorMessage += "**🔍 SEARCH DEBUG INFO:**\n";
+        errorMessage += `- Search Method: ${searchMethod}\n`;
+        errorMessage += `- Results Found: ${searchResults.length}\n`;
+        errorMessage += `- Real Results: ${hasRealResults ? "Yes" : "No"}\n`;
+        errorMessage += `- Sources: ${sources.length}\n\n`;
+
+        if (errorDetails.length > 0) {
+          errorMessage += "**❌ ERROR DETAILS:**\n";
+          errorDetails.forEach((detail, index) => {
+            errorMessage += `${index + 1}. ${detail}\n`;
+          });
+          errorMessage += "\n";
+        }
+
+        // Environment diagnostics are dev-only to protect user privacy
+        if (import.meta.env.DEV) {
+          console.info("ENV CHECK:", {
+            url: window.location.href,
+            ua: navigator.userAgent,
+            ts: new Date().toISOString(),
+          });
+        }
+
+        if (searchContext) {
+          errorMessage += "**📄 AVAILABLE CONTENT:**\n";
+          errorMessage += `${searchContext.substring(0, 800)}...\n\n`;
+        }
+
+        errorMessage += "**🔧 NEXT STEPS:**\n";
+        errorMessage += "1. Check browser console for detailed API logs\n";
+        errorMessage += "2. Verify API endpoints are accessible\n";
+        errorMessage += "3. Try rephrasing your question\n";
+        errorMessage += "4. Check network connectivity\n";
+
+        const aiMessage: LocalMessage = {
+          _id: `msg_${Date.now() + 1}`,
+          chatId: chatId,
+          role: "assistant",
+          content: errorMessage,
+          timestamp: Date.now(),
+          searchResults: searchResults.length > 0 ? searchResults : undefined,
+          sources: sources.length > 0 ? sources : undefined,
+          searchMethod: searchMethod,
+          hasRealResults: hasRealResults,
+        };
+
+        if (isMountedRef.current) {
+          setLocalMessages((prev) => [...prev, aiMessage]);
+        }
       }
-    } catch (error) {
-      // Check if error is due to abort
-      if (error instanceof Error && error.name === "AbortError") {
-        logger.debug("Request aborted (component unmounted or navigation)");
-        return; // Don't show error message for intentional aborts
-      }
-
-      console.error("💥 AI generation failed with exception:", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : "No stack trace",
-        timestamp: new Date().toISOString(),
-      });
-
-      // Create detailed error message with all the debugging info
-      let errorMessage =
-        "I'm having trouble generating a response. Here's the detailed debugging information:\n\n";
-
-      errorMessage += "**🔍 SEARCH DEBUG INFO:**\n";
-      errorMessage += `- Search Method: ${searchMethod}\n`;
-      errorMessage += `- Results Found: ${searchResults.length}\n`;
-      errorMessage += `- Real Results: ${hasRealResults ? "Yes" : "No"}\n`;
-      errorMessage += `- Sources: ${sources.length}\n\n`;
-
-      if (errorDetails.length > 0) {
-        errorMessage += "**❌ ERROR DETAILS:**\n";
-        errorDetails.forEach((detail, index) => {
-          errorMessage += `${index + 1}. ${detail}\n`;
-        });
-        errorMessage += "\n";
-      }
-
-      // Environment diagnostics are dev-only to protect user privacy
-      if (import.meta.env.DEV) {
-        console.info("ENV CHECK:", {
-          url: window.location.href,
-          ua: navigator.userAgent,
-          ts: new Date().toISOString(),
-        });
-      }
-
-      if (searchContext) {
-        errorMessage += "**📄 AVAILABLE CONTENT:**\n";
-        errorMessage += `${searchContext.substring(0, 800)}...\n\n`;
-      }
-
-      errorMessage += "**🔧 NEXT STEPS:**\n";
-      errorMessage += "1. Check browser console for detailed API logs\n";
-      errorMessage += "2. Verify API endpoints are accessible\n";
-      errorMessage += "3. Try rephrasing your question\n";
-      errorMessage += "4. Check network connectivity\n";
-
-      const aiMessage: LocalMessage = {
-        _id: `msg_${Date.now() + 1}`,
-        chatId: chatId,
-        role: "assistant",
-        content: errorMessage,
-        timestamp: Date.now(),
-        searchResults: searchResults.length > 0 ? searchResults : undefined,
-        sources: sources.length > 0 ? sources : undefined,
-        searchMethod: searchMethod,
-        hasRealResults: hasRealResults,
-      };
-
-      if (isMountedRef.current) {
-        setLocalMessages((prev) => [...prev, aiMessage]);
-      }
-    }
-  };
+    },
+    [
+      resolveApi,
+      fetchJsonWithRetry,
+      localMessages,
+      setLocalMessages,
+      setSearchProgress,
+      throttledMessageUpdate,
+    ],
+  );
 
   /**
    * Send message handler
@@ -1468,105 +1569,129 @@ export function ChatInterface({
    * - Updates chat title on first msg
    * @param content - Message content
    */
-  const handleSendMessage = async (content: string) => {
-    logger.debug("🚀 handleSendMessage called with:", content);
-    // Don't send while an answer is already generating
-    if (isGenerating) {
-      logger.debug("⚠️ Already generating, skipping send");
-      return;
-    }
-    // If no chat is active yet, create one and queue this send
-    if (!currentChatId) {
-      logger.debug(
-        "📝 No current chat, queueing message and creating new chat",
-      );
-      pendingSendRef.current = content;
-      awaitingNewChatRef.current = true;
-      await handleNewChat();
-      return;
-    }
-    // If a follow-up prompt is visible, do not block normal send; dismiss it
-    if (showFollowUpPrompt) {
-      logger.debug("-dismissing follow-up prompt");
-      setShowFollowUpPrompt(false);
-      setPlannerHint(undefined);
-      setPendingMessage("");
-    }
-
-    // Check message limit for unauthenticated users
-    if (!isAuthenticated && messageCount >= 4) {
-      onRequestSignUp?.();
-      return;
-    }
-
-    // New-topic decision: use server planner when authenticated; otherwise fallback heuristic
-    const currentMessagesForChat =
-      typeof currentChatId === "string"
-        ? localMessages.filter((msg) => msg.chatId === currentChatId)
-        : messages || [];
-
-    // Do NOT block sending while a suggestion banner is visible.
-    // If the banner is already open, bypass gating and proceed to send.
-    if (
-      !showFollowUpPrompt &&
-      isAuthenticated &&
-      typeof currentChatId !== "string"
-    ) {
-      // Client-side gating before planner call
-      // Using module-level CHAT_COOLDOWN_MS constant
-      const contentTrim = content.trim();
-      const words = contentTrim.split(/\s+/).filter(Boolean);
-      // Stricter cue detection matching our indicators
-      const cue =
-        /^(completely different|unrelated|separate topic|new subject|switch to|change to|moving on to|now let's talk about something else|different conversation)/i.test(
-          contentTrim,
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      logger.debug("🚀 handleSendMessage called with:", content);
+      // Don't send while an answer is already generating
+      if (isGenerating) {
+        logger.debug("⚠️ Already generating, skipping send");
+        return;
+      }
+      // If no chat is active yet, create one and queue this send
+      if (!currentChatId) {
+        logger.debug(
+          "📝 No current chat, queueing message and creating new chat",
         );
-      let gapMinutes = 0;
-      try {
-        const prior = (messages || []).filter((m) => m.role === "user");
-        const lastUser = prior.length > 0 ? prior[prior.length - 1] : undefined;
-        if (
-          lastUser &&
-          typeof (lastUser as unknown as { timestamp?: number }).timestamp ===
-            "number"
-        ) {
-          gapMinutes = Math.floor(
-            (Date.now() -
-              (lastUser as unknown as { timestamp: number }).timestamp) /
-              60000,
-          );
-        }
-      } catch {}
-      const shouldPlanBase =
-        cue || words.length >= PROMPT_MIN_WORDS || gapMinutes >= 180;
-      const chatKey = String(currentChatId);
-      const lastAt = lastPlannerCallAtByChat[chatKey] || 0;
-      const cooldownPassed = Date.now() - lastAt >= CHAT_COOLDOWN_MS;
-      const shouldCallPlanner = shouldPlanBase && cooldownPassed;
+        pendingSendRef.current = content;
+        awaitingNewChatRef.current = true;
+        await handleNewChat();
+        return;
+      }
+      // If a follow-up prompt is visible, do not block normal send; dismiss it
+      if (showFollowUpPrompt) {
+        logger.debug("-dismissing follow-up prompt");
+        setShowFollowUpPrompt(false);
+        setPlannerHint(undefined);
+        setPendingMessage("");
+      }
 
-      if (shouldCallPlanner) {
+      // Check message limit for unauthenticated users
+      if (!isAuthenticated && messageCount >= 4) {
+        onRequestSignUp?.();
+        return;
+      }
+
+      // New-topic decision: use server planner when authenticated; otherwise fallback heuristic
+      const currentMessagesForChat =
+        typeof currentChatId === "string"
+          ? localMessages.filter((msg) => msg.chatId === currentChatId)
+          : messages || [];
+
+      // Do NOT block sending while a suggestion banner is visible.
+      // If the banner is already open, bypass gating and proceed to send.
+      if (
+        !showFollowUpPrompt &&
+        isAuthenticated &&
+        typeof currentChatId !== "string"
+      ) {
+        // Client-side gating before planner call
+        // Using module-level CHAT_COOLDOWN_MS constant
+        const contentTrim = content.trim();
+        const words = contentTrim.split(/\s+/).filter(Boolean);
+        // Stricter cue detection matching our indicators
+        const cue =
+          /^(completely different|unrelated|separate topic|new subject|switch to|change to|moving on to|now let's talk about something else|different conversation)/i.test(
+            contentTrim,
+          );
+        let gapMinutes = 0;
         try {
-          const plan = await planSearch({
-            chatId: currentChatId,
-            newMessage: content,
-            maxContextMessages: 10,
-          });
-          setLastPlannerCallAtByChat((prev) => ({
-            ...prev,
-            [chatKey]: Date.now(),
-          }));
+          const prior = (messages || []).filter((m) => m.role === "user");
+          const lastUser =
+            prior.length > 0 ? prior[prior.length - 1] : undefined;
           if (
-            plan?.suggestNewChat &&
-            (plan.decisionConfidence ?? 0) >= 0.8 &&
-            words.length >= PROMPT_MIN_WORDS
+            lastUser &&
+            typeof (lastUser as unknown as { timestamp?: number }).timestamp ===
+              "number"
+          ) {
+            gapMinutes = Math.floor(
+              (Date.now() -
+                (lastUser as unknown as { timestamp: number }).timestamp) /
+                60000,
+            );
+          }
+        } catch {}
+        const shouldPlanBase =
+          cue || words.length >= PROMPT_MIN_WORDS || gapMinutes >= 180;
+        const chatKey = String(currentChatId);
+        const lastAt = lastPlannerCallAtByChat[chatKey] || 0;
+        const cooldownPassed = Date.now() - lastAt >= CHAT_COOLDOWN_MS;
+        const shouldCallPlanner = shouldPlanBase && cooldownPassed;
+
+        if (shouldCallPlanner) {
+          try {
+            const plan = await planSearch({
+              chatId: currentChatId,
+              newMessage: content,
+              maxContextMessages: 10,
+            });
+            setLastPlannerCallAtByChat((prev) => ({
+              ...prev,
+              [chatKey]: Date.now(),
+            }));
+            if (
+              plan?.suggestNewChat &&
+              (plan.decisionConfidence ?? 0) >= 0.8 &&
+              words.length >= PROMPT_MIN_WORDS
+            ) {
+              const lastPromptAt = lastPromptAtByChat[chatKey] || 0;
+              if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
+                // Non-blocking banner: show suggestion but do not prevent sending
+                setPlannerHint({
+                  reason: plan.reasons,
+                  confidence: plan.decisionConfidence,
+                });
+                setShowFollowUpPrompt(true);
+                setLastPromptAtByChat((prev) => ({
+                  ...prev,
+                  [chatKey]: Date.now(),
+                }));
+              }
+            }
+          } catch (e) {
+            // If planner fails, fall back to heuristic below
+            console.warn("planSearch failed, falling back to heuristic", e);
+          }
+        } else {
+          // If we didn't call planner, still use local heuristic for big topic shifts
+          if (
+            currentMessagesForChat.length >= 3 &&
+            words.length >= PROMPT_MIN_WORDS &&
+            isTopicChange(content, currentMessagesForChat)
           ) {
             const lastPromptAt = lastPromptAtByChat[chatKey] || 0;
             if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
               // Non-blocking banner: show suggestion but do not prevent sending
-              setPlannerHint({
-                reason: plan.reasons,
-                confidence: plan.decisionConfidence,
-              });
+              setPlannerHint(undefined);
               setShowFollowUpPrompt(true);
               setLastPromptAtByChat((prev) => ({
                 ...prev,
@@ -1574,110 +1699,123 @@ export function ChatInterface({
               }));
             }
           }
-        } catch (e) {
-          // If planner fails, fall back to heuristic below
-          console.warn("planSearch failed, falling back to heuristic", e);
         }
-      } else {
-        // If we didn't call planner, still use local heuristic for big topic shifts
+      } else if (!showFollowUpPrompt) {
+        const wordsUnauth = content.trim().split(/\s+/).filter(Boolean);
         if (
           currentMessagesForChat.length >= 3 &&
-          words.length >= PROMPT_MIN_WORDS &&
+          wordsUnauth.length >= PROMPT_MIN_WORDS &&
           isTopicChange(content, currentMessagesForChat)
         ) {
-          const lastPromptAt = lastPromptAtByChat[chatKey] || 0;
+          const chatKeyU = String(currentChatId);
+          const lastPromptAt = lastPromptAtByChat[chatKeyU] || 0;
           if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
-            // Non-blocking banner: show suggestion but do not prevent sending
+            // Non-blocking banner for unauthenticated users too
             setPlannerHint(undefined);
             setShowFollowUpPrompt(true);
             setLastPromptAtByChat((prev) => ({
               ...prev,
-              [chatKey]: Date.now(),
+              [chatKeyU]: Date.now(),
             }));
           }
         }
       }
-    } else if (!showFollowUpPrompt) {
-      const wordsUnauth = content.trim().split(/\s+/).filter(Boolean);
-      if (
-        currentMessagesForChat.length >= 3 &&
-        wordsUnauth.length >= PROMPT_MIN_WORDS &&
-        isTopicChange(content, currentMessagesForChat)
-      ) {
-        const chatKeyU = String(currentChatId);
-        const lastPromptAt = lastPromptAtByChat[chatKeyU] || 0;
-        if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
-          // Non-blocking banner for unauthenticated users too
-          setPlannerHint(undefined);
-          setShowFollowUpPrompt(true);
-          setLastPromptAtByChat((prev) => ({
-            ...prev,
-            [chatKeyU]: Date.now(),
-          }));
-        }
-      }
-    }
 
-    setIsGenerating(true);
-    setSearchProgress({ stage: "searching", message: "Searching the web..." });
+      setIsGenerating(true);
+      setSearchProgress({
+        stage: "searching",
+        message: "Searching the web...",
+      });
 
-    try {
-      if (isAuthenticated && looksServerId(String(currentChatId))) {
-        // Authenticated user - use Convex (without onProgress callback)
-        await generateResponse({
-          chatId: currentChatId as Id<"chats">,
-          message: content,
-        });
-      } else {
-        // Unauthenticated user - add user message to local storage first
-        const userMessage: LocalMessage = {
-          _id: `msg_${Date.now()}`,
-          chatId: currentChatId as string,
-          role: "user",
-          content,
-          timestamp: Date.now(),
-        };
+      try {
+        if (isAuthenticated && looksServerId(String(currentChatId))) {
+          // Authenticated user - use Convex (without onProgress callback)
+          await generateResponse({
+            chatId: currentChatId as Id<"chats">,
+            message: content,
+          });
+        } else {
+          // Unauthenticated user - add user message to local storage first
+          const userMessage: LocalMessage = {
+            _id: `msg_${Date.now()}`,
+            chatId: currentChatId as string,
+            role: "user",
+            content,
+            timestamp: Date.now(),
+          };
 
-        setLocalMessages((prev) => [...prev, userMessage]);
+          setLocalMessages((prev) => [...prev, userMessage]);
 
-        // Update chat title if it's the first message
-        if (messageCount === 0) {
-          const title =
-            content.length > 50 ? `${content.substring(0, 50)}...` : content;
-          setLocalChats((prev) =>
-            prev.map((chat) =>
-              chat._id === currentChatId
-                ? { ...chat, title, updatedAt: Date.now() }
-                : chat,
-            ),
+          // Update chat title if it's the first message
+          if (messageCount === 0) {
+            const title =
+              content.length > 50 ? `${content.substring(0, 50)}...` : content;
+            setLocalChats((prev) =>
+              prev.map((chat) =>
+                chat._id === currentChatId
+                  ? { ...chat, title, updatedAt: Date.now() }
+                  : chat,
+              ),
+            );
+          }
+
+          // Generate real AI response for unauthenticated users
+          await generateUnauthenticatedResponse(
+            content,
+            currentChatId as string,
           );
         }
 
-        // Generate real AI response for unauthenticated users
-        await generateUnauthenticatedResponse(content, currentChatId as string);
+        setMessageCount((prev) => prev + 1);
+      } catch (error) {
+        console.error("Failed to generate response:", error);
+
+        // Add error message to chat
+        const errorMessage: LocalMessage = {
+          _id: `msg_${Date.now() + 1}`,
+          chatId: currentChatId as string,
+          role: "assistant",
+          content: `**Error generating response:**\n\n${error instanceof Error ? error.message : "Unknown error occurred"}\n\nPlease try again or rephrase your question.`,
+          timestamp: Date.now(),
+        };
+
+        if (typeof currentChatId === "string") {
+          setLocalMessages((prev) => [...prev, errorMessage]);
+        }
+      } finally {
+        setIsGenerating(false);
+        setSearchProgress(null);
       }
-
-      setMessageCount((prev) => prev + 1);
-    } catch (error) {
-      console.error("Failed to generate response:", error);
-
-      // Add error message to chat
-      const errorMessage: LocalMessage = {
-        _id: `msg_${Date.now() + 1}`,
-        chatId: currentChatId as string,
-        role: "assistant",
-        content: `**Error generating response:**\n\n${error instanceof Error ? error.message : "Unknown error occurred"}\n\nPlease try again or rephrase your question.`,
-        timestamp: Date.now(),
-      };
-
-      if (typeof currentChatId === "string") {
-        setLocalMessages((prev) => [...prev, errorMessage]);
-      }
-    } finally {
-      setIsGenerating(false);
-      setSearchProgress(null);
-    }
-  };
+    },
+    [
+      isGenerating,
+      currentChatId,
+      handleNewChat,
+      showFollowUpPrompt,
+      isAuthenticated,
+      messageCount,
+      onRequestSignUp,
+      localMessages,
+      messages,
+      looksServerId,
+      planSearch,
+      lastPlannerCallAtByChat,
+      lastPromptAtByChat,
+      isTopicChange,
+      generateResponse,
+      setLocalMessages,
+      setLocalChats,
+      generateUnauthenticatedResponse,
+      setIsGenerating,
+      setSearchProgress,
+      setShowFollowUpPrompt,
+      setPlannerHint,
+      setPendingMessage,
+      setLastPlannerCallAtByChat,
+      setLastPromptAtByChat,
+      setMessageCount,
+    ],
+  );
 
   /**
    * Share chat handler
@@ -1685,26 +1823,29 @@ export function ChatInterface({
    * - Sets public/private visibility
    * @param isPublic - Public visibility flag
    */
-  const handleShare = async (privacy: "private" | "shared" | "public") => {
-    if (!currentChatId) return;
+  const handleShare = useCallback(
+    async (privacy: "private" | "shared" | "public") => {
+      if (!currentChatId) return;
 
-    if (typeof currentChatId === "string") {
-      // Handle local chat
-      setLocalChats((prev) =>
-        prev.map((chat) =>
-          chat._id === currentChatId ? { ...chat, privacy } : chat,
-        ),
-      );
-    } else {
-      // Handle Convex chat
-      try {
-        await updateChatPrivacy({ chatId: currentChatId, privacy });
-      } catch (e) {
-        logger.error("Failed to update privacy", e);
+      if (typeof currentChatId === "string") {
+        // Handle local chat
+        setLocalChats((prev) =>
+          prev.map((chat) =>
+            chat._id === currentChatId ? { ...chat, privacy } : chat,
+          ),
+        );
+      } else {
+        // Handle Convex chat
+        try {
+          await updateChatPrivacy({ chatId: currentChatId, privacy });
+        } catch (e) {
+          logger.error("Failed to update privacy", e);
+        }
       }
-    }
-    setShowShareModal(false);
-  };
+      setShowShareModal(false);
+    },
+    [currentChatId, setLocalChats, updateChatPrivacy],
+  );
 
   /**
    * Continue in same chat
@@ -1863,7 +2004,9 @@ export function ChatInterface({
   );
 
   // Keep sendRef in sync with the latest handler after it's defined
-  sendRef.current = handleSendMessage;
+  useEffect(() => {
+    sendRef.current = handleSendMessage;
+  }, [handleSendMessage]);
 
   // Add ref to track if we've attempted auto-creation
   const hasAutoCreatedRef = useRef(false);
@@ -2059,31 +2202,8 @@ export function ChatInterface({
           currentChatId={currentChatId}
           onSelectChat={setCurrentChatId}
           onNewChat={handleNewChat}
-          onDeleteLocalChat={(chatId) => {
-            // Remove local chat and its messages
-            setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
-            setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
-          }}
-          onRequestDeleteChat={(chatId) => {
-            if (!looksServerId(String(chatId))) {
-              setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
-              setLocalMessages((prev) =>
-                prev.filter((m) => m.chatId !== chatId),
-              );
-            } else {
-              // Schedule server deletion after undo window
-              setTimeout(async () => {
-                try {
-                  await deleteChat({ chatId: chatId as Id<"chats"> });
-                } catch {}
-              }, 5000);
-            }
-            setUndoBanner({
-              type: "chat",
-              chatId,
-              expiresAt: Date.now() + 5000,
-            });
-          }}
+          onDeleteLocalChat={handleDeleteLocalChat}
+          onRequestDeleteChat={handleRequestDeleteChat}
           isOpen={sidebarOpen}
           onToggle={handleToggleSidebar}
         />
@@ -2092,33 +2212,13 @@ export function ChatInterface({
       {/* Mobile Sidebar */}
       <MobileSidebar
         isOpen={sidebarOpen}
-        onClose={() => {
-          if (sidebarOpen) handleToggleSidebar();
-        }}
+        onClose={handleMobileSidebarClose}
         chats={allChats}
         currentChatId={currentChatId}
-        onSelectChat={(id) => {
-          userSelectedChatAtRef.current = Date.now();
-          setCurrentChatId(id);
-        }}
+        onSelectChat={handleMobileSidebarSelectChat}
         onNewChat={handleNewChat}
-        onDeleteLocalChat={(chatId) => {
-          setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
-          setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
-        }}
-        onRequestDeleteChat={(chatId) => {
-          if (!looksServerId(String(chatId))) {
-            setLocalChats((prev) => prev.filter((c) => c._id !== chatId));
-            setLocalMessages((prev) => prev.filter((m) => m.chatId !== chatId));
-          } else {
-            setTimeout(async () => {
-              try {
-                await deleteChat({ chatId: chatId as Id<"chats"> });
-              } catch {}
-            }, 5000);
-          }
-          setUndoBanner({ type: "chat", chatId, expiresAt: Date.now() + 5000 });
-        }}
+        onDeleteLocalChat={handleDeleteLocalChat}
+        onRequestDeleteChat={handleRequestDeleteChat}
       />
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full">
@@ -2128,40 +2228,13 @@ export function ChatInterface({
             messages={currentMessages}
             isGenerating={isGenerating}
             searchProgress={searchProgress}
-            onToggleSidebar={() => {
+            onToggleSidebar={useCallback(() => {
               if (!sidebarOpen) handleToggleSidebar();
-            }}
-            onShare={canShare ? () => setShowShareModal(true) : undefined}
+            }, [sidebarOpen, handleToggleSidebar])}
+            onShare={canShare ? handleOpenShareModal : undefined}
             currentChat={currentChat}
-            onDeleteLocalMessage={(messageId) => {
-              // Delete a single local message by id
-              setLocalMessages((prev) =>
-                prev.filter((m) => m._id !== messageId),
-              );
-            }}
-            onRequestDeleteMessage={(messageId) => {
-              if (
-                messageId.startsWith("local_") ||
-                messageId.startsWith("msg_")
-              ) {
-                setLocalMessages((prev) =>
-                  prev.filter((m) => m._id !== messageId),
-                );
-              } else {
-                setTimeout(async () => {
-                  try {
-                    await deleteMessage({
-                      messageId: messageId as Id<"messages">,
-                    });
-                  } catch {}
-                }, 5000);
-              }
-              setUndoBanner({
-                type: "message",
-                messageId,
-                expiresAt: Date.now() + 5000,
-              });
-            }}
+            onDeleteLocalMessage={handleDeleteLocalMessage}
+            onRequestDeleteMessage={handleRequestDeleteMessage}
           />
         </div>
         <div className="flex-shrink-0 relative">
@@ -2180,14 +2253,11 @@ export function ChatInterface({
           {/* Persistent controls aligned with input */}
           {canShare && (
             <div className="px-4 sm:px-6 mb-2 flex justify-end">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={() => {
-                    logger.debug("🖱️ New Chat button clicked in MessageList");
-                    handleNewChat();
-                  }}
+                  onClick={handleNewChatButton}
                   disabled={isCreatingChat}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title={
                     isCreatingChat ? "Creating new chat..." : "Start a new chat"
                   }
@@ -2222,22 +2292,21 @@ export function ChatInterface({
                     </svg>
                   )}
                 </button>
-                <div className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                  <CopyButton
-                    text={currentMessages
-                      .map(
-                        (m) =>
-                          `${m.role === "user" ? "User" : "Assistant"}: ${extractPlainText(m.content)}`,
-                      )
-                      .join("\n\n")}
-                    size="md"
-                    title="Copy entire conversation"
-                    ariaLabel="Copy entire conversation to clipboard"
-                  />
-                </div>
+                <CopyButton
+                  text={currentMessages
+                    .map(
+                      (m) =>
+                        `${m.role === "user" ? "User" : "Assistant"}: ${extractPlainText(m.content)}`,
+                    )
+                    .join("\n\n")}
+                  size="md"
+                  title="Copy entire conversation"
+                  ariaLabel="Copy entire conversation to clipboard"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                />
                 <button
-                  onClick={() => setShowShareModal(true)}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  onClick={handleOpenShareModal}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                   title="Share this conversation"
                   type="button"
                 >
@@ -2267,7 +2336,7 @@ export function ChatInterface({
                     : "Message deleted"}
                 </span>
                 <button
-                  onClick={() => setUndoBanner(null)}
+                  onClick={handleSetUndoBannerNull}
                   className="underline text-sm"
                 >
                   Undo

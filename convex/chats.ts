@@ -303,7 +303,11 @@ export const summarizeRecent = query({
       .query("messages")
       .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
       .order("desc");
-    const buf: any[] = [];
+    const buf: Array<{
+      role: "user" | "assistant" | "system";
+      content?: string;
+      timestamp?: number;
+    }> = [];
     for await (const m of q) {
       buf.push(m);
       if (buf.length >= limit) break;
@@ -312,7 +316,8 @@ export const summarizeRecent = query({
     const chat = await ctx.db.get(args.chatId);
     return buildContextSummary({
       messages: ordered,
-      rollingSummary: (chat as any)?.rollingSummary,
+      rollingSummary: (chat as unknown as { rollingSummary?: string })
+        ?.rollingSummary,
       maxChars: 1600,
     });
   },
@@ -340,7 +345,9 @@ export const summarizeRecentAction = action({
     });
     return buildContextSummary({
       messages: ordered,
-      rollingSummary: (chatResult as any)?.rollingSummary,
+      rollingSummary: (
+        chatResult as { rollingSummary?: string } | null | undefined
+      )?.rollingSummary,
       maxChars: 1600,
     });
   },
@@ -476,7 +483,7 @@ export const importLocalChats = mutation({
       if (ch.shareId) {
         const existingShare = await ctx.db
           .query("chats")
-          .withIndex("by_share_id", (q) => q.eq("shareId", ch.shareId!))
+          .withIndex("by_share_id", (q) => q.eq("shareId", ch.shareId ?? ""))
           .unique();
         if (existingShare) shareId = generateOpaqueId();
       }
@@ -484,7 +491,7 @@ export const importLocalChats = mutation({
       if (ch.publicId) {
         const existingPublic = await ctx.db
           .query("chats")
-          .withIndex("by_public_id", (q) => q.eq("publicId", ch.publicId!))
+          .withIndex("by_public_id", (q) => q.eq("publicId", ch.publicId ?? ""))
           .unique();
         if (existingPublic) publicId = generateOpaqueId();
       }
@@ -507,12 +514,12 @@ export const importLocalChats = mutation({
         await ctx.db.insert("messages", {
           chatId,
           role: m.role,
-          content: m.content,
+          content: m.content as string | undefined,
           timestamp: m.timestamp ?? Date.now(),
           // Preserve optional metadata when present
-          searchResults: m.searchResults as any,
+          searchResults: m.searchResults as any[] | undefined,
           sources: m.sources,
-          reasoning: m.reasoning as any,
+          reasoning: m.reasoning as string | undefined,
           searchMethod: m.searchMethod,
           hasRealResults: m.hasRealResults,
         });
