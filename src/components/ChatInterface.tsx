@@ -217,7 +217,7 @@ export function ChatInterface({
             attempt++;
             continue;
           }
-          baseSignal?.removeEventListener?.("abort", onAbort as any);
+          baseSignal?.removeEventListener?.("abort", onAbort as EventListener);
           return res;
         } catch (err) {
           lastErr = err;
@@ -261,6 +261,7 @@ export function ChatInterface({
   const [messageCount, setMessageCount] = useState(0);
   // Auth modals are managed by the App; request via callbacks instead
   const [showShareModal, setShowShareModal] = useState(false);
+  const handleCloseShareModal = useCallback(() => setShowShareModal(false), []);
   const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string>("");
   const [plannerHint, setPlannerHint] = useState<
@@ -2295,7 +2296,7 @@ export function ChatInterface({
 
       <ShareModal
         isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
+        onClose={handleCloseShareModal}
         onShare={handleShare}
         shareUrl={
           currentChat?.privacy === "public" && currentChat.publicId

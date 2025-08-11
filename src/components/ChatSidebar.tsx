@@ -33,6 +33,14 @@ export function ChatSidebar({
   onToggle,
 }: ChatSidebarProps) {
   const deleteChat = useMutation(api.chats.deleteChat);
+
+  const handleSelectChat = React.useCallback(
+    (chatId: Id<"chats"> | string) => {
+      onSelectChat(chatId);
+    },
+    [onSelectChat],
+  );
+
   if (!isOpen) {
     return (
       <div className="w-12 h-full border-r bg-muted/30 flex flex-col">
@@ -104,10 +112,7 @@ export function ChatSidebar({
           </button>
         </div>
         <button
-          onClick={() => {
-            console.log("🖱️ New Chat button clicked in ChatSidebar");
-            onNewChat();
-          }}
+          onClick={onNewChat}
           className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
         >
           <svg
@@ -135,9 +140,9 @@ export function ChatSidebar({
         ) : (
           <div className="p-2">
             {chats.map((chat) => (
-              <div key={chat._id} className="flex items-center gap-2 mb-1">
+              <div key={chat._id} className="flex items-center gap-2 mb-1 pr-2">
                 <button
-                  onClick={() => onSelectChat(chat._id)}
+                  onClick={() => handleSelectChat(chat._id)}
                   className={`flex-1 p-3 rounded-lg text-left hover:bg-muted transition-colors ${
                     currentChatId === chat._id ? "bg-muted" : ""
                   }`}
@@ -175,12 +180,15 @@ export function ChatSidebar({
                         onSelectChat(null);
                       }
                     } catch (err) {
-                      if ((import.meta as any)?.env?.DEV) {
+                      if (
+                        (import.meta as unknown as { env?: { DEV?: boolean } })
+                          ?.env?.DEV
+                      ) {
                         console.warn("Chat deletion failed:", err);
                       }
                     }
                   }}
-                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+                  className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
                   title="Delete chat"
                   aria-label="Delete chat"
                 >
