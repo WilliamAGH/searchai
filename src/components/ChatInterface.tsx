@@ -140,7 +140,7 @@ export function ChatInterface({
   onRequestSignUp?: () => void;
   onRequestSignIn?: () => void;
 }) {
-  console.log("💬 ChatInterface rendered with props:", {
+  logger.debug("💬 ChatInterface rendered with props:", {
     isAuthenticated,
     propChatId,
     propShareId,
@@ -151,7 +151,7 @@ export function ChatInterface({
   // Log when the component is unmounted
   useEffect(() => {
     return () => {
-      console.log("🧹 ChatInterface unmounted");
+      logger.debug("🧹 ChatInterface unmounted");
     };
   }, []);
   const convexUrl = (import.meta as any).env?.VITE_CONVEX_URL || "";
@@ -167,11 +167,11 @@ export function ChatInterface({
   const [currentChatId, setCurrentChatId] = useState<
     Id<"chats"> | string | null
   >(null);
-  console.log("🔄 ChatInterface currentChatId state:", currentChatId);
+  logger.debug("🔄 ChatInterface currentChatId state:", currentChatId);
 
   // Add a useEffect to monitor currentChatId changes
   useEffect(() => {
-    console.log("🔄 currentChatId state updated:", currentChatId);
+    logger.debug("🔄 currentChatId state updated:", currentChatId);
   }, [currentChatId]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
@@ -412,7 +412,7 @@ export function ChatInterface({
       const filtered = localMessages.filter(
         (msg) => msg.chatId === currentChatId,
       );
-      console.log("📨 Filtered local messages for current chat:", {
+      logger.debug("📨 Filtered local messages for current chat:", {
         currentChatId,
         totalLocalMessages: localMessages.length,
         filteredMessages: filtered.length,
@@ -445,7 +445,7 @@ export function ChatInterface({
       Date.now() - userSelectedChatAtRef.current < 1000;
 
     if (recentUserAction) {
-      console.log("🚫 Skipping URL override due to recent user action");
+      logger.debug("🚫 Skipping URL override due to recent user action");
       return;
     }
 
@@ -492,7 +492,7 @@ export function ChatInterface({
     }
 
     if (newChatId && newChatId !== currentChatId) {
-      console.log("🔄 Setting currentChatId from URL/data:", newChatId);
+      logger.debug("🔄 Setting currentChatId from URL/data:", newChatId);
       setCurrentChatId(newChatId);
     }
   }, [
@@ -553,7 +553,7 @@ export function ChatInterface({
     if (!currentChatId) return undefined;
     const idStr = String(currentChatId);
     const foundChat = allChats.find((c) => String(c._id) === idStr);
-    console.log(
+    logger.debug(
       "🗨️ ChatInterface currentChat:",
       foundChat,
       "currentChatId:",
@@ -571,37 +571,40 @@ export function ChatInterface({
    * - Updates URL for shareable chats
    */
   const handleNewChat = useCallback(async (): Promise<string | null> => {
-    console.log("🔍 handleNewChat called", { isAuthenticated, isCreatingChat });
+    logger.debug("🔍 handleNewChat called", {
+      isAuthenticated,
+      isCreatingChat,
+    });
     try {
       if (isCreatingChat) {
-        console.log("⚠️ Already creating chat, returning early");
+        logger.debug("⚠️ Already creating chat, returning early");
         return null;
       }
       setIsCreatingChat(true);
-      console.log("🔄 Setting isCreatingChat to true");
+      logger.debug("🔄 Setting isCreatingChat to true");
       // Mark that the user explicitly initiated a chat change
       userSelectedChatAtRef.current = Date.now();
-      console.log(
+      logger.debug(
         "📌 Marked user selected chat at:",
         userSelectedChatAtRef.current,
       );
       let newChatId: string | null = null;
 
       if (isAuthenticated) {
-        console.log("🔐 Authenticated user, creating Convex chat");
+        logger.debug("🔐 Authenticated user, creating Convex chat");
         const chatId = await createChat({
           title: "New Chat",
         });
         newChatId = String(chatId);
-        console.log("✅ Convex chat created:", chatId);
+        logger.debug("✅ Convex chat created:", chatId);
         setCurrentChatId(chatId);
-        console.log("🔄 setCurrentChatId called with:", chatId);
+        logger.debug("🔄 setCurrentChatId called with:", chatId);
         navigate(`/chat/${chatId}`);
-        console.log("🧭 navigate called with:", `/chat/${chatId}`);
+        logger.debug("🧭 navigate called with:", `/chat/${chatId}`);
         setMessageCount(0);
-        console.log("🔢 setMessageCount reset to 0");
+        logger.debug("🔢 setMessageCount reset to 0");
       } else {
-        console.log("👤 Unauthenticated user, creating local chat");
+        logger.debug("👤 Unauthenticated user, creating local chat");
         // Create local chat with unique share ID
         const shareId = generateShareId();
         const newChat: LocalChat = {
@@ -615,23 +618,23 @@ export function ChatInterface({
           privacy: "private",
         };
         setLocalChats((prev) => [newChat, ...prev]);
-        console.log("✅ Local chat created:", newChat._id);
+        logger.debug("✅ Local chat created:", newChat._id);
         setCurrentChatId(newChat._id);
-        console.log("🔄 setCurrentChatId called with:", newChat._id);
+        logger.debug("🔄 setCurrentChatId called with:", newChat._id);
         navigate(`/chat/${newChat._id}`);
-        console.log("🧭 navigate called with:", `/chat/${newChat._id}`);
+        logger.debug("🧭 navigate called with:", `/chat/${newChat._id}`);
         newChatId = newChat._id;
         setMessageCount(0);
-        console.log("🔢 setMessageCount reset to 0");
+        logger.debug("🔢 setMessageCount reset to 0");
       }
 
-      console.log("🏁 handleNewChat completed, returning:", newChatId);
+      logger.debug("🏁 handleNewChat completed, returning:", newChatId);
       return newChatId;
     } catch (error) {
       console.error("💥 Failed to create chat:", error);
       setIsCreatingChat(false);
     }
-    console.log("🏁 handleNewChat returning null");
+    logger.debug("🏁 handleNewChat returning null");
     return null;
   }, [
     isCreatingChat,
@@ -645,12 +648,12 @@ export function ChatInterface({
 
   // Always clear creating state once navigate/selection occurs
   useEffect(() => {
-    console.log("🔄 useEffect: Clear creating state triggered", {
+    logger.debug("🔄 useEffect: Clear creating state triggered", {
       isCreatingChat,
       currentChatId,
     });
     if (isCreatingChat && currentChatId) {
-      console.log("✅ Clearing isCreatingChat state");
+      logger.debug("✅ Clearing isCreatingChat state");
       setIsCreatingChat(false);
     }
   }, [isCreatingChat, currentChatId]);
@@ -707,11 +710,14 @@ export function ChatInterface({
   const awaitingNewChatRef = useRef<boolean>(false);
   const sendRef = useRef<null | ((m: string) => void)>(null);
   useEffect(() => {
-    console.log("🔄 useEffect: Deterministic post-create send flow triggered", {
-      awaitingNewChatRef: awaitingNewChatRef.current,
-      currentChatId,
-      pendingSendRef: pendingSendRef.current,
-    });
+    logger.debug(
+      "🔄 useEffect: Deterministic post-create send flow triggered",
+      {
+        awaitingNewChatRef: awaitingNewChatRef.current,
+        currentChatId,
+        pendingSendRef: pendingSendRef.current,
+      },
+    );
     if (!awaitingNewChatRef.current) return;
     if (!currentChatId) return;
     const msg = pendingSendRef.current;
@@ -720,7 +726,7 @@ export function ChatInterface({
     awaitingNewChatRef.current = false;
     pendingSendRef.current = null;
     // Send into the newly created chat id (currentChatId is now set)
-    console.log("📤 Sending pending message:", msg);
+    logger.debug("📤 Sending pending message:", msg);
     sendRef.current?.(msg);
   }, [currentChatId]);
 
@@ -1382,15 +1388,17 @@ export function ChatInterface({
    * @param content - Message content
    */
   const handleSendMessage = async (content: string) => {
-    console.log("🚀 handleSendMessage called with:", content);
+    logger.debug("🚀 handleSendMessage called with:", content);
     // Don't send while an answer is already generating
     if (isGenerating) {
-      console.log("⚠️ Already generating, skipping send");
+      logger.debug("⚠️ Already generating, skipping send");
       return;
     }
     // If no chat is active yet, create one and queue this send
     if (!currentChatId) {
-      console.log("📝 No current chat, queueing message and creating new chat");
+      logger.debug(
+        "📝 No current chat, queueing message and creating new chat",
+      );
       pendingSendRef.current = content;
       awaitingNewChatRef.current = true;
       await handleNewChat();
@@ -1398,7 +1406,7 @@ export function ChatInterface({
     }
     // If a follow-up prompt is visible, do not block normal send; dismiss it
     if (showFollowUpPrompt) {
-      console.log("-dismissing follow-up prompt");
+      logger.debug("-dismissing follow-up prompt");
       setShowFollowUpPrompt(false);
       setPlannerHint(undefined);
       setPendingMessage("");
@@ -1772,9 +1780,23 @@ export function ChatInterface({
     sendRef.current = handleSendMessage;
   }, [handleSendMessage]);
 
+  // Add ref to track if we've attempted auto-creation
+  const hasAutoCreatedRef = useRef(false);
+  const handleNewChatRef = useRef(handleNewChat);
+
+  // Keep handleNewChatRef in sync
+  useEffect(() => {
+    handleNewChatRef.current = handleNewChat;
+  }, [handleNewChat]);
+
+  // Reset auto-creation flag when authentication changes
+  useEffect(() => {
+    hasAutoCreatedRef.current = false;
+  }, [isAuthenticated]);
+
   // Auto-create first chat only if no chats exist and user hasn't selected/navigated
   useEffect(() => {
-    console.log("🔄 useEffect: Auto-create first chat triggered", {
+    logger.debug("🔄 useEffect: Auto-create first chat triggered", {
       allChatsLength: Array.isArray(allChats) ? allChats.length : "not array",
       currentChatId,
       userSelectedChatAtRef: userSelectedChatAtRef.current,
@@ -1790,7 +1812,10 @@ export function ChatInterface({
     const hasAny = Array.isArray(allChats) && allChats.length > 0;
     const queriesResolved = isAuthenticated ? Array.isArray(chats) : true;
 
+    // Skip if we've already attempted auto-creation or chat is being created
     if (
+      hasAutoCreatedRef.current ||
+      isCreatingChat ||
       !queriesResolved ||
       userSelectedChatAtRef.current ||
       currentChatId ||
@@ -1800,15 +1825,25 @@ export function ChatInterface({
       propPublicId ||
       hasAny
     ) {
-      console.log("⏭️ Skipping auto-create chat due to existing conditions");
+      logger.debug("⏭️ Skipping auto-create chat due to existing conditions", {
+        hasAutoCreated: hasAutoCreatedRef.current,
+        isCreatingChat,
+      });
       return;
     }
 
     const t = window.setTimeout(() => {
       const stillHasNone = Array.isArray(allChats) && allChats.length === 0;
-      if (!userSelectedChatAtRef.current && !currentChatId && stillHasNone) {
-        console.log("🤖 Auto-creating new chat");
-        handleNewChat();
+      if (
+        !userSelectedChatAtRef.current &&
+        !currentChatId &&
+        stillHasNone &&
+        !hasAutoCreatedRef.current &&
+        !isCreatingChat
+      ) {
+        logger.debug("🤖 Auto-creating new chat");
+        hasAutoCreatedRef.current = true;
+        handleNewChatRef.current();
       }
     }, 600);
     return () => window.clearTimeout(t);
@@ -1820,7 +1855,8 @@ export function ChatInterface({
     propChatId,
     propShareId,
     propPublicId,
-    handleNewChat,
+    isCreatingChat,
+    // Removed handleNewChat to avoid infinite loop - using ref instead
   ]);
 
   const canShare = currentMessages.length > 0 && !!currentChatId;
@@ -2053,7 +2089,7 @@ export function ChatInterface({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    console.log("🖱️ New Chat button clicked in MessageList");
+                    logger.debug("🖱️ New Chat button clicked in MessageList");
                     handleNewChat();
                   }}
                   disabled={isCreatingChat}
