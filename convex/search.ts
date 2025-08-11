@@ -880,8 +880,6 @@ interface DuckDuckGoResponse {
   Heading?: string;
 }
 
-// Duplicate interface removed (defined above)
-
 /**
  * Search via DuckDuckGo API
  * - Uses instant answer API
@@ -1211,10 +1209,10 @@ export const recordClientMetric = action({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const _metricClient: null = await ctx.runMutation(
-      internal.search.recordMetric,
-      { name: args.name, chatId: args.chatId },
-    );
+    await ctx.runMutation(internal.search.recordMetric, {
+      name: args.name,
+      chatId: args.chatId,
+    });
     return null;
   },
 });
