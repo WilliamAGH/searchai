@@ -439,13 +439,15 @@ export function ChatInterface({
 
   // Update URL when chat changes
   useEffect(() => {
-    // Don't override currentChatId if user just initiated a chat change
-    const recentUserAction =
+    // Don't override currentChatId if user just initiated a chat selection/navigation
+    // But allow authentication-related updates to proceed normally
+    const recentChatAction =
       userSelectedChatAtRef.current &&
       Date.now() - userSelectedChatAtRef.current < 1000;
 
-    if (recentUserAction) {
-      logger.debug("🚫 Skipping URL override due to recent user action");
+    // Only skip URL override for chat navigation, not authentication changes
+    if (recentChatAction && currentChatId) {
+      logger.debug("🚫 Skipping URL override due to recent chat action");
       return;
     }
 
