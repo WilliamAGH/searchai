@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
+import { logger } from "../lib/logger";
 
 interface MessageInputProps {
   /** Callback when message is sent */
@@ -53,6 +54,9 @@ export function MessageInput({
   const sendCurrentMessage = React.useCallback(() => {
     const trimmed = message.trim();
     if (trimmed && !disabled) {
+      logger.debug("⌨️ MessageInput: sending message", {
+        length: trimmed.length,
+      });
       onSendMessage(trimmed);
       setMessage("");
       onDraftChange?.("");
@@ -190,6 +194,24 @@ export function MessageInput({
     adjustTextarea();
   }, [message]);
 
+  // Autofocus the textarea when the input mounts and when it becomes enabled.
+  useEffect(() => {
+    if (!disabled) {
+      const el = textareaRef.current;
+      if (el) {
+        try {
+          el.focus();
+          logger.debug("🎯 MessageInput: focused textarea");
+        } catch {}
+      }
+    }
+  }, [disabled]);
+
+  useEffect(() => {
+    logger.debug("🧩 MessageInput mounted", { disabled, placeholder });
+    return () => logger.debug("🧩 MessageInput unmounted");
+  }, [disabled, placeholder]);
+
   // Recalculate textarea height on orientation/viewport changes
   useEffect(() => {
     const handler: EventListener = () => {
@@ -281,7 +303,7 @@ export function MessageInput({
               disabled={disabled}
               rows={1}
               autoComplete="off"
-              className={`w-full pl-3 sm:pl-4 pr-16 sm:pr-14 text-base tracking-tight ${
+              className={`w-full pl-3 sm:pl-4 pr-16 sm:pr-14 text-base tracking-tight font-ui slashed-zero lining-nums tabular-nums ${
                 message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"
               } rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-y-auto message-input-textarea message-textarea`}
             />
