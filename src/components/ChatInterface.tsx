@@ -503,6 +503,7 @@ export function ChatInterface({
     chatByPublicId,
     isAuthenticated,
     propChatId,
+    looksServerId,
     propShareId,
     propPublicId,
     localChats,
@@ -1641,14 +1642,14 @@ export function ChatInterface({
     if (pendingMessage) {
       const tempMessage = pendingMessage;
       setPendingMessage("");
-      handleSendMessage(tempMessage);
+      sendRef.current?.(tempMessage);
     }
   }, [
     pendingMessage,
     isAuthenticated,
     currentChatId,
     recordClientMetric,
-    handleSendMessage,
+    looksServerId,
   ]);
 
   /**
@@ -1682,7 +1683,7 @@ export function ChatInterface({
     isAuthenticated,
     currentChatId,
     recordClientMetric,
-    handleSendMessage,
+    looksServerId,
   ]);
 
   // Start new chat with summary: create chat, synthesize prompt with summary + question
@@ -1748,7 +1749,7 @@ export function ChatInterface({
     isAuthenticated,
     localMessages,
     summarizeRecentAction,
-    handleSendMessage,
+    looksServerId,
   ]);
 
   // Debounced draft analyzer: quick local heuristic, optional planner preflight (not blocking)
@@ -1778,9 +1779,7 @@ export function ChatInterface({
   );
 
   // Keep sendRef in sync with the latest handler after it's defined
-  useEffect(() => {
-    sendRef.current = handleSendMessage;
-  }, [handleSendMessage]);
+  sendRef.current = handleSendMessage;
 
   // Add ref to track if we've attempted auto-creation
   const hasAutoCreatedRef = useRef(false);
@@ -1939,6 +1938,9 @@ export function ChatInterface({
     importLocalChats,
     setLocalChats,
     setLocalMessages,
+    MIGRATION_RETRY_KEY,
+    MIGRATION_BACKOFF_MS,
+    currentChatId,
   ]);
 
   // Swipe handlers for mobile
