@@ -5,6 +5,7 @@
 import React, { useState, useRef } from "react";
 import { copyToClipboard } from "../lib/clipboard";
 import clsx from "clsx";
+import { toast } from "sonner";
 
 interface CopyButtonProps {
   /** Text to copy to clipboard */
@@ -44,28 +45,33 @@ export function CopyButton({
   /**
    * Handle copy action with feedback
    */
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const handleCopy = React.useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
 
-    const success = await copyToClipboard(text);
+      const success = await copyToClipboard(text);
 
-    if (success) {
-      setCopied(true);
-      onCopy?.();
+      if (success) {
+        setCopied(true);
+        onCopy?.();
 
-      // Clear any existing timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+        // Clear any existing timeout
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+
+        // Reset after 2 seconds
+        timeoutRef.current = setTimeout(() => {
+          setCopied(false);
+          timeoutRef.current = null;
+        }, 2000);
+      } else {
+        toast.error("Failed to copy to clipboard");
       }
-
-      // Reset after 2 seconds
-      timeoutRef.current = setTimeout(() => {
-        setCopied(false);
-        timeoutRef.current = null;
-      }, 2000);
-    }
-  };
+    },
+    [text, onCopy],
+  );
 
   const iconSize = size === "sm" ? "w-4 h-4" : "w-5 h-5";
 
