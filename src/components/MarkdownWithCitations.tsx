@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
 /**
  * Markdown renderer with citation support
  * - Processes markdown content
@@ -118,8 +119,10 @@ export function MarkdownWithCitations({
       remarkPlugins={[remarkGfm, remarkBreaks]}
       rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
       components={{
-        a: ({ _node, _inline, ...props }) => (
-          <a {...props} target="_blank" rel="noopener noreferrer" />
+        a: ({ _node, _inline, children, ...props }) => (
+          <a {...props} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
         ),
         code: ({ _node, _inline, className, children, ...props }) => (
           <code className={className} {...props}>

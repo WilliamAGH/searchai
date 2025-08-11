@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
 /**
  * Message list display component
  * - Auto-scrolls to bottom unless user scrolls up
