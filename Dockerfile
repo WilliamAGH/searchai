@@ -48,12 +48,11 @@ RUN npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
-# Install serve and wget for health checks
-RUN npm install -g serve && \
-    apk add --no-cache wget
+RUN apk add --no-cache wget
 
 # Copy built application only
 COPY --from=builder /app/dist ./dist
+COPY server.mjs ./server.mjs
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -69,5 +68,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
 
-# Serve the built application
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Serve the built application with API proxy
+ENV CONVEX_SITE_URL=""
+CMD ["node", "server.mjs"]

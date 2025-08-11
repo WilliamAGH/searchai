@@ -42,6 +42,7 @@ export function ShareModal({
     "private" | "shared" | "public" | "llm"
   >(privacy);
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -92,6 +93,7 @@ export function ShareModal({
 
   // Copy the currently displayed URL
   const handleCopyUrl = React.useCallback(async () => {
+    setBusy(true);
     // If selecting LLM/Shared/Public, ensure it's published/shared before copying
     const effective = selectedPrivacy === "llm" ? "shared" : selectedPrivacy;
     const maybe = await onShare(effective as "private" | "shared" | "public");
@@ -122,6 +124,8 @@ export function ShareModal({
       }
     } catch (error) {
       logger.error("Failed to share/copy URL", { error });
+    } finally {
+      setBusy(false);
     }
   }, [displayUrl, onShare, selectedPrivacy, exportBase, shareId]);
 
@@ -346,14 +350,44 @@ export function ShareModal({
                     />
                     <button
                       onClick={handleCopyUrl}
-                      className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                      className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-60"
                       aria-label={
                         copied
                           ? "URL copied to clipboard"
-                          : "Copy URL to clipboard"
+                          : busy
+                            ? "Publishing…"
+                            : "Copy URL to clipboard"
                       }
+                      disabled={busy}
                     >
-                      {copied ? "Copied!" : "Copy"}
+                      {busy ? (
+                        <span className="inline-flex items-center gap-2">
+                          <svg
+                            className="w-4 h-4 animate-spin"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                          >
+                            <circle
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              strokeWidth="4"
+                              className="opacity-25"
+                            />
+                            <path
+                              d="M4 12a8 8 0 018-8"
+                              strokeWidth="4"
+                              className="opacity-75"
+                            />
+                          </svg>
+                          Publishing…
+                        </span>
+                      ) : copied ? (
+                        "Copied!"
+                      ) : (
+                        "Copy"
+                      )}
                     </button>
                   </>
                 ) : (
@@ -376,12 +410,15 @@ export function ShareModal({
             </button>
             <button
               onClick={async () => {
+                setBusy(true);
                 await handleShare();
+                setBusy(false);
                 onClose();
               }}
-              className="flex-1 px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+              className="flex-1 px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-60"
+              disabled={busy}
             >
-              Update Privacy
+              {busy ? "Updating…" : "Update Privacy"}
             </button>
           </div>
         </div>

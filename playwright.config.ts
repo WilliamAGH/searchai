@@ -1,5 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
+const useProxyRuntime = process.env.PLAYWRIGHT_RUNTIME === "proxy";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
@@ -12,9 +14,17 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "vite preview --strictPort --port 4173 --host 127.0.0.1",
+    command: useProxyRuntime
+      ? "node server.mjs"
+      : "vite preview --strictPort --port 4173 --host 127.0.0.1",
     url: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173",
     reuseExistingServer: true,
     timeout: 60_000,
+    env: useProxyRuntime
+      ? {
+          PORT: "4173",
+          CONVEX_SITE_URL: process.env.CONVEX_SITE_URL || "",
+        }
+      : undefined,
   },
 });

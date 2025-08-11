@@ -445,15 +445,20 @@ export const generationStep = internalAction({
           hasRealResults = true;
         }
 
-        // Add user-provided URLs as additional search sources with high relevance
+        // Separate user-provided URLs from search results to ensure they're always included
+        let userUrlResults: Array<{
+          title: string;
+          url: string;
+          snippet: string;
+          relevanceScore: number;
+        }> = [];
+
         if (userProvidedUrls.length > 0) {
-          const userUrlResults =
-            createUserProvidedSearchResults(userProvidedUrls);
-          aggregated.unshift(...userUrlResults);
+          userUrlResults = createUserProvidedSearchResults(userProvidedUrls);
           hasRealResults = true;
         }
 
-        // Dedupe by URL (normalized), keep highest relevance
+        // Dedupe search results by URL (normalized), keep highest relevance
         const byUrl = new Map<
           string,
           {
@@ -463,8 +468,14 @@ export const generationStep = internalAction({
             relevanceScore: number;
           }
         >();
+
+        // Process aggregated search results (excluding user URLs)
         for (const r of aggregated) {
           const key = normalizeUrlForKey(r.url);
+          // Skip if this URL was provided by the user
+          if (userProvidedUrls.some((url) => normalizeUrlForKey(url) === key)) {
+            continue;
+          }
           const existing = byUrl.get(key);
           const score =
             typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;
@@ -477,6 +488,7 @@ export const generationStep = internalAction({
             });
           }
         }
+
         // Lightweight rerank: prioritize overlap with latest user message + quoted phrases
         const latest = (args.userMessage || "").toLowerCase();
         const phraseSet = new Set(Array.from(ngrams));
@@ -515,10 +527,15 @@ export const generationStep = internalAction({
           } catch {}
           return s;
         };
-        searchResults = Array.from(byUrl.values())
+
+        // Get top search results (separate from user URLs)
+        const topSearchResults = Array.from(byUrl.values())
           .map((r) => ({ ...r, relevanceScore: score(r) }))
           .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
           .slice(0, 7);
+
+        // Combine user URLs (first) with search results - user URLs always included!
+        searchResults = [...userUrlResults, ...topSearchResults];
 
         await ctx.runMutation(internal.messages.updateMessage, {
           messageId: args.assistantMessageId,
@@ -529,17 +546,26 @@ export const generationStep = internalAction({
         });
 
         if (searchResults.length > 0) {
-          // 5. Scrape content from top results
-          // Prioritize URLs based on enhancement rules
-          let resultsToScrape = searchResults;
+          // 5. Scrape content from results
+          // ALWAYS scrape ALL user-provided URLs, plus top search results
+          let resultsToScrape: typeof searchResults = [];
+
+          // First, add ALL user-provided URLs (they're at the beginning of searchResults)
+          const userProvidedCount = userUrlResults.length;
+          if (userProvidedCount > 0) {
+            resultsToScrape.push(...searchResults.slice(0, userProvidedCount));
+          }
+
+          // Then add top regular search results (up to 3 additional)
+          let regularResults = searchResults.slice(userProvidedCount);
           if (prioritizedUrls.length > 0) {
-            // Sort results with prioritized URLs first
-            resultsToScrape = sortResultsWithPriority(
-              searchResults,
+            // Sort regular results with prioritized URLs first
+            regularResults = sortResultsWithPriority(
+              regularResults,
               prioritizedUrls,
             );
           }
-          resultsToScrape = resultsToScrape.slice(0, 3);
+          resultsToScrape.push(...regularResults.slice(0, 3));
 
           // Deterministic source ordering independent of scrape resolution time
           const deterministicSources = resultsToScrape.map((r) => r.url);
