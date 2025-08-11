@@ -20,6 +20,7 @@ import {
   extractPlainText,
   formatConversationWithSources,
 } from "../lib/clipboard";
+import { logger } from "../lib/logger";
 
 /**
  * Extract hostname from URL safely
@@ -176,6 +177,16 @@ export function MessageList({
     }
   }, [messages, isGenerating, userHasScrolled]);
 
+  // Debug: surface message counts and rendering state
+  useEffect(() => {
+    if (Array.isArray(messages)) {
+      logger.debug("🖼️ MessageList render", {
+        count: messages.length,
+        firstRole: messages[0]?.role,
+      });
+    }
+  }, [messages]);
+
   // Detect when user scrolls manually
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -271,7 +282,7 @@ export function MessageList({
           aria-label="Toggle sources display"
         >
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-2 text-[15px] sm:text-base text-gray-700 dark:text-gray-300 min-w-0">
               <svg
                 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0"
                 fill="none"
@@ -310,7 +321,7 @@ export function MessageList({
             </svg>
           </div>
           {collapsed && summary && (
-            <div className="mt-1 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 truncate">
+            <div className="mt-1 text-[15px] sm:text-base text-gray-600 dark:text-gray-400 truncate">
               {summary}
               {hostnames.length > 3 ? " …" : ""}
             </div>
@@ -351,13 +362,13 @@ export function MessageList({
                       />
                     ) : null}
                     <div className="flex-1 min-w-0 overflow-hidden">
-                      <div className="text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 truncate">
+                      <div className="text-[15px] sm:text-base text-emerald-600 dark:text-emerald-400 truncate">
                         {result.title}
                       </div>
-                      <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 line-clamp-2 break-words">
+                      <div className="text-[15px] sm:text-base text-gray-600 dark:text-gray-400 line-clamp-2 break-words">
                         {result.snippet}
                       </div>
-                      <div className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-500 truncate">
+                      <div className="text-[15px] sm:text-base text-gray-500 dark:text-gray-500 truncate">
                         {getSafeHostname(result.url) || result.url}
                       </div>
                     </div>
@@ -376,6 +387,28 @@ export function MessageList({
       ref={scrollContainerRef}
       className="flex-1 overflow-y-auto relative overscroll-contain"
     >
+      {/* Hamburger menu button - only show on desktop when sidebar would be visible */}
+      <button
+        onClick={onToggleSidebar}
+        className="hidden lg:block fixed top-4 left-4 z-10 p-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg shadow-md transition-colors"
+        title="Toggle sidebar"
+        aria-label="Toggle sidebar"
+      >
+        <svg
+          className="w-6 h-6 text-gray-600 dark:text-gray-300"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 6h16M4 12h16M4 18h16"
+          />
+        </svg>
+      </button>
+
       {/* Scroll to bottom button */}
       {userHasScrolled && messages.length > 0 && (
         <button
@@ -527,7 +560,7 @@ export function MessageList({
                         onCitationHover={setHoveredCitationUrl}
                       />
                     ) : (
-                      <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed break-words">
+                      <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed break-words slashed-zero lining-nums tabular-nums">
                         {message.content}
                       </div>
                     )}
