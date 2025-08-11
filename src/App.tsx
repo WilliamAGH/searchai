@@ -107,6 +107,70 @@ function ChatPage({
   );
 }
 
+// Toast icons defined outside component to avoid recreating on each render
+const toastIcons = {
+  success: (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      height={16}
+      width={16}
+    >
+      <path
+        fillRule="evenodd"
+        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+        clipRule="evenodd"
+      />
+    </svg>
+  ),
+  info: (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      height={16}
+      width={16}
+    >
+      <path
+        fillRule="evenodd"
+        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+        clipRule="evenodd"
+      />
+    </svg>
+  ),
+  warning: (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      height={16}
+      width={16}
+    >
+      <path
+        fillRule="evenodd"
+        d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+        clipRule="evenodd"
+      />
+    </svg>
+  ),
+  error: (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      height={16}
+      width={16}
+    >
+      <path
+        fillRule="evenodd"
+        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+        clipRule="evenodd"
+      />
+    </svg>
+  ),
+};
+
 export default function App() {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
@@ -122,6 +186,18 @@ export default function App() {
     setShowSignInModal(true);
   }, []);
 
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
+
+  const closeSignIn = useCallback(() => {
+    setShowSignInModal(false);
+  }, []);
+
+  const closeSignUp = useCallback(() => {
+    setShowSignUpModal(false);
+  }, []);
+
   // Navigating home via <Link /> avoids full-page reloads in the SPA
 
   return (
@@ -134,11 +210,9 @@ export default function App() {
                 <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
                   {/* Mobile menu button */}
                   <button
-                    onClick={() => setIsSidebarOpen((prev) => !prev)}
-                    className="lg:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation"
-                    aria-label="Open chat menu"
-                    title="Open chat menu"
-                    type="button"
+                    onClick={toggleSidebar}
+                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    aria-label="Toggle sidebar"
                   >
                     <svg
                       className="w-5 h-5 text-gray-700 dark:text-gray-300"
@@ -214,7 +288,7 @@ export default function App() {
                       onRequestSignUp={openSignUp}
                       onRequestSignIn={openSignIn}
                       isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+                      onToggleSidebar={toggleSidebar}
                     />
                   }
                 />
@@ -225,7 +299,7 @@ export default function App() {
                       onRequestSignUp={openSignUp}
                       onRequestSignIn={openSignIn}
                       isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+                      onToggleSidebar={toggleSidebar}
                     />
                   }
                 />
@@ -236,7 +310,7 @@ export default function App() {
                       onRequestSignUp={openSignUp}
                       onRequestSignIn={openSignIn}
                       isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+                      onToggleSidebar={toggleSidebar}
                     />
                   }
                 />
@@ -247,7 +321,7 @@ export default function App() {
                       onRequestSignUp={openSignUp}
                       onRequestSignIn={openSignIn}
                       isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+                      onToggleSidebar={toggleSidebar}
                     />
                   }
                 />
@@ -258,85 +332,18 @@ export default function App() {
               position="top-center"
               // Provide explicit icons to avoid Sonner referencing its internal
               // icon components before initialization in some bundlers.
-              icons={{
-                success: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    height={16}
-                    width={16}
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                ),
-                info: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    height={16}
-                    width={16}
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                ),
-                warning: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    height={16}
-                    width={16}
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                ),
-                error: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    height={16}
-                    width={16}
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                ),
-              }}
+              icons={toastIcons}
             />
 
             <SignInModal
               isOpen={showSignInModal}
-              onClose={() => setShowSignInModal(false)}
-              onSwitchToSignUp={() => {
-                setShowSignInModal(false);
-                setShowSignUpModal(true);
-              }}
+              onClose={closeSignIn}
+              onSwitchToSignUp={openSignUp}
             />
             <SignUpModal
               isOpen={showSignUpModal}
-              onClose={() => setShowSignUpModal(false)}
-              onSwitchToSignIn={() => {
-                setShowSignUpModal(false);
-                setShowSignInModal(true);
-              }}
+              onClose={closeSignUp}
+              onSwitchToSignIn={openSignIn}
             />
           </div>
         </div>
