@@ -62,3 +62,65 @@ export function extractPlainText(content: string): string {
 
   return text;
 }
+
+/**
+ * Format a conversation with sources included
+ * @param messages - Array of messages with potential sources
+ * @returns Formatted text with sources between messages
+ */
+export function formatConversationWithSources(
+  messages: Array<{
+    role: "user" | "assistant" | "system";
+    content: string;
+    searchResults?: Array<{ title: string; url: string }>;
+    sources?: string[];
+  }>,
+): string {
+  const formatted: string[] = [];
+
+  messages.forEach((message, index) => {
+    // Add role prefix and content
+    const rolePrefix = message.role === "user" ? "User" : "Assistant";
+    formatted.push(`${rolePrefix}: ${extractPlainText(message.content)}`);
+
+    // If this is an assistant message with sources, add them after
+    if (message.role === "assistant") {
+      const sources: string[] = [];
+
+      // Collect sources from searchResults
+      if (message.searchResults && message.searchResults.length > 0) {
+        message.searchResults.forEach((result) => {
+          if (result.url && result.title) {
+            sources.push(`  • ${result.title}: ${result.url}`);
+          }
+        });
+      }
+
+      // Also collect from sources array if present
+      if (message.sources && message.sources.length > 0) {
+        // Only add if not already in searchResults
+        message.sources.forEach((sourceUrl) => {
+          const alreadyIncluded = message.searchResults?.some(
+            (r) => r.url === sourceUrl,
+          );
+          if (!alreadyIncluded) {
+            sources.push(`  • ${sourceUrl}`);
+          }
+        });
+      }
+
+      // Add sources section if we have any
+      if (sources.length > 0) {
+        formatted.push("\nSources:");
+        formatted.push(...sources);
+      }
+    }
+
+    // Add spacing between messages (but not after the last one)
+    if (index < messages.length - 1) {
+      formatted.push("");
+    }
+  });
+
+  return formatted.join("\n");
+}

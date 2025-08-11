@@ -29,7 +29,10 @@ import { ShareModal } from "./ShareModal";
 import { MobileSidebar } from "./MobileSidebar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
 import { CopyButton } from "./CopyButton";
-import { extractPlainText } from "../lib/clipboard";
+import {
+  extractPlainText,
+  formatConversationWithSources,
+} from "../lib/clipboard";
 // Auth modals are centralized in App; ChatInterface requests them via callbacks
 import { useSwipeable } from "react-swipeable";
 import { useNavigate } from "react-router-dom";
@@ -2293,12 +2296,7 @@ export function ChatInterface({
                   )}
                 </button>
                 <CopyButton
-                  text={currentMessages
-                    .map(
-                      (m) =>
-                        `${m.role === "user" ? "User" : "Assistant"}: ${extractPlainText(m.content)}`,
-                    )
-                    .join("\n\n")}
+                  text={formatConversationWithSources(currentMessages)}
                   size="md"
                   title="Copy entire conversation"
                   ariaLabel="Copy entire conversation to clipboard"
