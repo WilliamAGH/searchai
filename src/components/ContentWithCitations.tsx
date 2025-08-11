@@ -119,11 +119,11 @@ export function ContentWithCitations({
               url && [...domainToUrlMap.values()].includes(url);
             const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
             const baseClass =
-              "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium no-underline align-baseline transition-colors";
+              "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md font-medium no-underline align-baseline transition-colors";
             const normalClass =
-              "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300";
+              "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[15px] sm:text-base hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300";
             const hiClass =
-              "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600";
+              "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600 text-[15px] sm:text-base";
             return (
               <a
                 href={url}
