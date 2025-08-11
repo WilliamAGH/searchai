@@ -50,7 +50,7 @@ export function MessageInput({
    * - Trims whitespace
    * - Clears input after send
    */
-  const sendCurrentMessage = () => {
+  const sendCurrentMessage = React.useCallback(() => {
     const trimmed = message.trim();
     if (trimmed && !disabled) {
       onSendMessage(trimmed);
@@ -59,75 +59,59 @@ export function MessageInput({
       setHistoryIndex(null);
       setDraftBeforeHistory(null);
     }
-  };
+  }, [message, disabled, onSendMessage, onDraftChange]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    sendCurrentMessage();
-  };
+  const handleSubmit = React.useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      sendCurrentMessage();
+    },
+    [sendCurrentMessage],
+  );
 
   /**
    * Handle keyboard shortcuts
    * - Enter: send message
    * - Shift+Enter: newline
    */
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.isComposing) return; // avoid sending mid-IME composition
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendCurrentMessage();
-      return;
-    }
-
-    // Ignore modifier combos
-    if (e.altKey || e.ctrlKey || e.metaKey) return;
-
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
-    const atEnd =
-      ta.selectionStart === message.length &&
-      ta.selectionEnd === message.length;
-
-    // Navigate up: only when caret at start
-    if (e.key === "ArrowUp" && atStart && history.length > 0) {
-      e.preventDefault();
-      // On first entry into history mode, save current draft
-      if (historyIndex === null) {
-        setDraftBeforeHistory(message);
-        const idx = history.length - 1;
-        setHistoryIndex(idx);
-        const next = history[idx] || "";
-        setMessage(next);
-        onDraftChange?.(next);
-      } else {
-        const idx = Math.max(0, historyIndex - 1);
-        setHistoryIndex(idx);
-        const next = history[idx] || "";
-        setMessage(next);
-        onDraftChange?.(next);
+  const handleKeyDown = React.useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.isComposing) return; // avoid sending mid-IME composition
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendCurrentMessage();
+        return;
       }
-      // Move caret to end after setting message
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (el) {
-          const len = el.value.length;
-          el.setSelectionRange(len, len);
+
+      // Ignore modifier combos
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
+      const atEnd =
+        ta.selectionStart === message.length &&
+        ta.selectionEnd === message.length;
+
+      // Navigate up: only when caret at start
+      if (e.key === "ArrowUp" && atStart && history.length > 0) {
+        e.preventDefault();
+        // On first entry into history mode, save current draft
+        if (historyIndex === null) {
+          setDraftBeforeHistory(message);
+          const idx = history.length - 1;
+          setHistoryIndex(idx);
+          const next = history[idx] || "";
+          setMessage(next);
+          onDraftChange?.(next);
+        } else {
+          const idx = Math.max(0, historyIndex - 1);
+          setHistoryIndex(idx);
+          const next = history[idx] || "";
+          setMessage(next);
+          onDraftChange?.(next);
         }
-      });
-      return;
-    }
-
-    // Navigate down: only when caret at end
-    if (e.key === "ArrowDown" && atEnd && history.length > 0) {
-      if (historyIndex === null) return; // Not in history mode
-      e.preventDefault();
-      if (historyIndex < history.length - 1) {
-        const idx = historyIndex + 1;
-        setHistoryIndex(idx);
-        const next = history[idx] || "";
-        setMessage(next);
-        onDraftChange?.(next);
+        // Move caret to end after setting message
         requestAnimationFrame(() => {
           const el = textareaRef.current;
           if (el) {
@@ -135,24 +119,53 @@ export function MessageInput({
             el.setSelectionRange(len, len);
           }
         });
-      } else {
-        // Exiting history mode -> restore draft
-        const restore = draftBeforeHistory ?? "";
-        setHistoryIndex(null);
-        setDraftBeforeHistory(null);
-        setMessage(restore);
-        onDraftChange?.(restore);
-        requestAnimationFrame(() => {
-          const el = textareaRef.current;
-          if (el) {
-            const len = el.value.length;
-            el.setSelectionRange(len, len);
-          }
-        });
+        return;
       }
-      return;
-    }
-  };
+
+      // Navigate down: only when caret at end
+      if (e.key === "ArrowDown" && atEnd && history.length > 0) {
+        if (historyIndex === null) return; // Not in history mode
+        e.preventDefault();
+        if (historyIndex < history.length - 1) {
+          const idx = historyIndex + 1;
+          setHistoryIndex(idx);
+          const next = history[idx] || "";
+          setMessage(next);
+          onDraftChange?.(next);
+          requestAnimationFrame(() => {
+            const el = textareaRef.current;
+            if (el) {
+              const len = el.value.length;
+              el.setSelectionRange(len, len);
+            }
+          });
+        } else {
+          // Exiting history mode -> restore draft
+          const restore = draftBeforeHistory ?? "";
+          setHistoryIndex(null);
+          setDraftBeforeHistory(null);
+          setMessage(restore);
+          onDraftChange?.(restore);
+          requestAnimationFrame(() => {
+            const el = textareaRef.current;
+            if (el) {
+              const len = el.value.length;
+              el.setSelectionRange(len, len);
+            }
+          });
+        }
+        return;
+      }
+    },
+    [
+      sendCurrentMessage,
+      history,
+      historyIndex,
+      message,
+      onDraftChange,
+      draftBeforeHistory,
+    ],
+  );
 
   // Auto-resize height only, don't mess with padding
   const adjustTextarea = () => {
@@ -179,14 +192,14 @@ export function MessageInput({
 
   // Recalculate textarea height on orientation/viewport changes
   useEffect(() => {
-    const handler = () => {
+    const handler: EventListener = () => {
       requestAnimationFrame(() => adjustTextarea());
     };
     window.addEventListener("resize", handler);
-    window.addEventListener("orientationchange", handler as any);
+    window.addEventListener("orientationchange", handler);
     return () => {
       window.removeEventListener("resize", handler);
-      window.removeEventListener("orientationchange", handler as any);
+      window.removeEventListener("orientationchange", handler);
     };
   }, []);
 
@@ -229,7 +242,7 @@ export function MessageInput({
     const raf = requestAnimationFrame(() => {
       try {
         // Prevent scroll jumps on focus
-        (el as any).focus({ preventScroll: true });
+        el.focus({ preventScroll: true });
       } catch {
         el.focus();
       }

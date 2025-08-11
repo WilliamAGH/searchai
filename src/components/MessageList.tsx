@@ -14,6 +14,8 @@ import clsx from "clsx";
 import { SearchProgress } from "./SearchProgress";
 import { ReasoningDisplay } from "./ReasoningDisplay";
 import { ContentWithCitations } from "./ContentWithCitations";
+import { CopyButton } from "./CopyButton";
+import { extractPlainText } from "../lib/clipboard";
 
 /**
  * Extract hostname from URL safely
@@ -131,6 +133,37 @@ export function MessageList({
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  const handleScrollToBottom = React.useCallback(() => {
+    scrollToBottom();
+    setUserHasScrolled(false);
+  }, []);
+
+  const handleDeleteMessage = React.useCallback(
+    async (messageId: Id<"messages"> | string | undefined) => {
+      if (!messageId) return;
+
+      try {
+        if (!window.confirm("Delete this message? This cannot be undone."))
+          return;
+        if (onRequestDeleteMessage) {
+          onRequestDeleteMessage(String(messageId));
+        } else {
+          if (
+            String(messageId).startsWith("local_") ||
+            String(messageId).startsWith("msg_")
+          ) {
+            onDeleteLocalMessage?.(String(messageId));
+          } else {
+            await deleteMessage({ messageId: messageId as Id<"messages"> });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to delete message", err);
+      }
+    },
+    [onRequestDeleteMessage, onDeleteLocalMessage, deleteMessage],
+  );
 
   // Only auto-scroll if user hasn't manually scrolled up
   useEffect(() => {
@@ -342,10 +375,7 @@ export function MessageList({
       {/* Scroll to bottom button */}
       {userHasScrolled && messages.length > 0 && (
         <button
-          onClick={() => {
-            scrollToBottom();
-            setUserHasScrolled(false);
-          }}
+          onClick={handleScrollToBottom}
           className="fixed right-4 z-10 p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg transition-all transform hover:scale-105 fab-bottom"
           aria-label="Scroll to bottom"
         >
@@ -503,55 +533,37 @@ export function MessageList({
                     <div className="text-xs text-gray-500 dark:text-gray-500">
                       {new Date(safeTimestamp).toLocaleTimeString()}
                     </div>
-                    {message._id && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            if (
-                              !window.confirm(
-                                "Delete this message? This cannot be undone.",
-                              )
-                            )
-                              return;
-                            if (onRequestDeleteMessage) {
-                              onRequestDeleteMessage(String(message._id));
-                            } else {
-                              if (
-                                String(message._id).startsWith("local_") ||
-                                String(message._id).startsWith("msg_")
-                              ) {
-                                onDeleteLocalMessage?.(String(message._id));
-                              } else {
-                                await deleteMessage({
-                                  messageId: message._id!,
-                                });
-                              }
-                            }
-                          } catch (err) {
-                            // TODO: route via src/lib/logger.ts and gate by env
-                            console.error("Failed to delete message", err);
-                          }
-                        }}
-                        className="p-0 text-gray-400 hover:text-red-500 transition-all duration-200"
-                        title="Delete message"
-                        aria-label="Delete message"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                    <div className="flex items-center gap-2">
+                      <CopyButton
+                        text={extractPlainText(message.content)}
+                        size="sm"
+                        title="Copy message"
+                        ariaLabel="Copy message to clipboard"
+                      />
+                      {message._id && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMessage(message._id)}
+                          className="p-0 text-gray-400 hover:text-red-500 transition-all duration-200"
+                          title="Delete message"
+                          aria-label="Delete message"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      </button>
-                    )}
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
