@@ -36,6 +36,46 @@ export function MobileSidebar({
   const deleteChat = useMutation(api.chats.deleteChat);
   // Ensure Headless UI Dialog has a stable initial focusable element on open
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleNewChat = React.useCallback(() => {
+    console.info("🖱️ New Chat button clicked in MobileSidebar");
+    onNewChat();
+    onClose();
+  }, [onNewChat, onClose]);
+
+  const handleSelectChat = React.useCallback(
+    (chatId: Id<"chats"> | string) => {
+      onSelectChat(chatId);
+      onClose();
+    },
+    [onSelectChat, onClose],
+  );
+
+  const handleDeleteChat = React.useCallback(
+    async (chatId: Id<"chats"> | string, isCurrentChat: boolean) => {
+      try {
+        if (!window.confirm("Delete this chat? This cannot be undone.")) return;
+        if (onRequestDeleteChat) {
+          onRequestDeleteChat(chatId);
+        } else {
+          if (typeof chatId === "string") {
+            onDeleteLocalChat?.(chatId);
+          } else {
+            await deleteChat({ chatId });
+          }
+        }
+        if (isCurrentChat) {
+          onSelectChat(null);
+        }
+      } catch (err) {
+        if ((import.meta as unknown as { env?: { DEV?: boolean } })?.env?.DEV) {
+          console.warn("Chat deletion failed:", err);
+        }
+      }
+    },
+    [onRequestDeleteChat, onDeleteLocalChat, deleteChat, onSelectChat],
+  );
+
   return (
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog
@@ -128,13 +168,7 @@ export function MobileSidebar({
 
                 <nav className="flex flex-1 flex-col">
                   <button
-                    onClick={() => {
-                      console.log(
-                        "🖱️ New Chat button clicked in MobileSidebar",
-                      );
-                      onNewChat();
-                      onClose();
-                    }}
+                    onClick={handleNewChat}
                     className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4"
                   >
                     <svg
@@ -166,13 +200,10 @@ export function MobileSidebar({
                         {chats.map((chat) => (
                           <div
                             key={chat._id}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-2 pr-2"
                           >
                             <button
-                              onClick={() => {
-                                onSelectChat(chat._id);
-                                onClose();
-                              }}
+                              onClick={() => handleSelectChat(chat._id)}
                               className={`flex-1 px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
                                 currentChatId === chat._id
                                   ? "bg-gray-100 dark:bg-gray-800"
@@ -192,33 +223,13 @@ export function MobileSidebar({
                               </div>
                             </button>
                             <button
-                              onClick={async () => {
-                                try {
-                                  if (
-                                    !window.confirm(
-                                      "Delete this chat? This cannot be undone.",
-                                    )
-                                  )
-                                    return;
-                                  if (onRequestDeleteChat) {
-                                    onRequestDeleteChat(chat._id);
-                                  } else {
-                                    if (typeof chat._id === "string") {
-                                      onDeleteLocalChat?.(chat._id);
-                                    } else {
-                                      await deleteChat({ chatId: chat._id });
-                                    }
-                                  }
-                                  if (currentChatId === chat._id) {
-                                    onSelectChat(null);
-                                  }
-                                } catch (err) {
-                                  if ((import.meta as any)?.env?.DEV) {
-                                    console.warn("Chat deletion failed:", err);
-                                  }
-                                }
-                              }}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+                              onClick={() =>
+                                handleDeleteChat(
+                                  chat._id,
+                                  currentChatId === chat._id,
+                                )
+                              }
+                              className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
                               title="Delete chat"
                               aria-label="Delete chat"
                             >
