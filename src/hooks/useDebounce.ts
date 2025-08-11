@@ -1,8 +1,8 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from "react";
 
-export function useDebounce<T extends (...args: any[]) => void>(
+export function useDebounce<T extends (...args: unknown[]) => void>(
   callback: T,
-  delay: number
+  delay: number,
 ): T {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const callbackRef = useRef(callback);
@@ -22,7 +22,7 @@ export function useDebounce<T extends (...args: any[]) => void>(
         callbackRef.current(...args);
       }, delay);
     },
-    [delay]
+    [delay],
   ) as T;
 
   // Cleanup on unmount
@@ -37,9 +37,9 @@ export function useDebounce<T extends (...args: any[]) => void>(
   return debouncedCallback;
 }
 
-export function useThrottle<T extends (...args: any[]) => void>(
+export function useThrottle<T extends (...args: unknown[]) => void>(
   callback: T,
-  delay: number
+  delay: number,
 ): T {
   const lastRunRef = useRef<number>(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -63,14 +63,14 @@ export function useThrottle<T extends (...args: any[]) => void>(
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
-        
+
         timeoutRef.current = setTimeout(() => {
           callbackRef.current(...args);
           lastRunRef.current = Date.now();
         }, delay - timeSinceLastRun);
       }
     },
-    [delay]
+    [delay],
   ) as T;
 
   // Cleanup on unmount
