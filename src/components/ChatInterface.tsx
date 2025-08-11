@@ -8,12 +8,18 @@
  */
 
 import { useAction, useMutation, useQuery } from "convex/react";
-import React, { useEffect, useState } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce, useThrottle } from "../hooks/useDebounce";
-import { useRef, useCallback, useMemo } from "react";
+// merged into single React import above
 import { logger } from "../lib/logger";
 import { ChatSidebar } from "./ChatSidebar";
 import { looksChatId } from "../lib/utils";
@@ -22,6 +28,8 @@ import { MessageList } from "./MessageList";
 import { ShareModal } from "./ShareModal";
 import { MobileSidebar } from "./MobileSidebar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
+import { CopyButton } from "./CopyButton";
+import { extractPlainText } from "../lib/clipboard";
 // Auth modals are centralized in App; ChatInterface requests them via callbacks
 import { useSwipeable } from "react-swipeable";
 import { useNavigate } from "react-router-dom";
@@ -154,7 +162,9 @@ export function ChatInterface({
       logger.debug("🧹 ChatInterface unmounted");
     };
   }, []);
-  const convexUrl = (import.meta as any).env?.VITE_CONVEX_URL || "";
+  const convexUrl =
+    (import.meta as unknown as { env?: { VITE_CONVEX_URL?: string } }).env
+      ?.VITE_CONVEX_URL || "";
   const apiBase = convexUrl
     .replace(".convex.cloud", ".convex.site")
     .replace(/\/+$/, "");
@@ -163,6 +173,73 @@ export function ChatInterface({
     const segment = path.startsWith("/") ? path.slice(1) : path;
     return apiBase ? `${apiBase}/${segment}` : `/${segment}`;
   };
+
+  // Lightweight fetch JSON helper with retry/backoff for transient failures
+  const fetchJsonWithRetry = useCallback(
+    async (
+      url: string,
+      init: RequestInit & { retry?: number; retryDelayMs?: number } = {},
+    ) => {
+      const {
+        retry = 2,
+        retryDelayMs = 500,
+        ...opts
+      } = init as unknown as {
+        retry?: number;
+        retryDelayMs?: number;
+        signal?: AbortSignal;
+      } & RequestInit;
+      let attempt = 0;
+      let lastErr: unknown = null;
+      // Do not reuse an aborted signal across retries
+      const baseSignal: AbortSignal | undefined = (
+        init as unknown as { signal?: AbortSignal }
+      )?.signal;
+      while (attempt <= retry) {
+        try {
+          const controller = new AbortController();
+          const onAbort = () => controller.abort();
+          if (baseSignal) {
+            if (baseSignal.aborted)
+              throw new DOMException("Aborted", "AbortError");
+            baseSignal.addEventListener("abort", onAbort, { once: true });
+          }
+          const res = await fetch(url, {
+            ...opts,
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          if (!res.ok && res.status >= 500 && attempt < retry) {
+            // Retry 5xx
+            await new Promise((r) =>
+              setTimeout(r, retryDelayMs * Math.pow(2, attempt)),
+            );
+            attempt++;
+            continue;
+          }
+          baseSignal?.removeEventListener?.("abort", onAbort as any);
+          return res;
+        } catch (err) {
+          lastErr = err;
+          // AbortError: don't retry
+          if (err instanceof DOMException && err.name === "AbortError") {
+            throw err;
+          }
+          // Network error TypeError in Fetch: retry if attempts left
+          if (attempt < retry) {
+            await new Promise((r) =>
+              setTimeout(r, retryDelayMs * Math.pow(2, attempt)),
+            );
+            attempt++;
+            continue;
+          }
+          throw err;
+        }
+      }
+      throw lastErr ?? new Error("Unknown fetch error");
+    },
+    [],
+  );
 
   const [currentChatId, setCurrentChatId] = useState<
     Id<"chats"> | string | null
@@ -325,9 +402,12 @@ export function ChatInterface({
   const generateShareId = useCallback(() => {
     if (
       typeof crypto !== "undefined" &&
-      typeof (crypto as any).randomUUID === "function"
+      typeof (crypto as unknown as { randomUUID?: () => string }).randomUUID ===
+        "function"
     ) {
-      return (crypto as any).randomUUID().replace(/-/g, "");
+      return (crypto as unknown as { randomUUID: () => string })
+        .randomUUID()
+        .replace(/-/g, "");
     }
     try {
       const bytes = new Uint8Array(16);
@@ -816,11 +896,13 @@ export function ChatInterface({
         .trim()
         .slice(0, 220);
 
-      const searchResponse = await fetch(searchUrl, {
+      const searchResponse = await fetchJsonWithRetry(searchUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: contextualQuery, maxResults: 5 }),
         signal: abortControllerRef.current?.signal,
+        retry: 2,
+        retryDelayMs: 400,
       });
       const searchDuration = Date.now() - searchStartTime;
 
@@ -877,11 +959,13 @@ export function ChatInterface({
                   logger.debug("Body:", { urlLength: result.url?.length ?? 0 });
 
                   const scrapeStartTime = Date.now();
-                  const scrapeResponse = await fetch(scrapeUrl, {
+                  const scrapeResponse = await fetchJsonWithRetry(scrapeUrl, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ url: result.url }),
                     signal: abortControllerRef.current?.signal,
+                    retry: 1,
+                    retryDelayMs: 300,
                   });
                   const scrapeDuration = Date.now() - scrapeStartTime;
 
@@ -1345,8 +1429,8 @@ export function ChatInterface({
       }
 
       // Environment diagnostics are dev-only to protect user privacy
-      if ((import.meta as any)?.env?.DEV) {
-        console.debug("ENV CHECK:", {
+      if ((import.meta as unknown as { env?: { DEV?: boolean } })?.env?.DEV) {
+        console.info("ENV CHECK:", {
           url: window.location.href,
           ua: navigator.userAgent,
           ts: new Date().toISOString(),
@@ -1447,9 +1531,15 @@ export function ChatInterface({
       try {
         const prior = (messages || []).filter((m) => m.role === "user");
         const lastUser = prior.length > 0 ? prior[prior.length - 1] : undefined;
-        if (lastUser && typeof (lastUser as any).timestamp === "number") {
+        if (
+          lastUser &&
+          typeof (lastUser as unknown as { timestamp?: number }).timestamp ===
+            "number"
+        ) {
           gapMinutes = Math.floor(
-            (Date.now() - (lastUser as any).timestamp) / 60000,
+            (Date.now() -
+              (lastUser as unknown as { timestamp: number }).timestamp) /
+              60000,
           );
         }
       } catch {}
@@ -1880,11 +1970,12 @@ export function ChatInterface({
         const payload = localChats.map((chat) => ({
           localId: chat._id,
           title: chat.title || "New Chat",
-          privacy: (chat as any).privacy || "private",
+          privacy:
+            (chat as unknown as { privacy?: string }).privacy || "private",
           createdAt: chat.createdAt,
           updatedAt: chat.updatedAt,
-          shareId: (chat as any).shareId,
-          publicId: (chat as any).publicId,
+          shareId: (chat as unknown as { shareId?: string }).shareId,
+          publicId: (chat as unknown as { publicId?: string }).publicId,
           messages: localMessages
             .filter((m) => m.chatId === chat._id)
             .map((m) => ({
@@ -1905,7 +1996,10 @@ export function ChatInterface({
 
         // If currently viewing a local chat, switch to the imported server chat
         if (typeof currentChatId === "string") {
-          const map = mappings.find((m: any) => m.localId === currentChatId);
+          const map = mappings.find(
+            (m: unknown) =>
+              (m as { localId?: string }).localId === currentChatId,
+          );
           if (map) {
             setCurrentChatId(map.chatId);
           }
@@ -1913,7 +2007,7 @@ export function ChatInterface({
 
         // Clear local data after successful import
         setLocalChats([]);
-        setLocalMessages([] as any);
+        setLocalMessages([]);
       } catch (e) {
         console.warn("Local chat migration failed; preserving local data", e);
         // Set retry backoff
@@ -2062,7 +2156,9 @@ export function ChatInterface({
               } else {
                 setTimeout(async () => {
                   try {
-                    await deleteMessage({ messageId: messageId as any });
+                    await deleteMessage({
+                      messageId: messageId as Id<"messages">,
+                    });
                   } catch {}
                 }, 5000);
               }
@@ -2132,6 +2228,19 @@ export function ChatInterface({
                     </svg>
                   )}
                 </button>
+                <div className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                  <CopyButton
+                    text={currentMessages
+                      .map(
+                        (m) =>
+                          `${m.role === "user" ? "User" : "Assistant"}: ${extractPlainText(m.content)}`,
+                      )
+                      .join("\n\n")}
+                    size="md"
+                    title="Copy entire conversation"
+                    ariaLabel="Copy entire conversation to clipboard"
+                  />
+                </div>
                 <button
                   onClick={() => setShowShareModal(true)}
                   className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
