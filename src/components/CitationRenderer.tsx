@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-new-function-as-prop */
 /**
  * Interactive citation rendering component
  * - Converts [domain.com] citations to clickable links
@@ -201,4 +202,3 @@ export function CitationRenderer({
 
   return <>{processedContent}</>;
 }
-/* eslint-disable react-perf/jsx-no-new-function-as-prop */

@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
 /**
  * Adds interactive citations without DOM mutation
  * - Converts [domain.com] patterns to markdown links when domain maps to a source URL
@@ -150,4 +151,3 @@ export function ContentWithCitations({
     </div>
   );
 }
-/* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */

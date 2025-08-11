@@ -41,6 +41,52 @@ export function ChatSidebar({
     [onSelectChat],
   );
 
+  // Avoid inline functions in JSX: use dataset-driven handlers
+  const handleSelectClick = React.useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const attr = e.currentTarget.getAttribute("data-chat-id");
+      if (!attr) return;
+      const match = chats.find((c) => String(c._id) === attr);
+      handleSelectChat(match ? match._id : attr);
+    },
+    [chats, handleSelectChat],
+  );
+
+  const handleDeleteClick = React.useCallback(
+    async (e: React.MouseEvent<HTMLButtonElement>) => {
+      const attr = e.currentTarget.getAttribute("data-chat-id");
+      if (!attr) return;
+      const match = chats.find((c) => String(c._id) === attr);
+      try {
+        if (!window.confirm("Delete this chat? This cannot be undone.")) return;
+        if (onRequestDeleteChat) {
+          onRequestDeleteChat(match ? match._id : attr);
+        } else if (match) {
+          if (typeof match._id === "string") {
+            onDeleteLocalChat?.(match._id);
+          } else {
+            await deleteChat({ chatId: match._id });
+          }
+        }
+        if (match && currentChatId === match._id) {
+          onSelectChat(null);
+        }
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn("Chat deletion failed:", err);
+        }
+      }
+    },
+    [
+      chats,
+      onRequestDeleteChat,
+      onDeleteLocalChat,
+      deleteChat,
+      onSelectChat,
+      currentChatId,
+    ],
+  );
+
   if (!isOpen) {
     return (
       <div className="w-12 h-full border-r bg-muted/30 flex flex-col">
@@ -142,7 +188,8 @@ export function ChatSidebar({
             {chats.map((chat) => (
               <div key={chat._id} className="flex items-center gap-2 mb-1 pr-2">
                 <button
-                  onClick={() => handleSelectChat(chat._id)}
+                  data-chat-id={String(chat._id)}
+                  onClick={handleSelectClick}
                   className={`flex-1 p-3 rounded-lg text-left hover:bg-muted transition-colors ${
                     currentChatId === chat._id ? "bg-muted" : ""
                   }`}
@@ -158,33 +205,8 @@ export function ChatSidebar({
                   </div>
                 </button>
                 <button
-                  onClick={async () => {
-                    try {
-                      if (
-                        !window.confirm(
-                          "Delete this chat? This cannot be undone.",
-                        )
-                      )
-                        return;
-                      if (onRequestDeleteChat) {
-                        onRequestDeleteChat(chat._id);
-                      } else {
-                        if (typeof chat._id === "string") {
-                          // Local chat deletion
-                          onDeleteLocalChat?.(chat._id);
-                        } else {
-                          await deleteChat({ chatId: chat._id });
-                        }
-                      }
-                      if (currentChatId === chat._id) {
-                        onSelectChat(null);
-                      }
-                    } catch (err) {
-                      if (import.meta.env.DEV) {
-                        console.warn("Chat deletion failed:", err);
-                      }
-                    }
-                  }}
+                  data-chat-id={String(chat._id)}
+                  onClick={handleDeleteClick}
                   className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
                   title="Delete chat"
                   aria-label="Delete chat"
