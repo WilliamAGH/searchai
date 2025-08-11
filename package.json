@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "validate": "oxlint && tsc -p . --noEmit --pretty=false && tsc -p convex --noEmit --pretty=false && npm run -s test",
+    "validate:quick": "oxlint && tsc -p . --noEmit --pretty=false && tsc -p convex --noEmit --pretty=false && npm run -s test",
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "dev:frontend": "vite --open",
     "dev:backend": "convex dev",
