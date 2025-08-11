@@ -12,9 +12,9 @@ export const logger = {
    * Debug logging - only active in development
    * @param args - Arguments to log
    */
-  debug: (...args: any[]) => {
+  debug: (...args: unknown[]) => {
     if (isDev) {
-      console.log(...args);
+      console.info(...args);
     }
   },
 
@@ -22,7 +22,7 @@ export const logger = {
    * Info logging - only active in development
    * @param args - Arguments to log
    */
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     if (isDev) {
       console.info(...args);
     }
@@ -32,7 +32,7 @@ export const logger = {
    * Warning logging - always active
    * @param args - Arguments to log
    */
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     console.warn(...args);
   },
 
@@ -40,7 +40,7 @@ export const logger = {
    * Error logging - always active
    * @param args - Arguments to log
    */
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     console.error(...args);
   },
 };
