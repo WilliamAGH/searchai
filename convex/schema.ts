@@ -22,7 +22,9 @@ const applicationTables = {
     userId: v.optional(v.id("users")),
     shareId: v.optional(v.string()),
     publicId: v.optional(v.string()),
-    privacy: v.optional(v.union(v.literal("private"), v.literal("shared"), v.literal("public"))),
+    privacy: v.optional(
+      v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
     rollingSummary: v.optional(v.string()),
@@ -40,19 +42,30 @@ const applicationTables = {
    * - Reasoning/thinking tokens
    */
   messages: defineTable({
-    chatId: v.id('chats'),
-    role: v.union(v.literal('user'), v.literal('assistant'), v.literal('system')),
+    chatId: v.id("chats"),
+    role: v.union(
+      v.literal("user"),
+      v.literal("assistant"),
+      v.literal("system"),
+    ),
     content: v.optional(v.string()),
     searchResults: v.optional(v.array(v.any())),
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.any()),
-    searchMethod: v.optional(v.union(v.literal('serp'), v.literal('openrouter'), v.literal('duckduckgo'), v.literal('fallback'))),
+    searchMethod: v.optional(
+      v.union(
+        v.literal("serp"),
+        v.literal("openrouter"),
+        v.literal("duckduckgo"),
+        v.literal("fallback"),
+      ),
+    ),
     hasRealResults: v.optional(v.boolean()),
     isStreaming: v.optional(v.boolean()),
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
     timestamp: v.optional(v.number()),
-  }).index('by_chatId', ['chatId']),
+  }).index("by_chatId", ["chatId"]),
 
   /**
    * Metrics table
@@ -63,9 +76,9 @@ const applicationTables = {
   metrics: defineTable({
     name: v.string(),
     date: v.string(), // YYYY-MM-DD
-    chatId: v.optional(v.id('chats')),
+    chatId: v.optional(v.id("chats")),
     count: v.number(),
-  }).index('by_name_and_date', ['name', 'date']),
+  }).index("by_name_and_date", ["name", "date"]),
 
   /**
    * User preferences
@@ -78,8 +91,7 @@ const applicationTables = {
     theme: v.union(v.literal("light"), v.literal("dark"), v.literal("system")),
     searchEnabled: v.boolean(),
     maxSearchResults: v.number(),
-  })
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 };
 
 /**

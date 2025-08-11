@@ -139,7 +139,7 @@ export const searchWeb = action({
         );
       }
     } else {
-      console.log("SERP API key not available, skipping SERP search");
+      console.info("SERP API key not available, skipping SERP search");
     }
 
     // Try OpenRouter web search as fallback
@@ -163,7 +163,7 @@ export const searchWeb = action({
         );
       }
     } else {
-      console.log(
+      console.info(
         "OpenRouter API key not available, skipping OpenRouter search",
       );
     }
@@ -684,7 +684,7 @@ export async function searchWithSerpApiDuckDuckGo(
     maxResults,
     timestamp: new Date().toISOString(),
   };
-  console.log("🔍 SERP API Request:", requestLog);
+  console.info("🔍 SERP API Request:", requestLog);
 
   try {
     const response = await fetch(apiUrl, {
@@ -700,7 +700,7 @@ export async function searchWithSerpApiDuckDuckGo(
       endpoint: "https://serpapi.com/search.json",
       queryLength: query.length,
     } as const;
-    console.log("📊 SERP API Response:", safeLog);
+    console.info("📊 SERP API Response:", safeLog);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -717,7 +717,7 @@ export async function searchWithSerpApiDuckDuckGo(
     }
 
     const data: SerpApiResponse = await response.json();
-    console.log("✅ SERP API Success:", {
+    console.info("✅ SERP API Success:", {
       hasOrganic: !!data.organic_results,
       count: data.organic_results?.length || 0,
       queryLength: query.length,
@@ -734,7 +734,7 @@ export async function searchWithSerpApiDuckDuckGo(
           relevanceScore: 0.9,
         }));
 
-      console.log("📋 SERP API Results Parsed:", {
+      console.info("📋 SERP API Results Parsed:", {
         resultCount: results.length,
         sampleResults: results.slice(0, 2).map((r) => ({
           title: r.title,
@@ -1011,7 +1011,7 @@ export const scrapeUrl = action({
     if (hit && hit.exp > now) {
       return hit.val;
     }
-    console.log("🌐 Scraping URL initiated:", {
+    console.info("🌐 Scraping URL initiated:", {
       url: args.url,
       timestamp: new Date().toISOString(),
     });
@@ -1030,7 +1030,7 @@ export const scrapeUrl = action({
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
-      console.log("📊 Scrape response received:", {
+      console.info("📊 Scrape response received:", {
         url: args.url,
         status: response.status,
         statusText: response.statusText,
@@ -1049,7 +1049,7 @@ export const scrapeUrl = action({
       }
 
       const contentType = response.headers.get("content-type") || "";
-      console.log("📄 Content type check:", {
+      console.info("📄 Content type check:", {
         url: args.url,
         contentType: contentType,
       });
@@ -1065,7 +1065,7 @@ export const scrapeUrl = action({
       }
 
       const html = await response.text();
-      console.log("✅ HTML content fetched:", {
+      console.info("✅ HTML content fetched:", {
         url: args.url,
         contentLength: html.length,
         timestamp: new Date().toISOString(),
@@ -1081,7 +1081,7 @@ export const scrapeUrl = action({
         title = h1Match ? h1Match[1].trim() : new URL(args.url).hostname;
       }
 
-      console.log("🏷️ Title extracted:", {
+      console.info("🏷️ Title extracted:", {
         url: args.url,
         title: title,
         method: titleMatch ? "title tag" : h1Match ? "h1 tag" : "hostname",
@@ -1101,7 +1101,7 @@ export const scrapeUrl = action({
         .replace(/\s+/g, " ")
         .trim();
 
-      console.log("🧹 Content cleaned:", {
+      console.info("🧹 Content cleaned:", {
         url: args.url,
         originalLength: html.length,
         cleanedLength: content.length,
@@ -1146,7 +1146,7 @@ export const scrapeUrl = action({
       // Limit content length
       if (content.length > 5000) {
         content = `${content.substring(0, 5000)}...`;
-        console.log("✂️ Content truncated:", {
+        console.info("✂️ Content truncated:", {
           url: args.url,
           newLength: content.length,
         });
@@ -1160,7 +1160,7 @@ export const scrapeUrl = action({
 
       const result = { title, content, summary };
       cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
-      console.log("✅ Scraping completed successfully:", {
+      console.info("✅ Scraping completed successfully:", {
         url: args.url,
         resultLength: content.length,
         summaryLength: summary.length,

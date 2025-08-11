@@ -8,6 +8,7 @@
 
 import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
+import type { ModelMessage } from "ai";
 import { httpRouter } from "convex/server";
 import { api } from "./_generated/api";
 import { applyEnhancements, sortResultsWithPriority } from "./enhancements";
@@ -162,9 +163,22 @@ http.route({
         400,
       );
     }
+    const rawMessages = messages as Array<{
+      role?: unknown;
+      content?: unknown;
+    }>;
+    const coreMessages: ModelMessage[] = rawMessages.map((m) => ({
+      role:
+        m.role === "system" || m.role === "user" || m.role === "assistant"
+          ? (m.role as "system" | "user" | "assistant")
+          : "user",
+      content:
+        typeof m.content === "string" ? m.content : String(m.content ?? ""),
+    }));
+
     const result = await streamText({
       model: openai("gpt-4-turbo"),
-      messages: messages as any,
+      messages: coreMessages,
     });
     // Add CORS headers to the streaming response
     const base = result.toTextStreamResponse();
