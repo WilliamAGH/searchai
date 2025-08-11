@@ -46,7 +46,6 @@ function ChatPage({
 }: ChatPageProps) {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
-  const chatKey = chatId ?? shareId ?? publicId ?? "root";
 
   // Set per-route canonical and url metas
   useEffect(() => {
@@ -79,7 +78,6 @@ function ChatPage({
     <>
       <Authenticated>
         <ChatInterface
-          key={chatKey}
           isAuthenticated={true}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={onToggleSidebar}
@@ -92,7 +90,6 @@ function ChatPage({
       </Authenticated>
       <Unauthenticated>
         <ChatInterface
-          key={chatKey}
           isAuthenticated={false}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={onToggleSidebar}
