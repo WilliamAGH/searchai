@@ -200,6 +200,46 @@ export function MessageInput({
     adjustTextarea();
   }, [placeholder, disabled]);
 
+  // Politely auto-focus the input on mount (desktop only, no modals)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    if (disabled) return;
+
+    // Skip on touch-centric devices to avoid popping the keyboard
+    const isCoarse =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(pointer: coarse)").matches;
+
+    // Avoid stealing focus if something else is active or a modal is open
+    const hasModalOpen = !!document.querySelector(
+      '[role="dialog"][aria-modal="true"]',
+    );
+    const canStealFocus =
+      document.activeElement === document.body &&
+      document.visibilityState === "visible" &&
+      !isCoarse &&
+      !hasModalOpen;
+
+    // Only focus if the element is visible and enabled
+    const isVisible = el.offsetParent !== null && !el.disabled;
+    if (!canStealFocus || !isVisible) return;
+
+    const raf = requestAnimationFrame(() => {
+      try {
+        // Prevent scroll jumps on focus
+        (el as any).focus({ preventScroll: true });
+      } catch {
+        el.focus();
+      }
+    });
+
+    return () => cancelAnimationFrame(raf);
+    // Intentionally only on mount to avoid later focus stealing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 safe-bottom">
       <div className="max-w-4xl mx-auto p-3 sm:p-4">
