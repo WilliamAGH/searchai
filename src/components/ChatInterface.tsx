@@ -240,16 +240,29 @@ export function ChatInterface({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
+  const lastSidebarOpenedAtRef = useRef<number | null>(null);
+  const prevSidebarOpenRef = useRef<boolean>(false);
   // Use prop if provided, otherwise use local state
   const sidebarOpen =
     isSidebarOpen !== undefined ? isSidebarOpen : localSidebarOpen;
+  useEffect(() => {
+    const prev = prevSidebarOpenRef.current;
+    if (!prev && sidebarOpen) {
+      lastSidebarOpenedAtRef.current = Date.now();
+      logger.debug("⏱️ Marked sidebar as opened", {
+        at: lastSidebarOpenedAtRef.current,
+      });
+    }
+    prevSidebarOpenRef.current = sidebarOpen;
+  }, [sidebarOpen]);
   const handleToggleSidebar = useCallback(() => {
+    logger.debug("↔️ handleToggleSidebar", { sidebarOpen });
     if (onToggleSidebar) {
       onToggleSidebar();
     } else {
       setLocalSidebarOpen(!localSidebarOpen);
     }
-  }, [onToggleSidebar, localSidebarOpen]);
+  }, [onToggleSidebar, localSidebarOpen, sidebarOpen]);
   const [messageCount, setMessageCount] = useState(0);
   // Auth modals are managed by the App; request via callbacks instead
   const [showShareModal, setShowShareModal] = useState(false);
@@ -298,34 +311,88 @@ export function ChatInterface({
   const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
 
-  // Convex queries
+  // Convex queries with explicit args and debug logs
+  const getUserChatsArgs = isAuthenticated ? {} : "skip";
+  logger.debug("🧩 getUserChats args:", getUserChatsArgs);
   const chats = useQuery(
     api.chats.getUserChats,
-    isAuthenticated ? undefined : "skip",
+    getUserChatsArgs as {} | "skip",
   );
+
+  const opaqueParam = looksServerId(propChatId);
+  const getByOpaqueArgs =
+    isAuthenticated && opaqueParam
+      ? { chatId: propChatId as Id<"chats"> }
+      : ("skip" as const);
+  logger.debug("🧩 getChatByOpaqueId args:", getByOpaqueArgs);
   const chatByOpaqueId = useQuery(
     api.chats.getChatByOpaqueId,
-    isAuthenticated && looksServerId(propChatId)
-      ? { chatId: propChatId as Id<"chats"> }
-      : "skip",
+    getByOpaqueArgs as { chatId: Id<"chats"> } | "skip",
   );
+
+  const getByShareArgs = propShareId
+    ? { shareId: propShareId }
+    : ("skip" as const);
+  logger.debug("🧩 getChatByShareId args:", getByShareArgs);
   const chatByShareId = useQuery(
     api.chats.getChatByShareId,
-    propShareId ? { shareId: propShareId } : "skip",
+    getByShareArgs as { shareId: string } | "skip",
   );
+
+  const getByPublicArgs = propPublicId
+    ? { publicId: propPublicId }
+    : ("skip" as const);
+  logger.debug("🧩 getChatByPublicId args:", getByPublicArgs);
   const chatByPublicId = useQuery(
     api.chats.getChatByPublicId,
-    propPublicId ? { publicId: propPublicId } : "skip",
+    getByPublicArgs as { publicId: string } | "skip",
   );
+
+  const looksServerForCurrent = looksServerId(String(currentChatId || ""));
+  const getMessagesArgs =
+    currentChatId && looksServerForCurrent
+      ? { chatId: currentChatId as Id<"chats"> }
+      : ("skip" as const);
+  logger.debug("🧩 getChatMessages args:", {
+    currentChatId,
+    looksServerForCurrent,
+    args: getMessagesArgs,
+  });
   const messages = useQuery(
     api.chats.getChatMessages,
-    currentChatId && looksServerId(String(currentChatId))
-      ? { chatId: currentChatId as Id<"chats"> }
-      : "skip",
+    getMessagesArgs as
+      | { chatId: Id<"chats"> }
+      | "skip"
+      | { chatId: Id<"chats"> }
+      | "skip",
   );
+
+  useEffect(() => {
+    if (Array.isArray(messages)) {
+      logger.debug("🧾 messages updated", {
+        count: messages.length,
+        firstTwo:
+          messages.length > 0
+            ? messages.slice(0, 2).map((m) => ({ id: m._id, role: m.role }))
+            : [],
+      });
+    } else {
+      logger.debug("🧾 messages state (non-array)", { value: messages });
+    }
+  }, [messages]);
 
   // Callbacks for sidebar operations
   const handleMobileSidebarClose = useCallback(() => {
+    logger.debug("📱 Dialog onClose", { sidebarOpen });
+    const now = Date.now();
+    const openedAt = lastSidebarOpenedAtRef.current || 0;
+    const sinceOpen = now - openedAt;
+    if (sidebarOpen && sinceOpen < 800) {
+      logger.debug("⏱️ Ignoring onClose fired too soon after open", {
+        sinceOpenMs: sinceOpen,
+      });
+      return;
+    }
     if (sidebarOpen) handleToggleSidebar();
   }, [sidebarOpen, handleToggleSidebar]);
 
@@ -587,7 +654,7 @@ export function ChatInterface({
     return deduped;
   }, [currentMessages]);
 
-  // Update URL when chat changes
+  // URL → state: derive selection from URL/queries/local
   useEffect(() => {
     // Don't override currentChatId if user just initiated a chat selection/navigation
     // But allow authentication-related updates to proceed normally
@@ -608,16 +675,20 @@ export function ChatInterface({
     if (isAuthenticated) {
       if (chatByOpaqueId && chatByOpaqueId._id !== currentChatId) {
         newChatId = chatByOpaqueId._id;
+        logger.debug("🔗 url→state matched chatByOpaqueId", newChatId);
       } else if (chatByShareId && chatByShareId._id !== currentChatId) {
         newChatId = chatByShareId._id;
+        logger.debug("🔗 url→state matched chatByShareId", newChatId);
       } else if (chatByPublicId && chatByPublicId._id !== currentChatId) {
         newChatId = chatByPublicId._id;
+        logger.debug("🔗 url→state matched chatByPublicId", newChatId);
       } else if (
         propChatId &&
         looksServerId(propChatId) &&
         propChatId !== currentChatId
       ) {
         newChatId = propChatId;
+        logger.debug("🔗 url→state matched propChatId (server)", newChatId);
       }
     } else {
       // For unauthenticated users, check URL params against local chats
@@ -625,6 +696,10 @@ export function ChatInterface({
         const localChat = localChats.find((chat) => chat._id === propChatId);
         if (localChat && localChat._id !== currentChatId) {
           newChatId = localChat._id;
+          logger.debug(
+            "🔗 url→state matched local propChatId (unauth)",
+            newChatId,
+          );
         }
       } else if (propShareId) {
         const localChat = localChats.find(
@@ -632,6 +707,10 @@ export function ChatInterface({
         );
         if (localChat && localChat._id !== currentChatId) {
           newChatId = localChat._id;
+          logger.debug(
+            "🔗 url→state matched local shareId (unauth)",
+            newChatId,
+          );
         }
       } else if (propPublicId) {
         const localChat = localChats.find(
@@ -639,6 +718,10 @@ export function ChatInterface({
         );
         if (localChat && localChat._id !== currentChatId) {
           newChatId = localChat._id;
+          logger.debug(
+            "🔗 url→state matched local publicId (unauth)",
+            newChatId,
+          );
         }
       }
     }
@@ -661,8 +744,12 @@ export function ChatInterface({
   ]);
 
   const hasSetInitialUrlRef = useRef(false);
+  // State → URL: navigate to canonical path for current chat
   useEffect(() => {
-    if (!currentChatId) return;
+    if (!currentChatId) {
+      logger.debug("🧭 state→url: currentChatId is null; skip");
+      return;
+    }
     const chat = allChats.find((c) => String(c._id) === String(currentChatId));
 
     if (chat) {
@@ -675,7 +762,9 @@ export function ChatInterface({
         path = `/chat/${chat._id}`;
       }
       if (path !== window.location.pathname) {
-        if (!hasSetInitialUrlRef.current) {
+        const first = !hasSetInitialUrlRef.current;
+        logger.debug("🧭 state→url: navigating", { path, first });
+        if (first) {
           navigate(path, { replace: true });
           hasSetInitialUrlRef.current = true;
         } else {
@@ -685,7 +774,10 @@ export function ChatInterface({
     } else {
       // Fallback for a newly created chat that is not yet in `allChats`
       const path = `/chat/${currentChatId}`;
-      if (path !== window.location.pathname) navigate(path);
+      if (path !== window.location.pathname) {
+        logger.debug("🧭 state→url: fallback navigating", { path });
+        navigate(path);
+      }
     }
   }, [currentChatId, allChats, navigate]);
 
@@ -799,11 +891,34 @@ export function ChatInterface({
     setMessageCount,
   ]);
 
-  // Callback for new chat button
+  // Start a fresh session without creating a chat yet; URL stays at "/" until first send
+  const startNewChatSession = useCallback(() => {
+    try {
+      logger.debug("🆕 startNewChatSession: begin", {
+        path: typeof window !== "undefined" ? window.location.pathname : "n/a",
+        currentChatId,
+      });
+    } catch {}
+    userSelectedChatAtRef.current = Date.now();
+    setIsCreatingChat(false);
+    setMessageCount(0);
+    setShowFollowUpPrompt(false);
+    setPlannerHint(undefined);
+    setPendingMessage("");
+    setCurrentChatId(null);
+    try {
+      if (!window.location.pathname.endsWith("/")) {
+        navigate("/", { replace: true });
+        logger.debug("🆕 startNewChatSession: navigated to / (replace:true)");
+      }
+    } catch {}
+  }, [navigate, currentChatId]);
+
+  // Callback for new chat button: defer creation until first message is sent
   const handleNewChatButton = useCallback(() => {
-    logger.debug("🖱️ New Chat button clicked in MessageList");
-    handleNewChat();
-  }, [handleNewChat]);
+    logger.debug("🖱️ New Chat button clicked (deferred)");
+    startNewChatSession();
+  }, [startNewChatSession]);
 
   // Always clear creating state once navigate/selection occurs
   useEffect(() => {
@@ -1824,8 +1939,30 @@ export function ChatInterface({
    * @param isPublic - Public visibility flag
    */
   const handleShare = useCallback(
-    async (privacy: "private" | "shared" | "public") => {
+    async (
+      privacy: "private" | "shared" | "public",
+    ): Promise<{ shareId?: string; publicId?: string } | void> => {
       if (!currentChatId) return;
+
+      // Optimistically navigate to the canonical path for the new privacy
+      try {
+        const chat = allChats.find(
+          (c) => String(c._id) === String(currentChatId),
+        );
+        if (chat) {
+          let path = "";
+          if (privacy === "public" && chat.publicId) {
+            path = `/p/${chat.publicId}`;
+          } else if (privacy === "shared" && chat.shareId) {
+            path = `/s/${chat.shareId}`;
+          } else {
+            path = `/chat/${chat._id}`;
+          }
+          if (path && path !== window.location.pathname) {
+            navigate(path);
+          }
+        }
+      } catch {}
 
       if (typeof currentChatId === "string") {
         // Handle local chat
@@ -1834,17 +1971,80 @@ export function ChatInterface({
             chat._id === currentChatId ? { ...chat, privacy } : chat,
           ),
         );
+        // If making shared/public, publish anonymously to server so export URLs work
+        if (privacy === "shared" || privacy === "public") {
+          try {
+            const localChat = localChats.find((c) => c._id === currentChatId);
+            const msgs = localMessages
+              .filter((m) => m.chatId === currentChatId)
+              .map((m) => ({
+                role: m.role,
+                content: m.content,
+                timestamp: m.timestamp,
+                searchResults: m.searchResults,
+                sources: m.sources,
+                reasoning: m.reasoning as unknown,
+                searchMethod: m.searchMethod as unknown,
+                hasRealResults: m.hasRealResults,
+              }));
+            const res = await fetchJsonWithRetry(
+              `${window.location.origin}/api/publishChat`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  title: localChat?.title || "Shared Chat",
+                  privacy,
+                  shareId: localChat?.shareId,
+                  publicId: localChat?.publicId,
+                  messages: msgs,
+                }),
+              },
+            );
+            if (res.ok) {
+              const data = await res.json();
+              // Update local chat IDs if server had to regenerate to avoid collisions
+              setLocalChats((prev) =>
+                prev.map((c) =>
+                  c._id === currentChatId
+                    ? { ...c, shareId: data.shareId, publicId: data.publicId }
+                    : c,
+                ),
+              );
+              return {
+                shareId: data.shareId as string,
+                publicId: data.publicId as string,
+              };
+            }
+          } catch (e) {
+            logger.error("Failed to publish anonymous chat", e);
+          }
+        }
       } else {
         // Handle Convex chat
         try {
           await updateChatPrivacy({ chatId: currentChatId, privacy });
+          // Fetch identifiers for return
+          const found = allChats.find(
+            (c) => String(c._id) === String(currentChatId),
+          );
+          return { shareId: found?.shareId, publicId: found?.publicId };
         } catch (e) {
           logger.error("Failed to update privacy", e);
         }
       }
-      setShowShareModal(false);
+      // Do not forcibly close the modal here; caller decides
     },
-    [currentChatId, setLocalChats, updateChatPrivacy],
+    [
+      currentChatId,
+      allChats,
+      setLocalChats,
+      updateChatPrivacy,
+      navigate,
+      localChats,
+      localMessages,
+      fetchJsonWithRetry,
+    ],
   );
 
   /**
@@ -2200,8 +2400,24 @@ export function ChatInterface({
         <ChatSidebar
           chats={allChats}
           currentChatId={currentChatId}
-          onSelectChat={setCurrentChatId}
-          onNewChat={handleNewChat}
+          onSelectChat={(id) => {
+            logger.debug("🖱️ Sidebar selected chat", { id });
+            userSelectedChatAtRef.current = Date.now();
+            setCurrentChatId(id);
+            // Navigate immediately to reduce reliance on effects
+            try {
+              const sel = allChats.find((c) => String(c._id) === String(id));
+              let path = sel
+                ? sel.privacy === "public" && sel.publicId
+                  ? `/p/${sel.publicId}`
+                  : sel.privacy === "shared" && sel.shareId
+                    ? `/s/${sel.shareId}`
+                    : `/chat/${sel._id}`
+                : `/chat/${id}`;
+              if (path !== window.location.pathname) navigate(path);
+            } catch {}
+          }}
+          onNewChat={startNewChatSession}
           onDeleteLocalChat={handleDeleteLocalChat}
           onRequestDeleteChat={handleRequestDeleteChat}
           isOpen={sidebarOpen}
@@ -2215,8 +2431,23 @@ export function ChatInterface({
         onClose={handleMobileSidebarClose}
         chats={allChats}
         currentChatId={currentChatId}
-        onSelectChat={handleMobileSidebarSelectChat}
-        onNewChat={handleNewChat}
+        onSelectChat={(id) => {
+          logger.debug("📱 MobileSidebar selected chat", { id });
+          userSelectedChatAtRef.current = Date.now();
+          handleMobileSidebarSelectChat(id);
+          try {
+            const sel = allChats.find((c) => String(c._id) === String(id));
+            let path = sel
+              ? sel.privacy === "public" && sel.publicId
+                ? `/p/${sel.publicId}`
+                : sel.privacy === "shared" && sel.shareId
+                  ? `/s/${sel.shareId}`
+                  : `/chat/${sel._id}`
+              : `/chat/${id}`;
+            if (path !== window.location.pathname) navigate(path);
+          } catch {}
+        }}
+        onNewChat={startNewChatSession}
         onDeleteLocalChat={handleDeleteLocalChat}
         onRequestDeleteChat={handleRequestDeleteChat}
       />
@@ -2347,6 +2578,7 @@ export function ChatInterface({
               isGenerating ? "AI is working..." : "Ask me anything..."
             }
             history={userHistory}
+            key={`input-${String(currentChatId || "root")}`}
           />
         </div>
       </div>
@@ -2362,6 +2594,16 @@ export function ChatInterface({
               ? `${window.location.origin}/s/${currentChat.shareId}`
               : `${window.location.origin}/chat/${currentChat?._id}`
         }
+        llmTxtUrl={(() => {
+          // LLM link is only for shared chats (not public) to avoid indexability
+          if (currentChat?.privacy !== "shared" || !currentChat?.shareId)
+            return undefined;
+          const qp = `shareId=${encodeURIComponent(currentChat.shareId)}`;
+          return `${window.location.origin}/api/chatTextMarkdown?${qp}`;
+        })()}
+        shareId={currentChat?.shareId}
+        publicId={currentChat?.publicId}
+        exportBase={`${window.location.origin}/api/chatTextMarkdown`}
         privacy={currentChat?.privacy || "private"}
       />
     </div>
