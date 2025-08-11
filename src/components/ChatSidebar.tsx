@@ -104,7 +104,10 @@ export function ChatSidebar({
           </button>
         </div>
         <button
-          onClick={onNewChat}
+          onClick={() => {
+            console.log("🖱️ New Chat button clicked in ChatSidebar");
+            onNewChat();
+          }}
           className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
         >
           <svg
