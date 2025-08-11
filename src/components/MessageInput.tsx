@@ -213,6 +213,19 @@ export function MessageInput({
     adjustTextarea();
   }, [placeholder, disabled]);
 
+  const handleChange = React.useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value;
+      setMessage(val);
+      if (historyIndex !== null) {
+        setHistoryIndex(null);
+        setDraftBeforeHistory(null);
+      }
+      onDraftChange?.(val);
+    },
+    [historyIndex, onDraftChange],
+  );
+
   // Politely auto-focus the input on mount (desktop only, no modals)
   useEffect(() => {
     const el = textareaRef.current;
@@ -261,16 +274,7 @@ export function MessageInput({
             <textarea
               ref={textareaRef}
               value={message}
-              onChange={(e) => {
-                const val = e.target.value;
-                setMessage(val);
-                // Typing exits history navigation mode
-                if (historyIndex !== null) {
-                  setHistoryIndex(null);
-                  setDraftBeforeHistory(null);
-                }
-                onDraftChange?.(val);
-              }}
+              onChange={handleChange}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               aria-label="Message input"

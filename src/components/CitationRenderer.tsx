@@ -201,3 +201,4 @@ export function CitationRenderer({
 
   return <>{processedContent}</>;
 }
+/* eslint-disable react-perf/jsx-no-new-function-as-prop */
