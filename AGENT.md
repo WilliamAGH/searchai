@@ -22,6 +22,12 @@ PACKAGE_MANAGER_INSTALL: npm install
 PACKAGE_MANAGER_ADD: npm install
 PACKAGE_MANAGER_REMOVE: npm uninstall
 
+# Convex Deployments (see README.md for detailed setup)
+CONVEX_DEV_DEPLOYMENT: diligent-greyhound-240
+CONVEX_DEV_URL: https://diligent-greyhound-240.convex.cloud
+CONVEX_PROD_DEPLOYMENT: vivid-boar-858
+CONVEX_PROD_URL: https://vivid-boar-858.convex.cloud
+
 # Commands
 BUILD_COMMAND: npm run build
 DEV_COMMAND: npm run dev
@@ -73,6 +79,10 @@ DEPLOYMENT_PLATFORM: Self-hosted Docker Containers (using Coolify and otherwise)
 PRODUCTION_URL: https://search-ai.io
 DEVELOPMENT_URL: https://dev.search-ai.io
 LOCAL_DEVELOPMENT_URL: http://localhost:5173
+
+# Email Service
+EMAIL_PROVIDER: Resend
+EMAIL_ENV_KEY: CONVEX_RESEND_API_KEY
 ```
 
 This project operates under **ZERO TEMPERATURE** development standards where every decision must be explicitly verified through live documentation, no assumptions are permitted, and type safety is absolute.
@@ -180,6 +190,13 @@ All code changes must pass:
 - Real-time subscriptions
 - Separate TypeScript config for backend
 
+**IMPORTANT**: For detailed Convex setup, deployment, and environment configuration, see [README.md](./README.md#initial-setup). This includes:
+
+- Environment variable configuration
+- Deployment commands for dev/prod
+- API endpoint documentation
+- Troubleshooting common issues
+
 ### AI Integration
 
 - OpenAI SDK for completions
@@ -212,6 +229,20 @@ npm run dev              # Start both frontend and backend
 npm run dev:frontend     # Frontend only (Vite)
 npm run dev:backend      # Backend only (Convex)
 
+# Convex Operations (see README.md for complete guide)
+npx convex dev          # Start dev deployment with hot reload
+npx convex dev --once   # Deploy to dev without watching
+npx convex deploy       # Deploy to production
+npx convex logs         # View dev logs
+npx convex logs --prod  # View production logs
+npx convex dashboard    # Open Convex dashboard
+
+# Environment Management
+npx convex env set KEY "value"       # Set dev env variable
+npx convex env set KEY "value" --prod # Set prod env variable
+npx convex env list                   # List dev env variables
+npx convex env list --prod            # List prod env variables
+
 # Quality Checks
 npm run validate         # Run all validations
 npm run lint            # Run Oxlint
@@ -236,9 +267,15 @@ npm run clean:all       # Full reset
 
 ### Required Environment Variables
 
-- Convex deployment variables
-- OpenAI API keys
-- Authentication providers
+**See [README.md](./README.md#environment-variables-reference) for complete list.**
+
+Key variables:
+
+- `VITE_CONVEX_URL` - Frontend build-time Convex URL
+- `CONVEX_DEPLOYMENT` - CLI deployment target
+- `CONVEX_RESEND_API_KEY` - Email service API key
+- `OPENROUTER_API_KEY` - AI provider key
+- `SERP_API_KEY` - Search API key
 - Never commit `.env` files
 
 ### API Security
@@ -320,6 +357,51 @@ Follow conventional commits:
 - Actual installed package versions
 - TypeScript compiler output
 - Runtime behavior in development
+
+---
+
+## 🔧 CONVEX-SPECIFIC WORKFLOWS
+
+### Switching Between Environments
+
+```bash
+# Work with dev deployment
+export CONVEX_DEPLOYMENT=diligent-greyhound-240
+npx convex dev
+
+# Deploy to production
+export CONVEX_DEPLOYMENT=vivid-boar-858
+npx convex deploy -y
+```
+
+### Adding New Convex Functions
+
+1. Create function in `convex/` directory
+2. Ensure proper TypeScript types
+3. Deploy to dev: `npx convex dev --once`
+4. Test thoroughly
+5. Deploy to prod: `npx convex deploy -y`
+
+### Email Configuration (Resend)
+
+- Dev/Prod use `CONVEX_RESEND_API_KEY`
+- Email functions in `convex/email.ts`
+- Templates use inline HTML for better compatibility
+
+### Debugging Convex Issues
+
+```bash
+# Check function logs
+npx convex logs --filter "functionName"
+
+# View real-time logs
+npx convex logs --follow
+
+# Check deployment status
+npx convex dashboard
+```
+
+**For complete Convex documentation, troubleshooting, and deployment guides, refer to [README.md](./README.md).**
 
 ---
 
