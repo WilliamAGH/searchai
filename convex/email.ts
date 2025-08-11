@@ -81,12 +81,15 @@ export const sendEmail = action({
   },
 });
 
-export const sendWelcomeEmail: any = action({
+export const sendWelcomeEmail = action({
   args: {
     userEmail: v.string(),
     userName: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; messageId?: string; message?: string }> => {
     const welcomeHtml = `
       <!DOCTYPE html>
       <html>

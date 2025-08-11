@@ -17,7 +17,7 @@ import { auth } from "./auth";
 // Gate verbose logs in production
 const DEBUG_HTTP = process.env.DEBUG_HTTP === "1";
 const dlog = (...args: unknown[]) => {
-  if (DEBUG_HTTP) console.log(...args);
+  if (DEBUG_HTTP) console.info(...args);
 };
 
 /**
@@ -155,7 +155,7 @@ http.route({
     } catch {
       return corsResponse(JSON.stringify({ error: "Invalid JSON body" }), 400);
     }
-    const { messages } = (payload as any) ?? {};
+    const { messages } = (payload as unknown as { messages?: unknown[] }) ?? {};
     if (!Array.isArray(messages)) {
       return corsResponse(
         JSON.stringify({ error: "messages must be an array" }),
@@ -164,7 +164,7 @@ http.route({
     }
     const result = await streamText({
       model: openai("gpt-4-turbo"),
-      messages,
+      messages: messages as any,
     });
     // Add CORS headers to the streaming response
     const base = result.toTextStreamResponse();
@@ -709,7 +709,7 @@ http.route({
               while (isStreamActive) {
                 const { done, value } = await reader.read();
                 if (done) {
-                  console.log("🔄 OpenRouter streaming completed:", {
+                  console.info("🔄 OpenRouter streaming completed:", {
                     totalChunks: chunkCount,
                     duration: Date.now() - lastChunkTime,
                   });
