@@ -1,10 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "import",
-    "typescript",
-    "unicorn"
-  ],
+  "plugins": ["import", "typescript", "unicorn", "react"],
   "env": {
     "browser": true,
     "node": true
@@ -14,6 +10,8 @@
     "eqeqeq": "warn",
     "import/no-cycle": "error",
     "import/order": "off",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
     "react/self-closing-comp": [
       "error",
       {
@@ -30,10 +28,7 @@
   ],
   "overrides": [
     {
-      "files": [
-        "*.test.ts",
-        "*.spec.ts"
-      ],
+      "files": ["*.test.ts", "*.spec.ts"],
       "rules": {
         "@typescript-eslint/no-explicit-any": "off"
       }
