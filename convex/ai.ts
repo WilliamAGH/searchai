@@ -10,7 +10,12 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { action, internalAction } from "./_generated/server";
 import { buildContextSummary } from "./chats";
-import { applyEnhancements, sortResultsWithPriority } from "./enhancements";
+import {
+  applyEnhancements,
+  sortResultsWithPriority,
+  extractUrlsFromMessage,
+  createUserProvidedSearchResults,
+} from "./enhancements";
 
 // Normalize URLs for stable deduplication and deterministic ranking
 function normalizeUrlForKey(rawUrl: string): string {
@@ -285,7 +290,7 @@ export const generationStep = internalAction({
       relevanceScore?: number;
     }> = [];
     let searchContext = "";
-    const _sources: string[] = [];
+    let _sources: string[] = [];
     let hasRealResults = false;
     let searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback" =
       "fallback";
@@ -305,6 +310,9 @@ export const generationStep = internalAction({
     const prioritizedUrls = enhancements.prioritizedUrls;
     const injectedResults = enhancements.injectedResults;
     const enhancedSystemPromptAddition = enhancements.enhancedSystemPrompt;
+
+    // Extract domains/URLs from user message to include as additional sources
+    const userProvidedUrls = extractUrlsFromMessage(args.userMessage);
 
     try {
       // 4. Plan and perform context-aware web search
@@ -437,6 +445,14 @@ export const generationStep = internalAction({
           hasRealResults = true;
         }
 
+        // Add user-provided URLs as additional search sources with high relevance
+        if (userProvidedUrls.length > 0) {
+          const userUrlResults =
+            createUserProvidedSearchResults(userProvidedUrls);
+          aggregated.unshift(...userUrlResults);
+          hasRealResults = true;
+        }
+
         // Dedupe by URL (normalized), keep highest relevance
         const byUrl = new Map<
           string,
@@ -527,6 +543,7 @@ export const generationStep = internalAction({
 
           // Deterministic source ordering independent of scrape resolution time
           const deterministicSources = resultsToScrape.map((r) => r.url);
+          _sources = deterministicSources;
           const contentPromises = resultsToScrape.map(
             async (result: { url: string; title: string; snippet: string }) => {
               try {
