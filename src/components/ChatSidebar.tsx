@@ -180,10 +180,7 @@ export function ChatSidebar({
                         onSelectChat(null);
                       }
                     } catch (err) {
-                      if (
-                        (import.meta as unknown as { env?: { DEV?: boolean } })
-                          ?.env?.DEV
-                      ) {
+                      if (import.meta.env.DEV) {
                         console.warn("Chat deletion failed:", err);
                       }
                     }
