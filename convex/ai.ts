@@ -67,7 +67,7 @@ interface OpenRouterBody {
  */
 async function* streamOpenRouter(body: OpenRouterBody) {
   if (process.env.DEBUG_OPENROUTER)
-    console.log("🔄 OpenRouter streaming request initiated:", {
+    console.info("🔄 OpenRouter streaming request initiated:", {
       model: body.model,
       messageCount: body.messages.length,
       temperature: body.temperature,
@@ -99,7 +99,7 @@ async function* streamOpenRouter(body: OpenRouterBody) {
     );
 
     if (process.env.DEBUG_OPENROUTER)
-      console.log("📊 OpenRouter response received:", {
+      console.info("📊 OpenRouter response received:", {
         status: response.status,
         statusText: response.statusText,
         hasBody: !!response.body,
@@ -129,7 +129,7 @@ async function* streamOpenRouter(body: OpenRouterBody) {
     let chunkCount = 0;
 
     if (process.env.DEBUG_OPENROUTER)
-      console.log("✅ OpenRouter streaming started successfully");
+      console.info("✅ OpenRouter streaming started successfully");
 
     try {
       while (true) {
@@ -143,7 +143,7 @@ async function* streamOpenRouter(body: OpenRouterBody) {
             if (line.startsWith("data: ")) {
               const data = line.slice(6);
               if (data === "[DONE]") {
-                console.log("✅ OpenRouter streaming finished with [DONE]");
+                console.info("✅ OpenRouter streaming finished with [DONE]");
                 return;
               }
               try {
@@ -162,7 +162,7 @@ async function* streamOpenRouter(body: OpenRouterBody) {
             }
           }
           if (process.env.DEBUG_OPENROUTER)
-            console.log("🔄 OpenRouter streaming completed:", {
+            console.info("🔄 OpenRouter streaming completed:", {
               totalChunks: chunkCount,
             });
           break;
@@ -177,7 +177,7 @@ async function* streamOpenRouter(body: OpenRouterBody) {
             const data = line.slice(6);
             if (data === "[DONE]") {
               if (process.env.DEBUG_OPENROUTER)
-                console.log("✅ OpenRouter streaming finished with [DONE]");
+                console.info("✅ OpenRouter streaming finished with [DONE]");
               return;
             }
             try {
