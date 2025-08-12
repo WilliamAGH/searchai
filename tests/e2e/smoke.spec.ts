@@ -49,6 +49,20 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
     timeout: 15000,
   });
 
+  // Create chat by sending a message (toolbar is lazily rendered)
+  const input = page.locator('textarea, [role="textbox"]').first();
+  await expect(input).toBeVisible({ timeout: 15000 });
+  await input.click();
+  await input.type("Smoke home sanity");
+  await page.keyboard.press("Enter");
+
+  // Should show loading state or navigate quickly
+  await page.waitForURL(/\/(chat|s|p)\//, { timeout: 15000 }).catch(() => {});
+
+  // Verify navigation succeeded
+  const currentUrl = page.url();
+  expect(currentUrl).toMatch(/\/(chat|s|p)\//);
+
   // Fail if any console errors or request failures occurred
   expect
     .soft(
