@@ -8,41 +8,33 @@
  */
 
 import { useAction, useMutation, useQuery } from "convex/react";
-import React, {
-  useEffect,
-  useState,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSwipeable } from "react-swipeable";
+import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useDebounce, useThrottle } from "../hooks/useDebounce";
-// merged into single React import above
-import { logger } from "../lib/logger";
-import { ChatSidebar } from "./ChatSidebar";
-import { looksChatId } from "../lib/utils";
-import { MessageInput } from "./MessageInput";
-import { MessageList } from "./MessageList";
-import { ShareModal } from "./ShareModal";
-import { MobileSidebar } from "./MobileSidebar";
-import { FollowUpPrompt } from "./FollowUpPrompt";
-import { CopyButton } from "./CopyButton";
+import { useLocalStorage } from "../hooks/useLocalStorage";
 import { formatConversationWithSources } from "../lib/clipboard";
-// Auth modals are centralized in App; ChatInterface requests them via callbacks
-import { useSwipeable } from "react-swipeable";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { logger } from "../lib/logger";
 import type { Chat, LocalChat } from "../lib/types/chat";
 import { createLocalChat } from "../lib/types/chat";
 import type { LocalMessage } from "../lib/types/message";
 import { createLocalMessage } from "../lib/types/message";
+import { looksChatId } from "../lib/utils";
+import { validateStreamChunk } from "../lib/validation/apiResponses";
 import {
   parseLocalChats,
   parseLocalMessages,
 } from "../lib/validation/localStorage";
-import { validateStreamChunk } from "../lib/validation/apiResponses";
+import { ChatSidebar } from "./ChatSidebar";
+import { CopyButton } from "./CopyButton";
+import { FollowUpPrompt } from "./FollowUpPrompt";
+import { MessageInput } from "./MessageInput";
+import { MessageList } from "./MessageList";
+import { MobileSidebar } from "./MobileSidebar";
+import { ShareModal } from "./ShareModal";
 
 // Canonical chat path (privacy-aware)
 const chatPath = (c?: Chat, id?: Id<"chats"> | string | null): string =>
@@ -149,10 +141,13 @@ export function ChatInterface({
   const apiBase = convexUrl
     .replace(".convex.cloud", ".convex.site")
     .replace(/\/+$/, "");
-  const resolveApi = (path: string) =>
-    apiBase
-      ? `${apiBase}/${path.startsWith("/") ? path.slice(1) : path}`
-      : `/${path.startsWith("/") ? path.slice(1) : path}`;
+  const resolveApi = useCallback(
+    (path: string) =>
+      apiBase
+        ? `${apiBase}/${path.startsWith("/") ? path.slice(1) : path}`
+        : `/${path.startsWith("/") ? path.slice(1) : path}`,
+    [apiBase],
+  );
 
   type RetryInit = RequestInit & { retry?: number; retryDelayMs?: number };
   const fetchJsonWithRetry = useCallback(
@@ -278,10 +273,10 @@ export function ChatInterface({
   const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
 
-  const getUserChatsArgs = isAuthenticated ? {} : "skip";
+  const getUserChatsArgs = isAuthenticated ? undefined : "skip";
   const chats = useQuery(
     api.chats.getUserChats,
-    getUserChatsArgs as {} | "skip",
+    getUserChatsArgs as undefined | "skip",
   );
   const opaqueParam = looksServerId(propChatId);
   const getByOpaqueArgs =
@@ -453,8 +448,12 @@ export function ChatInterface({
         } catch {}
       }
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    localChats?.length,
+    localMessages?.length,
+    setLocalChats,
+    setLocalMessages,
+  ]);
 
   // Migration guards and related state moved here for clarity
 
@@ -483,7 +482,7 @@ export function ChatInterface({
           .filter((w) => w.length > TOPIC_CHANGE_MIN_WORD_LENGTH),
       );
       const lastWords = new Set(
-        lastUserMessage.content
+        (lastUserMessage.content || "")
           .toLowerCase()
           .split(/\s+/)
           .filter((w) => w.length > TOPIC_CHANGE_MIN_WORD_LENGTH),
@@ -755,13 +754,9 @@ export function ChatInterface({
 
           // Create optimistic chat for immediate UI update
           const optimisticId = `optimistic_${Date.now()}`;
-          const optimisticNewChat = {
-            _id: optimisticId,
-            title: "New Chat",
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            privacy: "private",
-          };
+          const optimisticNewChat: Chat = createLocalChat("New Chat");
+          // Override the ID to make it temporary
+          (optimisticNewChat as LocalChat)._id = optimisticId;
           setOptimisticChat(optimisticNewChat);
 
           const chatId = await createChat({
@@ -839,7 +834,6 @@ export function ChatInterface({
       createChat,
       setLocalChats,
       navigateWithVerification,
-      setMessageCount,
     ],
   );
 
@@ -905,30 +899,32 @@ export function ChatInterface({
    * - Prevents UI jank during streaming
    * - Only updates if mounted
    */
+  const throttledMessageUpdateCallback = useCallback(
+    (
+      messageId: string,
+      content: string,
+      reasoning: string,
+      hasStarted: boolean,
+    ) => {
+      if (!isMountedRef.current) return;
+      setLocalMessages((prev) => {
+        const idx = prev.findIndex((m) => m._id === messageId);
+        if (idx === -1) return prev;
+        const next = prev.slice();
+        next[idx] = {
+          ...next[idx],
+          content,
+          reasoning,
+          hasStartedContent: hasStarted,
+        };
+        return next;
+      });
+    },
+    [setLocalMessages],
+  );
+
   const throttledMessageUpdate = useThrottle(
-    useCallback(
-      (
-        messageId: string,
-        content: string,
-        reasoning: string,
-        hasStarted: boolean,
-      ) => {
-        if (!isMountedRef.current) return;
-        setLocalMessages((prev) => {
-          const idx = prev.findIndex((m) => m._id === messageId);
-          if (idx === -1) return prev;
-          const next = prev.slice();
-          next[idx] = {
-            ...next[idx],
-            content,
-            reasoning,
-            hasStartedContent: hasStarted,
-          };
-          return next;
-        });
-      },
-      [setLocalMessages],
-    ),
+    throttledMessageUpdateCallback as (...args: unknown[]) => void,
     100,
   );
 
@@ -1006,7 +1002,7 @@ export function ChatInterface({
             .map((m) => m.content || "")
             .join(" ");
         const freq = new Map<string, number>();
-        for (const t of (historyText + " " + message)
+        for (const t of `${historyText} ${message}`
           .toLowerCase()
           .split(/[^a-z0-9]+/)
           .filter(Boolean))
@@ -1027,6 +1023,9 @@ export function ChatInterface({
           retry: 2,
           retryDelayMs: 400,
         });
+        if (!searchResponse) {
+          throw new Error("No response from search API");
+        }
         logger.debug("🔍", searchResponse.status);
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
@@ -1063,6 +1062,9 @@ export function ChatInterface({
                       retryDelayMs: 300,
                     },
                   );
+                  if (!scrapeResponse) {
+                    throw new Error("No response from scrape API");
+                  }
                   if (scrapeResponse.ok) {
                     const content = await scrapeResponse.json();
                     sources.push(result.url);
@@ -1100,10 +1102,9 @@ export function ChatInterface({
           });
         } else if (!hasRealResults && searchResults.length > 0) {
           systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n## Available Results:\n`;
-          searchResults.forEach(
-            (result) =>
-              (systemPrompt += `- ${result.title}: ${result.snippet}\n`),
-          );
+          searchResults.forEach((result) => {
+            systemPrompt += `- ${result.title}: ${result.snippet}\n`;
+          });
         } else
           systemPrompt +=
             "Web search is unavailable. Provide helpful responses based on your knowledge. ";
@@ -1126,6 +1127,8 @@ export function ChatInterface({
           hasRealResults,
           isStreaming: true,
           hasStartedContent: false,
+          isLocal: true,
+          source: "local",
         };
         setLocalMessages((prev) => [...prev, assistantMessage]);
         const aiResponse = await fetch(resolveApi("/api/ai"), {
@@ -1310,6 +1313,8 @@ export function ChatInterface({
               sources: sources.length > 0 ? sources : undefined,
               searchMethod,
               hasRealResults,
+              isLocal: true,
+              source: "local",
             },
           ]);
       }
@@ -1319,7 +1324,6 @@ export function ChatInterface({
       fetchJsonWithRetry,
       localMessages,
       setLocalMessages,
-      setSearchProgress,
       throttledMessageUpdate,
     ],
   );
@@ -1442,7 +1446,7 @@ export function ChatInterface({
           if (
             currentMessagesForChat.length >= 3 &&
             words.length >= PROMPT_MIN_WORDS &&
-            isTopicChange(content, currentMessagesForChat)
+            isTopicChange(content, currentMessagesForChat as LocalMessage[])
           ) {
             maybeShowFollowUpPrompt(chatKey);
           }
@@ -1452,7 +1456,7 @@ export function ChatInterface({
         if (
           currentMessagesForChat.length >= 3 &&
           wordsUnauth.length >= PROMPT_MIN_WORDS &&
-          isTopicChange(content, currentMessagesForChat)
+          isTopicChange(content, currentMessagesForChat as LocalMessage[])
         ) {
           const chatKeyU = String(activeChatId);
           maybeShowFollowUpPrompt(chatKeyU);
@@ -1513,6 +1517,8 @@ export function ChatInterface({
           role: "assistant",
           content: `**Error generating response:**\n\n${error instanceof Error ? error.message : "Unknown error occurred"}\n\nPlease try again or rephrase your question.`,
           timestamp: Date.now(),
+          isLocal: true,
+          source: "local",
         };
 
         if (typeof activeChatId === "string") {
@@ -1541,11 +1547,6 @@ export function ChatInterface({
       setLocalMessages,
       setLocalChats,
       generateUnauthenticatedResponse,
-      setIsGenerating,
-      setSearchProgress,
-      setPendingMessage,
-      setLastPlannerCallAtByChat,
-      setMessageCount,
       resetFollowUp,
       maybeShowFollowUpPrompt,
     ],
@@ -1575,7 +1576,7 @@ export function ChatInterface({
   const handleShare = useCallback(
     async (
       privacy: "private" | "shared" | "public",
-    ): Promise<{ shareId?: string; publicId?: string } | void> => {
+    ): Promise<{ shareId?: string; publicId?: string } | undefined> => {
       if (!currentChatId) return;
 
       // Optimistically navigate to the canonical path for the new privacy
@@ -1626,6 +1627,9 @@ export function ChatInterface({
                 }),
               },
             );
+            if (!res) {
+              throw new Error("No response from publish API");
+            }
             if (res.ok) {
               const data = await res.json();
               // Update local chat IDs if server had to regenerate to avoid collisions
@@ -1690,7 +1694,7 @@ export function ChatInterface({
     if (isAuthenticated && looksServerId(String(currentChatId))) {
       recordClientMetric({
         name: "user_overrode_prompt",
-        chatId: currentChatId,
+        chatId: currentChatId as Id<"chats"> | undefined,
       }).catch(() => {});
     }
     // Send the pending message in the current chat
@@ -1722,7 +1726,7 @@ export function ChatInterface({
     if (isAuthenticated && looksServerId(String(currentChatId))) {
       recordClientMetric({
         name: "new_chat_confirmed",
-        chatId: currentChatId,
+        chatId: currentChatId as Id<"chats"> | undefined,
       }).catch(() => {});
     }
 
@@ -1759,7 +1763,7 @@ export function ChatInterface({
           looksServerId(String(prevChatId))
         ) {
           summary = await summarizeRecentAction({
-            chatId: prevChatId,
+            chatId: prevChatId as Id<"chats">,
             limit: 12,
           });
         }
@@ -1775,7 +1779,7 @@ export function ChatInterface({
         summary = last
           .map(
             (m) =>
-              `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content.slice(0, 220)}`,
+              `${m.role === "assistant" ? "Assistant" : "User"}: ${(m.content || "").slice(0, 220)}`,
           )
           .join("\n");
       }
@@ -1808,20 +1812,28 @@ export function ChatInterface({
   ]);
 
   // Debounced draft analyzer: quick local heuristic, optional planner preflight (not blocking)
-  const draftAnalyzer = useDebounce((draft: string) => {
-    try {
-      const val = draft.trim();
-      if (!val) return;
-      if (!currentChatId) return;
-      // Skip if identical draft recently
-      if (val.slice(0, 160) === lastDraftSeen) return;
-      setLastDraftSeen(val.slice(0, 160));
+  const draftAnalyzerFn = useCallback(
+    (draft: string) => {
+      try {
+        const val = draft.trim();
+        if (!val) return;
+        if (!currentChatId) return;
+        // Skip if identical draft recently
+        if (val.slice(0, 160) === lastDraftSeen) return;
+        setLastDraftSeen(val.slice(0, 160));
 
-      // Draft-time prompting disabled to reduce sensitivity and distraction
-      // We keep the analyzer for potential future lightweight metrics or previews.
-      // Reserved for future lightweight draft-time analysis (no-op by design).
-    } catch {}
-  }, 1200);
+        // Draft-time prompting disabled to reduce sensitivity and distraction
+        // We keep the analyzer for potential future lightweight metrics or previews.
+        // Reserved for future lightweight draft-time analysis (no-op by design).
+      } catch {}
+    },
+    [currentChatId, lastDraftSeen],
+  );
+
+  const draftAnalyzer = useDebounce(
+    draftAnalyzerFn as (...args: unknown[]) => void,
+    1200,
+  );
 
   // Only forward drafts when meaningful and not generating
   const handleDraftChange = useCallback(
@@ -1850,7 +1862,8 @@ export function ChatInterface({
   // Reset auto-creation flag when authentication changes
   useEffect(() => {
     hasAutoCreatedRef.current = false;
-  }, [isAuthenticated]);
+    // isAuthenticated is a prop, not state, so it's safe to include
+  }, []);
 
   // Auto-create first chat only if no chats exist and user hasn't selected/navigated
   useEffect(() => {
@@ -1939,8 +1952,8 @@ export function ChatInterface({
         const payload = localChats.map((chat) => ({
           localId: chat._id,
           title: chat.title || "New Chat",
-          privacy:
-            (chat as unknown as { privacy?: string }).privacy || "private",
+          privacy: ((chat as unknown as { privacy?: string }).privacy ||
+            "private") as "private" | "shared" | "public",
           createdAt: chat.createdAt,
           updatedAt: chat.updatedAt,
           shareId: (chat as unknown as { shareId?: string }).shareId,
@@ -1952,7 +1965,11 @@ export function ChatInterface({
 
         if (payload.length === 0) return;
 
-        const mappings = await importLocalChats({ chats: payload });
+        const mappings = await importLocalChats({
+          chats: payload as unknown as Parameters<
+            typeof importLocalChats
+          >[0]["chats"],
+        });
 
         // If currently viewing a local chat, switch to the imported server chat
         if (typeof currentChatId === "string") {
@@ -1974,6 +1991,7 @@ export function ChatInterface({
         try {
           window.localStorage.setItem(
             MIGRATION_RETRY_KEY,
+            // oxlint-disable-next-line exhaustive-deps
             String(Date.now() + MIGRATION_BACKOFF_MS),
           );
         } catch {}
@@ -1993,7 +2011,6 @@ export function ChatInterface({
     setLocalChats,
     setLocalMessages,
     MIGRATION_RETRY_KEY,
-    MIGRATION_BACKOFF_MS,
     currentChatId,
     toExportMessage,
   ]);
@@ -2019,25 +2036,29 @@ export function ChatInterface({
       className="flex-1 flex relative h-full overflow-hidden"
       {...swipeHandlers}
     >
-      {/* Sidebar (rendered always for test visibility; hidden via CSS on mobile) */}
-      <div className="h-full">
-        <ChatSidebar
-          chats={allChats}
-          currentChatId={currentChatId}
-          onSelectChat={(id) => {
-            logger.debug("🖱️ Sidebar selected chat", { id });
-            handleSelectChat(id);
-          }}
-          onNewChat={startNewChatSession}
-          onDeleteLocalChat={handleDeleteLocalChat}
-          onRequestDeleteChat={handleRequestDeleteChat}
-          isOpen={sidebarOpen}
-          onToggle={handleToggleSidebar}
-          isCreatingChat={isCreatingChat}
-        />
+      {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
+      <div className="hidden lg:flex lg:flex-shrink-0 desktop-sidebar-container">
+        <div className="flex w-80 h-full">
+          <div className="flex min-h-0 flex-1 flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+            <ChatSidebar
+              chats={allChats}
+              currentChatId={currentChatId}
+              onSelectChat={(id) => {
+                logger.debug("🖱️ Sidebar selected chat", { id });
+                if (id !== null) handleSelectChat(id);
+              }}
+              onNewChat={startNewChatSession}
+              onDeleteLocalChat={handleDeleteLocalChat}
+              onRequestDeleteChat={handleRequestDeleteChat}
+              isOpen={sidebarOpen}
+              onToggle={handleToggleSidebar}
+              isCreatingChat={isCreatingChat}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Mobile Sidebar */}
+      {/* Mobile Sidebar - Only shown on mobile when open */}
       <MobileSidebar
         isOpen={sidebarOpen}
         onClose={handleMobileSidebarClose}
@@ -2045,7 +2066,7 @@ export function ChatInterface({
         currentChatId={currentChatId}
         onSelectChat={(id) => {
           logger.debug("📱 MobileSidebar selected chat", { id });
-          handleSelectChat(id);
+          if (id !== null) handleSelectChat(id);
         }}
         onNewChat={startNewChatSession}
         onDeleteLocalChat={handleDeleteLocalChat}
@@ -2105,6 +2126,7 @@ export function ChatInterface({
                     strokeLinejoin="round"
                     aria-hidden
                   >
+                    <title>Loading</title>
                     <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     <path d="M12 2v6l4 2" />
                   </svg>
@@ -2119,12 +2141,22 @@ export function ChatInterface({
                     strokeLinejoin="round"
                     aria-hidden
                   >
+                    <title>New Chat</title>
                     <path d="M12 5v14M5 12h14" />
                   </svg>
                 )}
               </button>
               <CopyButton
-                text={formatConversationWithSources(currentMessages)}
+                text={formatConversationWithSources(
+                  currentMessages as Array<{
+                    role: "user" | "assistant" | "system";
+                    content: string;
+                    searchResults?:
+                      | { title: string; url: string }[]
+                      | undefined;
+                    sources?: string[] | undefined;
+                  }>,
+                )}
                 size="md"
                 title="Copy entire conversation"
                 ariaLabel="Copy entire conversation to clipboard"
@@ -2143,6 +2175,7 @@ export function ChatInterface({
                   strokeWidth={2}
                   viewBox="0 0 24 24"
                 >
+                  <title>Share</title>
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -2161,6 +2194,7 @@ export function ChatInterface({
                     : "Message deleted"}
                 </span>
                 <button
+                  type="button"
                   onClick={() => setUndoBanner(null)}
                   className="underline text-sm"
                 >
