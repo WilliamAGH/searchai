@@ -1,9 +1,10 @@
 /* eslint-disable react-perf/jsx-no-new-function-as-prop */
-import React, { Fragment, useRef } from "react";
-import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+
 import { Dialog, Transition } from "@headlessui/react";
-import { Id } from "../../convex/_generated/dataModel";
+import { useMutation } from "convex/react";
+import React, { Fragment, useRef } from "react";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 
 interface MobileSidebarProps {
@@ -76,7 +77,7 @@ export function MobileSidebar({
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog
         as="div"
-        className="relative z-50 lg:hidden"
+        className="relative z-50 lg:hidden mobile-sidebar-dialog"
         onClose={onClose}
         initialFocus={closeButtonRef}
       >
@@ -129,7 +130,9 @@ export function MobileSidebar({
                       viewBox="0 0 24 24"
                       strokeWidth="1.5"
                       stroke="currentColor"
+                      aria-label="Close sidebar"
                     >
+                      <title>Close sidebar</title>
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -150,6 +153,7 @@ export function MobileSidebar({
                         stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
+                        <title>Search</title>
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -164,6 +168,7 @@ export function MobileSidebar({
 
                 <nav className="flex flex-1 flex-col">
                   <button
+                    type="button"
                     onClick={handleNewChat}
                     disabled={isCreatingChat}
                     className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -174,6 +179,7 @@ export function MobileSidebar({
                         fill="none"
                         viewBox="0 0 24 24"
                       >
+                        <title>Creating chat</title>
                         <circle
                           className="opacity-25"
                           cx="12"
@@ -194,7 +200,9 @@ export function MobileSidebar({
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        aria-label="New chat"
                       >
+                        <title>New chat</title>
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -219,29 +227,35 @@ export function MobileSidebar({
                         {chats.map((chat) => (
                           <div
                             key={chat._id}
-                            className="flex items-center gap-2 pr-2"
+                            className="flex items-center gap-2 pr-2 min-w-0"
                           >
                             <button
+                              type="button"
                               onClick={() => handleSelectChat(chat._id)}
-                              className={`flex-1 px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                              className={`flex-1 min-w-0 px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
                                 currentChatId === chat._id
                                   ? "bg-gray-100 dark:bg-gray-800"
                                   : ""
                               }`}
                             >
-                              <div className="font-medium truncate text-sm">
+                              <div className="font-medium truncate text-sm min-w-0">
                                 {chat.title}
                               </div>
-                              <div className="text-xs text-gray-500 flex items-center gap-1">
-                                {chat.isLocal && (
-                                  <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded">
+                              <div className="text-xs text-gray-500 flex items-center gap-1 min-w-0">
+                                {"isLocal" in chat && chat.isLocal && (
+                                  <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
                                     Local
                                   </span>
                                 )}
-                                {new Date(chat.updatedAt).toLocaleDateString()}
+                                <span className="truncate">
+                                  {new Date(
+                                    chat.updatedAt,
+                                  ).toLocaleDateString()}
+                                </span>
                               </div>
                             </button>
                             <button
+                              type="button"
                               onClick={() =>
                                 handleDeleteChat(
                                   chat._id,
@@ -259,7 +273,9 @@ export function MobileSidebar({
                                 strokeWidth="2"
                                 viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg"
+                                aria-label="Delete chat"
                               >
+                                <title>Delete chat</title>
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
