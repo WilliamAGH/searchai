@@ -227,8 +227,13 @@ export const getChatMessages = query({
 
     if (!chat) return [];
 
-    // Allow access to chats without userId (anonymous chats) or user's own chats
-    if (chat.userId && chat.userId !== userId) return [];
+    // Allow access to:
+    // - Anonymous chats (no userId)
+    // - The owner's chats
+    // - Publicly shared chats (privacy: "shared" or "public")
+    const privacy = (chat as unknown as { privacy?: string }).privacy;
+    const isSharedOrPublic = privacy === "shared" || privacy === "public";
+    if (chat.userId && chat.userId !== userId && !isSharedOrPublic) return [];
 
     return await ctx.db
       .query("messages")
@@ -257,6 +262,24 @@ export const updateChatTitle = mutation({
 
     if (!chat) throw new Error("Chat not found");
     if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+
+    await ctx.db.patch(args.chatId, {
+      title: args.title,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+// Internal version for use within actions
+export const internalUpdateChatTitle = internalMutation({
+  args: {
+    chatId: v.id("chats"),
+    title: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) throw new Error("Chat not found");
 
     await ctx.db.patch(args.chatId, {
       title: args.title,
@@ -369,7 +392,10 @@ export const updateChatPrivacy = mutation({
       v.literal("public"),
     ),
   },
-  returns: v.null(),
+  returns: v.object({
+    shareId: v.union(v.string(), v.null()),
+    publicId: v.union(v.string(), v.null()),
+  }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
@@ -394,6 +420,12 @@ export const updateChatPrivacy = mutation({
       ...(publicId && !(chat as any).publicId ? { publicId } : {}),
       updatedAt: Date.now(),
     });
+
+    // Return identifiers so the client can update immediately without refetch
+    return {
+      shareId: shareId ?? (chat as any).shareId ?? null,
+      publicId: publicId ?? (chat as any).publicId ?? null,
+    };
   },
 });
 

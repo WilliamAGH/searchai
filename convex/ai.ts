@@ -242,6 +242,26 @@ export const generateStreamingResponse = action({
       content: trimmed,
     });
 
+    // Check if this is the first message and update title
+    const messageCount = await ctx.runMutation(
+      internal.messages.countMessages,
+      {
+        chatId: args.chatId,
+      },
+    );
+
+    if (messageCount === 1) {
+      // First user message
+      // Generate title from user message (same logic as unauthenticated users)
+      const title =
+        trimmed.length > 50 ? `${trimmed.substring(0, 50)}...` : trimmed;
+
+      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
+        chatId: args.chatId,
+        title,
+      });
+    }
+
     // 2. Create a placeholder message for the assistant's response
     const assistantMessageId = await ctx.runMutation(
       internal.messages.addMessage,
