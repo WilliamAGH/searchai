@@ -126,8 +126,8 @@ export function CitationRenderer({
 
   // Process content to replace citations with interactive links
   useEffect(() => {
-    // Regular expression to match [domain.com] patterns
-    const citationRegex = /\[([^\]]+(?:\.[^\]]+)+)\]/g;
+    // Regular expression to match [domain.com] or [full URL] patterns
+    const citationRegex = /\[([^\]]+)\]/g;
 
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
@@ -144,8 +144,44 @@ export function CitationRenderer({
         );
       }
 
-      const citedDomain = match[1];
-      const matchedUrl = domainToUrlMap.get(citedDomain);
+      const citedText = match[1];
+      let citedDomain = citedText;
+      let matchedUrl: string | undefined;
+
+      // Check if cited text is a full URL
+      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
+        // Extract domain from the full URL citation
+        citedDomain = getDomainFromUrl(citedText);
+        // Try to find exact URL match first
+        const exactMatch = searchResults.find((r) => r.url === citedText);
+        if (exactMatch) {
+          matchedUrl = exactMatch.url;
+        } else {
+          // Fallback to domain matching
+          matchedUrl = domainToUrlMap.get(citedDomain);
+        }
+      } else if (citedText.includes("/")) {
+        // Handle cases like "github.com/user/repo" - extract just the domain
+        const domainPart = citedText.split("/")[0];
+        citedDomain = domainPart;
+        // Look for any URL from this domain
+        matchedUrl = domainToUrlMap.get(citedDomain);
+        // If not found, try to find a URL that contains this path
+        if (!matchedUrl) {
+          const matchingResult = searchResults.find(
+            (r) =>
+              r.url.includes(citedText) ||
+              getDomainFromUrl(r.url) === citedDomain,
+          );
+          if (matchingResult) {
+            matchedUrl = matchingResult.url;
+          }
+        }
+      } else {
+        // Simple domain citation
+        matchedUrl = domainToUrlMap.get(citedText);
+        citedDomain = citedText;
+      }
 
       if (matchedUrl) {
         // Found a matching source - create interactive citation

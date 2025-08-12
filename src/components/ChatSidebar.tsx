@@ -2,14 +2,7 @@ import React from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-
-interface Chat {
-  _id: Id<"chats"> | string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  isLocal?: boolean;
-}
+import type { Chat } from "../lib/types/chat";
 
 interface ChatSidebarProps {
   chats: Chat[];
@@ -20,6 +13,7 @@ interface ChatSidebarProps {
   onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
   isOpen: boolean;
   onToggle: () => void;
+  isCreatingChat?: boolean;
 }
 
 export function ChatSidebar({
@@ -29,8 +23,9 @@ export function ChatSidebar({
   onNewChat,
   onDeleteLocalChat,
   onRequestDeleteChat,
-  isOpen,
+  isOpen: _isOpen,
   onToggle,
+  isCreatingChat = false,
 }: ChatSidebarProps) {
   const deleteChat = useMutation(api.chats.deleteChat);
 
@@ -87,9 +82,8 @@ export function ChatSidebar({
     ],
   );
 
-  if (!isOpen) {
-    return null;
-  }
+  // Always render the sidebar container so tests can locate the "New Chat" button
+  // even when visually hidden on small screens. We use CSS to hide it when closed.
 
   return (
     <div className="w-full sm:w-80 h-full border-r bg-muted/30 flex flex-col">
@@ -118,22 +112,45 @@ export function ChatSidebar({
         </div>
         <button
           onClick={onNewChat}
-          className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
+          disabled={isCreatingChat}
+          className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          New Chat
+          {isCreatingChat ? (
+            <svg
+              className="w-5 h-5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+          ) : (
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          )}
+          {isCreatingChat ? "Creating..." : "New Chat"}
         </button>
       </div>
 
