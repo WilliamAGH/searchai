@@ -155,7 +155,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
             <div className="flex flex-wrap gap-2 mt-2">
               {progress.urls.map((url, idx) => (
                 <div
-                  key={idx}
+                  key={`${url}-${idx}`}
                   className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-700 rounded-md text-xs"
                 >
                   {getFaviconUrl(url) ? (

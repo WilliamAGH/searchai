@@ -31,7 +31,7 @@ export function ShareModal({
   isOpen,
   onClose,
   onShare,
-  shareUrl,
+  shareUrl: _shareUrl,
   privacy,
   llmTxtUrl,
   shareId,
@@ -43,12 +43,22 @@ export function ShareModal({
   >(privacy);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [generatedUrl, setGeneratedUrl] = useState<string>("");
+  const [generatedFor, setGeneratedFor] = useState<
+    "shared" | "public" | "llm" | null
+  >(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     setSelectedPrivacy(privacy);
   }, [privacy]);
+
+  // When switching options, clear any previously generated URL
+  useEffect(() => {
+    setGeneratedUrl("");
+    setGeneratedFor(null);
+  }, [selectedPrivacy]);
 
   useEffect(() => {
     return () => {
@@ -74,60 +84,77 @@ export function ShareModal({
     }
   }, [isOpen]);
 
-  const handleShare = React.useCallback(async () => {
+  const _handleShare = React.useCallback(async () => {
     // Map LLM to shared privacy when persisting
     const effective = selectedPrivacy === "llm" ? "shared" : selectedPrivacy;
     await onShare(effective as "private" | "shared" | "public");
   }, [onShare, selectedPrivacy]);
 
-  // Compute the single URL we show/copy based on selected option
-  const displayUrl = React.useMemo(() => {
-    if (selectedPrivacy === "llm") {
-      if (llmTxtUrl) return llmTxtUrl;
-      if (exportBase && shareId)
-        return `${exportBase}?shareId=${encodeURIComponent(shareId)}&format=txt`;
-      return "";
-    }
-    return shareUrl || "";
-  }, [selectedPrivacy, llmTxtUrl, exportBase, shareId, shareUrl]);
+  // The URL box should start empty and only populate once generated
+  const displayUrl = generatedUrl;
 
-  // Copy the currently displayed URL
-  const handleCopyUrl = React.useCallback(async () => {
-    setBusy(true);
-    // If selecting LLM/Shared/Public, ensure it's published/shared before copying
-    const effective = selectedPrivacy === "llm" ? "shared" : selectedPrivacy;
-    const maybe = await onShare(effective as "private" | "shared" | "public");
-    let url = displayUrl;
-    if (!url && effective === "shared") {
-      const sid =
-        (maybe as unknown as { shareId?: string })?.shareId || shareId;
-      if (sid && exportBase) {
-        url =
-          selectedPrivacy === "llm"
-            ? `${exportBase}?shareId=${encodeURIComponent(sid)}&format=txt`
-            : `${window.location.origin}/s/${sid}`;
-      }
-    }
-    if (!url && effective === "public") {
-      const pid = (maybe as unknown as { publicId?: string })?.publicId;
-      if (pid) url = `${window.location.origin}/p/${pid}`;
-    }
-    if (!url) return;
-    try {
-      const ok = await copyToClipboard(url);
-      if (ok) {
-        setCopied(true);
-        if (copyTimeoutRef.current !== null) {
-          clearTimeout(copyTimeoutRef.current);
+  // Generate a fresh URL for the selected option, or copy if already generated
+  const handleGenerateOrCopy = React.useCallback(async () => {
+    // If already generated for the current selection, copy it
+    if (displayUrl && generatedFor === selectedPrivacy) {
+      try {
+        const ok = await copyToClipboard(displayUrl);
+        if (ok) {
+          setCopied(true);
+          if (copyTimeoutRef.current !== null)
+            clearTimeout(copyTimeoutRef.current);
+          copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
         }
-        copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+      } catch (error) {
+        logger.error("Failed to copy URL", { error });
+      }
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const effective = selectedPrivacy === "llm" ? "shared" : selectedPrivacy;
+      const maybe = await onShare(effective as "private" | "shared" | "public");
+      const ret =
+        (maybe as unknown as { shareId?: string; publicId?: string }) || {};
+
+      let newUrl = "";
+      if (selectedPrivacy === "llm") {
+        // Always build fresh LLM URL from returned shareId when available
+        if (ret.shareId && exportBase) {
+          newUrl = `${exportBase}?shareId=${encodeURIComponent(ret.shareId)}&format=txt`;
+        } else if (shareId && exportBase) {
+          newUrl = `${exportBase}?shareId=${encodeURIComponent(shareId)}&format=txt`;
+        } else if (llmTxtUrl) {
+          newUrl = llmTxtUrl;
+        }
+      } else if (selectedPrivacy === "shared") {
+        const sid = ret.shareId || shareId;
+        if (sid) newUrl = `${window.location.origin}/s/${sid}`;
+      } else if (selectedPrivacy === "public") {
+        const pid = ret.publicId || _publicId;
+        if (pid) newUrl = `${window.location.origin}/p/${pid}`;
+      }
+
+      if (newUrl) {
+        setGeneratedUrl(newUrl);
+        setGeneratedFor(selectedPrivacy);
       }
     } catch (error) {
-      logger.error("Failed to share/copy URL", { error });
+      logger.error("Failed to generate URL", { error });
     } finally {
       setBusy(false);
     }
-  }, [displayUrl, onShare, selectedPrivacy, exportBase, shareId]);
+  }, [
+    displayUrl,
+    generatedFor,
+    onShare,
+    selectedPrivacy,
+    exportBase,
+    shareId,
+    _publicId,
+    llmTxtUrl,
+  ]);
 
   const handleDialogKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -334,69 +361,68 @@ export function ShareModal({
                 htmlFor="share-url-input"
                 className="text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                {selectedPrivacy === "llm"
-                  ? "LLM Link (Markdown .txt)"
-                  : "Share URL"}
+                Link
               </label>
               <div className="flex gap-2">
-                {displayUrl ? (
-                  <>
-                    <input
-                      id="share-url-input"
-                      type="text"
-                      value={displayUrl}
-                      readOnly
-                      className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                    <button
-                      onClick={handleCopyUrl}
-                      className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-60"
-                      aria-label={
-                        copied
-                          ? "URL copied to clipboard"
-                          : busy
-                            ? "Publishing…"
-                            : "Copy URL to clipboard"
-                      }
-                      disabled={busy}
-                    >
-                      {busy ? (
-                        <span className="inline-flex items-center gap-2">
-                          <svg
-                            className="w-4 h-4 animate-spin"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                          >
-                            <circle
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              strokeWidth="4"
-                              className="opacity-25"
-                            />
-                            <path
-                              d="M4 12a8 8 0 018-8"
-                              strokeWidth="4"
-                              className="opacity-75"
-                            />
-                          </svg>
-                          Publishing…
-                        </span>
-                      ) : copied ? (
-                        "Copied!"
-                      ) : (
-                        "Copy"
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {selectedPrivacy === "llm"
-                      ? "LLM link will be generated after updating privacy."
-                      : "Link will be generated after updating privacy."}
-                  </div>
-                )}
+                <input
+                  id="share-url-input"
+                  type="text"
+                  value={displayUrl}
+                  placeholder={
+                    selectedPrivacy === "llm"
+                      ? "Generate LLM-friendly .txt link"
+                      : selectedPrivacy === "shared"
+                        ? "Generate shared link"
+                        : "Generate public link"
+                  }
+                  readOnly
+                  className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <button
+                  onClick={handleGenerateOrCopy}
+                  className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-60"
+                  aria-label={
+                    displayUrl
+                      ? "Copy URL to clipboard"
+                      : busy
+                        ? "Generating…"
+                        : "Generate URL"
+                  }
+                  disabled={busy}
+                >
+                  {displayUrl ? (
+                    copied ? (
+                      "Copied!"
+                    ) : (
+                      "Copy"
+                    )
+                  ) : busy ? (
+                    <span className="inline-flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          strokeWidth="4"
+                          className="opacity-25"
+                        />
+                        <path
+                          d="M4 12a8 8 0 018-8"
+                          strokeWidth="4"
+                          className="opacity-75"
+                        />
+                      </svg>
+                      Generating…
+                    </span>
+                  ) : (
+                    "Generate URL"
+                  )}
+                </button>
               </div>
             </div>
           )}
@@ -406,19 +432,7 @@ export function ShareModal({
               onClick={onClose}
               className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium"
             >
-              Cancel
-            </button>
-            <button
-              onClick={async () => {
-                setBusy(true);
-                await handleShare();
-                setBusy(false);
-                onClose();
-              }}
-              className="flex-1 px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-60"
-              disabled={busy}
-            >
-              {busy ? "Updating…" : "Update Privacy"}
+              Close
             </button>
           </div>
         </div>
