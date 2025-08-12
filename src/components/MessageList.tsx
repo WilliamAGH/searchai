@@ -21,6 +21,8 @@ import {
   formatConversationWithSources,
 } from "../lib/clipboard";
 import { logger } from "../lib/logger";
+import type { Chat } from "../lib/types/chat";
+import type { Message, SearchResult } from "../lib/types/message";
 
 /**
  * Extract hostname from URL safely
@@ -48,37 +50,6 @@ function getFaviconUrl(url: string): string | null {
   const hostname = getSafeHostname(url);
   if (!hostname) return null;
   return `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
-}
-
-interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore?: number;
-}
-
-interface Message {
-  _id?: Id<"messages">;
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: number;
-  searchResults?: SearchResult[];
-  sources?: string[];
-  reasoning?: string;
-  searchMethod?: "serp" | "openrouter" | "duckduckgo" | "fallback";
-  hasRealResults?: boolean;
-  isStreaming?: boolean;
-  hasStartedContent?: boolean;
-}
-
-interface Chat {
-  _id: string;
-  title: string;
-  shareId?: string;
-  // Align with new privacy model; keep legacy keys optional for back-compat
-  privacy?: "private" | "shared" | "public";
-  isShared?: boolean;
-  isPublic?: boolean;
 }
 
 interface MessageListProps {
@@ -482,7 +453,10 @@ export function MessageList({
 
             return (
               <div
-                key={message._id || index}
+                key={
+                  message._id ||
+                  `message-${index}-${message.timestamp || Date.now()}`
+                }
                 className="flex gap-2 sm:gap-4 max-w-full overflow-hidden"
               >
                 <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center">

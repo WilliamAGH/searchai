@@ -4,14 +4,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Dialog, Transition } from "@headlessui/react";
 import { Id } from "../../convex/_generated/dataModel";
-
-interface Chat {
-  _id: Id<"chats"> | string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  isLocal?: boolean;
-}
+import type { Chat } from "../lib/types/chat";
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -22,6 +15,7 @@ interface MobileSidebarProps {
   onNewChat: () => void;
   onDeleteLocalChat?: (chatId: string) => void;
   onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
+  isCreatingChat?: boolean;
 }
 
 export function MobileSidebar({
@@ -33,6 +27,7 @@ export function MobileSidebar({
   onNewChat,
   onDeleteLocalChat,
   onRequestDeleteChat,
+  isCreatingChat = false,
 }: MobileSidebarProps) {
   const deleteChat = useMutation(api.chats.deleteChat);
   // Ensure Headless UI Dialog has a stable initial focusable element on open
@@ -170,22 +165,45 @@ export function MobileSidebar({
                 <nav className="flex flex-1 flex-col">
                   <button
                     onClick={handleNewChat}
-                    className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4"
+                    disabled={isCreatingChat}
+                    className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    New Chat
+                    {isCreatingChat ? (
+                      <svg
+                        className="w-5 h-5 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                    )}
+                    {isCreatingChat ? "Creating..." : "New Chat"}
                   </button>
 
                   <div className="space-y-1">
