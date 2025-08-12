@@ -60,11 +60,52 @@ export function MarkdownWithCitations({
 
   // Process content to replace citations before markdown rendering
   const processedContent = React.useMemo(() => {
-    // Replace [domain.com] with custom markers that survive markdown processing
-    const citationRegex = /\[([^\]]+(?:\.[^\]]+)+)\]/g;
+    // Replace [domain.com] or [full URL] with custom markers that survive markdown processing
+    const citationRegex = /\[([^\]]+)\]/g;
 
-    const processed = content.replace(citationRegex, (match, domain) => {
-      const url = domainToUrlMap.get(domain);
+    const processed = content.replace(citationRegex, (match, citedText) => {
+      let domain = citedText;
+      let url: string | undefined;
+
+      // Check if cited text is a full URL
+      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
+        // Extract domain from the full URL citation
+        try {
+          domain = new URL(citedText).hostname.replace("www.", "");
+          // Try to find exact URL match first
+          const exactMatch = searchResults?.find((r) => r.url === citedText);
+          if (exactMatch) {
+            url = exactMatch.url;
+          } else {
+            // Fallback to domain matching
+            url = domainToUrlMap.get(domain);
+          }
+        } catch {
+          url = domainToUrlMap.get(citedText);
+        }
+      } else if (citedText.includes("/")) {
+        // Handle cases like "github.com/user/repo" - extract just the domain
+        const domainPart = citedText.split("/")[0];
+        domain = domainPart;
+        // Look for any URL from this domain
+        url = domainToUrlMap.get(domain);
+        // If not found, try to find a URL that contains this path
+        if (!url) {
+          const matchingResult = searchResults?.find(
+            (r) =>
+              r.url.includes(citedText) ||
+              (r.url.includes(domain) && r.url.includes("/")),
+          );
+          if (matchingResult) {
+            url = matchingResult.url;
+          }
+        }
+      } else {
+        // Simple domain citation
+        url = domainToUrlMap.get(citedText);
+        domain = citedText;
+      }
+
       if (url) {
         // Use a special marker that won't be escaped by markdown
         return `@@CITATION@@${domain}@@${url}@@`;
@@ -72,7 +113,7 @@ export function MarkdownWithCitations({
       return match;
     });
     return processed;
-  }, [content, domainToUrlMap]);
+  }, [content, domainToUrlMap, searchResults]);
 
   // Custom sanitize schema
   const sanitizeSchema: Schema = {

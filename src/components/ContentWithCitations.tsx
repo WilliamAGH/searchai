@@ -59,15 +59,74 @@ export function ContentWithCitations({
     return map;
   }, [searchResults]);
 
-  // Convert [domain] to markdown links where domain is known
+  // Convert [domain] or [URL] to markdown links where domain is known
   const processedContent = React.useMemo(() => {
-    const citationRegex = /\[([^\]]+(?:\.[^\]]+)+)\]/g;
-    return content.replace(citationRegex, (match, p1) => {
-      const citedDomain = String(p1);
-      const url = domainToUrlMap.get(citedDomain);
-      return url ? `[${citedDomain}](${url})` : match;
+    const citationRegex = /\[([^\]]+)\]/g;
+    return content.replace(citationRegex, (match, citedText) => {
+      let domain = citedText;
+      let url: string | undefined;
+
+      // Check if cited text is a full URL
+      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
+        // Extract domain from the full URL citation
+        domain = getDomainFromUrl(citedText);
+        // Try to find exact URL match first
+        const exactMatch = searchResults.find((r) => r.url === citedText);
+        if (exactMatch) {
+          url = exactMatch.url;
+        } else {
+          // Fallback to domain matching
+          url = domainToUrlMap.get(domain);
+        }
+      } else if (citedText.includes("/")) {
+        // Handle cases like "github.com/user/repo" - extract just the domain
+        const domainPart = citedText.split("/")[0];
+        domain = domainPart;
+
+        // Try multiple matching strategies
+        // 1. Exact path match
+        const exactPathMatch = searchResults.find((r) =>
+          r.url.includes(citedText),
+        );
+        if (exactPathMatch) {
+          url = exactPathMatch.url;
+        } else {
+          // 2. Domain match from map
+          url = domainToUrlMap.get(domain);
+          if (!url) {
+            // 3. Any URL from this domain
+            const domainMatch = searchResults.find((r) => {
+              const sourceDomain = getDomainFromUrl(r.url);
+              return (
+                sourceDomain === domain || sourceDomain === `www.${domain}`
+              );
+            });
+            if (domainMatch) {
+              url = domainMatch.url;
+            }
+          }
+        }
+
+        // If still no match but it looks like a valid domain, force match to first result from that domain
+        if (!url && domain.includes(".")) {
+          const anyMatch = searchResults.find((r) => r.url.includes(domain));
+          if (anyMatch) {
+            url = anyMatch.url;
+          }
+        }
+      } else {
+        // Simple domain citation - check if it looks like a domain
+        if (citedText.includes(".")) {
+          url = domainToUrlMap.get(citedText);
+          domain = citedText;
+        }
+      }
+
+      // Only convert to markdown link if we found a matching URL
+      // Always show just the domain in the link text
+      return url ? `[${domain}](${url})` : match;
     });
-  }, [content, domainToUrlMap]);
+  }, [content, domainToUrlMap, searchResults]);
 
   // Custom sanitize schema
   const sanitizeSchema: Schema = {
