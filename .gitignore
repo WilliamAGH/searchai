@@ -11,7 +11,7 @@ trace.zip
 test-results
 coverage
 *.bak
-
+.crush*
 node_modules
 dist
 dist-ssr

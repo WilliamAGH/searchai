@@ -60,8 +60,17 @@ TEST_SMOKE_COMMAND: npm run test:smoke
 LINTER: Oxlint v1.x
 FORMATTER: Prettier
 TYPE_CHECKER: TypeScript (tsc)
-VALIDATION_SCHEMA_LIB: Zod
-SCHEMA_VERSION: 4.x
+
+# Validation Strategy
+# - Convex v validators for schema & function args (type-safe, runtime-validated)
+# - Built-in validators: v.string(), v.number(), v.object(), v.array(), etc.
+# - Runtime validation automatic for all Convex functions
+# - Custom validation in handlers for business rules (email format, ranges, etc.)
+# - NO Zod needed for basic type validation (Convex handles this)
+# - Consider external validation ONLY for patterns Convex doesn't support:
+#   * Regex patterns, email/URL formats
+#   * String length constraints, number ranges
+#   * Custom transform/refine logic
 
 # Directories
 TYPES_DIR: src/types/
@@ -157,6 +166,110 @@ This project operates under **ZERO TEMPERATURE** development standards where eve
 - Runtime validation for all external data
 - Convex schema validation for backend
 
+### 🚨 CRITICAL: Convex Type Generation & Validation - DO NOT DUPLICATE
+
+**ABSOLUTELY FORBIDDEN - NEVER CREATE REDUNDANT TYPE DEFINITIONS:**
+
+Convex automatically generates all required TypeScript types in the `convex/_generated/` directory. These files are managed by Convex and regenerated on every `npx convex dev` or `npx convex codegen` command.
+
+**CONVEX PROVIDES COMPLETE TYPE SAFETY:**
+
+- Automatic type generation from schema
+- Runtime validation of function arguments
+- Serialization/deserialization handled automatically
+- Client-server type synchronization via generated files
+- Single source of truth: your schema.ts
+
+**AUTO-GENERATED TYPES (NEVER MANUALLY CREATE):**
+
+- `Doc<TableName>` - Document types for each table with all fields
+- `Id<TableName>` - Type-safe document ID types for each table
+- `DataModel` - Complete database schema representation
+- `QueryCtx`, `MutationCtx`, `ActionCtx` - Typed context objects
+- `api` and `internal` - Type-safe function references
+- All argument and return types for Convex functions
+
+**MANDATORY RULES:**
+
+1. **NEVER** create duplicate type definitions for database documents
+2. **NEVER** manually define types that mirror Convex schema
+3. **NEVER** create custom ID types - use `Id<TableName>` from `_generated/dataModel`
+4. **NEVER** modify or edit files in `convex/_generated/` directory
+5. **ALWAYS** import types from `convex/_generated/dataModel` and `convex/_generated/api`
+6. **ALWAYS** rely on Convex's automatic type inference for function arguments/returns
+
+**CORRECT USAGE:**
+
+```typescript
+// ✅ CORRECT - Import from generated types
+import { Doc, Id } from "../convex/_generated/dataModel";
+import { api } from "../convex/_generated/api";
+
+// Use the generated types directly
+const userId: Id<"users"> = "...";
+const user: Doc<"users"> = await ctx.db.get(userId);
+```
+
+**INCORRECT USAGE:**
+
+```typescript
+// ❌ WRONG - Creating redundant type definitions
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+}
+
+// ❌ WRONG - Duplicating what Convex already provides
+type UserId = string;
+type ChatDocument = {
+  title: string;
+  // ...
+};
+```
+
+The Convex type generation system ensures perfect synchronization between your schema and TypeScript types. Any manual type definitions for database entities are redundant and create maintenance overhead.
+
+### ✅ LITMUS TEST: Full Convex Type Optimization
+
+**VERIFICATION CHECKLIST - Our codebase MUST:**
+
+1. Use ONLY Convex-generated `Doc<T>` types for all database documents
+2. Use ONLY Convex-generated `Id<T>` types for all document references
+3. Import ALL database types from `convex/_generated/dataModel`
+4. Leverage Convex's automatic type inference for all function arguments
+5. Have ZERO manual interface/type definitions that duplicate schema
+6. Achieve 100% type safety through Convex's embedded type system
+
+**CONVEX TYPE & VALIDATION BENEFITS WE MUST LEVERAGE:**
+
+- **Automatic Schema Synchronization**: Types update instantly with schema changes
+- **Compile-Time Safety**: Invalid table names or fields caught at build time
+- **Runtime Validation**: Function args validated automatically at runtime
+- **Perfect Type Inference**: Function arguments and returns typed automatically
+- **System Fields Included**: `_id`, `_creationTime` automatically in `Doc<T>`
+- **Cross-Table References**: Type-safe with `Id<TableName>` preventing mismatches
+- **Serialization Handled**: Automatic JSON serialization/deserialization
+- **Zero Maintenance**: No manual type updates ever needed
+
+**UNIFIED TYPE STRATEGY:**
+
+```typescript
+// Our entire type system flows from Convex:
+// schema.ts → npx convex dev → _generated/* → Full app type safety
+
+// Frontend components
+import type { Doc, Id } from "../convex/_generated/dataModel";
+type ChatProps = { chat: Doc<"chats"> };
+
+// API calls
+import { api } from "../convex/_generated/api";
+const result = await convex.query(api.chats.getChat, { chatId });
+// ^ Fully typed arguments and return value
+
+// No separate types folder needed for DB entities!
+```
+
 ### Modern Stack
 
 - React 19 with latest features
@@ -185,10 +298,14 @@ All code changes must pass:
 
 ### Convex Backend
 
-- Schema-driven development
-- Type-safe API functions
-- Real-time subscriptions
+- Schema-driven development with AUTO-GENERATED types
+- Type-safe API functions with ZERO manual type definitions
+- Built-in runtime validation via `v` validators
+- Real-time subscriptions with full type inference
+- Automatic client-server type synchronization
 - Separate TypeScript config for backend
+- **CRITICAL**: ALL types come from `convex/_generated/*` - NO DUPLICATES
+- **VALIDATION**: Use Convex `v` validators for all function arguments
 
 **IMPORTANT**: For detailed Convex setup, deployment, and environment configuration, see [README.md](./README.md#initial-setup). This includes:
 
@@ -212,14 +329,21 @@ searchai-io/
 │   ├── components/     # React components
 │   ├── hooks/         # Custom React hooks
 │   ├── lib/           # Utilities and helpers
-│   ├── types/         # TypeScript type definitions
+│   ├── types/         # UI-only types (NEVER database entities!)
 │   └── styles/        # CSS and styling
 ├── convex/            # Convex backend
-│   ├── _generated/    # Auto-generated Convex types
+│   ├── _generated/    # Auto-generated Convex types (SOURCE OF TRUTH)
 │   └── *.ts          # Backend functions
 ├── tests/             # Test files
 └── public/            # Static assets
 ```
+
+**⚠️ CRITICAL DISTINCTION - src/types/ Directory:**
+
+- ✅ **ALLOWED**: UI-specific types (component props, form states, client-only interfaces)
+- ❌ **FORBIDDEN**: Any type that duplicates Convex schema (User, Chat, Message, etc.)
+- ❌ **FORBIDDEN**: Any ID types (use `Id<TableName>` from \_generated)
+- ❌ **FORBIDDEN**: Any database document types (use `Doc<TableName>` from \_generated)
 
 ## 🚀 KEY COMMANDS
 
