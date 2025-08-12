@@ -149,6 +149,28 @@ export const getChatById = query({
   },
 });
 
+/**
+ * Alias for getChatById to maintain frontend compatibility
+ * @param chatId - Chat database ID
+ * @returns Chat or null
+ */
+export const getChat = query({
+  args: { chatId: v.id("chats") },
+  returns: v.union(v.any(), v.null()),
+  handler: async (ctx, args) => {
+    // Alias to getChatById for frontend compatibility
+    const userId = await getAuthUserId(ctx);
+    const chat = await ctx.db.get(args.chatId);
+
+    if (!chat) return null;
+
+    // Allow access to chats without userId (anonymous chats) or user's own chats
+    if (chat.userId && chat.userId !== userId) return null;
+
+    return chat;
+  },
+});
+
 export const getChatByOpaqueId = query({
   args: { chatId: v.id("chats") },
   returns: v.union(v.any(), v.null()),
