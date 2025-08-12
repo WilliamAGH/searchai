@@ -169,6 +169,23 @@ export const updateMessage = internalMutation({
  * - Removes the message
  * - Invalidates planner cache and rolling summary (clears summary text)
  */
+/**
+ * Count messages for a chat
+ * Used to determine if title should be generated
+ */
+export const countMessages = internalMutation({
+  args: { chatId: v.id("chats") },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+      .filter((q) => q.eq(q.field("role"), "user"))
+      .collect();
+    return messages.length;
+  },
+});
+
 export const deleteMessage = mutation({
   args: { messageId: v.id("messages") },
   returns: v.null(),

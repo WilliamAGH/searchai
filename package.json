@@ -21,6 +21,7 @@
     "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo '✅ Cleaned VSCode caches - restart VSCode'",
     "test": "tsx ./tests/convex.search.spec.mjs && tsx ./tests/creator-detection.spec.mjs && tsx ./tests/enhancements.spec.mjs",
     "test:smoke": "playwright test -g smoke --reporter=line",
+    "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test -g smoke --reporter=line",
     "prepare": "husky"
   },
   "dependencies": {
