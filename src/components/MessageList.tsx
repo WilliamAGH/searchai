@@ -76,6 +76,7 @@ interface MessageListProps {
  * @param onShare - Share conversation callback
  * @param currentChat - Current chat metadata
  * @param searchProgress - Search progress indicator
+ * @param isSidebarOpen - Whether the sidebar is currently open
  */
 export function MessageList({
   messages,
@@ -146,7 +147,7 @@ export function MessageList({
     if (!userHasScrolled) {
       scrollToBottom();
     }
-  }, [messages, isGenerating, userHasScrolled]);
+  }, [userHasScrolled, messages, isGenerating]);
 
   // Debug: surface message counts and rendering state
   useEffect(() => {
@@ -259,6 +260,7 @@ export function MessageList({
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -282,6 +284,7 @@ export function MessageList({
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -358,31 +361,12 @@ export function MessageList({
       ref={scrollContainerRef}
       className="flex-1 overflow-y-auto relative overscroll-contain"
     >
-      {/* Hamburger menu button - only show on desktop when sidebar would be visible */}
-      <button
-        onClick={onToggleSidebar}
-        className="hidden lg:block fixed top-4 left-4 z-10 p-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg shadow-md transition-colors"
-        title="Toggle sidebar"
-        aria-label="Toggle sidebar"
-      >
-        <svg
-          className="w-6 h-6 text-gray-600 dark:text-gray-300"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 6h16M4 12h16M4 18h16"
-          />
-        </svg>
-      </button>
+      {/* Hamburger button removed - now handled by App header */}
 
       {/* Scroll to bottom button */}
       {userHasScrolled && messages.length > 0 && (
         <button
+          type="button"
           onClick={handleScrollToBottom}
           className="fixed right-4 z-10 p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg transition-all transform hover:scale-105 fab-bottom"
           aria-label="Scroll to bottom"
@@ -392,6 +376,7 @@ export function MessageList({
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -406,6 +391,7 @@ export function MessageList({
         <div className="flex-1 flex items-center justify-center min-h-[60vh]">
           <div className="text-center max-w-sm sm:max-w-lg px-4 sm:px-6">
             <button
+              type="button"
               onClick={onToggleSidebar}
               className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 transform hover:scale-105"
               title="Toggle chat history"
@@ -415,6 +401,7 @@ export function MessageList({
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -467,7 +454,7 @@ export function MessageList({
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
-                        aria-label="User"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -484,7 +471,7 @@ export function MessageList({
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
-                        aria-label="Assistant"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -575,6 +562,7 @@ export function MessageList({
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
+                            aria-hidden="true"
                           >
                             <path
                               strokeLinecap="round"
@@ -603,6 +591,7 @@ export function MessageList({
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -619,6 +608,7 @@ export function MessageList({
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path
                         strokeLinecap="round"

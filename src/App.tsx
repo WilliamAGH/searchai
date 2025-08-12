@@ -196,23 +196,27 @@ export default function App() {
   useEffect(() => {
     const handleResize = () => {
       const isDesktop = window.innerWidth >= 1024;
-
       // Only auto-manage sidebar if user hasn't manually toggled it
       if (!hasManuallyToggled) {
-        if (isDesktop && !isSidebarOpen) {
-          setIsSidebarOpen(true);
-        } else if (!isDesktop && isSidebarOpen) {
-          setIsSidebarOpen(false);
-        }
+        setIsSidebarOpen((current) => {
+          if (isDesktop && !current) {
+            return true;
+          } else if (!isDesktop && current) {
+            return false;
+          }
+          return current;
+        });
       }
     };
 
-    // Set initial state based on current screen size
-    handleResize();
+    // Set initial state based on current screen size only if not manually toggled
+    if (!hasManuallyToggled) {
+      handleResize();
+    }
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [isSidebarOpen, hasManuallyToggled]);
+  }, [hasManuallyToggled]);
 
   const openSignUp = useCallback(() => {
     setShowSignInModal(false);

@@ -20,7 +20,7 @@ import { formatConversationWithSources } from "../lib/clipboard";
 import { logger } from "../lib/logger";
 import type { Chat, LocalChat } from "../lib/types/chat";
 import { createLocalChat } from "../lib/types/chat";
-import type { LocalMessage } from "../lib/types/message";
+import type { LocalMessage, Message } from "../lib/types/message";
 import { createLocalMessage } from "../lib/types/message";
 import { looksChatId } from "../lib/utils";
 import { validateStreamChunk } from "../lib/validation/apiResponses";
@@ -184,15 +184,8 @@ export function ChatInterface({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
-  const lastSidebarOpenedAtRef = useRef<number | null>(null);
-  const prevSidebarOpenRef = useRef<boolean>(false);
   const sidebarOpen =
     isSidebarOpen !== undefined ? isSidebarOpen : localSidebarOpen;
-  useEffect(() => {
-    if (!prevSidebarOpenRef.current && sidebarOpen)
-      lastSidebarOpenedAtRef.current = Date.now();
-    prevSidebarOpenRef.current = sidebarOpen;
-  }, [sidebarOpen]);
   const handleToggleSidebar = useCallback(
     () =>
       onToggleSidebar
@@ -325,15 +318,6 @@ export function ChatInterface({
   // Callbacks for sidebar operations
   const handleMobileSidebarClose = useCallback(() => {
     logger.debug("📱 Dialog onClose", { sidebarOpen });
-    const now = Date.now();
-    const openedAt = lastSidebarOpenedAtRef.current || 0;
-    const sinceOpen = now - openedAt;
-    if (sidebarOpen && sinceOpen < 800) {
-      logger.debug("⏱️ Ignoring onClose fired too soon after open", {
-        sinceOpenMs: sinceOpen,
-      });
-      return;
-    }
     if (sidebarOpen) handleToggleSidebar();
   }, [sidebarOpen, handleToggleSidebar]);
 
@@ -560,9 +544,12 @@ export function ChatInterface({
   // Build user message history for terminal-like navigation (oldest -> newest)
   const userHistory = useMemo(() => {
     const list = currentMessages
-      .filter((m) => m.role === "user")
-      .map((m) => m.content)
-      .filter((s): s is string => typeof s === "string" && s.trim().length > 0);
+      .filter((m: Message | LocalMessage) => m.role === "user")
+      .map((m: Message | LocalMessage) => m.content)
+      .filter(
+        (s: string | undefined): s is string =>
+          typeof s === "string" && s.trim().length > 0,
+      );
     // De-duplicate consecutive duplicates
     const deduped: string[] = [];
     for (const s of list) {
@@ -1394,7 +1381,9 @@ export function ChatInterface({
           );
         let gapMinutes = 0;
         try {
-          const prior = (messages || []).filter((m) => m.role === "user");
+          const prior = (messages || []).filter(
+            (m: Message) => m.role === "user",
+          );
           const lastUser =
             prior.length > 0 ? prior[prior.length - 1] : undefined;
           if (
@@ -2036,27 +2025,29 @@ export function ChatInterface({
       className="flex-1 flex relative h-full overflow-hidden"
       {...swipeHandlers}
     >
-      {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
-      <div className="hidden lg:flex lg:flex-shrink-0 desktop-sidebar-container">
-        <div className="flex w-80 h-full">
-          <div className="flex min-h-0 flex-1 flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-            <ChatSidebar
-              chats={allChats}
-              currentChatId={currentChatId}
-              onSelectChat={(id) => {
-                logger.debug("🖱️ Sidebar selected chat", { id });
-                if (id !== null) handleSelectChat(id);
-              }}
-              onNewChat={startNewChatSession}
-              onDeleteLocalChat={handleDeleteLocalChat}
-              onRequestDeleteChat={handleRequestDeleteChat}
-              isOpen={sidebarOpen}
-              onToggle={handleToggleSidebar}
-              isCreatingChat={isCreatingChat}
-            />
+      {/* Desktop Sidebar - Hidden on mobile, conditionally visible on lg+ based on sidebarOpen */}
+      {sidebarOpen && (
+        <div className="hidden lg:flex lg:flex-shrink-0 desktop-sidebar-container">
+          <div className="flex w-80 h-full">
+            <div className="flex min-h-0 flex-1 flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+              <ChatSidebar
+                chats={allChats}
+                currentChatId={currentChatId}
+                onSelectChat={(id) => {
+                  logger.debug("🖱️ Sidebar selected chat", { id });
+                  if (id !== null) handleSelectChat(id);
+                }}
+                onNewChat={startNewChatSession}
+                onDeleteLocalChat={handleDeleteLocalChat}
+                onRequestDeleteChat={handleRequestDeleteChat}
+                isOpen={sidebarOpen}
+                onToggle={handleToggleSidebar}
+                isCreatingChat={isCreatingChat}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Mobile Sidebar - Only shown on mobile when open */}
       <MobileSidebar
@@ -2081,9 +2072,7 @@ export function ChatInterface({
             messages={currentMessages}
             isGenerating={isGenerating}
             searchProgress={searchProgress}
-            onToggleSidebar={useCallback(() => {
-              if (!sidebarOpen) handleToggleSidebar();
-            }, [sidebarOpen, handleToggleSidebar])}
+            onToggleSidebar={handleToggleSidebar}
             onShare={() => setShowShareModal(true)}
             currentChat={currentChat}
             onDeleteLocalMessage={handleDeleteLocalMessage}
