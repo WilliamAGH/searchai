@@ -1,7 +1,7 @@
-import React from "react";
 import { useMutation } from "convex/react";
+import React from "react";
 import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 
 interface ChatSidebarProps {
@@ -86,11 +86,12 @@ export function ChatSidebar({
   // even when visually hidden on small screens. We use CSS to hide it when closed.
 
   return (
-    <div className="w-full sm:w-80 h-full border-r bg-muted/30 flex flex-col">
+    <div className="w-full h-full bg-muted/30 flex flex-col">
       <div className="p-3 sm:p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">Chats</h3>
           <button
+            type="button"
             onClick={onToggle}
             className="p-1 hover:bg-muted rounded transition-colors"
             title="Close sidebar"
@@ -101,6 +102,7 @@ export function ChatSidebar({
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
+              <title>Close sidebar</title>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -111,6 +113,7 @@ export function ChatSidebar({
           </button>
         </div>
         <button
+          type="button"
           onClick={onNewChat}
           disabled={isCreatingChat}
           className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -121,6 +124,7 @@ export function ChatSidebar({
               fill="none"
               viewBox="0 0 24 24"
             >
+              <title>Creating chat</title>
               <circle
                 className="opacity-25"
                 cx="12"
@@ -142,6 +146,7 @@ export function ChatSidebar({
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
+              <title>New chat</title>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -162,25 +167,34 @@ export function ChatSidebar({
         ) : (
           <div className="p-2">
             {chats.map((chat) => (
-              <div key={chat._id} className="flex items-center gap-2 mb-1 pr-2">
+              <div
+                key={chat._id}
+                className="flex items-center gap-2 mb-1 pr-2 min-w-0"
+              >
                 <button
+                  type="button"
                   data-chat-id={String(chat._id)}
                   onClick={handleSelectClick}
-                  className={`flex-1 p-3 rounded-lg text-left hover:bg-muted transition-colors ${
+                  className={`flex-1 min-w-0 p-3 rounded-lg text-left hover:bg-muted transition-colors ${
                     currentChatId === chat._id ? "bg-muted" : ""
                   }`}
                 >
-                  <div className="font-medium truncate">{chat.title}</div>
-                  <div className="text-sm text-muted-foreground flex items-center gap-1">
-                    {chat.isLocal && (
-                      <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded">
+                  <div className="font-medium truncate min-w-0">
+                    {chat.title}
+                  </div>
+                  <div className="text-sm text-muted-foreground flex items-center gap-1 min-w-0">
+                    {"isLocal" in chat && chat.isLocal && (
+                      <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
                         Local
                       </span>
                     )}
-                    {new Date(chat.updatedAt).toLocaleDateString()}
+                    <span className="truncate">
+                      {new Date(chat.updatedAt).toLocaleDateString()}
+                    </span>
                   </div>
                 </button>
                 <button
+                  type="button"
                   data-chat-id={String(chat._id)}
                   onClick={handleDeleteClick}
                   className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
@@ -195,6 +209,7 @@ export function ChatSidebar({
                     viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg"
                   >
+                    <title>Delete chat</title>
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
