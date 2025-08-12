@@ -1,0 +1,438 @@
+/**
+ * LocalStorage Chat Repository Implementation
+ * Handles chat operations for unauthenticated users using browser localStorage
+ */
+
+import { BaseRepository } from "./ChatRepository";
+import {
+  UnifiedChat,
+  UnifiedMessage,
+  StreamChunk,
+  ChatResponse,
+  IdUtils,
+  TitleUtils,
+  StorageUtils,
+} from "../types/unified";
+import {
+  parseLocalChats,
+  parseLocalMessages,
+} from "../validation/localStorage";
+import { validateStreamChunk } from "../validation/apiResponses";
+
+const STORAGE_KEYS = {
+  CHATS: "searchai_chats_v2",
+  MESSAGES: "searchai_messages_v2",
+  SETTINGS: "searchai_settings",
+} as const;
+
+export class LocalChatRepository extends BaseRepository {
+  protected storageType = "local" as const;
+
+  constructor() {
+    super();
+    if (!StorageUtils.hasLocalStorage()) {
+      throw new Error("LocalStorage is not available in this browser");
+    }
+  }
+
+  // Chat operations
+  async getChats(): Promise<UnifiedChat[]> {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CHATS);
+      if (!stored) return [];
+
+      const chats = parseLocalChats(stored);
+      return chats.map(
+        (chat) =>
+          ({
+            ...chat,
+            id: chat._id,
+            source: "local" as const,
+            synced: false,
+          }) as UnifiedChat,
+      );
+    } catch (error) {
+      console.error("Failed to load chats from localStorage:", error);
+      return [];
+    }
+  }
+
+  async getChatById(id: string): Promise<UnifiedChat | null> {
+    const chats = await this.getChats();
+    return chats.find((c) => c.id === id) || null;
+  }
+
+  async createChat(title?: string): Promise<ChatResponse> {
+    const finalTitle = title || "New Chat";
+    const chat: UnifiedChat = {
+      id: IdUtils.generateLocalId("chat"),
+      title: TitleUtils.sanitize(finalTitle),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      privacy: "private",
+      source: "local",
+      synced: false,
+    };
+
+    const chats = await this.getChats();
+    chats.unshift(chat); // Add to beginning
+    await this.saveChats(chats);
+
+    return { chat, isNew: true };
+  }
+
+  async updateChatTitle(id: string, title: string): Promise<void> {
+    const chats = await this.getChats();
+    const index = chats.findIndex((c) => c.id === id);
+
+    if (index === -1) {
+      throw new Error(`Chat ${id} not found`);
+    }
+
+    chats[index].title = TitleUtils.sanitize(title);
+    chats[index].updatedAt = Date.now();
+    await this.saveChats(chats);
+  }
+
+  async updateChatPrivacy(
+    id: string,
+    privacy: "private" | "shared" | "public",
+  ): Promise<void> {
+    const chats = await this.getChats();
+    const index = chats.findIndex((c) => c.id === id);
+
+    if (index === -1) {
+      throw new Error(`Chat ${id} not found`);
+    }
+
+    chats[index].privacy = privacy;
+    chats[index].updatedAt = Date.now();
+
+    // For shared/public chats, we need to publish to server
+    if (privacy !== "private") {
+      // This will be handled by the publishAnonymousChat flow
+      // Just update local state for now
+    }
+
+    await this.saveChats(chats);
+  }
+
+  async deleteChat(id: string): Promise<void> {
+    const chats = await this.getChats();
+    const filtered = chats.filter((c) => c.id !== id);
+    await this.saveChats(filtered);
+
+    // Also delete associated messages
+    const messages = await this.getAllMessages();
+    const filteredMessages = messages.filter((m) => m.chatId !== id);
+    await this.saveMessages(filteredMessages);
+  }
+
+  // Message operations
+  async getMessages(chatId: string): Promise<UnifiedMessage[]> {
+    const messages = await this.getAllMessages();
+    return messages
+      .filter((m) => m.chatId === chatId)
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  async addMessage(
+    chatId: string,
+    message: Partial<UnifiedMessage>,
+  ): Promise<UnifiedMessage> {
+    const fullMessage: UnifiedMessage = {
+      id: IdUtils.generateLocalId("msg"),
+      chatId,
+      role: message.role || "user",
+      content: message.content || "",
+      timestamp: Date.now(),
+      source: "local",
+      synced: false,
+      ...message,
+    };
+
+    const messages = await this.getAllMessages();
+    messages.push(fullMessage);
+    await this.saveMessages(messages);
+
+    // Update chat's updatedAt timestamp
+    const chats = await this.getChats();
+    const chatIndex = chats.findIndex((c) => c.id === chatId);
+    if (chatIndex !== -1) {
+      chats[chatIndex].updatedAt = Date.now();
+      await this.saveChats(chats);
+    }
+
+    return fullMessage;
+  }
+
+  async updateMessage(
+    id: string,
+    updates: Partial<UnifiedMessage>,
+  ): Promise<void> {
+    const messages = await this.getAllMessages();
+    const index = messages.findIndex((m) => m.id === id);
+
+    if (index === -1) {
+      throw new Error(`Message ${id} not found`);
+    }
+
+    messages[index] = { ...messages[index], ...updates };
+    await this.saveMessages(messages);
+  }
+
+  async deleteMessage(id: string): Promise<void> {
+    const messages = await this.getAllMessages();
+    const filtered = messages.filter((m) => m.id !== id);
+    await this.saveMessages(filtered);
+  }
+
+  // Search and AI operations
+  async *generateResponse(
+    chatId: string,
+    message: string,
+  ): AsyncGenerator<StreamChunk> {
+    // For local users, we use the HTTP API
+    try {
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          chatId,
+          // Include recent messages for context
+          context: await this.getRecentContext(chatId),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI request failed: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          yield { type: "done" };
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            if (data === "[DONE]") {
+              yield { type: "done" };
+              return;
+            }
+            const chunk = validateStreamChunk(data);
+            if (chunk) {
+              if (chunk.content) {
+                yield { type: "content", content: chunk.content };
+              }
+              if (chunk.thinking) {
+                yield {
+                  type: "metadata",
+                  metadata: { thinking: chunk.thinking },
+                };
+              }
+              if (chunk.error) {
+                yield { type: "error", error: chunk.error };
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      yield {
+        type: "error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  async searchWeb(query: string): Promise<unknown> {
+    const response = await fetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Search failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Sharing operations
+  async shareChat(
+    id: string,
+    privacy: "shared" | "public",
+  ): Promise<{ shareId?: string; publicId?: string }> {
+    const chat = await this.getChatById(id);
+    if (!chat) throw new Error(`Chat ${id} not found`);
+
+    const messages = await this.getMessages(id);
+
+    // Publish to server for sharing
+    const response = await fetch("/api/publishChat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: chat.title,
+        privacy,
+        messages: messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+          searchResults: m.searchResults,
+          sources: m.sources,
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to publish chat: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+
+    // Update local chat with share IDs
+    chat.shareId = result.shareId;
+    chat.publicId = result.publicId;
+    chat.privacy = privacy;
+
+    const chats = await this.getChats();
+    const index = chats.findIndex((c) => c.id === id);
+    if (index !== -1) {
+      chats[index] = chat;
+      await this.saveChats(chats);
+    }
+
+    return { shareId: result.shareId, publicId: result.publicId };
+  }
+
+  async getChatByShareId(shareId: string): Promise<UnifiedChat | null> {
+    const chats = await this.getChats();
+    return chats.find((c) => c.shareId === shareId) || null;
+  }
+
+  async getChatByPublicId(publicId: string): Promise<UnifiedChat | null> {
+    const chats = await this.getChats();
+    return chats.find((c) => c.publicId === publicId) || null;
+  }
+
+  // Migration and sync
+  async exportData(): Promise<{
+    chats: UnifiedChat[];
+    messages: UnifiedMessage[];
+  }> {
+    const chats = await this.getChats();
+    const messages = await this.getAllMessages();
+    return { chats, messages };
+  }
+
+  async importData(data: {
+    chats: UnifiedChat[];
+    messages: UnifiedMessage[];
+  }): Promise<void> {
+    // Merge with existing data
+    const existingChats = await this.getChats();
+    const existingMessages = await this.getAllMessages();
+
+    const chatIds = new Set(existingChats.map((c) => c.id));
+    const messageIds = new Set(existingMessages.map((m) => m.id));
+
+    // Add new chats
+    for (const chat of data.chats) {
+      if (!chatIds.has(chat.id)) {
+        existingChats.push(chat);
+      }
+    }
+
+    // Add new messages
+    for (const message of data.messages) {
+      if (!messageIds.has(message.id)) {
+        existingMessages.push(message);
+      }
+    }
+
+    await this.saveChats(existingChats);
+    await this.saveMessages(existingMessages);
+  }
+
+  // Private helper methods
+  private async getAllMessages(): Promise<UnifiedMessage[]> {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+      if (!stored) return [];
+
+      const messages = parseLocalMessages(stored);
+      return messages.map(
+        (msg) =>
+          ({
+            ...msg,
+            id: msg._id,
+            source: "local" as const,
+            synced: false,
+          }) as UnifiedMessage,
+      );
+    } catch (error) {
+      console.error("Failed to load messages from localStorage:", error);
+      return [];
+    }
+  }
+
+  private async saveChats(chats: UnifiedChat[]): Promise<void> {
+    // Convert back to legacy format for compatibility
+    const legacy = chats.map((chat) => ({
+      _id: chat.id,
+      title: chat.title,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      privacy: chat.privacy,
+      shareId: chat.shareId,
+      publicId: chat.publicId,
+      isLocal: true,
+    }));
+
+    localStorage.setItem(STORAGE_KEYS.CHATS, JSON.stringify(legacy));
+  }
+
+  private async saveMessages(messages: UnifiedMessage[]): Promise<void> {
+    // Convert back to legacy format for compatibility
+    const legacy = messages.map((msg) => ({
+      _id: msg.id,
+      chatId: msg.chatId,
+      role: msg.role,
+      content: msg.content,
+      timestamp: msg.timestamp,
+      searchResults: msg.searchResults,
+      sources: msg.sources,
+      reasoning: msg.reasoning,
+      searchMethod: msg.searchMethod,
+      hasRealResults: msg.hasRealResults,
+    }));
+
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(legacy));
+  }
+
+  private async getRecentContext(
+    chatId: string,
+    limit: number = 10,
+  ): Promise<unknown[]> {
+    const messages = await this.getMessages(chatId);
+    return messages
+      .slice(-limit)
+      .map((m) => ({ role: m.role, content: m.content }));
+  }
+}

@@ -1,0 +1,364 @@
+/**
+ * Convex Chat Repository Implementation
+ * Handles chat operations for authenticated users using Convex backend
+ */
+
+import { ConvexClient } from "convex/browser";
+import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
+import { BaseRepository } from "./ChatRepository";
+import {
+  UnifiedChat,
+  UnifiedMessage,
+  StreamChunk,
+  ChatResponse,
+  IdUtils,
+  TitleUtils,
+} from "../types/unified";
+
+export class ConvexChatRepository extends BaseRepository {
+  protected storageType = "convex" as const;
+  private client: ConvexClient;
+
+  constructor(client: ConvexClient) {
+    super();
+    this.client = client;
+  }
+
+  // Chat operations
+  async getChats(): Promise<UnifiedChat[]> {
+    try {
+      const chats = await this.client.query(api.chats.getUserChats, {});
+      if (!chats) return [];
+
+      return chats.map((chat) => ({
+        id: IdUtils.toUnifiedId(chat._id),
+        title: chat.title,
+        createdAt: chat._creationTime,
+        updatedAt: chat.updatedAt || chat._creationTime,
+        privacy: chat.privacy || "private",
+        shareId: chat.shareId,
+        publicId: chat.publicId,
+        rollingSummary: chat.rollingSummary,
+        source: "convex",
+        synced: true,
+        lastSyncAt: Date.now(),
+      }));
+    } catch (error) {
+      console.error("Failed to fetch chats from Convex:", error);
+      return [];
+    }
+  }
+
+  async getChatById(id: string): Promise<UnifiedChat | null> {
+    try {
+      if (!IdUtils.isConvexId(id)) {
+        // Try to find by opaque ID or share ID
+        const byOpaque = await this.client.query(api.chats.getChatByOpaqueId, {
+          chatId: id as Id<"chats">,
+        });
+        if (byOpaque) {
+          return this.convexToUnifiedChat(byOpaque);
+        }
+        return null;
+      }
+
+      const chat = await this.client.query(api.chats.getChat, {
+        chatId: IdUtils.toConvexChatId(id),
+      });
+
+      return chat ? this.convexToUnifiedChat(chat) : null;
+    } catch (error) {
+      console.error("Failed to fetch chat from Convex:", error);
+      return null;
+    }
+  }
+
+  async createChat(title?: string): Promise<ChatResponse> {
+    try {
+      const finalTitle = title || "New Chat";
+      const chatId = await this.client.mutation(api.chats.createChat, {
+        title: TitleUtils.sanitize(finalTitle),
+        privacy: "private",
+      });
+
+      const chat = await this.getChatById(IdUtils.toUnifiedId(chatId));
+      if (!chat) throw new Error("Failed to create chat");
+
+      return { chat, isNew: true };
+    } catch (error) {
+      console.error("Failed to create chat in Convex:", error);
+      throw error;
+    }
+  }
+
+  async updateChatTitle(id: string, title: string): Promise<void> {
+    try {
+      await this.client.mutation(api.chats.updateChatTitle, {
+        chatId: IdUtils.toConvexChatId(id),
+        title: TitleUtils.sanitize(title),
+      });
+    } catch (error) {
+      console.error("Failed to update chat title in Convex:", error);
+      throw error;
+    }
+  }
+
+  async updateChatPrivacy(
+    id: string,
+    privacy: "private" | "shared" | "public",
+  ): Promise<void> {
+    try {
+      await this.client.mutation(api.chats.updateChatPrivacy, {
+        chatId: IdUtils.toConvexChatId(id),
+        privacy,
+      });
+    } catch (error) {
+      console.error("Failed to update chat privacy in Convex:", error);
+      throw error;
+    }
+  }
+
+  async deleteChat(id: string): Promise<void> {
+    try {
+      await this.client.mutation(api.chats.deleteChat, {
+        chatId: IdUtils.toConvexChatId(id),
+      });
+    } catch (error) {
+      console.error("Failed to delete chat from Convex:", error);
+      throw error;
+    }
+  }
+
+  // Message operations
+  async getMessages(chatId: string): Promise<UnifiedMessage[]> {
+    try {
+      const messages = await this.client.query(api.chats.getChatMessages, {
+        chatId: IdUtils.toConvexChatId(chatId),
+      });
+
+      if (!messages) return [];
+
+      return messages.map((msg) => this.convexToUnifiedMessage(msg));
+    } catch (error) {
+      console.error("Failed to fetch messages from Convex:", error);
+      return [];
+    }
+  }
+
+  async addMessage(
+    _chatId: string,
+    _message: Partial<UnifiedMessage>,
+  ): Promise<UnifiedMessage> {
+    // For Convex, messages are added through the streaming response action
+    // This is a placeholder that won't be directly called
+    throw new Error("Use generateResponse for adding messages in Convex");
+  }
+
+  async updateMessage(
+    _id: string,
+    _updates: Partial<UnifiedMessage>,
+  ): Promise<void> {
+    // Messages are updated through internal mutations in Convex
+    // This is handled by the streaming response
+    throw new Error("Message updates are handled internally in Convex");
+  }
+
+  async deleteMessage(id: string): Promise<void> {
+    try {
+      await this.client.mutation(api.messages.deleteMessage, {
+        messageId: IdUtils.toConvexMessageId(id),
+      });
+    } catch (error) {
+      console.error("Failed to delete message from Convex:", error);
+      throw error;
+    }
+  }
+
+  // Search and AI operations
+  async *generateResponse(
+    chatId: string,
+    message: string,
+  ): AsyncGenerator<StreamChunk> {
+    try {
+      // Start the generation
+      await this.client.action(api.ai.generateStreamingResponse, {
+        chatId: IdUtils.toConvexChatId(chatId),
+        message,
+      });
+
+      // Since Convex handles streaming internally, we need to poll for updates
+      // In a real implementation, this would use Convex subscriptions
+      let lastMessageCount = 0;
+      let iterations = 0;
+      const maxIterations = 300; // 30 seconds timeout
+
+      while (iterations < maxIterations) {
+        const messages = await this.getMessages(chatId);
+
+        if (messages.length > lastMessageCount) {
+          const newMessages = messages.slice(lastMessageCount);
+
+          for (const msg of newMessages) {
+            if (msg.role === "assistant") {
+              if (msg.content) {
+                yield { type: "content", content: msg.content };
+              }
+              if (!msg.isStreaming) {
+                yield { type: "done" };
+                return;
+              }
+            }
+          }
+
+          lastMessageCount = messages.length;
+        }
+
+        // Wait a bit before next poll
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        iterations++;
+      }
+
+      yield { type: "error", error: "Response timeout" };
+    } catch (error) {
+      yield {
+        type: "error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  async searchWeb(query: string): Promise<unknown> {
+    try {
+      return await this.client.action(api.search.searchWeb, {
+        query,
+        maxResults: 5,
+      });
+    } catch (error) {
+      console.error("Search failed:", error);
+      throw error;
+    }
+  }
+
+  // Sharing operations
+  async shareChat(
+    id: string,
+    privacy: "shared" | "public",
+  ): Promise<{ shareId?: string; publicId?: string }> {
+    try {
+      await this.updateChatPrivacy(id, privacy);
+      const chat = await this.getChatById(id);
+
+      return {
+        shareId: chat?.shareId,
+        publicId: chat?.publicId,
+      };
+    } catch (error) {
+      console.error("Failed to share chat:", error);
+      throw error;
+    }
+  }
+
+  async getChatByShareId(shareId: string): Promise<UnifiedChat | null> {
+    try {
+      const chat = await this.client.query(api.chats.getChatByShareId, {
+        shareId,
+      });
+      return chat ? this.convexToUnifiedChat(chat) : null;
+    } catch (error) {
+      console.error("Failed to fetch chat by share ID:", error);
+      return null;
+    }
+  }
+
+  async getChatByPublicId(publicId: string): Promise<UnifiedChat | null> {
+    try {
+      const chat = await this.client.query(api.chats.getChatByPublicId, {
+        publicId,
+      });
+      return chat ? this.convexToUnifiedChat(chat) : null;
+    } catch (error) {
+      console.error("Failed to fetch chat by public ID:", error);
+      return null;
+    }
+  }
+
+  // Migration and sync
+  async exportData(): Promise<{
+    chats: UnifiedChat[];
+    messages: UnifiedMessage[];
+  }> {
+    const chats = await this.getChats();
+    const allMessages: UnifiedMessage[] = [];
+
+    for (const chat of chats) {
+      const messages = await this.getMessages(chat.id);
+      allMessages.push(...messages);
+    }
+
+    return { chats, messages: allMessages };
+  }
+
+  async importData(data: {
+    chats: UnifiedChat[];
+    messages: UnifiedMessage[];
+  }): Promise<void> {
+    // Import is handled through the migration service
+    // This creates new chats and messages in Convex
+    for (const chat of data.chats) {
+      try {
+        await this.createChat(chat.title);
+
+        // Import messages for this chat
+        const chatMessages = data.messages.filter((m) => m.chatId === chat.id);
+        // This would need a special import mutation in Convex
+        // For now, we skip message import
+        console.info(
+          `Would import ${chatMessages.length} messages for chat ${chat.id}`,
+        );
+      } catch (error) {
+        console.error(`Failed to import chat ${chat.id}:`, error);
+      }
+    }
+  }
+
+  // Helper methods
+  private convexToUnifiedChat(chat: unknown): UnifiedChat {
+    const c = chat as Record<string, unknown>;
+    return {
+      id: IdUtils.toUnifiedId(c._id as Id<"chats">),
+      title: c.title as string,
+      createdAt: c._creationTime as number,
+      updatedAt: (c.updatedAt || c._creationTime) as number,
+      privacy: (c.privacy || "private") as "private" | "shared" | "public",
+      shareId: c.shareId as string | undefined,
+      publicId: c.publicId as string | undefined,
+      rollingSummary: c.rollingSummary as string | undefined,
+      source: "convex",
+      synced: true,
+      lastSyncAt: Date.now(),
+    };
+  }
+
+  private convexToUnifiedMessage(msg: unknown): UnifiedMessage {
+    const m = msg as Record<string, unknown>;
+    return {
+      id: IdUtils.toUnifiedId(m._id as Id<"messages">),
+      chatId: IdUtils.toUnifiedId(m.chatId as Id<"chats">),
+      role: m.role as "user" | "assistant" | "system",
+      content: (m.content || "") as string,
+      timestamp: (m.timestamp || m._creationTime) as number,
+      searchResults: m.searchResults as UnifiedMessage["searchResults"],
+      sources: m.sources as string[] | undefined,
+      reasoning: m.reasoning as string | undefined,
+      searchMethod: m.searchMethod as UnifiedMessage["searchMethod"],
+      hasRealResults: m.hasRealResults as boolean | undefined,
+      isStreaming: m.isStreaming as boolean | undefined,
+      streamedContent: m.streamedContent as string | undefined,
+      thinking: m.thinking as string | undefined,
+      source: "convex",
+      synced: true,
+      lastSyncAt: Date.now(),
+    };
+  }
+}
