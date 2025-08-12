@@ -7,7 +7,7 @@
  * - Conditional rendering for auth/unauth users
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, lazy } from "react";
 import { Authenticated, Unauthenticated } from "convex/react";
 import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "sonner";
@@ -19,11 +19,21 @@ import {
   useLocation,
   Link,
 } from "react-router-dom";
-import { ChatInterface } from "./components/ChatInterface";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { SignInModal } from "./components/SignInModal";
 import { SignUpModal } from "./components/SignUpModal";
+import { LoadingBoundary } from "./components/LoadingBoundary";
+
+// Lazy load heavy components (with explicit promise chain)
+const ChatInterface = lazy(() =>
+  import("./components/ChatInterface")
+    .then((module) => ({ default: module.ChatInterface }))
+    .catch((err) => {
+      // Re-throw so Suspense error boundaries can catch
+      throw err;
+    }),
+);
 
 /**
  * Main App component
@@ -77,28 +87,32 @@ function ChatPage({
   return (
     <>
       <Authenticated>
-        <ChatInterface
-          isAuthenticated={true}
-          isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={onToggleSidebar}
-          chatId={chatId}
-          shareId={shareId}
-          publicId={publicId}
-          onRequestSignUp={onRequestSignUp}
-          onRequestSignIn={onRequestSignIn}
-        />
+        <LoadingBoundary message="Loading chat interface...">
+          <ChatInterface
+            isAuthenticated={true}
+            isSidebarOpen={isSidebarOpen}
+            onToggleSidebar={onToggleSidebar}
+            chatId={chatId}
+            shareId={shareId}
+            publicId={publicId}
+            onRequestSignUp={onRequestSignUp}
+            onRequestSignIn={onRequestSignIn}
+          />
+        </LoadingBoundary>
       </Authenticated>
       <Unauthenticated>
-        <ChatInterface
-          isAuthenticated={false}
-          isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={onToggleSidebar}
-          chatId={chatId}
-          shareId={shareId}
-          publicId={publicId}
-          onRequestSignUp={onRequestSignUp}
-          onRequestSignIn={onRequestSignIn}
-        />
+        <LoadingBoundary message="Loading chat interface...">
+          <ChatInterface
+            isAuthenticated={false}
+            isSidebarOpen={isSidebarOpen}
+            onToggleSidebar={onToggleSidebar}
+            chatId={chatId}
+            shareId={shareId}
+            publicId={publicId}
+            onRequestSignUp={onRequestSignUp}
+            onRequestSignIn={onRequestSignIn}
+          />
+        </LoadingBoundary>
       </Unauthenticated>
     </>
   );
@@ -171,7 +185,12 @@ const toastIcons = {
 export default function App() {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 1024; // open by default on desktop (lg+)
+    }
+    return false;
+  });
 
   const openSignUp = useCallback(() => {
     setShowSignInModal(false);

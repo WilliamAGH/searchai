@@ -39,6 +39,34 @@ const mime = new Map([
   [".woff2", "font/woff2"],
 ]);
 
+// Minimal IP-based rate limiter for publish endpoint
+const PUBLISH_MAX = Number(process.env.RATELIMIT_PUBLISH_MAX || 10); // requests
+const PUBLISH_WINDOW_MS = Number(
+  process.env.RATELIMIT_PUBLISH_WINDOW_MS || 5 * 60 * 1000,
+); // 5 minutes
+const publishHits = new Map(); // key -> array of timestamps
+
+function rateLimited(remote, now = Date.now()) {
+  const key = remote || "unknown";
+  const arr = publishHits.get(key) || [];
+  const fresh = arr.filter((t) => now - t < PUBLISH_WINDOW_MS);
+  if (fresh.length >= PUBLISH_MAX) {
+    publishHits.set(key, fresh);
+    return {
+      limited: true,
+      remaining: 0,
+      resetMs: Math.max(0, PUBLISH_WINDOW_MS - (now - fresh[0] || 0)),
+    };
+  }
+  fresh.push(now);
+  publishHits.set(key, fresh);
+  return {
+    limited: false,
+    remaining: Math.max(0, PUBLISH_MAX - fresh.length),
+    resetMs: PUBLISH_WINDOW_MS,
+  };
+}
+
 function sendFile(res, filePath) {
   try {
     const st = statSync(filePath);
@@ -108,6 +136,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (req.url.startsWith("/api/")) {
+    // Rate-limit POST /api/publishChat
+    if (req.method === "POST" && req.url.startsWith("/api/publishChat")) {
+      const remote =
+        req.socket?.remoteAddress || req.headers["x-forwarded-for"];
+      const rl = rateLimited(String(remote || ""));
+      if (rl.limited) {
+        res.writeHead(429, {
+          "Content-Type": "application/json",
+          "Retry-After": String(Math.ceil(rl.resetMs / 1000)),
+          "X-RateLimit-Limit": String(PUBLISH_MAX),
+          "X-RateLimit-Remaining": String(rl.remaining),
+        });
+        res.end(
+          JSON.stringify({
+            error: "Too Many Requests",
+            retryAfterMs: rl.resetMs,
+          }),
+        );
+        return;
+      }
+    }
     return void proxyApi(req, res);
   }
   // Conditional LLM/plain rewrite for shared/public routes
