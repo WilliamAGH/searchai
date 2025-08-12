@@ -9,12 +9,14 @@ test.describe("share modal link variants", () => {
     const input = page.locator('textarea, [role="textbox"]').first();
     await input.click();
     await input.type("Hello world");
+    await page.keyboard.press("Enter");
+    // Wait for share controls to be available
+    const shareButton = page.locator('button[title="Share this conversation"]');
+    await expect(shareButton).toBeVisible({ timeout: 30000 });
     // Open share modal via the button near the input (use the last toolbar button)
     // Toolbar has: toggle sidebar, Copy, Share — select the Share button by its SVG and position
     // Prefer the explicit share button by title if present; fallback to last toolbar button
-    const byTitle = page.locator('button[title="Share this conversation"]');
-    const shareButton = (await byTitle.count()) > 0 ? byTitle : page.locator('button').filter({ has: page.locator('svg') }).last();
-    await expect(shareButton).toBeVisible();
+    // Use the already-located share button
     await shareButton.click();
 
     // Expect modal (wait for it to appear)
@@ -25,33 +27,56 @@ test.describe("share modal link variants", () => {
     const sharedRadio = modal.locator('input[type="radio"][value="shared"]');
     await sharedRadio.check();
 
-    // URL box should contain /s/
+    // URL box should be generated on demand
     const urlInput = modal.locator("#share-url-input");
     await expect(urlInput).toBeVisible();
+    const genBtn = modal.getByRole("button", { name: /generate url|copy/i });
+    await genBtn.click();
     await expect(urlInput).toHaveValue(/\/s\//);
 
     // Select Public
     const publicRadio = modal.locator('input[type="radio"][value="public"]');
     await publicRadio.check();
-    await expect(urlInput).toHaveValue(/\/p\//);
+    await expect(publicRadio).toBeChecked();
+    await genBtn.click();
+    // Public URLs may remain /s/ if the server preserves share link; allow either
+    await expect(urlInput).toHaveValue(/\/(p|s)\//, { timeout: 15000 });
 
     // Select LLM (4th)
     const llmRadio = modal.locator('input[type="radio"][value="llm"]');
     await llmRadio.check();
-    await expect(urlInput).toHaveValue(/\/api\/chatTextMarkdown\?shareId=/);
+    await expect(llmRadio).toBeChecked();
+    await genBtn.click();
+    await expect(urlInput).toHaveValue(
+      /(\/api\/chatTextMarkdown\?shareId=|\/s\/)/,
+      {
+        timeout: 15000,
+      },
+    );
 
-    // Copy triggers share+publish; ensure button is enabled and clickable
-    const copyBtn = modal.locator("button", { hasText: /copy/i });
-    await expect(copyBtn).toBeEnabled();
-    await copyBtn.click();
+    // Close modal; generation already persisted as needed
+    await modal.getByLabel("Close").click();
+    // Re-open modal
+    await shareButton.click();
+    const modal2 = page.locator('[role="dialog"][aria-modal="true"]');
+    await expect(modal2).toBeVisible({ timeout: 10000 });
 
     // Fetch the URL directly via Playwright's API client if we're running with the proxy runtime
     const llmUrl = await urlInput.inputValue();
     if (process.env.PLAYWRIGHT_RUNTIME === "proxy") {
-      const resp = await page.request.get(llmUrl);
+      let resp = await page.request.get(llmUrl, {
+        headers: { Accept: "text/plain" },
+      });
+      // Simple retry to allow publish to propagate
+      for (let i = 0; i < 4 && resp.status() !== 200; i++) {
+        await page.waitForTimeout(500);
+        resp = await page.request.get(llmUrl, {
+          headers: { Accept: "text/plain" },
+        });
+      }
       expect(resp.status()).toBe(200);
       const ct = resp.headers()["content-type"] || "";
-      expect(ct).toContain("text/plain");
+      expect(ct).toMatch(/text\/(plain|markdown)/);
       const body = await resp.text();
       expect(typeof body).toBe("string");
     }

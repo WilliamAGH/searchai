@@ -4,8 +4,13 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
 import "./index.css";
 import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { env, initializeEnv } from "./lib/env";
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
+// Validate environment variables on startup
+initializeEnv();
+
+const convex = new ConvexReactClient(env.convexUrl);
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
@@ -13,7 +18,9 @@ if (!rootEl) {
 }
 
 createRoot(rootEl).render(
-  <ConvexAuthProvider client={convex}>
-    <App />
-  </ConvexAuthProvider>,
+  <ErrorBoundary>
+    <ConvexAuthProvider client={convex}>
+      <App />
+    </ConvexAuthProvider>
+  </ErrorBoundary>,
 );
