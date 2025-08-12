@@ -183,15 +183,24 @@ export function ChatInterface({
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
-  const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
-  const sidebarOpen =
-    isSidebarOpen !== undefined ? isSidebarOpen : localSidebarOpen;
+  // Use the App's sidebar state directly - no local state needed
+  const sidebarOpen = isSidebarOpen ?? false;
+
+  // Refs for timing logic to prevent premature sidebar closures
+  const lastSidebarOpenedAtRef = useRef<number>(0);
+  const prevSidebarOpenRef = useRef<boolean>(false);
+
+  // Track when sidebar opens for timing logic
+  useEffect(() => {
+    if (sidebarOpen && !prevSidebarOpenRef.current) {
+      lastSidebarOpenedAtRef.current = Date.now();
+    }
+    prevSidebarOpenRef.current = sidebarOpen;
+  }, [sidebarOpen]);
+
   const handleToggleSidebar = useCallback(
-    () =>
-      onToggleSidebar
-        ? onToggleSidebar()
-        : setLocalSidebarOpen(!localSidebarOpen),
-    [onToggleSidebar, localSidebarOpen],
+    () => onToggleSidebar?.(),
+    [onToggleSidebar],
   );
   const [messageCount, setMessageCount] = useState(0);
   // Auth modals are managed by the App; request via callbacks instead
@@ -318,8 +327,15 @@ export function ChatInterface({
   // Callbacks for sidebar operations
   const handleMobileSidebarClose = useCallback(() => {
     logger.debug("📱 Dialog onClose", { sidebarOpen });
-    if (sidebarOpen) handleToggleSidebar();
-  }, [sidebarOpen, handleToggleSidebar]);
+    if (sidebarOpen && onToggleSidebar) {
+      const sinceOpen = Date.now() - lastSidebarOpenedAtRef.current;
+      if (sinceOpen < 800) {
+        logger.debug("📱 Ignoring close - too soon after open", { sinceOpen });
+        return;
+      }
+      onToggleSidebar();
+    }
+  }, [sidebarOpen, onToggleSidebar]);
 
   // (moved) handleSelectChat defined after allChats to avoid TDZ
 
