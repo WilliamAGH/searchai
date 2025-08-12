@@ -1,0 +1,96 @@
+graph TB
+    subgraph "Browser Layer"
+        U[User Input]
+        CI[ChatInterface.tsx]
+        ML[MessageList.tsx]
+        CS[ChatSidebar.tsx]
+        SM[ShareModal.tsx]
+    end
+
+    subgraph "Hook Layer"
+        UCH[useUnifiedChat Hook]
+        ULS[useLocalStorage Hook]
+    end
+
+    subgraph "Repository Pattern"
+        CR[ChatRepository Interface]
+        LCR[LocalChatRepository]
+        CCR[ConvexChatRepository]
+    end
+
+    subgraph "Storage Layer"
+        LS[(localStorage)]
+        CD[(Convex DB)]
+        MS[MigrationService]
+    end
+
+    subgraph "Convex Backend"
+        CA[chats.ts]
+        MA[messages.ts]
+        AI[ai.ts]
+        SA[search.ts]
+        AUTH[auth.config.ts]
+    end
+
+    subgraph "External APIs"
+        OR[OpenRouter API]
+        SERP[SERP API]
+        DDG[DuckDuckGo API]
+    end
+
+    %% User flow
+    U --"1. Type message"--> CI
+    CI --"2. Call sendMessage"--> UCH
+    UCH --"3. Check auth status"--> CR
+    
+    %% Repository routing
+    CR --"4a. Unauth"--> LCR
+    CR --"4b. Auth"--> CCR
+    
+    %% Storage operations
+    LCR --"5a. Store locally"--> LS
+    CCR --"5b. Store in DB"--> CD
+    
+    %% Migration flow
+    UCH --"On auth change"--> MS
+    MS --"Migrate data"--> LS
+    MS --"Import to"--> CD
+    
+    %% Backend flow for authenticated users
+    CCR --"6. generateResponse"--> AI
+    AI --"7. planSearch"--> SA
+    SA --"8a. Try SERP"--> SERP
+    SA --"8b. Try OR"--> OR
+    SA --"8c. Fallback"--> DDG
+    
+    %% AI generation
+    AI --"9. Stream chunks"--> OR
+    AI --"10. Update message"--> MA
+    MA --"11. Store in DB"--> CD
+    
+    %% Response flow
+    AI --"12. SSE stream"--> CCR
+    CCR --"13. Update state"--> UCH
+    UCH --"14. Render"--> ML
+    
+    %% Share flow
+    CI --"Share chat"--> SM
+    SM --"Update privacy"--> CA
+    CA --"Generate IDs"--> CD
+    
+    %% Sidebar updates
+    UCH --"Chat list"--> CS
+    
+    %% Auth flow
+    CI --"Check auth"--> AUTH
+    AUTH --"JWT tokens"--> CD
+
+    %% Styling
+    style CI fill:#e1f5fe
+    style UCH fill:#fff3e0
+    style CR fill:#f3e5f5
+    style AI fill:#e8f5e9
+    style SA fill:#fce4ec
+    style OR fill:#ffebee
+    style CD fill:#e3f2fd
+    style LS fill:#f1f8e9
