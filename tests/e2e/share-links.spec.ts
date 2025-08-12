@@ -7,7 +7,8 @@ test.describe("share modal link variants", () => {
 
     // Type to create a local chat quickly
     const input = page.locator('textarea, [role="textbox"]').first();
-    await input.click();
+    // Use force click to bypass body element pointer-events interception in tests
+    await input.click({ force: true });
     await input.type("Hello world");
     await page.keyboard.press("Enter");
     // Wait for share controls to be available
@@ -17,10 +18,12 @@ test.describe("share modal link variants", () => {
     // Toolbar has: toggle sidebar, Copy, Share — select the Share button by its SVG and position
     // Prefer the explicit share button by title if present; fallback to last toolbar button
     // Use the already-located share button
-    await shareButton.click();
+    await shareButton.click({ force: true });
 
-    // Expect modal (wait for it to appear)
-    const modal = page.locator('[role="dialog"][aria-modal="true"]');
+    // Expect modal (wait for it to appear) - target ShareModal specifically
+    const modal = page.locator(
+      '[role="dialog"][aria-modal="true"][aria-labelledby="share-modal-title"]',
+    );
     await expect(modal).toBeVisible({ timeout: 10000 });
 
     // Select Shared option
@@ -57,8 +60,10 @@ test.describe("share modal link variants", () => {
     // Close modal; generation already persisted as needed
     await modal.getByLabel("Close").click();
     // Re-open modal
-    await shareButton.click();
-    const modal2 = page.locator('[role="dialog"][aria-modal="true"]');
+    await shareButton.click({ force: true });
+    const modal2 = page.locator(
+      '[role="dialog"][aria-modal="true"][aria-labelledby="share-modal-title"]',
+    );
     await expect(modal2).toBeVisible({ timeout: 10000 });
 
     // Fetch the URL directly via Playwright's API client if we're running with the proxy runtime

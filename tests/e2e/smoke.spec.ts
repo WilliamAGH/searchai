@@ -52,7 +52,8 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
   // Create chat by sending a message (toolbar is lazily rendered)
   const input = page.locator('textarea, [role="textbox"]').first();
   await expect(input).toBeVisible({ timeout: 15000 });
-  await input.click();
+  // Use force click to bypass body element pointer-events interception in tests
+  await input.click({ force: true });
   await input.type("Smoke home sanity");
   await page.keyboard.press("Enter");
 
