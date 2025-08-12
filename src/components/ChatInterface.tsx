@@ -34,6 +34,25 @@ import { formatConversationWithSources } from "../lib/clipboard";
 import { useSwipeable } from "react-swipeable";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import type { Chat, LocalChat } from "../lib/types/chat";
+import { createLocalChat } from "../lib/types/chat";
+import type { LocalMessage } from "../lib/types/message";
+import { createLocalMessage } from "../lib/types/message";
+import {
+  parseLocalChats,
+  parseLocalMessages,
+} from "../lib/validation/localStorage";
+import { validateStreamChunk } from "../lib/validation/apiResponses";
+
+// Canonical chat path (privacy-aware)
+const chatPath = (c?: Chat, id?: Id<"chats"> | string | null): string =>
+  c
+    ? c.privacy === "public" && c.publicId
+      ? `/p/${c.publicId}`
+      : c.privacy === "shared" && c.shareId
+        ? `/s/${c.shareId}`
+        : `/chat/${c._id}`
+    : `/chat/${id ?? ""}`;
 
 // Topic-change detection constants (made less sensitive)
 const TOPIC_CHANGE_SIMILARITY_THRESHOLD = 0.1; // require much lower overlap
@@ -44,7 +63,6 @@ const TOPIC_CHANGE_INDICATORS = [
   /^(switch to|change to|moving on to)/i,
   /^(now let's talk about something else|different conversation)/i,
 ];
-// Common stop words used when extracting lightweight keywords for search context
 const STOP_WORDS = new Set([
   "the",
   "a",
@@ -97,38 +115,8 @@ const CHAT_COOLDOWN_MS = 45_000; // reduce planner frequency
 const PROMPT_COOLDOWN_MS = 180_000; // show at most every 3m per chat
 const DRAFT_MIN_LENGTH = 20; // avoid premature draft triggers
 
-interface LocalChat {
-  _id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  isLocal: true;
-  shareId?: string;
-  isShared?: boolean;
-  isPublic?: boolean;
-  privacy?: "private" | "shared" | "public";
-  publicId?: string;
-}
-
-interface LocalMessage {
-  _id: string;
-  chatId: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-  searchResults?: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    relevanceScore?: number;
-  }>;
-  sources?: string[];
-  reasoning?: string;
-  searchMethod?: "serp" | "openrouter" | "duckduckgo" | "fallback";
-  hasRealResults?: boolean;
-  isStreaming?: boolean;
-  hasStartedContent?: boolean;
-}
+// Using unified types from lib/types/chat.ts and lib/types/message.ts
+// These types leverage Convex's Doc<"chats"> and Doc<"messages"> for full type safety
 
 export function ChatInterface({
   isAuthenticated,
@@ -149,81 +137,44 @@ export function ChatInterface({
   onRequestSignUp?: () => void;
   onRequestSignIn?: () => void;
 }) {
-  logger.debug("💬 ChatInterface rendered with props:", {
+  logger.debug("💬 ChatInterface rendered", {
     isAuthenticated,
     propChatId,
     propShareId,
     propPublicId,
     isSidebarOpen,
   });
-
-  // Log when the component is unmounted
-  useEffect(() => {
-    return () => {
-      logger.debug("🧹 ChatInterface unmounted");
-    };
-  }, []);
+  useEffect(() => () => logger.debug("🧹 ChatInterface unmounted"), []);
   const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
   const apiBase = convexUrl
     .replace(".convex.cloud", ".convex.site")
     .replace(/\/+$/, "");
+  const resolveApi = (path: string) =>
+    apiBase
+      ? `${apiBase}/${path.startsWith("/") ? path.slice(1) : path}`
+      : `/${path.startsWith("/") ? path.slice(1) : path}`;
 
-  const resolveApi = (path: string) => {
-    const segment = path.startsWith("/") ? path.slice(1) : path;
-    return apiBase ? `${apiBase}/${segment}` : `/${segment}`;
-  };
-
-  // Lightweight fetch JSON helper with retry/backoff for transient failures
   type RetryInit = RequestInit & { retry?: number; retryDelayMs?: number };
   const fetchJsonWithRetry = useCallback(
     async (url: string, init: RetryInit = {}) => {
       const { retry = 2, retryDelayMs = 500, ...opts } = init;
-      let attempt = 0;
-      let lastErr: unknown = null;
-      // Do not reuse an aborted signal across retries
-      const baseSignal: AbortSignal | undefined = init?.signal;
-      while (attempt <= retry) {
+      for (let i = 0; i <= retry; i++) {
         try {
-          const controller = new AbortController();
-          const onAbort: EventListener = () => controller.abort();
-          if (baseSignal) {
-            if (baseSignal.aborted)
-              throw new DOMException("Aborted", "AbortError");
-            baseSignal.addEventListener("abort", onAbort, { once: true });
-          }
-          const res = await fetch(url, {
-            ...opts,
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          if (!res.ok && res.status >= 500 && attempt < retry) {
-            // Retry 5xx
-            await new Promise((r) =>
-              setTimeout(r, retryDelayMs * Math.pow(2, attempt)),
-            );
-            attempt++;
+          const res = await fetch(url, { ...opts, cache: "no-store" });
+          if (!res.ok && res.status >= 500 && i < retry) {
+            await new Promise((r) => setTimeout(r, retryDelayMs * 2 ** i));
             continue;
           }
-          baseSignal?.removeEventListener("abort", onAbort);
           return res;
-        } catch (err) {
-          lastErr = err;
-          // AbortError: don't retry
-          if (err instanceof DOMException && err.name === "AbortError") {
-            throw err;
-          }
-          // Network error TypeError in Fetch: retry if attempts left
-          if (attempt < retry) {
-            await new Promise((r) =>
-              setTimeout(r, retryDelayMs * Math.pow(2, attempt)),
-            );
-            attempt++;
+        } catch (e) {
+          if (e instanceof DOMException && e.name === "AbortError") throw e;
+          if (i < retry) {
+            await new Promise((r) => setTimeout(r, retryDelayMs * 2 ** i));
             continue;
           }
-          throw err;
+          throw e;
         }
       }
-      throw lastErr ?? new Error("Unknown fetch error");
     },
     [],
   );
@@ -231,46 +182,33 @@ export function ChatInterface({
   const [currentChatId, setCurrentChatId] = useState<
     Id<"chats"> | string | null
   >(null);
-  logger.debug("🔄 ChatInterface currentChatId state:", currentChatId);
-
-  // Add a useEffect to monitor currentChatId changes
-  useEffect(() => {
-    logger.debug("🔄 currentChatId state updated:", currentChatId);
-  }, [currentChatId]);
+  useEffect(
+    () => logger.debug("🔄 currentChatId updated:", currentChatId),
+    [currentChatId],
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
   const lastSidebarOpenedAtRef = useRef<number | null>(null);
   const prevSidebarOpenRef = useRef<boolean>(false);
-  // Use prop if provided, otherwise use local state
   const sidebarOpen =
     isSidebarOpen !== undefined ? isSidebarOpen : localSidebarOpen;
   useEffect(() => {
-    const prev = prevSidebarOpenRef.current;
-    if (!prev && sidebarOpen) {
+    if (!prevSidebarOpenRef.current && sidebarOpen)
       lastSidebarOpenedAtRef.current = Date.now();
-      logger.debug("⏱️ Marked sidebar as opened", {
-        at: lastSidebarOpenedAtRef.current,
-      });
-    }
     prevSidebarOpenRef.current = sidebarOpen;
   }, [sidebarOpen]);
-  const handleToggleSidebar = useCallback(() => {
-    logger.debug("↔️ handleToggleSidebar", { sidebarOpen });
-    if (onToggleSidebar) {
-      onToggleSidebar();
-    } else {
-      setLocalSidebarOpen(!localSidebarOpen);
-    }
-  }, [onToggleSidebar, localSidebarOpen, sidebarOpen]);
+  const handleToggleSidebar = useCallback(
+    () =>
+      onToggleSidebar
+        ? onToggleSidebar()
+        : setLocalSidebarOpen(!localSidebarOpen),
+    [onToggleSidebar, localSidebarOpen],
+  );
   const [messageCount, setMessageCount] = useState(0);
   // Auth modals are managed by the App; request via callbacks instead
   const [showShareModal, setShowShareModal] = useState(false);
-  const handleCloseShareModal = useCallback(() => setShowShareModal(false), []);
-  const handleOpenShareModal = useCallback(() => setShowShareModal(true), []);
-  const handleSetUndoBannerNull = useCallback(() => setUndoBanner(null), []);
 
-  // Local storage for unauthenticated users (scoped per host to avoid env conflation)
   const storageNamespace = useMemo(
     () => `searchai:${window.location.host}`,
     [],
@@ -295,12 +233,41 @@ export function ChatInterface({
     { debounceMs: 800 },
   );
 
-  // Convex hooks and utilities
   const navigate = useNavigate();
+
+  const navigateWithVerification = useCallback(
+    async (path: string, options?: { replace?: boolean }): Promise<boolean> => {
+      try {
+        logger.debug("🧭 Nav:", path, options);
+        navigate(path, options);
+        // Give the router a bit more time to update the location before verifying
+        await new Promise((r) => setTimeout(r, 100));
+        const curr = window.location.pathname,
+          target = path.split("?")[0];
+        if (curr === target || curr.startsWith(target)) {
+          logger.debug("✅");
+          return true;
+        }
+        if (options?.replace) {
+          navigate(path);
+          await new Promise((r) => setTimeout(r, 100));
+          if (
+            window.location.pathname === target ||
+            window.location.pathname.startsWith(target)
+          )
+            return true;
+        }
+        return false;
+      } catch (e) {
+        logger.error("❌", e);
+        return false;
+      }
+    },
+    [navigate],
+  );
+
   const userSelectedChatAtRef = useRef<number | null>(null);
   const looksServerId = looksChatId;
-
-  // Convex mutations and actions
   const deleteChat = useMutation(api.chats.deleteChat);
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const createChat = useMutation(api.chats.createChat);
@@ -311,75 +278,54 @@ export function ChatInterface({
   const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
 
-  // Convex queries with explicit args and debug logs
   const getUserChatsArgs = isAuthenticated ? {} : "skip";
-  logger.debug("🧩 getUserChats args:", getUserChatsArgs);
   const chats = useQuery(
     api.chats.getUserChats,
     getUserChatsArgs as {} | "skip",
   );
-
   const opaqueParam = looksServerId(propChatId);
   const getByOpaqueArgs =
     isAuthenticated && opaqueParam
       ? { chatId: propChatId as Id<"chats"> }
       : ("skip" as const);
-  logger.debug("🧩 getChatByOpaqueId args:", getByOpaqueArgs);
   const chatByOpaqueId = useQuery(
     api.chats.getChatByOpaqueId,
     getByOpaqueArgs as { chatId: Id<"chats"> } | "skip",
   );
-
   const getByShareArgs = propShareId
     ? { shareId: propShareId }
     : ("skip" as const);
-  logger.debug("🧩 getChatByShareId args:", getByShareArgs);
   const chatByShareId = useQuery(
     api.chats.getChatByShareId,
     getByShareArgs as { shareId: string } | "skip",
   );
-
   const getByPublicArgs = propPublicId
     ? { publicId: propPublicId }
     : ("skip" as const);
-  logger.debug("🧩 getChatByPublicId args:", getByPublicArgs);
   const chatByPublicId = useQuery(
     api.chats.getChatByPublicId,
     getByPublicArgs as { publicId: string } | "skip",
   );
-
   const looksServerForCurrent = looksServerId(String(currentChatId || ""));
   const getMessagesArgs =
     currentChatId && looksServerForCurrent
       ? { chatId: currentChatId as Id<"chats"> }
       : ("skip" as const);
-  logger.debug("🧩 getChatMessages args:", {
-    currentChatId,
-    looksServerForCurrent,
-    args: getMessagesArgs,
-  });
   const messages = useQuery(
     api.chats.getChatMessages,
-    getMessagesArgs as
-      | { chatId: Id<"chats"> }
-      | "skip"
-      | { chatId: Id<"chats"> }
-      | "skip",
+    getMessagesArgs as { chatId: Id<"chats"> } | "skip",
   );
 
-  useEffect(() => {
-    if (Array.isArray(messages)) {
-      logger.debug("🧾 messages updated", {
-        count: messages.length,
-        firstTwo:
-          messages.length > 0
-            ? messages.slice(0, 2).map((m) => ({ id: m._id, role: m.role }))
-            : [],
-      });
-    } else {
-      logger.debug("🧾 messages state (non-array)", { value: messages });
-    }
-  }, [messages]);
+  useEffect(
+    () =>
+      logger.debug(
+        "🧾 messages updated",
+        Array.isArray(messages)
+          ? { count: messages.length }
+          : { value: messages },
+      ),
+    [messages],
+  );
 
   // Callbacks for sidebar operations
   const handleMobileSidebarClose = useCallback(() => {
@@ -396,13 +342,7 @@ export function ChatInterface({
     if (sidebarOpen) handleToggleSidebar();
   }, [sidebarOpen, handleToggleSidebar]);
 
-  const handleMobileSidebarSelectChat = useCallback(
-    (id: Id<"chats"> | string) => {
-      userSelectedChatAtRef.current = Date.now();
-      setCurrentChatId(id);
-    },
-    [],
-  );
+  // (moved) handleSelectChat defined after allChats to avoid TDZ
 
   // Callbacks for deleting local chats
   const handleDeleteLocalChat = useCallback(
@@ -499,16 +439,12 @@ export function ChatInterface({
         (localChats?.length ?? 0) > 0 || (localMessages?.length ?? 0) > 0;
       if (!hasNew && (legacyChats || legacyMsgs)) {
         if (legacyChats) {
-          try {
-            const parsed = JSON.parse(legacyChats);
-            if (Array.isArray(parsed)) setLocalChats(parsed);
-          } catch {}
+          const parsed = parseLocalChats(legacyChats);
+          if (parsed.length > 0) setLocalChats(parsed);
         }
         if (legacyMsgs) {
-          try {
-            const parsed = JSON.parse(legacyMsgs);
-            if (Array.isArray(parsed)) setLocalMessages(parsed);
-          } catch {}
+          const parsed = parseLocalMessages(legacyMsgs);
+          if (parsed.length > 0) setLocalMessages(parsed);
         }
         // Clear legacy keys after copying
         try {
@@ -531,55 +467,15 @@ export function ChatInterface({
   );
   const MIGRATION_BACKOFF_MS = 10 * 60 * 1000; // 10 minutes
 
-  /**
-   * Generate unique share ID
-   * - Random alphanumeric string
-   * - Used for shareable chat URLs
-   */
-  const generateShareId = useCallback(() => {
-    if (
-      typeof crypto !== "undefined" &&
-      typeof (crypto as unknown as { randomUUID?: () => string }).randomUUID ===
-        "function"
-    ) {
-      return (crypto as unknown as { randomUUID: () => string })
-        .randomUUID()
-        .replace(/-/g, "");
-    }
-    try {
-      const bytes = new Uint8Array(16);
-      (crypto as Crypto).getRandomValues(bytes);
-      return Array.from(bytes)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-    } catch {}
-    // Fallback (lower entropy)
-    return `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
-  }, []);
+  // ID generation is now handled by createLocalChat() helper function
 
-  /**
-   * Detect topic change between messages
-   * - Uses lexical similarity (Jaccard index)
-   * - Checks topic change indicators
-   * - Returns true only when similarity < TOPIC_CHANGE_SIMILARITY_THRESHOLD
-   *   AND an explicit topic-change indicator is present
-   * @param newMessage - New message text
-   * @param previousMessages - Chat history
-   * @returns true if topic changed significantly
-   */
   const isTopicChange = useCallback(
     (newMessage: string, previousMessages: LocalMessage[]) => {
-      // Don't prompt if there are no previous messages or only one exchange
       if (previousMessages.length < 2) return false;
-
-      // Get the last user message (if any)
       const lastUserMessage = [...previousMessages]
         .reverse()
         .find((m) => m.role === "user");
       if (!lastUserMessage) return false;
-
-      // Simple heuristic: Check if the new message has very different keywords
-      // or is asking about something completely different
       const newWords = new Set(
         newMessage
           .toLowerCase()
@@ -592,34 +488,57 @@ export function ChatInterface({
           .split(/\s+/)
           .filter((w) => w.length > TOPIC_CHANGE_MIN_WORD_LENGTH),
       );
-
-      // Calculate overlap
       const intersection = new Set(
         [...newWords].filter((x) => lastWords.has(x)),
       );
       const similarity =
         intersection.size / Math.max(newWords.size, lastWords.size);
-
-      // If similarity is very low AND we have explicit signals of new topics
-      const hasIndicator = TOPIC_CHANGE_INDICATORS.some((pattern) =>
-        pattern.test(newMessage),
+      return (
+        similarity < TOPIC_CHANGE_SIMILARITY_THRESHOLD &&
+        TOPIC_CHANGE_INDICATORS.some((pattern) => pattern.test(newMessage))
       );
-
-      // Be conservative: require both conditions
-      return similarity < TOPIC_CHANGE_SIMILARITY_THRESHOLD && hasIndicator;
     },
     [],
   );
 
+  // Optimistic chat state for immediate UI updates
+  const [optimisticChat, setOptimisticChat] = useState<Chat | null>(null);
+
   // Get all chats (either from Convex or local storage)
   const allChats = useMemo(() => {
+    let baseChats: Chat[] = [];
+
     if (isAuthenticated && chats) {
-      return chats;
+      baseChats = chats;
     } else if (!isAuthenticated) {
-      return localChats;
+      baseChats = localChats;
     }
-    return [];
-  }, [isAuthenticated, chats, localChats]);
+
+    // Add optimistic chat if it exists and isn't already in the list
+    if (
+      optimisticChat &&
+      !baseChats.find((c) => c._id === optimisticChat._id)
+    ) {
+      return [optimisticChat, ...baseChats];
+    }
+
+    return baseChats;
+  }, [isAuthenticated, chats, localChats, optimisticChat]);
+
+  // Unified chat selection + navigation (placed after allChats to avoid TDZ)
+  const handleSelectChat = useCallback(
+    (id: Id<"chats"> | string) => {
+      userSelectedChatAtRef.current = Date.now();
+      setCurrentChatId(id);
+      try {
+        const sel = allChats.find((c) => String(c._id) === String(id));
+        const path = chatPath(sel, id);
+        if (path !== window.location.pathname)
+          void navigateWithVerification(path);
+      } catch {}
+    },
+    [allChats, navigateWithVerification],
+  );
 
   // Get current messages (either from Convex or local storage)
   const currentMessages = useMemo(() => {
@@ -753,22 +672,15 @@ export function ChatInterface({
     const chat = allChats.find((c) => String(c._id) === String(currentChatId));
 
     if (chat) {
-      let path = "";
-      if (chat.privacy === "public" && chat.publicId) {
-        path = `/p/${chat.publicId}`;
-      } else if (chat.privacy === "shared" && chat.shareId) {
-        path = `/s/${chat.shareId}`;
-      } else {
-        path = `/chat/${chat._id}`;
-      }
+      const path = chatPath(chat, currentChatId);
       if (path !== window.location.pathname) {
         const first = !hasSetInitialUrlRef.current;
         logger.debug("🧭 state→url: navigating", { path, first });
         if (first) {
-          navigate(path, { replace: true });
+          void navigateWithVerification(path, { replace: true });
           hasSetInitialUrlRef.current = true;
         } else {
-          navigate(path);
+          void navigateWithVerification(path);
         }
       }
     } else {
@@ -776,10 +688,10 @@ export function ChatInterface({
       const path = `/chat/${currentChatId}`;
       if (path !== window.location.pathname) {
         logger.debug("🧭 state→url: fallback navigating", { path });
-        navigate(path);
+        void navigateWithVerification(path);
       }
     }
-  }, [currentChatId, allChats, navigate]);
+  }, [currentChatId, allChats, navigateWithVerification]);
 
   useEffect(() => {
     const chat = allChats.find((c) => c._id === currentChatId);
@@ -815,108 +727,152 @@ export function ChatInterface({
    * - Anon: creates local with share ID
    * - Updates URL for shareable chats
    */
-  const handleNewChat = useCallback(async (): Promise<string | null> => {
-    logger.debug("🔍 handleNewChat called", {
-      isAuthenticated,
-      isCreatingChat,
-    });
-    try {
-      if (isCreatingChat) {
-        logger.debug("⚠️ Already creating chat, returning early");
-        return null;
-      }
-      setIsCreatingChat(true);
-      logger.debug("🔄 Setting isCreatingChat to true");
-      // Mark that the user explicitly initiated a chat change
-      userSelectedChatAtRef.current = Date.now();
-      logger.debug(
-        "📌 Marked user selected chat at:",
-        userSelectedChatAtRef.current,
-      );
-      let newChatId: string | null = null;
-
-      if (isAuthenticated) {
-        logger.debug("🔐 Authenticated user, creating Convex chat");
-        const chatId = await createChat({
-          title: "New Chat",
-        });
-        newChatId = String(chatId);
-        logger.debug("✅ Convex chat created:", chatId);
-        setCurrentChatId(chatId);
-        logger.debug("🔄 setCurrentChatId called with:", chatId);
-        navigate(`/chat/${chatId}`);
-        logger.debug("🧭 navigate called with:", `/chat/${chatId}`);
-        setMessageCount(0);
-        logger.debug("🔢 setMessageCount reset to 0");
-      } else {
-        logger.debug("👤 Unauthenticated user, creating local chat");
-        // Create local chat with unique share ID
-        const shareId = generateShareId();
-        const newChat: LocalChat = {
-          _id: `local_${Date.now()}`,
-          title: "New Chat",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          isLocal: true,
-          shareId,
-          publicId: generateShareId(), // Also generate a public ID
-          privacy: "private",
-        };
-        setLocalChats((prev) => [newChat, ...prev]);
-        logger.debug("✅ Local chat created:", newChat._id);
-        setCurrentChatId(newChat._id);
-        logger.debug("🔄 setCurrentChatId called with:", newChat._id);
-        navigate(`/chat/${newChat._id}`);
-        logger.debug("🧭 navigate called with:", `/chat/${newChat._id}`);
-        newChatId = newChat._id;
-        setMessageCount(0);
-        logger.debug("🔢 setMessageCount reset to 0");
-      }
-
-      logger.debug("🏁 handleNewChat completed, returning:", newChatId);
-      return newChatId;
-    } catch (error) {
-      console.error("💥 Failed to create chat:", error);
-      setIsCreatingChat(false);
-    }
-    logger.debug("🏁 handleNewChat returning null");
-    return null;
-  }, [
-    isCreatingChat,
-    isAuthenticated,
-    createChat,
-    setLocalChats,
-    generateShareId,
-    navigate,
-    setMessageCount,
-  ]);
-
-  // Start a fresh session without creating a chat yet; URL stays at "/" until first send
-  const startNewChatSession = useCallback(() => {
-    try {
-      logger.debug("🆕 startNewChatSession: begin", {
-        path: typeof window !== "undefined" ? window.location.pathname : "n/a",
-        currentChatId,
+  const handleNewChat = useCallback(
+    async (opts?: { userInitiated?: boolean }): Promise<string | null> => {
+      const userInitiated = opts?.userInitiated !== false;
+      logger.debug("🔍 handleNewChat called", {
+        isAuthenticated,
+        isCreatingChat,
+        userInitiated,
       });
-    } catch {}
+      try {
+        if (userInitiated && isCreatingChat) {
+          logger.debug("⚠️ Already creating chat, returning early");
+          return null;
+        }
+        if (userInitiated) setIsCreatingChat(true);
+        logger.debug("🔄 Setting isCreatingChat to true");
+        // Mark that the user explicitly initiated a chat change
+        userSelectedChatAtRef.current = Date.now();
+        logger.debug(
+          "📌 Marked user selected chat at:",
+          userSelectedChatAtRef.current,
+        );
+        let newChatId: string | null = null;
+
+        if (isAuthenticated) {
+          logger.debug("🔐 Authenticated user, creating Convex chat");
+
+          // Create optimistic chat for immediate UI update
+          const optimisticId = `optimistic_${Date.now()}`;
+          const optimisticNewChat = {
+            _id: optimisticId,
+            title: "New Chat",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            privacy: "private",
+          };
+          setOptimisticChat(optimisticNewChat);
+
+          const chatId = await createChat({
+            title: "New Chat",
+          });
+          newChatId = String(chatId);
+          logger.debug("✅ Convex chat created:", chatId);
+
+          // Clear optimistic chat once real chat is created
+          setOptimisticChat(null);
+
+          setCurrentChatId(chatId);
+          logger.debug("🔄 setCurrentChatId called with:", chatId);
+          const navSuccess = await navigateWithVerification(`/chat/${chatId}`);
+          if (!navSuccess) {
+            logger.error("❌ Failed to navigate to new chat:", chatId);
+            // Still return the chat ID as it was created successfully
+          }
+          logger.debug("🧭 navigate called with:", `/chat/${chatId}`);
+          setMessageCount(0);
+          logger.debug("🔢 setMessageCount reset to 0");
+        } else {
+          logger.debug("👤 Unauthenticated user, creating local chat");
+          // Create local chat using unified type helper
+          const newChat = createLocalChat("New Chat");
+          setLocalChats((prev) => [newChat, ...prev]);
+          logger.debug("✅ Local chat created:", newChat._id);
+          setCurrentChatId(newChat._id);
+          logger.debug("🔄 setCurrentChatId called with:", newChat._id);
+          const navSuccess = await navigateWithVerification(
+            `/chat/${newChat._id}`,
+          );
+          if (!navSuccess) {
+            logger.error(
+              "❌ Failed to navigate to new local chat:",
+              newChat._id,
+            );
+            // Still return the chat ID as it was created successfully
+          }
+          logger.debug("🧭 navigate called with:", `/chat/${newChat._id}`);
+          newChatId = newChat._id;
+          setMessageCount(0);
+          logger.debug("🔢 setMessageCount reset to 0");
+        }
+
+        logger.debug("🏁 handleNewChat completed, returning:", newChatId);
+        return newChatId;
+      } catch (error) {
+        console.error("💥 Failed to create chat:", error);
+        logger.error("❌ Chat creation failed with error:", error);
+
+        // Show user-friendly error message
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to create new chat";
+        console.error(`Chat creation error: ${errorMessage}`);
+
+        // TODO: Add toast notification here
+        // For now, alert the user
+        if (typeof window !== "undefined") {
+          alert(
+            `Failed to create new chat: ${errorMessage}\n\nPlease try again.`,
+          );
+        }
+
+        return null;
+      } finally {
+        // Ensure flag is always cleared even if navigation fails
+        if (userInitiated) setIsCreatingChat(false);
+        setOptimisticChat(null); // Ensure optimistic chat is cleared
+      }
+    },
+    [
+      isCreatingChat,
+      isAuthenticated,
+      createChat,
+      setLocalChats,
+      navigateWithVerification,
+      setMessageCount,
+    ],
+  );
+
+  // Create a new chat immediately and navigate to it
+  const startNewChatSession = useCallback(async () => {
+    logger.debug("🆕 startNewChatSession: Creating new chat immediately");
+
+    // Reset state first
     userSelectedChatAtRef.current = Date.now();
-    setIsCreatingChat(false);
     setMessageCount(0);
     setShowFollowUpPrompt(false);
     setPlannerHint(undefined);
     setPendingMessage("");
-    setCurrentChatId(null);
-    try {
-      if (!window.location.pathname.endsWith("/")) {
-        navigate("/", { replace: true });
-        logger.debug("🆕 startNewChatSession: navigated to / (replace:true)");
-      }
-    } catch {}
-  }, [navigate, currentChatId]);
 
-  // Callback for new chat button: defer creation until first message is sent
+    // Create the chat immediately
+    const newChatId = await handleNewChat();
+
+    if (!newChatId) {
+      logger.error("❌ Failed to create new chat in startNewChatSession");
+      // Navigate to home as fallback
+      try {
+        await navigateWithVerification("/");
+      } catch (error) {
+        logger.error("❌ Fallback navigation to home failed:", error);
+        window.location.href = "/";
+      }
+    }
+    // If successful, handleNewChat already navigated to the new chat
+  }, [handleNewChat, navigateWithVerification]);
+
+  // Callback for new chat button: create immediately
   const handleNewChatButton = useCallback(() => {
-    logger.debug("🖱️ New Chat button clicked (deferred)");
+    logger.debug("🖱️ New Chat button clicked");
     startNewChatSession();
   }, [startNewChatSession]);
 
@@ -979,30 +935,27 @@ export function ChatInterface({
   // Add abort controller for stream cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Deterministic post-create send flow (replaces setTimeout-based races)
-  const pendingSendRef = useRef<string | null>(null);
-  const awaitingNewChatRef = useRef<boolean>(false);
+  // Reference to send function for follow-up scenarios
   const sendRef = useRef<null | ((m: string) => void)>(null);
-  useEffect(() => {
-    logger.debug(
-      "🔄 useEffect: Deterministic post-create send flow triggered",
-      {
-        awaitingNewChatRef: awaitingNewChatRef.current,
-        currentChatId,
-        pendingSendRef: pendingSendRef.current,
-      },
-    );
-    if (!awaitingNewChatRef.current) return;
-    if (!currentChatId) return;
-    const msg = pendingSendRef.current;
-    if (!msg) return;
-    // Clear first to avoid re-entrancy
-    awaitingNewChatRef.current = false;
-    pendingSendRef.current = null;
-    // Send into the newly created chat id (currentChatId is now set)
-    logger.debug("📤 Sending pending message:", msg);
-    sendRef.current?.(msg);
-  }, [currentChatId]);
+
+  // Small helper to reset follow-up prompt UI
+  const resetFollowUp = useCallback(() => {
+    setShowFollowUpPrompt(false);
+    setPlannerHint(undefined);
+  }, []);
+
+  // Helper to maybe show follow-up prompt with cooldown
+  const maybeShowFollowUpPrompt = useCallback(
+    (chatKey: string, opts?: { reason?: string; confidence?: number }) => {
+      const lastPromptAt = lastPromptAtByChat[chatKey] || 0;
+      if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
+        setPlannerHint(opts);
+        setShowFollowUpPrompt(true);
+        setLastPromptAtByChat((prev) => ({ ...prev, [chatKey]: Date.now() }));
+      }
+    },
+    [lastPromptAtByChat],
+  );
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1026,65 +979,46 @@ export function ChatInterface({
   const generateUnauthenticatedResponse = useCallback(
     async (message: string, chatId: string) => {
       let searchResults: Array<{
-        title: string;
-        url: string;
-        snippet: string;
-        relevanceScore?: number;
-      }> = [];
-      let searchContext = "";
-      const sources: string[] = [];
-      let hasRealResults = false;
-      let searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback" =
-        "fallback";
-      const errorDetails: string[] = [];
-
+          title: string;
+          url: string;
+          snippet: string;
+          relevanceScore?: number;
+        }> = [],
+        searchContext = "",
+        sources: string[] = [],
+        hasRealResults = false,
+        searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback" =
+          "fallback";
       try {
-        // Create/replace abort controller for the full generation pipeline (search→scrape→AI)
-        if (abortControllerRef.current) {
+        if (abortControllerRef.current)
           try {
             abortControllerRef.current.abort();
           } catch {}
-        }
         abortControllerRef.current = new AbortController();
-
-        // Step 1: Search the web
         setSearchProgress({
           stage: "searching",
           message: "Searching the web for relevant information...",
         });
-
-        const searchUrl = resolveApi("/api/search");
-        logger.debug("🔍 SEARCH API REQUEST:");
-        logger.debug("URL:", searchUrl);
-        logger.debug("Method:", "POST");
-        // Avoid logging raw user input in dev
-        logger.debug("Body:", { queryLength: message.length, maxResults: 5 });
-
-        const searchStartTime = Date.now();
-        // Build a context-aware query by appending a few keywords from recent history
-        const historyText = localMessages
-          .filter((m) => m.chatId === chatId)
-          .slice(-8)
-          .map((m) => m.content || "")
-          .join(" ");
-        const kw = (txt: string) =>
-          txt
-            .toLowerCase()
-            .split(/[^a-z0-9]+/)
-            .filter(Boolean);
+        const searchUrl = resolveApi("/api/search"),
+          historyText = localMessages
+            .filter((m) => m.chatId === chatId)
+            .slice(-8)
+            .map((m) => m.content || "")
+            .join(" ");
         const freq = new Map<string, number>();
-        for (const t of kw(historyText + " " + message)) {
-          if (t.length < 4 || STOP_WORDS.has(t)) continue;
-          freq.set(t, (freq.get(t) || 0) + 1);
-        }
-        const top = Array.from(freq.entries())
+        for (const t of (historyText + " " + message)
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter(Boolean))
+          if (t.length >= 4 && !STOP_WORDS.has(t))
+            freq.set(t, (freq.get(t) || 0) + 1);
+        const contextualQuery = `${message} ${Array.from(freq.entries())
           .sort((a, b) => b[1] - a[1])
           .slice(0, 4)
-          .map(([w]) => w);
-        const contextualQuery = `${message} ${top.join(" ")}`
+          .map(([w]) => w)
+          .join(" ")}`
           .trim()
           .slice(0, 220);
-
         const searchResponse = await fetchJsonWithRetry(searchUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1093,282 +1027,150 @@ export function ChatInterface({
           retry: 2,
           retryDelayMs: 400,
         });
-        const searchDuration = Date.now() - searchStartTime;
-
-        logger.debug("🔍 SEARCH API RESPONSE:");
-        logger.debug("Status:", searchResponse.status);
-        logger.debug("Duration:", `${searchDuration}ms`);
-        logger.debug("Headers: <omitted>");
-
+        logger.debug("🔍", searchResponse.status);
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
-          logger.debug(
-            "🔍 SEARCH API RESPONSE BODY:",
-            JSON.stringify(searchData, null, 2),
-          );
-
           searchResults = searchData.results || [];
           hasRealResults = searchData.hasRealResults || false;
           searchMethod = searchData.searchMethod || "fallback";
-
           if (searchResults.length > 0) {
             setSearchProgress({
               stage: "scraping",
               message: "Reading content from top sources...",
               urls: searchResults.slice(0, 3).map((r) => r.url),
             });
-
-            // Step 2: Scrape content from top results
-            const contentPromises = searchResults
-              .slice(0, 3)
-              .map(
-                async (result: {
-                  url: string;
-                  title: string;
-                  snippet: string;
-                }) => {
-                  let host = "unknown";
-                  try {
-                    host = new URL(result.url).hostname;
-                  } catch {
-                    /* noop */
-                  }
-                  setSearchProgress({
-                    stage: "scraping",
-                    message: `Reading content from ${host}...`,
-                    currentUrl: result.url,
-                    urls: searchResults.slice(0, 3).map((r) => r.url),
-                  });
-
-                  try {
-                    const scrapeUrl = resolveApi("/api/scrape");
-                    logger.debug("🌐 SCRAPE API REQUEST:");
-                    logger.debug("URL:", scrapeUrl);
-                    logger.debug("Method:", "POST");
-                    logger.debug("Body:", {
-                      urlLength: result.url?.length ?? 0,
-                    });
-
-                    const scrapeStartTime = Date.now();
-                    const scrapeResponse = await fetchJsonWithRetry(scrapeUrl, {
+            const contents = await Promise.all(
+              searchResults.slice(0, 3).map(async (result) => {
+                let host = "unknown";
+                try {
+                  host = new URL(result.url).hostname;
+                } catch {}
+                setSearchProgress({
+                  stage: "scraping",
+                  message: `Reading from ${host}...`,
+                  currentUrl: result.url,
+                  urls: searchResults.slice(0, 3).map((r) => r.url),
+                });
+                try {
+                  const scrapeResponse = await fetchJsonWithRetry(
+                    resolveApi("/api/scrape"),
+                    {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ url: result.url }),
                       signal: abortControllerRef.current?.signal,
                       retry: 1,
                       retryDelayMs: 300,
-                    });
-                    const scrapeDuration = Date.now() - scrapeStartTime;
-
-                    logger.debug("🌐 SCRAPE API RESPONSE:");
-                    logger.debug("Status:", scrapeResponse.status);
-                    logger.debug("Duration:", `${scrapeDuration}ms`);
-                    logger.debug("URL:", result.url);
-
-                    if (scrapeResponse.ok) {
-                      const content = await scrapeResponse.json();
-                      logger.debug(
-                        "🌐 SCRAPE API RESPONSE BODY:",
-                        JSON.stringify(content, null, 2),
-                      );
-                      sources.push(result.url);
-                      return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
-                    } else {
-                      const errorText = await scrapeResponse.text();
-                      console.error("🌐 SCRAPE API ERROR:", {
-                        status: scrapeResponse.status,
-                        statusText: scrapeResponse.statusText,
-                        error: errorText,
-                        url: result.url,
-                        timestamp: new Date().toISOString(),
-                      });
-                      errorDetails.push(
-                        `Scraping failed for ${result.url}: HTTP ${scrapeResponse.status} ${scrapeResponse.statusText} - ${errorText}`,
-                      );
-                      return `Source: ${result.title} (${result.url})\n${result.snippet}`;
-                    }
-                  } catch (error) {
-                    console.error("🌐 SCRAPE API EXCEPTION:", {
-                      error:
-                        error instanceof Error
-                          ? error.message
-                          : "Unknown error",
-                      stack:
-                        error instanceof Error ? error.stack : "No stack trace",
-                      url: result.url,
-                      timestamp: new Date().toISOString(),
-                    });
-                    errorDetails.push(
-                      `Scraping error for ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`,
-                    );
-                    return `Source: ${result.title} (${result.url})\n${result.snippet}`;
+                    },
+                  );
+                  if (scrapeResponse.ok) {
+                    const content = await scrapeResponse.json();
+                    sources.push(result.url);
+                    return `Source: ${result.title} (${result.url})\n${content.summary || content.content.substring(0, 1500)}`;
                   }
-                },
-              );
-
-            const contents = await Promise.all(contentPromises);
+                } catch {}
+                return `Source: ${result.title} (${result.url})\n${result.snippet}`;
+              }),
+            );
             searchContext = contents.join("\n\n");
-
             setSearchProgress({
               stage: "analyzing",
               message: "Analyzing information and generating response...",
             });
           }
         } else {
-          const errorText = await searchResponse.text();
-          console.error("🔍 SEARCH API ERROR:", {
-            status: searchResponse.status,
-            statusText: searchResponse.statusText,
-            error: errorText,
-            timestamp: new Date().toISOString(),
-          });
-          // User-visible failure reason for final search retry failure
+          console.error("Search failed:", searchResponse.status);
           try {
-            toast.error(
-              `Web search failed: HTTP ${searchResponse.status} ${searchResponse.statusText}`,
-            );
+            toast.error(`Web search failed: HTTP ${searchResponse.status}`);
           } catch {}
-          errorDetails.push(
-            `Search API failed: HTTP ${searchResponse.status} ${searchResponse.statusText} - ${errorText}`,
-          );
         }
-
         setSearchProgress({
           stage: "generating",
           message: "AI is thinking and generating response...",
         });
-
-        // Generate AI response with streaming - include ALL context
-        let systemPrompt = `You are a helpful AI assistant. `;
-
+        let systemPrompt = "You are a helpful AI assistant. ";
         if (hasRealResults && searchContext) {
-          systemPrompt += `Use the following search results to inform your response. IMPORTANT: When citing sources, use the domain name in brackets like [example.com] format. Place citations inline immediately after the relevant information.\n\n`;
-          systemPrompt += `## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n`;
-          systemPrompt += `## Source References (USE THESE DOMAIN CITATIONS):\n`;
-          searchResults.forEach(
-            (
-              result: { title: string; url: string; snippet: string },
-              _idx: number,
-            ) => {
-              let domain = "unknown";
-              try {
-                domain = new URL(result.url).hostname.replace("www.", "");
-              } catch {}
-              systemPrompt += `[${domain}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
-            },
-          );
+          systemPrompt += `Use the following search results to inform your response. IMPORTANT: When citing sources, use the domain name in brackets like [example.com] format. Place citations inline immediately after the relevant information.\n\n## Search Results (${searchResults.length} sources found):\n${searchContext}\n\n## Source References (USE THESE DOMAIN CITATIONS):\n`;
+          searchResults.forEach((result) => {
+            let domain = "unknown";
+            try {
+              domain = new URL(result.url).hostname.replace("www.", "");
+            } catch {}
+            systemPrompt += `[${domain}] ${result.title}\n    URL: ${result.url}\n    Snippet: ${result.snippet}\n\n`;
+          });
         } else if (!hasRealResults && searchResults.length > 0) {
-          systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n`;
-          systemPrompt += `## Available Results:\n`;
+          systemPrompt += `Limited search results available. Use what's available and supplement with your knowledge.\n\n## Available Results:\n`;
           searchResults.forEach(
-            (result: { title: string; snippet: string }) => {
-              systemPrompt += `- ${result.title}: ${result.snippet}\n`;
-            },
+            (result) =>
+              (systemPrompt += `- ${result.title}: ${result.snippet}\n`),
           );
-        } else {
-          systemPrompt += `Web search is unavailable. Provide helpful responses based on your knowledge. `;
-        }
-
-        systemPrompt += `\n\nProvide clear, helpful responses. When you reference information from the search results, you MUST include citations using the [domain.com] format shown above. Place citations immediately after the relevant statement. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.`;
-
-        // Get chat history for context
+        } else
+          systemPrompt +=
+            "Web search is unavailable. Provide helpful responses based on your knowledge. ";
+        systemPrompt +=
+          "\n\nProvide clear, helpful responses. When you reference information from the search results, you MUST include citations using the [domain.com] format shown above. Place citations immediately after the relevant statement. Always format output using strict GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language tags. Avoid arbitrary HTML beyond <u>. This is a continued conversation, so consider the full context of previous messages.";
         const chatHistory = localMessages
           .filter((msg) => msg.chatId === chatId)
-          .map((msg) => ({
-            role: msg.role,
-            content: msg.content || "",
-          }));
-
-        const aiRequestBody = {
-          message,
-          systemPrompt,
-          searchResults,
-          sources,
-          chatHistory,
-        };
-
-        const aiUrl = resolveApi("/api/ai");
-        logger.debug("🤖 AI API REQUEST:");
-        logger.debug("URL:", aiUrl);
-        logger.debug("Method:", "POST");
-        // Do not log full bodies with user content/history
-        logger.debug("Body:", {
-          messageLength: aiRequestBody.message.length,
-          searchResults: aiRequestBody.searchResults?.length ?? 0,
-          sources: aiRequestBody.sources?.length ?? 0,
-          historySize: aiRequestBody.chatHistory?.length ?? 0,
-        });
-
-        // Create placeholder assistant message for streaming
+          .map((msg) => ({ role: msg.role, content: msg.content || "" }));
         const assistantMessageId = `msg_${Date.now() + 1}`;
         const assistantMessage: LocalMessage = {
           _id: assistantMessageId,
-          chatId: chatId,
+          chatId,
           role: "assistant",
           content: "",
           timestamp: Date.now(),
           searchResults: searchResults.length > 0 ? searchResults : undefined,
           sources: sources.length > 0 ? sources : undefined,
           reasoning: "",
-          searchMethod: searchMethod,
-          hasRealResults: hasRealResults,
+          searchMethod,
+          hasRealResults,
           isStreaming: true,
           hasStartedContent: false,
         };
-
         setLocalMessages((prev) => [...prev, assistantMessage]);
-
-        const aiStartTime = Date.now();
-        const aiResponse = await fetch(aiUrl, {
+        const aiResponse = await fetch(resolveApi("/api/ai"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
           },
-          body: JSON.stringify(aiRequestBody),
+          body: JSON.stringify({
+            message,
+            systemPrompt,
+            searchResults,
+            sources,
+            chatHistory,
+          }),
           signal: abortControllerRef.current.signal,
         });
-        const aiDuration = Date.now() - aiStartTime;
-
-        logger.debug("🤖 AI API RESPONSE:");
-        logger.debug("Status:", aiResponse.status);
-        logger.debug("Duration:", `${aiDuration}ms`);
-        logger.debug(
-          "Headers:",
-          Object.fromEntries(aiResponse.headers.entries()),
-        );
-
         if (aiResponse.ok && aiResponse.body) {
           const contentType = aiResponse.headers.get("content-type");
-
           if (contentType?.includes("text/event-stream")) {
-            // Handle streaming response properly
-            const reader = aiResponse.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-            let accumulatedContent = "";
-            let accumulatedThinking = "";
-            let hasStartedContent = false;
-            let chunkCount = 0;
-            const streamStartTime = Date.now();
-
-            let isReading = true;
-
-            // Listen for abort signal
-            if (abortControllerRef.current) {
+            const reader = aiResponse.body.getReader(),
+              decoder = new TextDecoder();
+            let buffer = "",
+              accumulatedContent = "",
+              accumulatedThinking = "",
+              hasStartedContent = false,
+              isReading = true;
+            const fallbackText = searchResults?.length
+              ? `I'm sorry, I couldn't complete the response. Top sources:\n${searchResults
+                  .slice(0, 3)
+                  .map((r) => `- ${r.title} — ${r.url}`)
+                  .join("\n")}`
+              : "I'm sorry, I couldn't generate a response this time.";
+            if (abortControllerRef.current)
               abortControllerRef.current.signal.addEventListener(
                 "abort",
                 () => {
                   isReading = false;
-                  // Gracefully finalize or remove the placeholder to avoid spinner hang
                   setLocalMessages((prev) => {
                     const idx = prev.findIndex(
                       (m) => m._id === assistantMessageId,
                     );
                     if (idx === -1) return prev;
                     const next = prev.slice();
-                    const hadContent = !!next[idx].content?.trim();
-                    if (hadContent) {
+                    if (next[idx].content?.trim()) {
                       next[idx] = {
                         ...next[idx],
                         isStreaming: false,
@@ -1382,36 +1184,13 @@ export function ChatInterface({
                 },
                 { once: true },
               );
-            }
-
             try {
               while (isReading && isMountedRef.current) {
                 const { done, value } = await reader.read();
                 if (done) {
-                  // If the model streamed no visible content, fall back to a concise answer
-                  if (
-                    !accumulatedContent ||
-                    accumulatedContent.trim().length === 0
-                  ) {
-                    if (searchResults && searchResults.length > 0) {
-                      const topFew = searchResults
-                        .slice(0, 3)
-                        .map((r) => `- ${r.title} — ${r.url}`)
-                        .join("\n");
-                      accumulatedContent = `I'm sorry, I couldn't complete the streamed response. Here are top sources that may help:\n\n${topFew}`;
-                    } else {
-                      accumulatedContent =
-                        "I'm sorry, I couldn't generate a response this time.";
-                    }
-                  }
-                  logger.debug("🔄 Streaming completed:", {
-                    totalChunks: chunkCount,
-                    duration: Date.now() - streamStartTime,
-                    finalContentLength: accumulatedContent.length,
-                    timestamp: new Date().toISOString(),
-                  });
-                  // Finalize the message only if component is still mounted
-                  if (isMountedRef.current) {
+                  if (!accumulatedContent?.trim())
+                    accumulatedContent = fallbackText;
+                  if (isMountedRef.current)
                     setLocalMessages((prev) =>
                       prev.map((msg) =>
                         msg._id === assistantMessageId
@@ -1425,36 +1204,18 @@ export function ChatInterface({
                           : msg,
                       ),
                     );
-                  }
                   break;
                 }
-
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split("\n");
                 buffer = lines.pop() || "";
-
                 for (const line of lines) {
                   if (line.startsWith("data: ")) {
                     const data = line.slice(6);
                     if (data === "[DONE]") {
-                      if (
-                        !accumulatedContent ||
-                        accumulatedContent.trim().length === 0
-                      ) {
-                        if (searchResults && searchResults.length > 0) {
-                          const topFew = searchResults
-                            .slice(0, 3)
-                            .map((r) => `- ${r.title} — ${r.url}`)
-                            .join("\n");
-                          accumulatedContent = `I'm sorry, I couldn't complete the streamed response. Here are top sources that may help:\n\n${topFew}`;
-                        } else {
-                          accumulatedContent =
-                            "I'm sorry, I couldn't generate a response this time.";
-                        }
-                      }
-                      logger.debug("✅ Streaming finished with [DONE]");
-                      // Finalize the message only if component is still mounted
-                      if (isMountedRef.current) {
+                      if (!accumulatedContent?.trim())
+                        accumulatedContent = fallbackText;
+                      if (isMountedRef.current)
                         setLocalMessages((prev) =>
                           prev.map((msg) =>
                             msg._id === assistantMessageId
@@ -1468,73 +1229,33 @@ export function ChatInterface({
                               : msg,
                           ),
                         );
-                      }
                       return;
                     }
-                    try {
-                      chunkCount++;
-                      const chunk = JSON.parse(data);
-                      if (chunk.type === "chunk") {
-                        if (chunk.thinking) {
-                          // Some providers may send non-string reasoning; normalize
-                          accumulatedThinking += String(chunk.thinking);
-                        }
-                        if (chunk.content) {
-                          accumulatedContent += chunk.content;
-                          if (!hasStartedContent) {
-                            hasStartedContent = true;
-                          }
-                        }
-
-                        // Update the message in real-time using throttled update
-                        throttledMessageUpdate(
-                          assistantMessageId,
-                          accumulatedContent,
-                          String(accumulatedThinking || ""),
-                          hasStartedContent,
-                        );
+                    const chunk = validateStreamChunk(data);
+                    if (chunk && chunk.type === "chunk") {
+                      if (chunk.thinking)
+                        accumulatedThinking += String(chunk.thinking);
+                      if (chunk.content) {
+                        accumulatedContent += chunk.content;
+                        if (!hasStartedContent) hasStartedContent = true;
                       }
-                    } catch (e) {
-                      console.error("❌ Failed to parse stream chunk:", {
-                        error:
-                          e instanceof Error
-                            ? e.message
-                            : "Unknown parsing error",
-                        chunk: data,
-                        chunkNumber: chunkCount,
-                        timestamp: new Date().toISOString(),
-                      });
+                      throttledMessageUpdate(
+                        assistantMessageId,
+                        accumulatedContent,
+                        String(accumulatedThinking || ""),
+                        hasStartedContent,
+                      );
                     }
                   }
                 }
               }
             } catch (streamError) {
-              // Check if error is due to abort
               if (
                 streamError instanceof Error &&
                 streamError.name === "AbortError"
-              ) {
-                logger.debug(
-                  "Stream aborted (component unmounted or navigation)",
-                );
-                return; // Don't show error message for intentional aborts
-              }
-
-              console.error("💥 Stream reading error:", {
-                error:
-                  streamError instanceof Error
-                    ? streamError.message
-                    : "Unknown streaming error",
-                stack:
-                  streamError instanceof Error
-                    ? streamError.stack
-                    : "No stack trace",
-                duration: Date.now() - streamStartTime,
-                chunkCount: chunkCount,
-                timestamp: new Date().toISOString(),
-              });
-              // Fallback to error message only if component is still mounted
-              if (isMountedRef.current) {
+              )
+                return;
+              if (isMountedRef.current)
                 setLocalMessages((prev) =>
                   prev.map((msg) =>
                     msg._id === assistantMessageId
@@ -1548,122 +1269,49 @@ export function ChatInterface({
                       : msg,
                   ),
                 );
-              }
             } finally {
               reader.releaseLock();
             }
           } else {
-            // Fallback to non-streaming response
             const aiData = await aiResponse.json();
-            logger.debug(
-              "🤖 AI API RESPONSE BODY:",
-              JSON.stringify(aiData, null, 2),
-            );
-
-            const responseContent =
-              aiData.response ||
-              "I apologize, but I couldn't generate a response. Please try again.";
-            const reasoningTokens = aiData.reasoning || null;
-
-            // Update the placeholder message only if component is still mounted
-            if (isMountedRef.current) {
+            if (isMountedRef.current)
               setLocalMessages((prev) =>
                 prev.map((msg) =>
                   msg._id === assistantMessageId
                     ? {
                         ...msg,
-                        content: responseContent,
-                        reasoning: reasoningTokens,
+                        content:
+                          aiData.response ||
+                          "I apologize, but I couldn't generate a response. Please try again.",
+                        reasoning: aiData.reasoning || null,
                         isStreaming: false,
                       }
                     : msg,
                 ),
               );
-            }
           }
-        } else {
-          const aiErrorData = await aiResponse.text();
-          console.error("🤖 AI API ERROR:", {
-            status: aiResponse.status,
-            statusText: aiResponse.statusText,
-            error: aiErrorData,
-            duration: aiDuration,
-            timestamp: new Date().toISOString(),
-          });
-          errorDetails.push(
-            `AI API failed: HTTP ${aiResponse.status} ${aiResponse.statusText}`,
-          );
-          errorDetails.push(`AI error details: ${aiErrorData}`);
-          throw new Error(
-            `AI API failed with status ${aiResponse.status} ${aiResponse.statusText}`,
-          );
-        }
+        } else
+          throw new Error(`AI API failed with status ${aiResponse.status}`);
       } catch (error) {
-        // Check if error is due to abort
-        if (error instanceof Error && error.name === "AbortError") {
-          logger.debug("Request aborted (component unmounted or navigation)");
-          return; // Don't show error message for intentional aborts
-        }
-
-        console.error("💥 AI generation failed with exception:", {
-          error: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : "No stack trace",
-          timestamp: new Date().toISOString(),
-        });
-
-        // Create detailed error message with all the debugging info
-        let errorMessage =
-          "I'm having trouble generating a response. Here's the detailed debugging information:\n\n";
-
-        errorMessage += "**🔍 SEARCH DEBUG INFO:**\n";
-        errorMessage += `- Search Method: ${searchMethod}\n`;
-        errorMessage += `- Results Found: ${searchResults.length}\n`;
-        errorMessage += `- Real Results: ${hasRealResults ? "Yes" : "No"}\n`;
-        errorMessage += `- Sources: ${sources.length}\n\n`;
-
-        if (errorDetails.length > 0) {
-          errorMessage += "**❌ ERROR DETAILS:**\n";
-          errorDetails.forEach((detail, index) => {
-            errorMessage += `${index + 1}. ${detail}\n`;
-          });
-          errorMessage += "\n";
-        }
-
-        // Environment diagnostics are dev-only to protect user privacy
-        if (import.meta.env.DEV) {
-          console.info("ENV CHECK:", {
-            url: window.location.href,
-            ua: navigator.userAgent,
-            ts: new Date().toISOString(),
-          });
-        }
-
-        if (searchContext) {
-          errorMessage += "**📄 AVAILABLE CONTENT:**\n";
-          errorMessage += `${searchContext.substring(0, 800)}...\n\n`;
-        }
-
-        errorMessage += "**🔧 NEXT STEPS:**\n";
-        errorMessage += "1. Check browser console for detailed API logs\n";
-        errorMessage += "2. Verify API endpoints are accessible\n";
-        errorMessage += "3. Try rephrasing your question\n";
-        errorMessage += "4. Check network connectivity\n";
-
-        const aiMessage: LocalMessage = {
-          _id: `msg_${Date.now() + 1}`,
-          chatId: chatId,
-          role: "assistant",
-          content: errorMessage,
-          timestamp: Date.now(),
-          searchResults: searchResults.length > 0 ? searchResults : undefined,
-          sources: sources.length > 0 ? sources : undefined,
-          searchMethod: searchMethod,
-          hasRealResults: hasRealResults,
-        };
-
-        if (isMountedRef.current) {
-          setLocalMessages((prev) => [...prev, aiMessage]);
-        }
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error("AI generation failed:", error);
+        const errorMessage = `I'm having trouble generating a response. ${searchContext ? `\n\n**Available Content:**\n${searchContext.substring(0, 800)}...\n\n` : ""}**Next Steps:**\n1. Check browser console\n2. Verify API endpoints\n3. Try rephrasing\n4. Check network connectivity`;
+        if (isMountedRef.current)
+          setLocalMessages((prev) => [
+            ...prev,
+            {
+              _id: `msg_${Date.now() + 1}`,
+              chatId,
+              role: "assistant",
+              content: errorMessage,
+              timestamp: Date.now(),
+              searchResults:
+                searchResults.length > 0 ? searchResults : undefined,
+              sources: sources.length > 0 ? sources : undefined,
+              searchMethod,
+              hasRealResults,
+            },
+          ]);
       }
     },
     [
@@ -1692,21 +1340,23 @@ export function ChatInterface({
         logger.debug("⚠️ Already generating, skipping send");
         return;
       }
-      // If no chat is active yet, create one and queue this send
-      if (!currentChatId) {
-        logger.debug(
-          "📝 No current chat, queueing message and creating new chat",
-        );
-        pendingSendRef.current = content;
-        awaitingNewChatRef.current = true;
-        await handleNewChat();
-        return;
+      // If no chat is active yet, create one first then send
+      let activeChatId = currentChatId;
+      if (!activeChatId) {
+        logger.debug("📝 No current chat, creating new chat before sending");
+        const newChatId = await handleNewChat();
+        if (!newChatId) {
+          logger.error("❌ Failed to create chat for message");
+          return;
+        }
+        // Use the newly created chat for this message
+        activeChatId = isAuthenticated ? (newChatId as Id<"chats">) : newChatId;
+        logger.debug("📝 Using newly created chat:", activeChatId);
       }
       // If a follow-up prompt is visible, do not block normal send; dismiss it
       if (showFollowUpPrompt) {
         logger.debug("-dismissing follow-up prompt");
-        setShowFollowUpPrompt(false);
-        setPlannerHint(undefined);
+        resetFollowUp();
         setPendingMessage("");
       }
 
@@ -1718,8 +1368,8 @@ export function ChatInterface({
 
       // New-topic decision: use server planner when authenticated; otherwise fallback heuristic
       const currentMessagesForChat =
-        typeof currentChatId === "string"
-          ? localMessages.filter((msg) => msg.chatId === currentChatId)
+        typeof activeChatId === "string"
+          ? localMessages.filter((msg) => msg.chatId === activeChatId)
           : messages || [];
 
       // Do NOT block sending while a suggestion banner is visible.
@@ -1727,7 +1377,7 @@ export function ChatInterface({
       if (
         !showFollowUpPrompt &&
         isAuthenticated &&
-        typeof currentChatId !== "string"
+        typeof activeChatId !== "string"
       ) {
         // Client-side gating before planner call
         // Using module-level CHAT_COOLDOWN_MS constant
@@ -1757,7 +1407,7 @@ export function ChatInterface({
         } catch {}
         const shouldPlanBase =
           cue || words.length >= PROMPT_MIN_WORDS || gapMinutes >= 180;
-        const chatKey = String(currentChatId);
+        const chatKey = String(activeChatId);
         const lastAt = lastPlannerCallAtByChat[chatKey] || 0;
         const cooldownPassed = Date.now() - lastAt >= CHAT_COOLDOWN_MS;
         const shouldCallPlanner = shouldPlanBase && cooldownPassed;
@@ -1765,7 +1415,7 @@ export function ChatInterface({
         if (shouldCallPlanner) {
           try {
             const plan = await planSearch({
-              chatId: currentChatId,
+              chatId: activeChatId as Id<"chats">,
               newMessage: content,
               maxContextMessages: 10,
             });
@@ -1778,19 +1428,10 @@ export function ChatInterface({
               (plan.decisionConfidence ?? 0) >= 0.8 &&
               words.length >= PROMPT_MIN_WORDS
             ) {
-              const lastPromptAt = lastPromptAtByChat[chatKey] || 0;
-              if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
-                // Non-blocking banner: show suggestion but do not prevent sending
-                setPlannerHint({
-                  reason: plan.reasons,
-                  confidence: plan.decisionConfidence,
-                });
-                setShowFollowUpPrompt(true);
-                setLastPromptAtByChat((prev) => ({
-                  ...prev,
-                  [chatKey]: Date.now(),
-                }));
-              }
+              maybeShowFollowUpPrompt(chatKey, {
+                reason: plan.reasons,
+                confidence: plan.decisionConfidence,
+              });
             }
           } catch (e) {
             // If planner fails, fall back to heuristic below
@@ -1803,16 +1444,7 @@ export function ChatInterface({
             words.length >= PROMPT_MIN_WORDS &&
             isTopicChange(content, currentMessagesForChat)
           ) {
-            const lastPromptAt = lastPromptAtByChat[chatKey] || 0;
-            if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
-              // Non-blocking banner: show suggestion but do not prevent sending
-              setPlannerHint(undefined);
-              setShowFollowUpPrompt(true);
-              setLastPromptAtByChat((prev) => ({
-                ...prev,
-                [chatKey]: Date.now(),
-              }));
-            }
+            maybeShowFollowUpPrompt(chatKey);
           }
         }
       } else if (!showFollowUpPrompt) {
@@ -1822,17 +1454,8 @@ export function ChatInterface({
           wordsUnauth.length >= PROMPT_MIN_WORDS &&
           isTopicChange(content, currentMessagesForChat)
         ) {
-          const chatKeyU = String(currentChatId);
-          const lastPromptAt = lastPromptAtByChat[chatKeyU] || 0;
-          if (Date.now() - lastPromptAt >= PROMPT_COOLDOWN_MS) {
-            // Non-blocking banner for unauthenticated users too
-            setPlannerHint(undefined);
-            setShowFollowUpPrompt(true);
-            setLastPromptAtByChat((prev) => ({
-              ...prev,
-              [chatKeyU]: Date.now(),
-            }));
-          }
+          const chatKeyU = String(activeChatId);
+          maybeShowFollowUpPrompt(chatKeyU);
         }
       }
 
@@ -1843,21 +1466,19 @@ export function ChatInterface({
       });
 
       try {
-        if (isAuthenticated && looksServerId(String(currentChatId))) {
+        if (isAuthenticated && looksServerId(String(activeChatId))) {
           // Authenticated user - use Convex (without onProgress callback)
           await generateResponse({
-            chatId: currentChatId as Id<"chats">,
+            chatId: activeChatId as Id<"chats">,
             message: content,
           });
         } else {
           // Unauthenticated user - add user message to local storage first
-          const userMessage: LocalMessage = {
-            _id: `msg_${Date.now()}`,
-            chatId: currentChatId as string,
-            role: "user",
+          const userMessage = createLocalMessage(
+            activeChatId as string,
+            "user",
             content,
-            timestamp: Date.now(),
-          };
+          );
 
           setLocalMessages((prev) => [...prev, userMessage]);
 
@@ -1867,7 +1488,7 @@ export function ChatInterface({
               content.length > 50 ? `${content.substring(0, 50)}...` : content;
             setLocalChats((prev) =>
               prev.map((chat) =>
-                chat._id === currentChatId
+                chat._id === activeChatId
                   ? { ...chat, title, updatedAt: Date.now() }
                   : chat,
               ),
@@ -1877,7 +1498,7 @@ export function ChatInterface({
           // Generate real AI response for unauthenticated users
           await generateUnauthenticatedResponse(
             content,
-            currentChatId as string,
+            activeChatId as string,
           );
         }
 
@@ -1888,13 +1509,13 @@ export function ChatInterface({
         // Add error message to chat
         const errorMessage: LocalMessage = {
           _id: `msg_${Date.now() + 1}`,
-          chatId: currentChatId as string,
+          chatId: activeChatId as string,
           role: "assistant",
           content: `**Error generating response:**\n\n${error instanceof Error ? error.message : "Unknown error occurred"}\n\nPlease try again or rephrase your question.`,
           timestamp: Date.now(),
         };
 
-        if (typeof currentChatId === "string") {
+        if (typeof activeChatId === "string") {
           setLocalMessages((prev) => [...prev, errorMessage]);
         }
       } finally {
@@ -1915,7 +1536,6 @@ export function ChatInterface({
       looksServerId,
       planSearch,
       lastPlannerCallAtByChat,
-      lastPromptAtByChat,
       isTopicChange,
       generateResponse,
       setLocalMessages,
@@ -1923,12 +1543,11 @@ export function ChatInterface({
       generateUnauthenticatedResponse,
       setIsGenerating,
       setSearchProgress,
-      setShowFollowUpPrompt,
-      setPlannerHint,
       setPendingMessage,
       setLastPlannerCallAtByChat,
-      setLastPromptAtByChat,
       setMessageCount,
+      resetFollowUp,
+      maybeShowFollowUpPrompt,
     ],
   );
 
@@ -1938,6 +1557,21 @@ export function ChatInterface({
    * - Sets public/private visibility
    * @param isPublic - Public visibility flag
    */
+  // Map local messages to export payload shape
+  const toExportMessage = useCallback(
+    (m: LocalMessage) => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp,
+      searchResults: m.searchResults,
+      sources: m.sources,
+      reasoning: m.reasoning as unknown,
+      searchMethod: m.searchMethod as unknown,
+      hasRealResults: m.hasRealResults,
+    }),
+    [],
+  );
+
   const handleShare = useCallback(
     async (
       privacy: "private" | "shared" | "public",
@@ -1959,7 +1593,7 @@ export function ChatInterface({
             path = `/chat/${chat._id}`;
           }
           if (path && path !== window.location.pathname) {
-            navigate(path);
+            void navigateWithVerification(path);
           }
         }
       } catch {}
@@ -1977,18 +1611,9 @@ export function ChatInterface({
             const localChat = localChats.find((c) => c._id === currentChatId);
             const msgs = localMessages
               .filter((m) => m.chatId === currentChatId)
-              .map((m) => ({
-                role: m.role,
-                content: m.content,
-                timestamp: m.timestamp,
-                searchResults: m.searchResults,
-                sources: m.sources,
-                reasoning: m.reasoning as unknown,
-                searchMethod: m.searchMethod as unknown,
-                hasRealResults: m.hasRealResults,
-              }));
+              .map(toExportMessage);
             const res = await fetchJsonWithRetry(
-              `${window.location.origin}/api/publishChat`,
+              resolveApi("/api/publishChat"),
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -2023,12 +1648,16 @@ export function ChatInterface({
       } else {
         // Handle Convex chat
         try {
-          await updateChatPrivacy({ chatId: currentChatId, privacy });
-          // Fetch identifiers for return
-          const found = allChats.find(
-            (c) => String(c._id) === String(currentChatId),
-          );
-          return { shareId: found?.shareId, publicId: found?.publicId };
+          const updated = await updateChatPrivacy({
+            chatId: currentChatId,
+            privacy,
+          });
+          // Optimistically merge ids into local view to unblock modal URL building
+          setLocalChats((prev) => prev);
+          return {
+            shareId: updated?.shareId || undefined,
+            publicId: updated?.publicId || undefined,
+          };
         } catch (e) {
           logger.error("Failed to update privacy", e);
         }
@@ -2040,10 +1669,12 @@ export function ChatInterface({
       allChats,
       setLocalChats,
       updateChatPrivacy,
-      navigate,
+      navigateWithVerification,
       localChats,
       localMessages,
       fetchJsonWithRetry,
+      resolveApi,
+      toExportMessage,
     ],
   );
 
@@ -2054,8 +1685,7 @@ export function ChatInterface({
    * - Uses setTimeout for state sync
    */
   const handleContinueChat = useCallback(() => {
-    setShowFollowUpPrompt(false);
-    setPlannerHint(undefined);
+    resetFollowUp();
     // Telemetry: user chose to continue in current chat
     if (isAuthenticated && looksServerId(String(currentChatId))) {
       recordClientMetric({
@@ -2075,6 +1705,7 @@ export function ChatInterface({
     currentChatId,
     recordClientMetric,
     looksServerId,
+    resetFollowUp,
   ]);
 
   /**
@@ -2084,8 +1715,7 @@ export function ChatInterface({
    * - Sends pending message
    */
   const handleNewChatForFollowUp = useCallback(async () => {
-    setShowFollowUpPrompt(false);
-    setPlannerHint(undefined);
+    resetFollowUp();
     const tempMessage = pendingMessage;
     setPendingMessage("");
     // Telemetry: user agreed to start new chat
@@ -2097,11 +1727,11 @@ export function ChatInterface({
     }
 
     // Create new chat and send message
-    if (tempMessage) {
-      pendingSendRef.current = tempMessage;
-      awaitingNewChatRef.current = true;
+    const newChatId = await handleNewChat();
+    if (newChatId && tempMessage) {
+      // Send the message to the new chat
+      sendRef.current?.(tempMessage);
     }
-    await handleNewChat();
   }, [
     pendingMessage,
     handleNewChat,
@@ -2109,12 +1739,12 @@ export function ChatInterface({
     currentChatId,
     recordClientMetric,
     looksServerId,
+    resetFollowUp,
   ]);
 
   // Start new chat with summary: create chat, synthesize prompt with summary + question
   const handleNewChatWithSummary = useCallback(async () => {
-    setShowFollowUpPrompt(false);
-    setPlannerHint(undefined);
+    resetFollowUp();
     const tempMessage = pendingMessage;
     setPendingMessage("");
 
@@ -2155,12 +1785,11 @@ export function ChatInterface({
         ? `Summary of previous conversation (for context):\n${summary}\n\nQuestion: ${tempMessage || ""}`
         : tempMessage || "";
 
-      if (composed) {
-        pendingSendRef.current = composed;
-        awaitingNewChatRef.current = true;
+      // Create destination chat and send composed message
+      const newChatId = await handleNewChat();
+      if (newChatId && composed) {
+        sendRef.current?.(composed);
       }
-      // Create destination chat ONCE; effect will send composed into it
-      await handleNewChat();
     } catch (e) {
       console.warn("New chat w/ summary failed", e);
       // Fallback to normal new chat flow
@@ -2175,6 +1804,7 @@ export function ChatInterface({
     localMessages,
     summarizeRecentAction,
     looksServerId,
+    resetFollowUp,
   ]);
 
   // Debounced draft analyzer: quick local heuristic, optional planner preflight (not blocking)
@@ -2210,7 +1840,7 @@ export function ChatInterface({
 
   // Add ref to track if we've attempted auto-creation
   const hasAutoCreatedRef = useRef(false);
-  const handleNewChatRef = useRef(handleNewChat);
+  const handleNewChatRef = useRef<typeof handleNewChat>(handleNewChat);
 
   // Keep handleNewChatRef in sync
   useEffect(() => {
@@ -2271,9 +1901,10 @@ export function ChatInterface({
       ) {
         logger.debug("🤖 Auto-creating new chat");
         hasAutoCreatedRef.current = true;
-        handleNewChatRef.current();
+        // Auto-creation should not block manual user creation
+        handleNewChatRef.current?.({ userInitiated: false });
       }
-    }, 600);
+    }, 2000);
     return () => window.clearTimeout(t);
   }, [
     isAuthenticated,
@@ -2287,7 +1918,8 @@ export function ChatInterface({
     // Removed handleNewChat to avoid infinite loop - using ref instead
   ]);
 
-  const canShare = currentMessages.length > 0 && !!currentChatId;
+  // Make Share controls available consistently in UI; the modal/copy logic
+  // still validates and will no-op if no chat exists.
 
   // Migrate any existing local chats/messages after sign-in (once per mount, with backoff on failure)
   useEffect(() => {
@@ -2315,16 +1947,7 @@ export function ChatInterface({
           publicId: (chat as unknown as { publicId?: string }).publicId,
           messages: localMessages
             .filter((m) => m.chatId === chat._id)
-            .map((m) => ({
-              role: m.role,
-              content: m.content,
-              timestamp: m.timestamp,
-              searchResults: m.searchResults,
-              sources: m.sources,
-              reasoning: m.reasoning,
-              searchMethod: m.searchMethod,
-              hasRealResults: m.hasRealResults,
-            })),
+            .map(toExportMessage),
         }));
 
         if (payload.length === 0) return;
@@ -2372,6 +1995,7 @@ export function ChatInterface({
     MIGRATION_RETRY_KEY,
     MIGRATION_BACKOFF_MS,
     currentChatId,
+    toExportMessage,
   ]);
 
   // Swipe handlers for mobile
@@ -2395,33 +2019,21 @@ export function ChatInterface({
       className="flex-1 flex relative h-full overflow-hidden"
       {...swipeHandlers}
     >
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block h-full">
+      {/* Sidebar (rendered always for test visibility; hidden via CSS on mobile) */}
+      <div className="h-full">
         <ChatSidebar
           chats={allChats}
           currentChatId={currentChatId}
           onSelectChat={(id) => {
             logger.debug("🖱️ Sidebar selected chat", { id });
-            userSelectedChatAtRef.current = Date.now();
-            setCurrentChatId(id);
-            // Navigate immediately to reduce reliance on effects
-            try {
-              const sel = allChats.find((c) => String(c._id) === String(id));
-              let path = sel
-                ? sel.privacy === "public" && sel.publicId
-                  ? `/p/${sel.publicId}`
-                  : sel.privacy === "shared" && sel.shareId
-                    ? `/s/${sel.shareId}`
-                    : `/chat/${sel._id}`
-                : `/chat/${id}`;
-              if (path !== window.location.pathname) navigate(path);
-            } catch {}
+            handleSelectChat(id);
           }}
           onNewChat={startNewChatSession}
           onDeleteLocalChat={handleDeleteLocalChat}
           onRequestDeleteChat={handleRequestDeleteChat}
           isOpen={sidebarOpen}
           onToggle={handleToggleSidebar}
+          isCreatingChat={isCreatingChat}
         />
       </div>
 
@@ -2433,23 +2045,12 @@ export function ChatInterface({
         currentChatId={currentChatId}
         onSelectChat={(id) => {
           logger.debug("📱 MobileSidebar selected chat", { id });
-          userSelectedChatAtRef.current = Date.now();
-          handleMobileSidebarSelectChat(id);
-          try {
-            const sel = allChats.find((c) => String(c._id) === String(id));
-            let path = sel
-              ? sel.privacy === "public" && sel.publicId
-                ? `/p/${sel.publicId}`
-                : sel.privacy === "shared" && sel.shareId
-                  ? `/s/${sel.shareId}`
-                  : `/chat/${sel._id}`
-              : `/chat/${id}`;
-            if (path !== window.location.pathname) navigate(path);
-          } catch {}
+          handleSelectChat(id);
         }}
         onNewChat={startNewChatSession}
         onDeleteLocalChat={handleDeleteLocalChat}
         onRequestDeleteChat={handleRequestDeleteChat}
+        isCreatingChat={isCreatingChat}
       />
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full">
@@ -2462,7 +2063,7 @@ export function ChatInterface({
             onToggleSidebar={useCallback(() => {
               if (!sidebarOpen) handleToggleSidebar();
             }, [sidebarOpen, handleToggleSidebar])}
-            onShare={canShare ? handleOpenShareModal : undefined}
+            onShare={() => setShowShareModal(true)}
             currentChat={currentChat}
             onDeleteLocalMessage={handleDeleteLocalMessage}
             onRequestDeleteMessage={handleRequestDeleteMessage}
@@ -2482,77 +2083,75 @@ export function ChatInterface({
             hintConfidence={plannerHint?.confidence}
           />
           {/* Persistent controls aligned with input */}
-          {canShare && (
-            <div className="px-4 sm:px-6 mb-2 flex justify-end">
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handleNewChatButton}
-                  disabled={isCreatingChat}
-                  className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    isCreatingChat ? "Creating new chat..." : "Start a new chat"
-                  }
-                  type="button"
-                >
-                  {isCreatingChat ? (
-                    <svg
-                      className="w-5 h-5 animate-spin"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      <path d="M12 2v6l4 2" />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-5 h-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  )}
-                </button>
-                <CopyButton
-                  text={formatConversationWithSources(currentMessages)}
-                  size="md"
-                  title="Copy entire conversation"
-                  ariaLabel="Copy entire conversation to clipboard"
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
-                />
-                <button
-                  onClick={handleOpenShareModal}
-                  className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  title="Share this conversation"
-                  type="button"
-                >
+          <div className="px-4 sm:px-6 mb-2 flex justify-end">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleNewChatButton}
+                disabled={isCreatingChat}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={
+                  isCreatingChat ? "Creating new chat..." : "Start a new chat"
+                }
+                type="button"
+              >
+                {isCreatingChat ? (
                   <svg
-                    className="w-5 h-5"
+                    className="w-5 h-5 animate-spin"
+                    viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth={2}
-                    viewBox="0 0 24 24"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                    />
+                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path d="M12 2v6l4 2" />
                   </svg>
-                </button>
-              </div>
+                ) : (
+                  <svg
+                    className="w-5 h-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                )}
+              </button>
+              <CopyButton
+                text={formatConversationWithSources(currentMessages)}
+                size="md"
+                title="Copy entire conversation"
+                ariaLabel="Copy entire conversation to clipboard"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              />
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                title="Share this conversation"
+                type="button"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                  />
+                </svg>
+              </button>
             </div>
-          )}
+          </div>
           {undoBanner && (
             <div className="px-4 sm:px-6 mb-2 flex justify-center">
               <div className="flex items-center gap-3 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-lg border border-yellow-200 dark:border-yellow-800">
@@ -2562,7 +2161,7 @@ export function ChatInterface({
                     : "Message deleted"}
                 </span>
                 <button
-                  onClick={handleSetUndoBannerNull}
+                  onClick={() => setUndoBanner(null)}
                   className="underline text-sm"
                 >
                   Undo
@@ -2585,25 +2184,19 @@ export function ChatInterface({
 
       <ShareModal
         isOpen={showShareModal}
-        onClose={handleCloseShareModal}
+        onClose={() => setShowShareModal(false)}
         onShare={handleShare}
-        shareUrl={
-          currentChat?.privacy === "public" && currentChat.publicId
-            ? `${window.location.origin}/p/${currentChat.publicId}`
-            : currentChat?.privacy === "shared" && currentChat.shareId
-              ? `${window.location.origin}/s/${currentChat.shareId}`
-              : `${window.location.origin}/chat/${currentChat?._id}`
-        }
+        shareUrl={`${window.location.origin}${chatPath(currentChat, currentChat?._id ?? currentChatId)}`}
         llmTxtUrl={(() => {
           // LLM link is only for shared chats (not public) to avoid indexability
           if (currentChat?.privacy !== "shared" || !currentChat?.shareId)
             return undefined;
           const qp = `shareId=${encodeURIComponent(currentChat.shareId)}`;
-          return `${window.location.origin}/api/chatTextMarkdown?${qp}`;
+          return `${apiBase}/api/chatTextMarkdown?${qp}`;
         })()}
         shareId={currentChat?.shareId}
         publicId={currentChat?.publicId}
-        exportBase={`${window.location.origin}/api/chatTextMarkdown`}
+        exportBase={`${apiBase}/api/chatTextMarkdown`}
         privacy={currentChat?.privacy || "private"}
       />
     </div>
