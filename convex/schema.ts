@@ -49,7 +49,16 @@ const applicationTables = {
       v.literal("system"),
     ),
     content: v.optional(v.string()),
-    searchResults: v.optional(v.array(v.any())),
+    searchResults: v.optional(
+      v.array(
+        v.object({
+          title: v.string(),
+          url: v.string(),
+          snippet: v.string(),
+          relevanceScore: v.number(), // Required, not optional - consistent with most definitions
+        }),
+      ),
+    ),
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.any()),
     searchMethod: v.optional(
