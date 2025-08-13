@@ -5,7 +5,7 @@
 
 import { v } from "convex/values";
 import { action, internalAction, internalMutation } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { api } from "./_generated/api";
 
 // Import search providers
 import {

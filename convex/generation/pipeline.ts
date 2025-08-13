@@ -25,6 +25,7 @@ export const generateStreamingResponse = action({
   args: {
     chatId: v.id("chats"),
     message: v.string(),
+    isReplyToAssistant: v.optional(v.boolean()), // NEW: Track if replying to assistant
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -33,43 +34,23 @@ export const generateStreamingResponse = action({
     if (!trimmed) {
       return null;
     }
-    // 1. Add user message to chat
-    await ctx.runMutation(internal.messages.addMessage, {
-      chatId: args.chatId,
-      role: "user",
-      content: trimmed,
-    });
-
-    // Check if this is the first message and update title
-    const messageCount = await ctx.runMutation(
-      internal.messages.countMessages,
+    // Use transaction for atomic operations
+    const result = await ctx.runMutation(
+      internal.messages.addMessageWithTransaction,
       {
         chatId: args.chatId,
+        userMessage: trimmed,
+        isReplyToAssistant: args.isReplyToAssistant,
       },
     );
 
-    if (messageCount === 1) {
-      // First user message
-      // Generate title from user message (same logic as unauthenticated users)
-      const title =
-        trimmed.length > 50 ? `${trimmed.substring(0, 50)}...` : trimmed;
-
-      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-        chatId: args.chatId,
-        title,
-      });
+    if (!result.success || !result.assistantMessageId) {
+      throw new Error(
+        `Failed to add messages: ${result.error || "No assistant message ID returned"}`,
+      );
     }
 
-    // 2. Create a placeholder message for the assistant's response
-    const assistantMessageId = await ctx.runMutation(
-      internal.messages.addMessage,
-      {
-        chatId: args.chatId,
-        role: "assistant",
-        content: "",
-        isStreaming: true,
-      },
-    );
+    const assistantMessageId = result.assistantMessageId;
 
     // 3. Start the generation process without blocking
     try {
