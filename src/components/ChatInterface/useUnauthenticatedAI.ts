@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useRef, useEffect } from "react";
+import { logger } from "../../lib/logger";
 import type { ChatActions, ChatState } from "../../hooks/types";
 import type { UnauthenticatedAIService } from "../../lib/services/UnauthenticatedAIService";
 
@@ -86,7 +87,7 @@ export function useUnauthenticatedAI({
         });
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
-        console.error("AI generation failed:", error);
+        logger.error("AI generation failed:", error);
       }
     },
     [chatState.messages, chatActions, aiService],

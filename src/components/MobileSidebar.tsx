@@ -6,6 +6,7 @@ import React, { Fragment, useRef } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
+import { logger } from "../lib/logger";
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -35,7 +36,7 @@ export function MobileSidebar({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const handleNewChat = React.useCallback(() => {
-    console.info("🖱️ New Chat button clicked in MobileSidebar");
+    logger.info("🖱️ New Chat button clicked in MobileSidebar");
     onNewChat();
     onClose();
   }, [onNewChat, onClose]);
@@ -92,7 +93,7 @@ export function MobileSidebar({
         }
       } catch (err) {
         if ((import.meta as unknown as { env?: { DEV?: boolean } })?.env?.DEV) {
-          console.warn("Chat deletion failed:", err);
+          logger.warn("Chat deletion failed:", err);
         }
       }
     },

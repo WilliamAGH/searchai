@@ -1,30 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { storageService, StorageKey } from "../lib/services/StorageService";
 
 /**
- * LocalStorage hook with debounced persistence.
+ * LocalStorage hook with debounced persistence using centralized StorageService.
+ *
+ * This is the v2 implementation that uses the centralized storage service
+ * to ensure consistent error handling and key management.
  *
  * Rationale:
  * - Streaming token updates were triggering dozens of writes/second, which are synchronous
  *   and can freeze/crash Safari on iOS. We debounce writes to reduce contention.
  * - Uses functional state updates to avoid stale-closure bugs when callers pass updater funcs.
+ * - Uses centralized StorageService for consistent error handling
  */
 export function useLocalStorage<T>(
-  key: string,
+  key: StorageKey,
   initialValue: T,
   options: { debounceMs?: number } = {},
 ): [T, (value: T | ((prev: T) => T)) => void] {
   const { debounceMs = 500 } = options; // Lower write frequency during streams
 
   const [storedValue, setStoredValue] = useState<T>(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? (JSON.parse(item) as T) : initialValue;
-    } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { logger } = require("../lib/logger");
-      logger.error(`Error reading localStorage key "${key}":`, error);
-      return initialValue;
-    }
+    const item = storageService.get<T>(key);
+    return item !== null ? item : initialValue;
   });
 
   // Track latest state for debounced persistence
@@ -36,13 +34,7 @@ export function useLocalStorage<T>(
   }, [storedValue]);
 
   const persist = useCallback(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(latestRef.current));
-    } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { logger } = require("../lib/logger");
-      logger.error(`Error setting localStorage key "${key}":`, error);
-    }
+    storageService.set(key, latestRef.current);
   }, [key]);
 
   const schedulePersist = () => {

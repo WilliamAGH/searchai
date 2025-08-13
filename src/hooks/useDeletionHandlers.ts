@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { logger } from "../lib/logger";
 import type { Id } from "../../convex/_generated/dataModel";
 
 interface UseDeletionHandlersProps {
@@ -103,7 +104,7 @@ export function useDeletionHandlers({
         }, 3000);
         timeoutsRef.current.push(timeoutId);
       } catch (error) {
-        console.error("Failed to delete chat:", error);
+        logger.error("Failed to delete chat:", error);
         setUndoBanner({
           show: true,
           message: "Failed to delete chat",
@@ -166,7 +167,7 @@ export function useDeletionHandlers({
         }, 3000);
         timeoutsRef.current.push(timeoutId);
       } catch (error) {
-        console.error("Failed to delete message:", error);
+        logger.error("Failed to delete message:", error);
         setUndoBanner({
           show: true,
           message: "Failed to delete message",

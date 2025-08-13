@@ -53,16 +53,16 @@ export default defineConfig({
       },
     },
   ],
-  webServer: process.env.CI
-    ? undefined // In CI, servers should already be running
-    : [
-        {
-          command: "npm run dev:frontend",
-          port: 5173,
-          timeout: 120_000,
-          reuseExistingServer: true,
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      ],
+  webServer: [
+    {
+      command: process.env.CI
+        ? "vite preview --strictPort --port 5173"
+        : "npm run dev:frontend",
+      port: 5173,
+      timeout: 120_000,
+      reuseExistingServer: true,
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  ],
 });

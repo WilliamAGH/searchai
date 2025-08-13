@@ -67,7 +67,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           await updatePrefs({ theme: newTheme });
         } catch (error) {
           // Log error if it occurs for authenticated users
-          console.error("Failed to save theme preference:", error);
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { logger } = require("../lib/logger");
+          logger.error("Failed to save theme preference:", error);
         }
       }
     },

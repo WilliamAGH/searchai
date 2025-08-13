@@ -31,8 +31,7 @@ export class ErrorBoundary extends Component<Props, State> {
       stack: error.stack,
       componentStack: errorInfo.componentStack,
     });
-
-    console.error("Error caught by boundary:", error, errorInfo);
+    logger.error("Error caught by boundary:", error, errorInfo);
 
     // Call custom error handler if provided
     if (this.props.onError) {

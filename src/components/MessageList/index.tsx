@@ -87,7 +87,7 @@ export function MessageList({
           }
         }
       } catch (err) {
-        console.error("Failed to delete message", err);
+        logger.error("Failed to delete message", err);
       }
     },
     [onRequestDeleteMessage, onDeleteLocalMessage, deleteMessage],

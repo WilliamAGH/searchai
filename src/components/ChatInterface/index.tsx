@@ -23,6 +23,7 @@ import { useConvexQueries } from "../../hooks/useConvexQueries";
 import { useSidebarTiming } from "../../hooks/useSidebarTiming";
 import { useServices } from "../../hooks/useServices";
 import { useUnauthenticatedAI } from "./useUnauthenticatedAI";
+import { logger } from "../../lib/logger";
 import { ChatLayout } from "./ChatLayout";
 import type { Chat } from "../../lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "../../lib/constants/topicDetection";
@@ -204,7 +205,7 @@ export function ChatInterface({
           return chat.id;
         }
       } catch (error) {
-        console.error("Failed to create chat:", error);
+        logger.error("Failed to create chat:", error);
       }
       setIsCreatingChat(false);
       return null;

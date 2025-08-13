@@ -61,7 +61,7 @@ export class LocalChatRepository extends BaseRepository {
           }) as UnifiedChat,
       );
     } catch (error) {
-      console.error("Failed to load chats from localStorage:", error);
+      logger.error("Failed to load chats from localStorage:", error);
       return [];
     }
   }

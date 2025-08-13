@@ -67,8 +67,11 @@ export function ChatSidebar({
           onSelectChat(null);
         }
       } catch (err) {
+        // Only log warnings in dev to avoid noise in production
         if (import.meta.env.DEV) {
-          console.warn("Chat deletion failed:", err);
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { logger } = require("../lib/logger");
+          logger.warn("Chat deletion failed:", err);
         }
       }
     },

@@ -34,6 +34,7 @@ import { mapMessagesToLocal } from "../lib/utils/messageMapper";
 import { buildUserHistory } from "../lib/utils/chatHistory";
 import { ChatSidebar } from "./ChatSidebar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
+import { logger } from "../lib/logger";
 import { MessageInput } from "./MessageInput";
 import { MessageList } from "./MessageList";
 import { MobileSidebar } from "./MobileSidebar";
@@ -209,7 +210,7 @@ export function ChatInterface({
           return chat.id;
         }
       } catch (error) {
-        console.error("Failed to create chat:", error);
+        logger.error("Failed to create chat:", error);
       }
       setIsCreatingChat(false);
       return null;
@@ -283,7 +284,7 @@ export function ChatInterface({
         });
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
-        console.error("AI generation failed:", error);
+        logger.error("AI generation failed:", error);
       }
     },
     [chatState.messages, chatActions, aiService],

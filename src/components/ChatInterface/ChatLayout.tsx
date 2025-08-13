@@ -14,6 +14,11 @@ import { ShareModalContainer } from "../ShareModalContainer";
 import type { Chat } from "../../lib/types/chat";
 import type { ChatState, ChatActions } from "../../hooks/types";
 
+type ChatSidebarProps = React.ComponentProps<typeof ChatSidebar>;
+type MobileSidebarProps = React.ComponentProps<typeof MobileSidebar>;
+type MessageListProps = React.ComponentProps<typeof MessageList>;
+type MessageInputProps = React.ComponentProps<typeof MessageInput>;
+
 interface ChatLayoutProps {
   // Layout state
   sidebarOpen: boolean;
@@ -36,15 +41,17 @@ interface ChatLayoutProps {
   };
 
   // Component props
-  chatSidebarProps: unknown;
-  mobileSidebarProps: unknown;
-  messageListProps: unknown;
-  messageInputProps: unknown;
-  swipeHandlers: unknown;
+  chatSidebarProps: ChatSidebarProps;
+  mobileSidebarProps: MobileSidebarProps;
+  messageListProps: MessageListProps;
+  messageInputProps: MessageInputProps;
+  swipeHandlers: Record<string, unknown>;
 
   // Callbacks
   setShowShareModal: (show: boolean) => void;
-  setUndoBanner: (banner: unknown) => void;
+  setUndoBanner: (
+    banner: { message: string; action?: () => void } | null,
+  ) => void;
   openShareModal: () => void;
   handleContinueChat: () => void;
   handleNewChatForFollowUp: () => void;
@@ -55,11 +62,14 @@ interface ChatLayoutProps {
   chatActions: ChatActions;
 
   // API functions
-  updateChatPrivacy: unknown;
-  navigateWithVerification: unknown;
-  buildChatPath: unknown;
-  fetchJsonWithRetry: unknown;
-  resolveApi: unknown;
+  updateChatPrivacy: (args: {
+    chatId: string;
+    privacy: "private" | "shared" | "public";
+  }) => Promise<void>;
+  navigateWithVerification: (path: string) => Promise<void>;
+  buildChatPath: (chatId: string) => string;
+  fetchJsonWithRetry: <T>(url: string, init?: RequestInit) => Promise<T>;
+  resolveApi: (path: string) => string;
 }
 
 export function ChatLayout({

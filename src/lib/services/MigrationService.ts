@@ -12,8 +12,9 @@ import {
   parseLocalChats,
   parseLocalMessages,
 } from "../validation/localStorage";
+import { logger } from "../logger";
+import { storageService, STORAGE_KEYS } from "./StorageService";
 
-const MIGRATION_KEY = "searchai_migration_status";
 const MIGRATION_ARCHIVE_PREFIX = "searchai_archive_";
 
 export interface MigrationStatus {
@@ -41,12 +42,14 @@ export class MigrationService {
    */
   private getMigrationStatus(): MigrationStatus {
     try {
-      const stored = localStorage.getItem(MIGRATION_KEY);
+      const stored = storageService.get<MigrationStatus>(
+        STORAGE_KEYS.MIGRATION_VERSION,
+      );
       if (stored) {
-        return JSON.parse(stored);
+        return stored;
       }
     } catch (error) {
-      console.error("Failed to load migration status:", error);
+      logger.error("Failed to load migration status:", error);
     }
 
     return {
@@ -61,9 +64,9 @@ export class MigrationService {
    */
   private saveMigrationStatus(status: MigrationStatus): void {
     try {
-      localStorage.setItem(MIGRATION_KEY, JSON.stringify(status));
+      storageService.set(STORAGE_KEYS.MIGRATION_VERSION, status);
     } catch (error) {
-      console.error("Failed to save migration status:", error);
+      logger.error("Failed to save migration status:", error);
     }
   }
 
@@ -76,6 +79,7 @@ export class MigrationService {
 
     try {
       // Archive chats
+      // Note: Using raw localStorage for archive keys as they're dynamic
       localStorage.setItem(
         `${MIGRATION_ARCHIVE_PREFIX}chats_${timestamp}`,
         JSON.stringify(chats),
@@ -87,11 +91,11 @@ export class MigrationService {
         JSON.stringify(messages),
       );
 
-      console.info(
+      logger.info(
         `Archived ${chats.length} chats and ${messages.length} messages`,
       );
     } catch (error) {
-      console.error("Failed to archive local data:", error);
+      logger.error("Failed to archive local data:", error);
       throw new Error("Failed to archive data before migration");
     }
   }
@@ -101,6 +105,7 @@ export class MigrationService {
    */
   private async restoreFromArchive(timestamp: number): Promise<void> {
     try {
+      // Note: Using raw localStorage for archive keys as they're dynamic
       const chatsStr = localStorage.getItem(
         `${MIGRATION_ARCHIVE_PREFIX}chats_${timestamp}`,
       );
@@ -113,10 +118,10 @@ export class MigrationService {
         const messages = parseLocalMessages(messagesStr);
 
         await this.localRepo.importData({ chats, messages });
-        console.info("Restored data from archive");
+        logger.info("Restored data from archive");
       }
     } catch (error) {
-      console.error("Failed to restore from archive:", error);
+      logger.error("Failed to restore from archive:", error);
     }
   }
 
@@ -205,11 +210,11 @@ export class MigrationService {
 
               // For now, we skip message migration as it requires backend changes
               // In a full implementation, we'd have an importMessage mutation
-              console.info(
+              logger.info(
                 `Would migrate message ${message.id} to chat ${convexChat.id}`,
               );
             } catch (msgError) {
-              console.error(
+              logger.error(
                 `Failed to migrate message ${message.id}:`,
                 msgError,
               );
@@ -224,7 +229,7 @@ export class MigrationService {
           // Save progress after each successful chat migration
           this.saveMigrationStatus(status);
         } catch (chatError) {
-          console.error(`Failed to migrate chat ${chat.id}:`, chatError);
+          logger.error(`Failed to migrate chat ${chat.id}:`, chatError);
           errors.push(
             `Chat ${chat.title}: ${chatError instanceof Error ? chatError.message : "Unknown error"}`,
           );
@@ -257,7 +262,7 @@ export class MigrationService {
       };
     } catch (error) {
       // Critical failure - restore from archive
-      console.error("Critical migration failure:", error);
+      logger.error("Critical migration failure:", error);
       await this.restoreFromArchive(archiveTimestamp);
 
       status.failedAttempts++;

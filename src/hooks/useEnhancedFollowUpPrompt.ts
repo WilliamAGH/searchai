@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { logger } from "../lib/logger";
 
 interface UseEnhancedFollowUpPromptProps {
   isAuthenticated: boolean;
@@ -105,7 +106,7 @@ export function useEnhancedFollowUpPrompt({
           });
           setPlannerHint(summary);
         } catch (error) {
-          console.error("Failed to summarize recent chat:", error);
+          logger.error("Failed to summarize recent chat:", error);
         }
       }
 

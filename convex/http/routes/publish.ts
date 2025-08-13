@@ -239,7 +239,8 @@ export function registerPublishRoutes(http: HttpRouter) {
       }
 
       // Validate format
-      type Fmt = "json" | "markdown" | "html" | "txt";
+      const validFormats = ["json", "markdown", "html", "txt"] as const;
+      type Fmt = (typeof validFormats)[number];
       let baseFormat: Fmt = "json";
       if (formatParam) {
         const fmt = formatParam.toLowerCase();

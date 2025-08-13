@@ -31,7 +31,9 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       textArea.remove();
     }
   } catch (error) {
-    console.error("Failed to copy text:", error);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { logger } = require("./logger");
+    logger.error("Failed to copy text:", error);
     return false;
   }
 }
