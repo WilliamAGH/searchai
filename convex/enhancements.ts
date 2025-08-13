@@ -15,25 +15,31 @@ import type { SearchResult } from "./search/providers/serpapi";
 
 // Extract URLs and domains from user message
 export function extractUrlsFromMessage(message: string): string[] {
-  // Regex to match URLs and domains
+  // Regex to match:
+  // 1) http/https URLs up to whitespace or closing paren
+  // 2) www.* domains
+  // 3) bare domains with TLDs, allowing subdomains
   const urlRegex =
-    /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,})/g;
+    /(https?:\/\/[\w\-._~:/?#[\]@!$&'()*+,;=%]+)|(www\.[^\s)]+)|\b([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?=\/|\b)/g;
   const matches = message.match(urlRegex) || [];
 
-  // Convert all matches to proper URLs
   const urls: string[] = [];
-  for (const match of matches) {
-    if (match.startsWith("http")) {
-      urls.push(match);
-    } else if (match.startsWith("www.")) {
-      urls.push(`https://${match}`);
+  for (let raw of matches) {
+    // Strip surrounding quotes and trailing punctuation/parentheses
+    raw = raw.replace(/^['"(]+/, "").replace(/[)\].,!?]+$/, "");
+
+    if (raw.startsWith("http")) {
+      urls.push(raw);
+    } else if (raw.startsWith("www.")) {
+      urls.push(`https://${raw}`);
     } else {
-      // For domains, create a search URL
-      urls.push(`https://${match}`);
+      urls.push(`https://${raw}`);
     }
   }
 
-  return [...new Set(urls)]; // Deduplicate
+  // Deduplicate and normalize
+  const deduped = Array.from(new Set(urls));
+  return deduped;
 }
 
 // Create search results from user-provided URLs
