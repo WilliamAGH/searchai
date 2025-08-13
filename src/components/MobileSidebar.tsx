@@ -1,4 +1,4 @@
-/* eslint-disable react-perf/jsx-no-new-function-as-prop */
+// Refactored to use stable callbacks; no inline function props
 
 import { Dialog, Transition } from "@headlessui/react";
 import { useMutation } from "convex/react";
@@ -48,6 +48,32 @@ export function MobileSidebar({
     [onSelectChat, onClose],
   );
 
+  const handleOverlayKeyDown = React.useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === "Escape") onClose();
+    },
+    [onClose],
+  );
+
+  const handleSelectChatFromBtn = React.useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const id = e.currentTarget.getAttribute("data-chat-id");
+      if (!id) return;
+      handleSelectChat(id);
+    },
+    [handleSelectChat],
+  );
+
+  const handleDeleteChatFromBtn = React.useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const id = e.currentTarget.getAttribute("data-chat-id");
+      const isCurrent = e.currentTarget.getAttribute("data-current") === "1";
+      if (!id) return;
+      void handleDeleteChat(id, isCurrent);
+    },
+    [handleDeleteChat],
+  );
+
   const handleDeleteChat = React.useCallback(
     async (chatId: Id<"chats"> | string, isCurrentChat: boolean) => {
       try {
@@ -93,9 +119,7 @@ export function MobileSidebar({
           <button
             className="fixed inset-0 bg-gray-900/80"
             onClick={onClose}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") onClose();
-            }}
+            onKeyDown={handleOverlayKeyDown}
             type="button"
             aria-label="Close sidebar overlay"
           />
@@ -239,7 +263,8 @@ export function MobileSidebar({
                           >
                             <button
                               type="button"
-                              onClick={() => handleSelectChat(chat._id)}
+                              data-chat-id={String(chat._id)}
+                              onClick={handleSelectChatFromBtn}
                               className={`flex-1 min-w-0 px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
                                 currentChatId === chat._id
                                   ? "bg-gray-100 dark:bg-gray-800"
@@ -264,12 +289,11 @@ export function MobileSidebar({
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                handleDeleteChat(
-                                  chat._id,
-                                  currentChatId === chat._id,
-                                )
+                              data-chat-id={String(chat._id)}
+                              data-current={
+                                currentChatId === chat._id ? "1" : "0"
                               }
+                              onClick={handleDeleteChatFromBtn}
                               className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
                               title="Delete chat"
                               aria-label="Delete chat"

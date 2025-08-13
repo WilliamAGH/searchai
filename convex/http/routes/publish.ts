@@ -7,22 +7,36 @@
 import { httpAction } from "../../_generated/server";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
-import { corsResponse, escapeHtml, formatConversationMarkdown } from "../utils";
+import { escapeHtml, formatConversationMarkdown } from "../utils";
 
 /**
  * Register publish and export routes on the HTTP router
  */
 export function registerPublishRoutes(http: HttpRouter) {
+  // Helper: determine allowed origin (env-driven; defaults to *)
+  const getAllowedOrigin = (origin: string | null): string => {
+    const allowed = process.env.CONVEX_ALLOWED_ORIGINS;
+    if (!allowed || allowed === "*") return "*";
+    const list = allowed
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!origin) return list[0] || "*";
+    return list.includes(origin) ? origin : list[0] || "*";
+  };
+
   // CORS preflight for /api/publishChat
   http.route({
     path: "/api/publishChat",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
       const requested = request.headers.get("Access-Control-Request-Headers");
+      const origin = request.headers.get("Origin");
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": allowOrigin,
           "Access-Control-Allow-Methods": "POST, OPTIONS",
           "Access-Control-Allow-Headers": requested || "Content-Type",
           "Access-Control-Max-Age": "600",
@@ -37,22 +51,86 @@ export function registerPublishRoutes(http: HttpRouter) {
     path: "/api/publishChat",
     method: "POST",
     handler: httpAction(async (ctx, request): Promise<Response> => {
-      let payload: any;
-      try {
-        payload = await request.json();
-      } catch {
-        return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
-          400,
-        );
+      interface PublishPayloadMessage {
+        role: "user" | "assistant";
+        content?: string;
+        searchResults?: Array<{
+          title: string;
+          url: string;
+          snippet: string;
+          relevanceScore: number;
+        }>;
+        sources?: string[];
+        timestamp?: number;
       }
-      const title = String(payload?.title || "Shared Chat");
-      const privacy = payload?.privacy === "public" ? "public" : "shared";
-      const shareId =
-        typeof payload?.shareId === "string" ? payload.shareId : undefined;
-      const publicId =
-        typeof payload?.publicId === "string" ? payload.publicId : undefined;
-      const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+      // Keep local payload shape inline in parsing logic to avoid unused type warnings
+      type PublishPayload = {
+        title?: string;
+        privacy?: string;
+        shareId?: string;
+        publicId?: string;
+        messages?: PublishPayloadMessage[];
+      };
+
+      let rawPayload: unknown;
+      try {
+        rawPayload = await request.json();
+      } catch {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": allowOrigin,
+          },
+        });
+      }
+
+      // Validate basic structure and extract payload
+      const payload = rawPayload as PublishPayload;
+
+      // Business logic validation
+      const title = (payload.title || "Shared Chat").trim().slice(0, 200);
+      const privacy = payload.privacy === "public" ? "public" : "shared";
+      const shareId = payload.shareId
+        ? String(payload.shareId).slice(0, 100)
+        : undefined;
+      const publicId = payload.publicId
+        ? String(payload.publicId).slice(0, 100)
+        : undefined;
+
+      // Validate and normalize messages
+      const messages = Array.isArray(payload.messages)
+        ? payload.messages.slice(0, 100).map((m: any) => ({
+            role:
+              m.role === "user" || m.role === "assistant"
+                ? m.role
+                : "assistant",
+            content: m.content ? String(m.content).slice(0, 50000) : undefined,
+            searchResults: Array.isArray(m.searchResults)
+              ? m.searchResults.slice(0, 20).map((r: any) => ({
+                  title: String(r.title || "").slice(0, 200),
+                  url: String(r.url || "").slice(0, 2048),
+                  snippet: String(r.snippet || "").slice(0, 500),
+                  relevanceScore:
+                    typeof r.relevanceScore === "number"
+                      ? Math.max(0, Math.min(1, r.relevanceScore))
+                      : 0.5,
+                }))
+              : undefined,
+            sources: Array.isArray(m.sources)
+              ? m.sources
+                  .slice(0, 20)
+                  .filter((s: any) => typeof s === "string")
+                  .map((s: any) => String(s).slice(0, 2048))
+              : undefined,
+            timestamp:
+              typeof m.timestamp === "number" && isFinite(m.timestamp)
+                ? Math.floor(m.timestamp)
+                : undefined,
+          }))
+        : [];
 
       try {
         // Work around TS2589: Known Convex limitation with complex type inference
@@ -64,7 +142,8 @@ export function registerPublishRoutes(http: HttpRouter) {
           publicId,
           messages,
         });
-        const origin = request.headers.get("Origin") || "";
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
         const baseUrl = origin || process.env.SITE_URL || "";
         const shareUrl = `${baseUrl}/s/${result.shareId}`;
         const publicUrl = `${baseUrl}/p/${result.publicId}`;
@@ -83,14 +162,22 @@ export function registerPublishRoutes(http: HttpRouter) {
             status: 200,
             headers: {
               "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Origin": allowOrigin,
             },
           },
         );
       } catch (e: any) {
-        return corsResponse(
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
+        return new Response(
           JSON.stringify({ error: String(e?.message || e) }),
-          500,
+          {
+            status: 500,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": allowOrigin,
+            },
+          },
         );
       }
     }),
@@ -102,10 +189,12 @@ export function registerPublishRoutes(http: HttpRouter) {
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
       const requested = request.headers.get("Access-Control-Request-Headers");
+      const origin = request.headers.get("Origin");
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": allowOrigin,
           "Access-Control-Allow-Methods": "GET, OPTIONS",
           "Access-Control-Allow-Headers": requested || "Content-Type",
           "Access-Control-Max-Age": "600",
@@ -121,22 +210,42 @@ export function registerPublishRoutes(http: HttpRouter) {
     method: "GET",
     handler: httpAction(async (ctx, request): Promise<Response> => {
       const url = new URL(request.url);
-      const shareId = url.searchParams.get("shareId");
-      const publicId = url.searchParams.get("publicId");
-      const explicitFormat = url.searchParams.get("format");
+      const shareIdParam = url.searchParams.get("shareId");
+      const publicIdParam = url.searchParams.get("publicId");
+      const formatParam = url.searchParams.get("format");
       const accept = (request.headers.get("Accept") || "").toLowerCase();
 
+      // Validate parameters
+      const shareId = shareIdParam
+        ? String(shareIdParam).trim().slice(0, 100)
+        : undefined;
+      const publicId = publicIdParam
+        ? String(publicIdParam).trim().slice(0, 100)
+        : undefined;
+
       if (!shareId && !publicId) {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: "Missing shareId or publicId" }),
           {
             status: 400,
             headers: {
               "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Origin": allowOrigin,
             },
           },
         );
+      }
+
+      // Validate format
+      type Fmt = "json" | "markdown" | "html" | "txt";
+      let baseFormat: Fmt = "json";
+      if (formatParam) {
+        const fmt = formatParam.toLowerCase();
+        if (fmt === "markdown" || fmt === "md") baseFormat = "markdown";
+        else if (fmt === "html") baseFormat = "html";
+        else if (fmt === "txt" || fmt === "text") baseFormat = "txt";
       }
 
       // Resolve chat by shareId/publicId
@@ -147,13 +256,15 @@ export function registerPublishRoutes(http: HttpRouter) {
           });
 
       if (!chat) {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: "Chat not found or not accessible" }),
           {
             status: 404,
             headers: {
               "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Origin": allowOrigin,
             },
           },
         );
@@ -183,21 +294,20 @@ export function registerPublishRoutes(http: HttpRouter) {
         sources: Array.isArray(m.sources) ? m.sources : undefined,
       }));
 
-      // Decide format
-      type Fmt = "json" | "markdown" | "html" | "txt";
-      let fmt: Fmt = "json";
-      if (explicitFormat === "markdown" || explicitFormat === "md")
-        fmt = "markdown";
-      else if (explicitFormat === "html") fmt = "html";
-      else if (explicitFormat === "txt" || explicitFormat === "text")
-        fmt = "txt";
-      else if (explicitFormat === "json") fmt = "json";
-      else if (
-        accept.includes("text/markdown") ||
-        accept.includes("application/markdown")
-      )
-        fmt = "markdown";
-      else if (accept.includes("text/html")) fmt = "html";
+      // Decide format (baseFormat from validation, or from Accept header)
+      let fmt = baseFormat;
+
+      // If no explicit format, check Accept header
+      if (baseFormat === "json") {
+        if (
+          accept.includes("text/markdown") ||
+          accept.includes("application/markdown")
+        ) {
+          fmt = "markdown";
+        } else if (accept.includes("text/html")) {
+          fmt = "html";
+        }
+      }
 
       const robots =
         exportedChat.privacy === "public"
@@ -209,11 +319,13 @@ export function registerPublishRoutes(http: HttpRouter) {
           chat: exportedChat,
           messages: exportedMessages,
         });
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(body, {
           status: 200,
           headers: {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": allowOrigin,
             "X-Robots-Tag": robots,
             Vary: "Accept, Origin",
             "Cache-Control":
@@ -230,11 +342,13 @@ export function registerPublishRoutes(http: HttpRouter) {
       });
 
       if (fmt === "txt") {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(md, {
           status: 200,
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": allowOrigin,
             "X-Robots-Tag": robots,
             Vary: "Accept, Origin",
             "Cache-Control":
@@ -246,11 +360,13 @@ export function registerPublishRoutes(http: HttpRouter) {
       }
 
       if (fmt === "markdown") {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(md, {
           status: 200,
           headers: {
             "Content-Type": "text/markdown; charset=utf-8",
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": allowOrigin,
             "X-Robots-Tag": robots,
             Vary: "Accept, Origin",
             "Cache-Control":
@@ -285,11 +401,13 @@ export function registerPublishRoutes(http: HttpRouter) {
   </body>
 </html>`;
 
+      const origin = request.headers.get("Origin");
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(html, {
         status: 200,
         headers: {
           "Content-Type": "text/html; charset=utf-8",
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": allowOrigin,
           "X-Robots-Tag": robots,
           Vary: "Accept, Origin",
           "Cache-Control":
@@ -326,16 +444,27 @@ export function registerPublishRoutes(http: HttpRouter) {
     method: "GET",
     handler: httpAction(async (ctx, request): Promise<Response> => {
       const url = new URL(request.url);
-      const shareId = url.searchParams.get("shareId");
-      const publicId = url.searchParams.get("publicId");
+      const shareIdParam = url.searchParams.get("shareId");
+      const publicIdParam = url.searchParams.get("publicId");
+
+      // Validate parameters
+      const shareId = shareIdParam
+        ? String(shareIdParam).trim().slice(0, 100)
+        : undefined;
+      const publicId = publicIdParam
+        ? String(publicIdParam).trim().slice(0, 100)
+        : undefined;
+
       if (!shareId && !publicId) {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: "Missing shareId or publicId" }),
           {
             status: 400,
             headers: {
               "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Origin": allowOrigin,
             },
           },
         );
@@ -346,13 +475,15 @@ export function registerPublishRoutes(http: HttpRouter) {
             publicId: publicId!,
           });
       if (!chat) {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: "Chat not found or not accessible" }),
           {
             status: 404,
             headers: {
               "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Origin": allowOrigin,
             },
           },
         );
@@ -381,11 +512,13 @@ export function registerPublishRoutes(http: HttpRouter) {
         exportedChat.privacy === "public"
           ? "index, follow"
           : "noindex, nofollow";
+      const origin = request.headers.get("Origin");
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(md, {
         status: 200,
         headers: {
           "Content-Type": "text/plain; charset=utf-8",
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": allowOrigin,
           "X-Robots-Tag": robots,
           Vary: "Accept, Origin",
           "Cache-Control":

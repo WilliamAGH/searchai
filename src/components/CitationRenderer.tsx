@@ -1,4 +1,4 @@
-/* eslint-disable react-perf/jsx-no-new-function-as-prop */
+// Refactored to use stable callbacks and props
 /**
  * Interactive citation rendering component
  * - Converts [domain.com] citations to clickable links
@@ -44,9 +44,20 @@ const CitationLink: React.FC<{
   domain: string;
   url: string;
   isHighlighted: boolean;
-  onHover: (hovering: boolean) => void;
-}> = ({ domain, url, isHighlighted, onHover }) => {
+  onHoverUrl: (url: string | null) => void;
+}> = ({ domain, url, isHighlighted, onHoverUrl }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const handleEnter = React.useCallback(() => {
+    setIsHovered(true);
+    onHoverUrl(url);
+  }, [onHoverUrl, url]);
+  const handleLeave = React.useCallback(() => {
+    setIsHovered(false);
+    onHoverUrl(null);
+  }, [onHoverUrl]);
+  const handleClick = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
 
   return (
     <a
@@ -64,17 +75,9 @@ const CitationLink: React.FC<{
               : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
         }
       `}
-      onMouseEnter={() => {
-        setIsHovered(true);
-        onHover(true);
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        onHover(false);
-      }}
-      onClick={(e) => {
-        e.stopPropagation(); // Prevent event bubbling
-      }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      onClick={handleClick}
     >
       <span>{domain}</span>
       {(isHovered || isHighlighted) && (
@@ -125,6 +128,9 @@ export function CitationRenderer({
   }, [searchResults]);
 
   // Process content to replace citations with interactive links
+  const noop = React.useCallback(() => {}, []);
+  const hoverHandler = onCitationHover ?? noop;
+
   useEffect(() => {
     // Regular expression to match [domain.com] or [full URL] patterns
     const citationRegex = /\[([^\]]+)\]/g;
@@ -193,11 +199,7 @@ export function CitationRenderer({
             domain={citedDomain}
             url={matchedUrl}
             isHighlighted={isHighlighted}
-            onHover={(hovering) => {
-              if (onCitationHover) {
-                onCitationHover(hovering ? matchedUrl : null);
-              }
-            }}
+            onHoverUrl={hoverHandler}
           />,
         );
       } else {
@@ -228,13 +230,7 @@ export function CitationRenderer({
     }
 
     setProcessedContent(parts);
-  }, [
-    content,
-    searchResults,
-    hoveredSourceUrl,
-    domainToUrlMap,
-    onCitationHover,
-  ]);
+  }, [content, searchResults, hoveredSourceUrl, domainToUrlMap, hoverHandler]);
 
   return <>{processedContent}</>;
 }

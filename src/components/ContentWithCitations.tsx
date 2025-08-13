@@ -1,4 +1,4 @@
-/* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
+// Refactored to use memoized plugins and components; no inline arrays/objects
 /**
  * Adds interactive citations without DOM mutation
  * - Converts [domain.com] patterns to markdown links when domain maps to a source URL
@@ -7,10 +7,11 @@
  */
 
 import React, { useRef } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeSanitize from "rehype-sanitize";
+import type { PluggableList } from "unified";
 import { defaultSchema } from "hast-util-sanitize";
 import type { Schema } from "hast-util-sanitize";
 
@@ -128,82 +129,105 @@ export function ContentWithCitations({
     });
   }, [content, domainToUrlMap, searchResults]);
 
-  // Custom sanitize schema
-  const sanitizeSchema: Schema = {
-    ...defaultSchema,
-    tagNames: [
-      ...(defaultSchema.tagNames ?? []),
-      "u",
-      "table",
-      "thead",
-      "tbody",
-      "tr",
-      "th",
-      "td",
-      "blockquote",
-      "hr",
-      "strong",
-      "em",
-      "del",
-      "br",
-      "p",
-      "ul",
-      "ol",
-      "li",
-      "pre",
-      "code",
-      "h1",
-      "h2",
-      "h3",
-      "h4",
-      "h5",
-      "h6",
-    ],
-    attributes: {
-      ...defaultSchema.attributes,
-      a: ["href", "target", "rel"],
-      code: ["className"],
+  // Custom sanitize schema (stable)
+  const sanitizeSchema: Schema = React.useMemo(
+    () => ({
+      ...defaultSchema,
+      tagNames: [
+        ...(defaultSchema.tagNames ?? []),
+        "u",
+        "table",
+        "thead",
+        "tbody",
+        "tr",
+        "th",
+        "td",
+        "blockquote",
+        "hr",
+        "strong",
+        "em",
+        "del",
+        "br",
+        "p",
+        "ul",
+        "ol",
+        "li",
+        "pre",
+        "code",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+      ],
+      attributes: {
+        ...defaultSchema.attributes,
+        a: ["href", "target", "rel"],
+        code: ["className"],
+      },
+    }),
+    [],
+  );
+
+  const remarkPlugins: PluggableList = React.useMemo(
+    () => [remarkGfm, remarkBreaks],
+    [],
+  );
+  const rehypePlugins: PluggableList = React.useMemo(
+    () => [[rehypeSanitize, sanitizeSchema]],
+    [sanitizeSchema],
+  );
+
+  const anchorRenderer: NonNullable<Components["a"]> = React.useCallback(
+    ({ href, children, ...props }) => {
+      const url = String(href || "");
+      const isCitation = url && [...domainToUrlMap.values()].includes(url);
+      const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
+      const baseClass =
+        "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md font-medium no-underline align-baseline transition-colors";
+      const normalClass =
+        "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[15px] sm:text-base hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300";
+      const hiClass =
+        "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600 text-[15px] sm:text-base";
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-citation-url={isCitation ? url : undefined}
+          className={`${baseClass} ${highlighted ? hiClass : normalClass}`}
+          onMouseEnter={() => isCitation && onCitationHover?.(url)}
+          onMouseLeave={() => isCitation && onCitationHover?.(null)}
+          {...props}
+        >
+          {children}
+        </a>
+      );
     },
-  };
+    [domainToUrlMap, hoveredSourceUrl, onCitationHover],
+  );
+
+  const codeRenderer: NonNullable<Components["code"]> = React.useCallback(
+    ({ className, children, ...props }) => (
+      <code className={className} {...props}>
+        {String(children)}
+      </code>
+    ),
+    [],
+  );
+
+  const markdownComponents: Components = React.useMemo(
+    () => ({ a: anchorRenderer, code: codeRenderer }),
+    [anchorRenderer, codeRenderer],
+  );
 
   return (
     <div ref={containerRef}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
-        rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
-        components={{
-          a: ({ href, children, ...props }) => {
-            const url = String(href || "");
-            const isCitation =
-              url && [...domainToUrlMap.values()].includes(url);
-            const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
-            const baseClass =
-              "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md font-medium no-underline align-baseline transition-colors";
-            const normalClass =
-              "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[15px] sm:text-base hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300";
-            const hiClass =
-              "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600 text-[15px] sm:text-base";
-            return (
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-citation-url={isCitation ? url : undefined}
-                className={`${baseClass} ${highlighted ? hiClass : normalClass}`}
-                onMouseEnter={() => isCitation && onCitationHover?.(url)}
-                onMouseLeave={() => isCitation && onCitationHover?.(null)}
-                {...props}
-              >
-                {children}
-              </a>
-            );
-          },
-          code: ({ className, children, ...props }) => (
-            <code className={className} {...props}>
-              {String(children)}
-            </code>
-          ),
-        }}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={markdownComponents}
       >
         {processedContent}
       </ReactMarkdown>

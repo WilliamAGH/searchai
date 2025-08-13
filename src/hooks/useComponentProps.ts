@@ -47,12 +47,9 @@ export function useComponentProps({
   isGenerating,
   searchProgress,
   isCreatingChat,
-  showShareModal,
   isAuthenticated,
   handleSelectChat,
-  handleToggleSidebar,
   handleNewChatButton,
-  startNewChatSession,
   handleDeleteLocalChat,
   handleRequestDeleteChat,
   handleDeleteLocalMessage,
@@ -146,6 +143,7 @@ export function useComponentProps({
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,
+      onShare: isMobile ? () => setShowShareModal(true) : undefined,
     }),
     [
       isGenerating,
@@ -153,25 +151,8 @@ export function useComponentProps({
       handleSendMessage,
       handleDraftChange,
       userHistory,
-    ],
-  );
-
-  const chatControlsProps = useMemo(
-    () => ({
-      currentChat,
-      showShareModal,
+      isMobile,
       setShowShareModal,
-      isGenerating,
-      onNewChat: startNewChatSession,
-      onToggleSidebar: handleToggleSidebar,
-    }),
-    [
-      currentChat,
-      showShareModal,
-      setShowShareModal,
-      isGenerating,
-      startNewChatSession,
-      handleToggleSidebar,
     ],
   );
 
@@ -180,6 +161,5 @@ export function useComponentProps({
     mobileSidebarProps,
     messageListProps,
     messageInputProps,
-    chatControlsProps,
   };
 }

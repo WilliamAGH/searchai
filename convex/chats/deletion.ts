@@ -35,15 +35,6 @@ export const deleteChat = mutation({
     await ctx.db.delete(args.chatId);
 
     // Best-effort: also invalidate planner cache for this chat
-    // TODO: Re-enable when circular dependency is resolved
-    // try {
-    //   await ctx.scheduler.runAfter(
-    //     0,
-    //     internal.search.invalidatePlanCacheForChat,
-    //     {
-    //       chatId: args.chatId,
-    //     },
-    //   );
-    // } catch {}
+    // Note: Disabled to avoid circular dependency; enable once dependency issue is resolved.
   },
 });

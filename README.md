@@ -112,6 +112,9 @@ npx convex env set CONVEX_OPENAI_BASE_URL "https://api.openai.com/v1"  # or your
 # Recommended: Your site URL for auth callbacks/headers
 npx convex env set SITE_URL "https://dev.search-ai.io"   # set per environment
 
+# Optional: Restrict CORS for export/publish routes (comma-separated origins)
+npx convex env set CONVEX_ALLOWED_ORIGINS "https://dev.search-ai.io,https://localhost:5173"
+
 # List all env vars to verify
 npx convex env list
 ```
@@ -170,6 +173,9 @@ npx convex env set SERP_API_KEY "your-serp-key" --prod
 npx convex env set CONVEX_OPENAI_API_KEY "your-openai-like-key" --prod
 npx convex env set CONVEX_OPENAI_BASE_URL "https://api.openai.com/v1" --prod
 npx convex env set SITE_URL "https://search-ai.io" --prod
+
+# Optional: Restrict CORS for export/publish routes (comma-separated origins)
+npx convex env set CONVEX_ALLOWED_ORIGINS "https://search-ai.io,https://dev.search-ai.io" --prod
 
 # Deploy Convex functions to production (deploy defaults to prod)
 npx convex deploy

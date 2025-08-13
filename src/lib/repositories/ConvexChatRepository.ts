@@ -15,6 +15,7 @@ import {
   IdUtils,
   TitleUtils,
 } from "../types/unified";
+import { logger } from "../logger";
 // Removed unused imports from errorHandling
 
 export class ConvexChatRepository extends BaseRepository {
@@ -46,7 +47,7 @@ export class ConvexChatRepository extends BaseRepository {
         lastSyncAt: Date.now(),
       }));
     } catch (error) {
-      console.error("Failed to fetch chats from Convex:", error);
+      logger.error("Failed to fetch chats from Convex:", error);
       return [];
     }
   }
@@ -70,7 +71,7 @@ export class ConvexChatRepository extends BaseRepository {
 
       return chat ? this.convexToUnifiedChat(chat) : null;
     } catch (error) {
-      console.error("Failed to fetch chat from Convex:", error);
+      logger.error("Failed to fetch chat from Convex:", error);
       return null;
     }
   }
@@ -88,7 +89,7 @@ export class ConvexChatRepository extends BaseRepository {
 
       return { chat, isNew: true };
     } catch (error) {
-      console.error("Failed to create chat in Convex:", error);
+      logger.error("Failed to create chat in Convex:", error);
       throw error;
     }
   }
@@ -100,7 +101,7 @@ export class ConvexChatRepository extends BaseRepository {
         title: TitleUtils.sanitize(title),
       });
     } catch (error) {
-      console.error("Failed to update chat title in Convex:", error);
+      logger.error("Failed to update chat title in Convex:", error);
       throw error;
     }
   }
@@ -115,7 +116,7 @@ export class ConvexChatRepository extends BaseRepository {
         privacy,
       });
     } catch (error) {
-      console.error("Failed to update chat privacy in Convex:", error);
+      logger.error("Failed to update chat privacy in Convex:", error);
       throw error;
     }
   }
@@ -126,7 +127,7 @@ export class ConvexChatRepository extends BaseRepository {
         chatId: IdUtils.toConvexChatId(id),
       });
     } catch (error) {
-      console.error("Failed to delete chat from Convex:", error);
+      logger.error("Failed to delete chat from Convex:", error);
       throw error;
     }
   }
@@ -142,27 +143,103 @@ export class ConvexChatRepository extends BaseRepository {
 
       return messages.map((msg) => this.convexToUnifiedMessage(msg));
     } catch (error) {
-      console.error("Failed to fetch messages from Convex:", error);
+      logger.error("Failed to fetch messages from Convex:", error);
       return [];
     }
   }
 
   async addMessage(
-    _chatId: string,
-    _message: Partial<UnifiedMessage>,
+    chatId: string,
+    message: Partial<UnifiedMessage>,
   ): Promise<UnifiedMessage> {
-    // For Convex, messages are added through the streaming response action
-    // This is a placeholder that won't be directly called
-    throw new Error("Use generateResponse for adding messages in Convex");
+    try {
+      // Note: addMessage is an internal mutation in Convex, primarily used by the streaming response
+      // For user messages, they are typically added as part of the generateResponse flow
+      // This implementation provides a way to add messages directly if needed
+
+      // Convex typing: addMessage is an internal mutation; cast narrowly at callsite
+      const messageId = await this.client.mutation(
+        api.messages.addMessage as unknown as (args: {
+          chatId: ReturnType<typeof IdUtils.toConvexChatId>;
+          role: "user" | "assistant" | "system";
+          content: string;
+          searchResults?: UnifiedMessage["searchResults"];
+          sources?: string[];
+          reasoning?: string;
+          searchMethod?: UnifiedMessage["searchMethod"];
+          hasRealResults?: boolean;
+          isStreaming?: boolean;
+          streamedContent?: string;
+          thinking?: string;
+        }) => Promise<unknown>,
+        {
+          chatId: IdUtils.toConvexChatId(chatId),
+          role: message.role || "user",
+          content: message.content || "",
+          searchResults: message.searchResults,
+          sources: message.sources,
+          reasoning: message.reasoning,
+          searchMethod: message.searchMethod,
+          hasRealResults: message.hasRealResults,
+          isStreaming: message.isStreaming,
+          streamedContent: message.streamedContent,
+          thinking: message.thinking,
+        },
+      );
+
+      // Fetch the created message
+      const messages = await this.getMessages(chatId);
+      const createdMessage = messages.find(
+        (m) => m.id === IdUtils.toUnifiedId(messageId),
+      );
+
+      if (!createdMessage) {
+        throw new Error("Failed to retrieve created message");
+      }
+
+      return createdMessage;
+    } catch (error) {
+      logger.error("Failed to add message to Convex:", error);
+      // Fallback: For user messages in authenticated mode, use the generateResponse flow
+      throw new Error(
+        "Direct message addition not supported. Use generateResponse for adding messages in Convex authenticated mode.",
+      );
+    }
   }
 
   async updateMessage(
-    _id: string,
-    _updates: Partial<UnifiedMessage>,
+    id: string,
+    updates: Partial<UnifiedMessage>,
   ): Promise<void> {
-    // Messages are updated through internal mutations in Convex
-    // This is handled by the streaming response
-    throw new Error("Message updates are handled internally in Convex");
+    try {
+      // Update message metadata using the available mutation
+      if (
+        updates.searchResults ||
+        updates.sources ||
+        updates.searchMethod ||
+        updates.hasRealResults !== undefined
+      ) {
+        await this.client.mutation(api.messages.updateMessageMetadata, {
+          messageId: IdUtils.toConvexMessageId(id),
+          searchResults: updates.searchResults,
+          sources: updates.sources,
+          searchMethod: updates.searchMethod,
+          hasRealResults: updates.hasRealResults,
+        });
+      }
+
+      // Note: Content and reasoning updates are handled by internal mutations
+      // during the streaming process. Direct content updates are not exposed
+      // as public mutations for security reasons.
+      if (updates.content || updates.reasoning) {
+        logger.warn(
+          "Direct content/reasoning updates not supported in Convex. These are updated during streaming.",
+        );
+      }
+    } catch (error) {
+      logger.error("Failed to update message in Convex:", error);
+      throw error;
+    }
   }
 
   async deleteMessage(id: string): Promise<void> {
@@ -171,7 +248,7 @@ export class ConvexChatRepository extends BaseRepository {
         messageId: IdUtils.toConvexMessageId(id),
       });
     } catch (error) {
-      console.error("Failed to delete message from Convex:", error);
+      logger.error("Failed to delete message from Convex:", error);
       throw error;
     }
   }
@@ -273,7 +350,7 @@ export class ConvexChatRepository extends BaseRepository {
         maxResults: 5,
       });
     } catch (error) {
-      console.error("Search failed:", error);
+      logger.error("Search failed:", error);
       throw error;
     }
   }
@@ -292,7 +369,7 @@ export class ConvexChatRepository extends BaseRepository {
         publicId: chat?.publicId,
       };
     } catch (error) {
-      console.error("Failed to share chat:", error);
+      logger.error("Failed to share chat:", error);
       throw error;
     }
   }
@@ -304,7 +381,7 @@ export class ConvexChatRepository extends BaseRepository {
       });
       return chat ? this.convexToUnifiedChat(chat) : null;
     } catch (error) {
-      console.error("Failed to fetch chat by share ID:", error);
+      logger.error("Failed to fetch chat by share ID:", error);
       return null;
     }
   }
@@ -316,7 +393,7 @@ export class ConvexChatRepository extends BaseRepository {
       });
       return chat ? this.convexToUnifiedChat(chat) : null;
     } catch (error) {
-      console.error("Failed to fetch chat by public ID:", error);
+      logger.error("Failed to fetch chat by public ID:", error);
       return null;
     }
   }
@@ -351,11 +428,11 @@ export class ConvexChatRepository extends BaseRepository {
         const chatMessages = data.messages.filter((m) => m.chatId === chat.id);
         // This would need a special import mutation in Convex
         // For now, we skip message import
-        console.info(
+        logger.info(
           `Would import ${chatMessages.length} messages for chat ${chat.id}`,
         );
       } catch (error) {
-        console.error(`Failed to import chat ${chat.id}:`, error);
+        logger.error(`Failed to import chat ${chat.id}:`, error);
       }
     }
   }

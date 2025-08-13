@@ -10,54 +10,54 @@
 - [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/components/ShareModalContainer.tsx
 - [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/components/ChatControls.tsx
 - [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useComponentProps.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useUnifiedChat.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useMessageHandler.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useDeletionHandlers.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useAutoCreateFirstChat.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/playwright-report/integration/index.html
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/e2e/utils/react-click.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.cursor/rules/testing.mdc
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/messageMapper.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/services/ChatCreationService.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.claude/settings.local.json
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/chat_fix_race_conditions_aug_13_25.md
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/playwright-integration.config.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useSidebarTiming.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useUrlStateSync.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/integration/race-condition-fix.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useEnhancedFollowUpPrompt.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/package.json
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/title-generation.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/url-extraction.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useKeyboardShortcuts.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/enhancements.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/services/UnauthenticatedAIService.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/types/unified.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.env.example
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/verify-title-generation.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/new-chat.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/integration-title-auth.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/currentChat-derivation.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/chat-links.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/chatHistory.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/httpUtils.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useConvexQueries.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/vitest.config.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/App.tsx
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/styles/mobile-sidebar-fix.css
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/topicDetection.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useServices.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useMetaTags.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useIsMobile.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useDraftAnalyzer.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/components/UndoBanner.tsx
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/enhancements.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/creator-detection.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/convex.search.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/constants/topicDetection.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/adapters/chatAdapter.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/scripts/check-convex-imports.cjs
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/chatValidation.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useUnifiedChat.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useMessageHandler.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useDeletionHandlers.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useAutoCreateFirstChat.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/playwright-report/integration/index.html
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/e2e/utils/react-click.ts
+- [x] /.cursor/rules/testing.mdc
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/messageMapper.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/services/ChatCreationService.ts
+- [x] /.claude/settings.local.json
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/chat_fix_race_conditions_aug_13_25.md
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/playwright-integration.config.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useSidebarTiming.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useUrlStateSync.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/integration/race-condition-fix.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useEnhancedFollowUpPrompt.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/package.json
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/title-generation.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/url-extraction.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useKeyboardShortcuts.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/enhancements.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/services/UnauthenticatedAIService.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/types/unified.ts
+- [x] /.env.example
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/verify-title-generation.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/new-chat.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/integration-title-auth.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/currentChat-derivation.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/chat-links.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/chatHistory.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/httpUtils.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useConvexQueries.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/vitest.config.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/App.tsx
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/styles/mobile-sidebar-fix.css
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/topicDetection.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useServices.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useMetaTags.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useIsMobile.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useDraftAnalyzer.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/components/UndoBanner.tsx
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/enhancements.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/creator-detection.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/convex.search.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/constants/topicDetection.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/adapters/chatAdapter.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/scripts/check-convex-imports.cjs
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/chatValidation.ts
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.husky/\_/husky.sh
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.husky/\_/pre-auto-gc
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.husky/\_/pre-push
@@ -76,15 +76,15 @@
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.husky/\_/h
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.husky/\_/.gitignore
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/package-lock.json
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/search.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/telemetry.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/integration/chat-message-chaining.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/messages.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/generation/pipeline.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/http/routes/publish.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/**tests**/chatValidation.test.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/config/featureFlags.ts
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/chat_interface_tasks_aug_12_25.md
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/search.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/telemetry.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/integration/chat-message-chaining.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/messages.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/generation/pipeline.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/convex/http/routes/publish.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/utils/**tests**/chatValidation.test.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/lib/config/featureFlags.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/chat_interface_tasks_aug_12_25.md
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/.vscode/extensions.json
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/e2e/share-links.spec.ts
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/tests/e2e/smoke-new-chat-share.spec.ts

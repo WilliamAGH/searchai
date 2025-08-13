@@ -7,11 +7,12 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
-import { logger } from "../lib/logger";
 
 interface MessageInputProps {
   /** Callback when message is sent */
   onSendMessage: (message: string) => void;
+  /** Open share modal */
+  onShare?: () => void;
   /** Disable input during generation */
   disabled?: boolean;
   /** Placeholder text */
@@ -30,6 +31,7 @@ interface MessageInputProps {
  */
 export function MessageInput({
   onSendMessage,
+  onShare,
   disabled = false,
   placeholder = "Ask me anything...",
   onDraftChange,
@@ -54,9 +56,6 @@ export function MessageInput({
   const sendCurrentMessage = React.useCallback(() => {
     const trimmed = message.trim();
     if (trimmed && !disabled) {
-      logger.debug("⌨️ MessageInput: sending message", {
-        length: trimmed.length,
-      });
       onSendMessage(trimmed);
       setMessage("");
       onDraftChange?.("");
@@ -186,37 +185,26 @@ export function MessageInput({
     ta.style.height = target + "px";
   };
 
-  /**
-   * Auto-resize textarea based on content
-   * - Min: 1 row; Max: 200px height
-   */
+  // Autofocus once and manage focus
   useEffect(() => {
-    adjustTextarea();
-  }, [message]);
-
-  // Autofocus the textarea when the input mounts and when it becomes enabled.
-  useEffect(() => {
-    if (!disabled) {
-      const el = textareaRef.current;
-      if (el) {
-        try {
-          el.focus();
-          logger.debug("🎯 MessageInput: focused textarea");
-        } catch {}
-      }
+    if (disabled) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      try {
+        el.focus();
+      } catch {}
     }
   }, [disabled]);
 
+  // Consolidated adjustTextarea triggers: content changes, env changes, and viewport changes
   useEffect(() => {
-    logger.debug("🧩 MessageInput mounted", { disabled, placeholder });
-    return () => logger.debug("🧩 MessageInput unmounted");
-  }, [disabled, placeholder]);
-
-  // Recalculate textarea height on orientation/viewport changes
+    adjustTextarea();
+  }, [message, placeholder, disabled]);
   useEffect(() => {
-    const handler: EventListener = () => {
-      requestAnimationFrame(() => adjustTextarea());
-    };
+    const handler: EventListener = () => requestAnimationFrame(adjustTextarea);
     window.addEventListener("resize", handler);
     window.addEventListener("orientationchange", handler);
     return () => {
@@ -224,16 +212,6 @@ export function MessageInput({
       window.removeEventListener("orientationchange", handler);
     };
   }, []);
-
-  // Ensure placeholder is centered on mount (before any typing)
-  useEffect(() => {
-    adjustTextarea();
-  }, []);
-
-  // Recenter on placeholder/disabled changes to cover empty-state transitions
-  useEffect(() => {
-    adjustTextarea();
-  }, [placeholder, disabled]);
 
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -248,11 +226,13 @@ export function MessageInput({
     [historyIndex, onDraftChange],
   );
 
-  // Politely auto-focus the input on mount (desktop only, no modals)
+  // Politely auto-focus the input once (desktop only, no modals)
+  const hasAutoFocusedRef = useRef(false);
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     if (disabled) return;
+    if (hasAutoFocusedRef.current) return;
 
     // Skip on touch-centric devices to avoid popping the keyboard
     const isCoarse =
@@ -283,10 +263,9 @@ export function MessageInput({
       }
     });
 
+    hasAutoFocusedRef.current = true;
     return () => cancelAnimationFrame(raf);
-    // Intentionally only on mount to avoid later focus stealing
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [disabled]);
 
   return (
     <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 safe-bottom">
@@ -307,6 +286,17 @@ export function MessageInput({
                 message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"
               } rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-y-auto message-input-textarea message-textarea`}
             />
+            {onShare && (
+              <button
+                type="button"
+                onClick={() => onShare?.()}
+                aria-label="Open share menu"
+                disabled={disabled}
+                className="absolute right-11 sm:right-10 top-1/2 -translate-y-1/2 h-8 px-2 text-xs sm:text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-60"
+              >
+                Share
+              </button>
+            )}
             <button
               type="submit"
               aria-label="Send message"

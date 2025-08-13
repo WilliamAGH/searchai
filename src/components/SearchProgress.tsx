@@ -1,22 +1,5 @@
 import React, { useCallback } from "react";
-
-function getSafeHostname(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    try {
-      return new URL(`https://${url}`).hostname;
-    } catch {
-      return "";
-    }
-  }
-}
-
-function getFaviconUrl(url: string): string | null {
-  const hostname = getSafeHostname(url);
-  if (!hostname) return null;
-  return `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
-}
+import { getFaviconUrl, getSafeHostname } from "../lib/utils/favicon";
 
 interface SearchProgressProps {
   progress: {

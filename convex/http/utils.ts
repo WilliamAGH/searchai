@@ -32,6 +32,58 @@ export function corsResponse(body: string, status = 200) {
 }
 
 /**
+ * Compute CORS headers based on request Origin and allowed origins list.
+ * If CONVEX_ALLOWED_ORIGINS is unset, allow all origins (dev default).
+ */
+export function corsHeadersForRequest(
+  request: Request,
+  methods: string,
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  const origin = request.headers.get("Origin");
+  const raw = (process.env.CONVEX_ALLOWED_ORIGINS || "").trim();
+  const allowList = raw
+    ? raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  let allowOrigin = "*";
+  if (allowList.length > 0) {
+    if (origin && allowList.includes(origin)) {
+      allowOrigin = origin;
+    } else {
+      // Not in allow list: return a safe default that does not echo arbitrary origin
+      allowOrigin = "null";
+    }
+  }
+
+  return {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": methods,
+    "Access-Control-Allow-Headers":
+      request.headers.get("Access-Control-Request-Headers") || "Content-Type",
+    "Access-Control-Max-Age": "600",
+    Vary: "Origin",
+    ...extra,
+  };
+}
+
+export function corsJsonResponseForRequest(
+  request: Request,
+  body: string,
+  status = 200,
+  methods = "GET, POST, OPTIONS",
+) {
+  return new Response(body, {
+    status,
+    headers: corsHeadersForRequest(request, methods),
+  });
+}
+
+/**
  * Utility: Basic HTML escape for embedding text content safely
  */
 export function escapeHtml(s: string): string {

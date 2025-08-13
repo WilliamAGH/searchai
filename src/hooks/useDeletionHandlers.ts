@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 
 interface UseDeletionHandlersProps {
@@ -32,6 +32,20 @@ export function useDeletionHandlers({
   deleteMessage,
 }: UseDeletionHandlersProps) {
   const [undoBanner, setUndoBanner] = useState<UndoBannerState | null>(null);
+  const timeoutsRef = useRef<number[]>([]);
+
+  const clearAllTimeouts = useCallback(() => {
+    for (const id of timeoutsRef.current) {
+      clearTimeout(id);
+    }
+    timeoutsRef.current = [];
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearAllTimeouts();
+    };
+  }, [clearAllTimeouts]);
 
   const handleDeleteLocalChat = useCallback(
     async (chatId: string) => {
@@ -55,8 +69,9 @@ export function useDeletionHandlers({
           },
         });
 
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
+        // Auto-hide after 5 seconds (with cleanup)
+        clearAllTimeouts();
+        const timeoutId = window.setTimeout(() => {
           setUndoBanner((prev) =>
             prev?.message ===
             `Chat "${chatToDelete.title || "Untitled"}" deleted`
@@ -64,9 +79,10 @@ export function useDeletionHandlers({
               : prev,
           );
         }, 5000);
+        timeoutsRef.current.push(timeoutId);
       }
     },
-    [chatState.chats, chatActions],
+    [chatState.chats, chatActions, clearAllTimeouts],
   );
 
   const handleRequestDeleteChat = useCallback(
@@ -80,10 +96,12 @@ export function useDeletionHandlers({
           message: "Chat deleted successfully",
         });
 
-        // Auto-hide after 3 seconds
-        setTimeout(() => {
+        // Auto-hide after 3 seconds (with cleanup)
+        clearAllTimeouts();
+        const timeoutId = window.setTimeout(() => {
           setUndoBanner({ show: false, message: "" });
         }, 3000);
+        timeoutsRef.current.push(timeoutId);
       } catch (error) {
         console.error("Failed to delete chat:", error);
         setUndoBanner({
@@ -92,7 +110,7 @@ export function useDeletionHandlers({
         });
       }
     },
-    [deleteChat],
+    [deleteChat, clearAllTimeouts],
   );
 
   const handleDeleteLocalMessage = useCallback(
@@ -117,15 +135,17 @@ export function useDeletionHandlers({
           },
         });
 
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
+        // Auto-hide after 5 seconds (with cleanup)
+        clearAllTimeouts();
+        const timeoutId = window.setTimeout(() => {
           setUndoBanner((prev) =>
             prev?.message === "Message deleted" ? null : prev,
           );
         }, 5000);
+        timeoutsRef.current.push(timeoutId);
       }
     },
-    [chatState.messages, chatActions],
+    [chatState.messages, chatActions, clearAllTimeouts],
   );
 
   const handleRequestDeleteMessage = useCallback(
@@ -139,10 +159,12 @@ export function useDeletionHandlers({
           message: "Message deleted",
         });
 
-        // Auto-hide after 3 seconds
-        setTimeout(() => {
+        // Auto-hide after 3 seconds (with cleanup)
+        clearAllTimeouts();
+        const timeoutId = window.setTimeout(() => {
           setUndoBanner({ show: false, message: "" });
         }, 3000);
+        timeoutsRef.current.push(timeoutId);
       } catch (error) {
         console.error("Failed to delete message:", error);
         setUndoBanner({
@@ -151,7 +173,7 @@ export function useDeletionHandlers({
         });
       }
     },
-    [deleteMessage],
+    [deleteMessage, clearAllTimeouts],
   );
 
   return {

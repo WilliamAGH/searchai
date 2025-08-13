@@ -5,6 +5,7 @@
 
 import { v } from "convex/values";
 import { action, internalAction, internalMutation } from "./_generated/server";
+import { vSearchResult } from "./lib/validators";
 import { api } from "./_generated/api";
 
 // Import search providers
@@ -50,6 +51,23 @@ import {
 // Re-export test utilities for backward compatibility
 export { __extractKeywordsForTest, __augmentQueryForTest };
 
+// Local view types for clarity
+type ChatRole = "user" | "assistant" | "system";
+interface ChatMessageView {
+  role: ChatRole;
+  content?: string;
+  timestamp?: number;
+}
+
+interface LLMPlan {
+  shouldSearch?: boolean;
+  contextSummary?: string;
+  queries?: string[];
+  suggestNewChat?: boolean;
+  decisionConfidence?: number;
+  reasons?: string;
+}
+
 /**
  * Perform web search using available providers
  * Tries: SERP API -> OpenRouter -> DuckDuckGo -> Fallback
@@ -60,14 +78,7 @@ export const searchWeb = action({
     maxResults: v.optional(v.number()),
   },
   returns: v.object({
-    results: v.array(
-      v.object({
-        title: v.string(),
-        url: v.string(),
-        snippet: v.string(),
-        relevanceScore: v.number(),
-      }),
-    ),
+    results: v.array(vSearchResult),
     searchMethod: v.union(
       v.literal("serp"),
       v.literal("openrouter"),
@@ -244,7 +255,7 @@ export const planSearch = action({
     const maxContext = Math.max(1, Math.min(args.maxContextMessages ?? 10, 25));
 
     // Load recent messages for lightweight context summary
-    const messages: any[] = await ctx.runQuery(api.chats.getChatMessages, {
+    const messages = await ctx.runQuery(api.chats.getChatMessages, {
       chatId: args.chatId,
     });
     // Prefer server-stored rolling summary if present (reduces tokens)
@@ -252,7 +263,7 @@ export const planSearch = action({
       chatId: args.chatId,
     });
 
-    const recent: any[] = messages.slice(
+    const recent: ChatMessageView[] = messages.slice(
       Math.max(0, messages.length - maxContext),
     );
 
@@ -262,8 +273,10 @@ export const planSearch = action({
       [...recent]
         .reverse()
         .find(
-          (m: any) => m.role === "user" && serialize(m.content) !== newContent,
-        ) || [...recent].reverse().find((m: any) => m.role === "user");
+          (m: ChatMessageView) =>
+            m.role === "user" && serialize(m.content || "") !== newContent,
+        ) ||
+      [...recent].reverse().find((m: ChatMessageView) => m.role === "user");
     const jaccardScore = jaccard(
       tokSet(serialize(prevUser?.content)),
       tokSet(newContent),
@@ -276,12 +289,16 @@ export const planSearch = action({
 
     // DRY: Use shared summarizer (recency-weighted, includes rolling summary)
     const contextSummary = buildContextSummary({
-      messages: recent.map((m: any) => ({
+      messages: recent.map((m: ChatMessageView) => ({
         role: m.role,
         content: serialize(m.content),
         timestamp: m.timestamp,
       })),
-      rollingSummary: (chat as any)?.rollingSummary,
+      rollingSummary:
+        chat &&
+        (chat as { rollingSummary?: string }).rollingSummary !== undefined
+          ? (chat as { rollingSummary?: string }).rollingSummary
+          : undefined,
       maxChars: 1600,
     });
 
@@ -392,7 +409,7 @@ export const planSearch = action({
         parsed = match ? JSON.parse(match[0]) : null;
       }
 
-      const plan = parsed as any;
+      const plan = parsed as Partial<LLMPlan> | null;
       if (
         plan?.shouldSearch !== undefined &&
         plan?.queries &&

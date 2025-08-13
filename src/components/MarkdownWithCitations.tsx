@@ -1,4 +1,4 @@
-/* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
+// Refactored to use memoized plugins and components
 /**
  * Markdown renderer with citation support
  * - Processes markdown content
@@ -8,12 +8,13 @@
 
 import React from "react";
 import clsx from "clsx";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeSanitize from "rehype-sanitize";
 import { defaultSchema } from "hast-util-sanitize";
 import type { Schema } from "hast-util-sanitize";
+import type { PluggableList } from "unified";
 
 interface MarkdownWithCitationsProps {
   content: string;
@@ -115,190 +116,209 @@ export function MarkdownWithCitations({
     return processed;
   }, [content, domainToUrlMap, searchResults]);
 
-  // Custom sanitize schema
-  const sanitizeSchema: Schema = {
-    ...defaultSchema,
-    tagNames: [
-      ...(defaultSchema.tagNames ?? []),
-      "u",
-      "span",
-      "table",
-      "thead",
-      "tbody",
-      "tr",
-      "th",
-      "td",
-      "blockquote",
-      "hr",
-      "strong",
-      "em",
-      "del",
-      "br",
-      "p",
-      "ul",
-      "ol",
-      "li",
-      "pre",
-      "code",
-      "h1",
-      "h2",
-      "h3",
-      "h4",
-      "h5",
-      "h6",
-    ],
-    attributes: {
-      ...defaultSchema.attributes,
-      a: ["href", "target", "rel"],
-      code: ["className"],
-      span: ["className", "data-url", "data-domain"],
+  // Custom sanitize schema (stable)
+  const sanitizeSchema: Schema = React.useMemo(
+    () => ({
+      ...defaultSchema,
+      tagNames: [
+        ...(defaultSchema.tagNames ?? []),
+        "u",
+        "span",
+        "table",
+        "thead",
+        "tbody",
+        "tr",
+        "th",
+        "td",
+        "blockquote",
+        "hr",
+        "strong",
+        "em",
+        "del",
+        "br",
+        "p",
+        "ul",
+        "ol",
+        "li",
+        "pre",
+        "code",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+      ],
+      attributes: {
+        ...defaultSchema.attributes,
+        a: ["href", "target", "rel"],
+        code: ["className"],
+        span: ["className", "data-url", "data-domain"],
+      },
+    }),
+    [],
+  );
+
+  const remarkPlugins: PluggableList = React.useMemo(
+    () => [remarkGfm, remarkBreaks],
+    [],
+  );
+  const rehypePlugins: PluggableList = React.useMemo(
+    () => [[rehypeSanitize, sanitizeSchema]],
+    [sanitizeSchema],
+  );
+
+  const anchorRenderer: NonNullable<Components["a"]> = React.useCallback(
+    ({ children, ...props }) => (
+      <a {...props} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    ),
+    [],
+  );
+
+  const codeRenderer: NonNullable<Components["code"]> = React.useCallback(
+    ({ className, children, ...props }) => (
+      <code className={className} {...props}>
+        {String(children)}
+      </code>
+    ),
+    [],
+  );
+
+  const paragraphRenderer: NonNullable<Components["p"]> = React.useCallback(
+    ({ children, ...props }) => {
+      const processChildren = (nodes: React.ReactNode): React.ReactNode => {
+        return React.Children.map(nodes, (child) => {
+          if (typeof child === "string") {
+            const parts = child.split(/@@CITATION@@([^@]+)@@([^@]+)@@/);
+            const result: React.ReactNode[] = [];
+            for (let i = 0; i < parts.length; i++) {
+              if (i % 3 === 0) {
+                if (parts[i]) result.push(parts[i]);
+              } else if (i % 3 === 1) {
+                const domain = parts[i];
+                const url = parts[i + 1];
+                const isHighlighted = hoveredSourceUrl === url;
+                result.push(
+                  <a
+                    key={`citation-${i}`}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={clsx(
+                      "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
+                      isHighlighted
+                        ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
+                    )}
+                    onMouseEnter={() => onCitationHover?.(url)}
+                    onMouseLeave={() => onCitationHover?.(null)}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span>{domain}</span>
+                    <svg
+                      className="w-3 h-3 opacity-60"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
+                    </svg>
+                  </a>,
+                );
+                i++;
+              }
+            }
+            return result.length > 0 ? result : child;
+          }
+          return child;
+        });
+      };
+      return <p {...props}>{processChildren(children)}</p>;
     },
-  };
+    [hoveredSourceUrl, onCitationHover],
+  );
+
+  const listItemRenderer: NonNullable<Components["li"]> = React.useCallback(
+    ({ children, ...props }) => {
+      const processChildren = (nodes: React.ReactNode): React.ReactNode => {
+        return React.Children.map(nodes, (child) => {
+          if (typeof child === "string") {
+            const parts = child.split(/@@CITATION@@([^@]+)@@([^@]+)@@/);
+            const result: React.ReactNode[] = [];
+            for (let i = 0; i < parts.length; i++) {
+              if (i % 3 === 0) {
+                if (parts[i]) result.push(parts[i]);
+              } else if (i % 3 === 1) {
+                const domain = parts[i];
+                const url = parts[i + 1];
+                const isHighlighted = hoveredSourceUrl === url;
+                result.push(
+                  <a
+                    key={`citation-${i}`}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={clsx(
+                      "inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
+                      isHighlighted
+                        ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
+                    )}
+                    onMouseEnter={() => onCitationHover?.(url)}
+                    onMouseLeave={() => onCitationHover?.(null)}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span>{domain}</span>
+                    <svg
+                      className="w-3 h-3 opacity-60"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
+                    </svg>
+                  </a>,
+                );
+                i++;
+              }
+            }
+            return result.length > 0 ? result : child;
+          }
+          return child;
+        });
+      };
+      return <li {...props}>{processChildren(children)}</li>;
+    },
+    [hoveredSourceUrl, onCitationHover],
+  );
+
+  const markdownComponents: Components = React.useMemo(
+    () => ({
+      a: anchorRenderer,
+      code: codeRenderer,
+      p: paragraphRenderer,
+      li: listItemRenderer,
+    }),
+    [anchorRenderer, codeRenderer, paragraphRenderer, listItemRenderer],
+  );
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkBreaks]}
-      rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
-      components={{
-        a: ({ _node, _inline, children, ...props }) => (
-          <a {...props} target="_blank" rel="noopener noreferrer">
-            {children}
-          </a>
-        ),
-        code: ({ _node, _inline, className, children, ...props }) => (
-          <code className={className} {...props}>
-            {String(children)}
-          </code>
-        ),
-        p: ({ _node, _inline, children, ...props }) => {
-          const processChildren = (
-            children: React.ReactNode,
-          ): React.ReactNode => {
-            return React.Children.map(children, (child) => {
-              if (typeof child === "string") {
-                // Process citation markers in text
-                const parts = child.split(/@@CITATION@@([^@]+)@@([^@]+)@@/);
-                const result: React.ReactNode[] = [];
-
-                for (let i = 0; i < parts.length; i++) {
-                  if (i % 3 === 0) {
-                    // Regular text
-                    if (parts[i]) result.push(parts[i]);
-                  } else if (i % 3 === 1) {
-                    // Domain
-                    const domain = parts[i];
-                    const url = parts[i + 1];
-                    const isHighlighted = hoveredSourceUrl === url;
-
-                    result.push(
-                      <a
-                        key={`citation-${i}`}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={clsx(
-                          "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
-                          isHighlighted
-                            ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
-                        )}
-                        onMouseEnter={() => onCitationHover?.(url)}
-                        onMouseLeave={() => onCitationHover?.(null)}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span>{domain}</span>
-                        <svg
-                          className="w-3 h-3 opacity-60"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                          />
-                        </svg>
-                      </a>,
-                    );
-                    i++; // Skip the URL part as we've already processed it
-                  }
-                }
-
-                return result.length > 0 ? result : child;
-              }
-              return child;
-            });
-          };
-
-          return <p {...props}>{processChildren(children)}</p>;
-        },
-        li: ({ _node, _inline, children, ...props }) => {
-          const processChildren = (
-            children: React.ReactNode,
-          ): React.ReactNode => {
-            return React.Children.map(children, (child) => {
-              if (typeof child === "string") {
-                // Process citation markers in text
-                const parts = child.split(/@@CITATION@@([^@]+)@@([^@]+)@@/);
-                const result: React.ReactNode[] = [];
-
-                for (let i = 0; i < parts.length; i++) {
-                  if (i % 3 === 0) {
-                    // Regular text
-                    if (parts[i]) result.push(parts[i]);
-                  } else if (i % 3 === 1) {
-                    // Domain
-                    const domain = parts[i];
-                    const url = parts[i + 1];
-                    const isHighlighted = hoveredSourceUrl === url;
-
-                    result.push(
-                      <a
-                        key={`citation-${i}`}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={clsx(
-                          "inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
-                          isHighlighted
-                            ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
-                        )}
-                        onMouseEnter={() => onCitationHover?.(url)}
-                        onMouseLeave={() => onCitationHover?.(null)}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span>{domain}</span>
-                        <svg
-                          className="w-3 h-3 opacity-60"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                          />
-                        </svg>
-                      </a>,
-                    );
-                    i++; // Skip the URL part as we've already processed it
-                  }
-                }
-
-                return result.length > 0 ? result : child;
-              }
-              return child;
-            });
-          };
-
-          return <li {...props}>{processChildren(children)}</li>;
-        },
-      }}
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
+      components={markdownComponents}
     >
       {processedContent}
     </ReactMarkdown>

@@ -10,6 +10,7 @@ lerna-debug.log*
 trace.zip
 test-results
 coverage
+playwright-report
 *.bak
 .crush*
 node_modules

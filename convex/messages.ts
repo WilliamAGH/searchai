@@ -1,6 +1,8 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { vSearchResult } from "./lib/validators";
 
 export const addMessage = internalMutation({
   args: {
@@ -10,16 +12,7 @@ export const addMessage = internalMutation({
     isStreaming: v.optional(v.boolean()),
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
-    searchResults: v.optional(
-      v.array(
-        v.object({
-          title: v.string(),
-          url: v.string(),
-          snippet: v.string(),
-          relevanceScore: v.number(), // Required to match schema
-        }),
-      ),
-    ),
+    searchResults: v.optional(v.array(vSearchResult)),
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(
@@ -91,16 +84,7 @@ export const internalUpdateMessageReasoning = internalMutation({
 export const updateMessageMetadata = mutation({
   args: {
     messageId: v.id("messages"),
-    searchResults: v.optional(
-      v.array(
-        v.object({
-          title: v.string(),
-          url: v.string(),
-          snippet: v.string(),
-          relevanceScore: v.number(), // Required to match schema
-        }),
-      ),
-    ),
+    searchResults: v.optional(v.array(vSearchResult)),
     sources: v.optional(v.array(v.string())),
     searchMethod: v.optional(
       v.union(
@@ -133,16 +117,7 @@ export const updateMessage = internalMutation({
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
     isStreaming: v.optional(v.boolean()),
-    searchResults: v.optional(
-      v.array(
-        v.object({
-          title: v.string(),
-          url: v.string(),
-          snippet: v.string(),
-          relevanceScore: v.number(), // Required to match schema
-        }),
-      ),
-    ),
+    searchResults: v.optional(v.array(vSearchResult)),
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(
@@ -196,17 +171,19 @@ export const deleteMessage = mutation({
 
     await ctx.db.delete(args.messageId);
 
-    // Best-effort: invalidate planner cache and clear rolling summary to force regeneration
-    // TODO: Re-enable cache invalidation when circular dependency is resolved
-    // try {
-    //   await ctx.scheduler.runAfter(
-    //     0,
-    //     internal.search.invalidatePlanCacheForChat,
-    //     {
-    //       chatId: message.chatId,
-    //     },
-    //   );
-    // } catch {}
+    // Best-effort: invalidate planner cache (decoupled internal action)
+    try {
+      // @ts-ignore - Known Convex TS2589 type instantiation issue; alias to avoid deep generic instantiation
+      const invalidatePlan: any = internal.search.invalidatePlanCacheForChat;
+      await ctx.scheduler.runAfter(0, invalidatePlan, {
+        chatId: message.chatId,
+      });
+    } catch (e) {
+      console.warn("Failed to schedule plan cache invalidation", {
+        chatId: message.chatId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
 
     // Clear rolling summary directly to avoid circular dependency
     try {
@@ -215,7 +192,13 @@ export const deleteMessage = mutation({
         rollingSummaryUpdatedAt: Date.now(),
         updatedAt: Date.now(),
       });
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to clear rolling summary after message delete", {
+        chatId: message.chatId,
+        messageId: args.messageId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
     return null;
   },
 });

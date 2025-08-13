@@ -1,5 +1,4 @@
 import { useCallback, useRef } from "react";
-import type { Id } from "../../convex/_generated/dataModel";
 import { logger } from "../lib/logger";
 import type { Message } from "../lib/types/message";
 import type { Chat } from "../lib/types/chat";
@@ -53,13 +52,15 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
     async (message: string) => {
       if (!message.trim()) return;
 
-      let activeChatId = deps.currentChatId;
+      let activeChatId: string | null = deps.currentChatId;
 
       // FIX: Check for existing messages first to prevent new chat creation
       if (!activeChatId && deps.chatState.messages.length > 0) {
-        const existingChatId = deps.chatState.messages[0]?.chatId as
-          | string
-          | undefined;
+        const firstMsg = deps.chatState.messages[0];
+        const existingChatId =
+          firstMsg && typeof firstMsg.chatId === "string"
+            ? firstMsg.chatId
+            : undefined;
         if (existingChatId) {
           logger.info("✅ Found existing chat from messages", {
             existingChatId,
@@ -78,9 +79,8 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
           logger.error("❌ Failed to create chat for message");
           return;
         }
-        activeChatId = deps.isAuthenticated
-          ? (newChatId as Id<"chats">)
-          : newChatId;
+        // Frontend uses string chat IDs; avoid unsafe casts
+        activeChatId = newChatId;
       }
 
       // Send the message
@@ -90,7 +90,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
         if (deps.isAuthenticated) {
           await deps.generateResponse({
-            chatId: String(activeChatId),
+            chatId: activeChatId,
             message: message.trim(),
             isReplyToAssistant:
               deps.chatState.messages.length > 0 &&
@@ -100,7 +100,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         } else {
           await deps.generateUnauthenticatedResponse(
             message.trim(),
-            String(activeChatId),
+            activeChatId,
           );
         }
 
@@ -111,7 +111,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         if (userMessageCount === 0) {
           const title =
             message.length > 50 ? `${message.substring(0, 50)}...` : message;
-          await deps.chatActions.updateChat(String(activeChatId), { title });
+          await deps.chatActions.updateChat(activeChatId, { title });
         }
 
         deps.maybeShowFollowUpPrompt();

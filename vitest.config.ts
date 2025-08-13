@@ -16,10 +16,33 @@ export default defineConfig({
       "tests/integration/**",
       "tests/**/*.spec.ts",
     ],
-    reporters: ["default"],
+    reporter: process.env.CI ? ["default", "json", "html"] : ["default"],
+    ...(process.env.CI && {
+      pool: "forks" as const,
+      minThreads: 1,
+      maxThreads: 1,
+    }),
     coverage: {
       provider: "v8",
-      enabled: false,
+      reporter: ["text", "json", "html", "lcov"],
+      reportsDirectory: "./coverage",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/**/__tests__/**",
+        "src/**/*.d.ts",
+        "src/main.tsx",
+        "convex/_generated/**",
+      ],
+      thresholds: {
+        global: {
+          branches: 80,
+          functions: 80,
+          lines: 80,
+          statements: 80,
+        },
+      },
+      enabled: true,
     },
   },
 });

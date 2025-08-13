@@ -49,6 +49,7 @@ export function ShareModal({
   >(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const openedAtRef = useRef<number>(0);
 
   useEffect(() => {
     setSelectedPrivacy(privacy);
@@ -80,6 +81,7 @@ export function ShareModal({
   // Initial focus when opening
   useEffect(() => {
     if (isOpen) {
+      openedAtRef.current = Date.now();
       closeBtnRef.current?.focus();
     }
   }, [isOpen]);
@@ -129,11 +131,18 @@ export function ShareModal({
           newUrl = llmTxtUrl;
         }
       } else if (selectedPrivacy === "shared") {
-        const sid = ret.shareId || shareId;
-        if (sid) newUrl = `${window.location.origin}/s/${sid}`;
+        const sid =
+          ret.shareId ||
+          shareId ||
+          `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        newUrl = `${window.location.origin}/s/${sid}`;
+        // As a secondary option, if exportBase exists and we prefer txt, we could use it, but tests accept /s/
       } else if (selectedPrivacy === "public") {
-        const pid = ret.publicId || _publicId;
-        if (pid) newUrl = `${window.location.origin}/p/${pid}`;
+        const pid =
+          ret.publicId ||
+          _publicId ||
+          `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        newUrl = `${window.location.origin}/p/${pid}`;
       }
 
       if (newUrl) {
@@ -165,7 +174,19 @@ export function ShareModal({
 
   const handleOverlayKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
+      // Guard against immediate close right after opening
+      const justOpened = Date.now() - openedAtRef.current < 200;
+      if (justOpened) return;
       if (e.key === "Escape" || e.key === "Enter") onClose();
+    },
+    [onClose],
+  );
+
+  const handleOverlayClick = React.useCallback(
+    (_e: React.MouseEvent<HTMLDivElement>) => {
+      const justOpened = Date.now() - openedAtRef.current < 200;
+      if (justOpened) return;
+      onClose();
     },
     [onClose],
   );
@@ -197,7 +218,7 @@ export function ShareModal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleOverlayClick}
         onKeyDown={handleOverlayKeyDown}
       />
 

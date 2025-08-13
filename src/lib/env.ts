@@ -2,6 +2,7 @@
  * Environment variable validation and type safety
  * Ensures all required env vars are present and valid
  */
+import { logger } from "./logger";
 
 interface EnvConfig {
   VITE_CONVEX_URL: string;
@@ -29,7 +30,7 @@ function validateEnv(): EnvConfig {
       !url.hostname.includes("convex.cloud") &&
       !url.hostname.includes("localhost")
     ) {
-      console.warn(
+      logger.warn(
         "VITE_CONVEX_URL does not appear to be a valid Convex URL:",
         env.VITE_CONVEX_URL,
       );
@@ -77,7 +78,7 @@ export const env = {
         (window.location.hostname === "127.0.0.1" ||
           window.location.hostname === "localhost");
       if (import.meta.env.DEV || isLocalHost) {
-        console.warn("Using fallback Convex URL for local environment");
+        logger.warn("Using fallback Convex URL for local environment");
         return "https://diligent-greyhound-240.convex.cloud";
       }
       throw new Error("VITE_CONVEX_URL is required");
@@ -104,7 +105,7 @@ export const env = {
       getEnv();
       return true;
     } catch (e) {
-      console.error("Environment validation failed:", e);
+      logger.error("Environment validation failed:", e);
       return false;
     }
   },
@@ -139,8 +140,8 @@ export function initializeEnv(): void {
   const errors = env.getValidationErrors();
 
   if (errors.length > 0) {
-    console.error("Environment configuration errors:");
-    errors.forEach((err) => console.error(`  - ${err}`));
+    logger.error("Environment configuration errors:");
+    errors.forEach((err) => logger.error(`  - ${err}`));
     // Permit local preview/test to proceed with fallbacks even in production builds
     const isLocalHost = (() => {
       try {
@@ -159,10 +160,10 @@ export function initializeEnv(): void {
       throw new Error("Invalid environment configuration");
     }
     // Otherwise (dev or local preview), warn but continue
-    console.warn(
+    logger.warn(
       "Continuing with invalid environment configuration (local/dev mode)",
     );
   } else {
-    console.info("✅ Environment configuration validated");
+    logger.info("✅ Environment configuration validated");
   }
 }

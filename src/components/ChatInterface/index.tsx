@@ -1,0 +1,406 @@
+/**
+ * Main chat interface - orchestrates chats/messages for all users
+ * Refactored to use sub-components for better organization
+ */
+
+import { useAction, useMutation } from "convex/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { useUnifiedChat } from "../../hooks/useUnifiedChat";
+import { useChatNavigation } from "../../hooks/useChatNavigation";
+import { useDraftAnalyzer } from "../../hooks/useDraftAnalyzer";
+import { useMessageHandler } from "../../hooks/useMessageHandler";
+import { useEnhancedFollowUpPrompt } from "../../hooks/useEnhancedFollowUpPrompt";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
+import { useComponentProps } from "../../hooks/useComponentProps";
+import { useDeletionHandlers } from "../../hooks/useDeletionHandlers";
+import { useIsMobile } from "../../hooks/useIsMobile";
+import { useUrlStateSync } from "../../hooks/useUrlStateSync";
+import { useMetaTags } from "../../hooks/useMetaTags";
+import { useAutoCreateFirstChat } from "../../hooks/useAutoCreateFirstChat";
+import { useConvexQueries } from "../../hooks/useConvexQueries";
+import { useSidebarTiming } from "../../hooks/useSidebarTiming";
+import { useServices } from "../../hooks/useServices";
+import { useUnauthenticatedAI } from "./useUnauthenticatedAI";
+import { ChatLayout } from "./ChatLayout";
+import type { Chat } from "../../lib/types/chat";
+import { DRAFT_MIN_LENGTH } from "../../lib/constants/topicDetection";
+import {
+  buildApiBase,
+  resolveApiPath,
+  fetchJsonWithRetry,
+} from "../../lib/utils/httpUtils";
+import { isTopicChange } from "../../lib/utils/topicDetection";
+import { mapMessagesToLocal } from "../../lib/utils/messageMapper";
+import { buildUserHistory } from "../../lib/utils/chatHistory";
+
+export function ChatInterface({
+  isAuthenticated,
+  isSidebarOpen = false,
+  onToggleSidebar,
+  chatId: propChatId,
+  shareId: propShareId,
+  publicId: propPublicId,
+  onRequestSignUp,
+  onRequestSignIn: _onRequestSignIn,
+}: {
+  isAuthenticated: boolean;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
+  chatId?: string;
+  shareId?: string;
+  publicId?: string;
+  onRequestSignUp?: () => void;
+  onRequestSignIn?: () => void;
+}) {
+  const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
+  const apiBase = buildApiBase(convexUrl);
+  const resolveApi = useCallback(
+    (path: string) => resolveApiPath(apiBase, path),
+    [apiBase],
+  );
+
+  const [localIsGenerating, setIsGenerating] = useState(false);
+  const { aiService } = useServices(convexUrl);
+
+  const { state: chatState, actions: chatActions } = useUnifiedChat();
+  const currentChatId = chatState.currentChatId;
+  const isGenerating = chatState.isGenerating || localIsGenerating;
+  const searchProgress = chatState.searchProgress;
+  const currentChat = chatState.currentChat;
+  const messages = chatState.messages;
+  const chats = chatState.chats;
+
+  const sidebarOpen = isSidebarOpen ?? false;
+  const { handleMobileSidebarClose } = useSidebarTiming({
+    sidebarOpen,
+    onToggleSidebar,
+  });
+
+  const [messageCount, setMessageCount] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const openShareModal = useCallback(() => {
+    setShowShareModal(true);
+  }, []);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+
+  const userSelectedChatAtRef = useRef<number | null>(null);
+  const deleteChat = useMutation(api.chats.deleteChat);
+  const deleteMessage = useMutation(api.messages.deleteMessage);
+
+  // Get all chats (either from Convex or local storage)
+  const allChats = useMemo(() => {
+    let baseChats: Chat[] = [];
+
+    // The unified hook handles both authenticated and unauthenticated states
+    // Convert from unified format to local format for compatibility
+    if (chats && chats.length > 0) {
+      baseChats = chats.map(
+        (chat) =>
+          ({
+            _id: chat.id || chat._id,
+            title: chat.title,
+            createdAt: chat.createdAt,
+            updatedAt: chat.updatedAt,
+            privacy: chat.privacy || "private",
+            shareId: chat.shareId,
+            publicId: chat.publicId,
+            isLocal: !isAuthenticated,
+            source: isAuthenticated ? "convex" : "local",
+            userId: chat.userId,
+          }) as Chat,
+      );
+    }
+
+    return baseChats;
+  }, [isAuthenticated, chats]);
+
+  const {
+    navigateWithVerification,
+    buildChatPath,
+    handleSelectChat: navHandleSelectChat,
+  } = useChatNavigation({
+    currentChatId,
+    allChats,
+    isAuthenticated,
+    onSelectChat: chatActions.selectChat,
+  });
+  const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
+  const generateResponse = useAction(api.ai.generateStreamingResponse);
+  const planSearch = useAction(api.search.planSearch);
+  const recordClientMetric = useAction(api.search.recordClientMetric);
+  const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
+
+  const { chatByOpaqueId, chatByShareId, chatByPublicId } = useConvexQueries({
+    isAuthenticated,
+    propChatId,
+    propShareId,
+    propPublicId,
+    currentChatId,
+  });
+
+  // Use deletion handlers hook for all deletion operations
+  const {
+    handleDeleteLocalChat,
+    handleRequestDeleteChat,
+    handleDeleteLocalMessage,
+    handleRequestDeleteMessage,
+    undoBanner,
+    setUndoBanner,
+  } = useDeletionHandlers({
+    chatState,
+    chatActions,
+    deleteChat,
+    deleteMessage,
+  });
+
+  const [lastPlannerCallAtByChat, setLastPlannerCallAtByChat] = useState<
+    Record<string, number>
+  >({});
+
+  const handleSelectChat = useCallback(
+    (id: Id<"chats"> | string) => {
+      userSelectedChatAtRef.current = Date.now();
+      navHandleSelectChat(String(id));
+    },
+    [navHandleSelectChat],
+  );
+
+  const currentMessages = useMemo(
+    () => mapMessagesToLocal(messages, isAuthenticated),
+    [messages, isAuthenticated],
+  );
+  const userHistory = useMemo(
+    () => buildUserHistory(currentMessages),
+    [currentMessages],
+  );
+
+  useUrlStateSync({
+    currentChatId,
+    isAuthenticated,
+    propChatId,
+    propShareId,
+    propPublicId,
+    chatByOpaqueId,
+    chatByShareId,
+    chatByPublicId,
+    localChats: chatState.chats,
+    selectChat: chatActions.selectChat,
+    userSelectedChatAtRef,
+  });
+  useMetaTags({ currentChatId, allChats });
+
+  const handleNewChat = useCallback(
+    async (_opts?: { userInitiated?: boolean }): Promise<string | null> => {
+      setIsCreatingChat(true);
+      try {
+        // Simply use the createChat action from useUnifiedChat
+        const chat = await chatActions.createChat("New Chat");
+        if (chat?.id) {
+          // Navigate to the new chat
+          await navigateWithVerification(`/chat/${chat.id}`);
+          setIsCreatingChat(false);
+          return chat.id;
+        }
+      } catch (error) {
+        console.error("Failed to create chat:", error);
+      }
+      setIsCreatingChat(false);
+      return null;
+    },
+    [chatActions, navigateWithVerification],
+  );
+
+  useEffect(() => {
+    if (isCreatingChat && currentChatId) setIsCreatingChat(false);
+  }, [isCreatingChat, currentChatId]);
+
+  // Use unauthenticated AI hook
+  const { generateUnauthenticatedResponse } = useUnauthenticatedAI({
+    chatState,
+    chatActions,
+    aiService,
+  });
+
+  const sendRefTemp = useRef<((message: string) => Promise<void>) | null>(null);
+  const {
+    showFollowUpPrompt,
+    pendingMessage: _pendingMessage,
+    plannerHint,
+    resetFollowUp,
+    maybeShowFollowUpPrompt,
+    setPendingMessage,
+    handleContinueChat,
+    handleNewChatForFollowUp,
+    handleNewChatWithSummary,
+  } = useEnhancedFollowUpPrompt({
+    isAuthenticated,
+    currentChatId,
+    handleNewChat,
+    sendRef: sendRefTemp,
+    recordClientMetric,
+    summarizeRecentAction,
+    chatState,
+  });
+
+  // Use the message handler hook with race condition fixes
+  const { handleSendMessage, sendRef } = useMessageHandler({
+    // State
+    isGenerating,
+    currentChatId,
+    showFollowUpPrompt,
+    isAuthenticated,
+    messageCount,
+    messages,
+    chatState,
+    lastPlannerCallAtByChat,
+
+    // Actions
+    setIsGenerating,
+    setMessageCount,
+    setLastPlannerCallAtByChat,
+    setPendingMessage,
+
+    // Functions
+    handleNewChat,
+    resetFollowUp,
+    onRequestSignUp,
+    planSearch,
+    isTopicChange,
+    generateResponse,
+    generateUnauthenticatedResponse,
+    maybeShowFollowUpPrompt,
+    chatActions,
+  });
+
+  useEffect(() => {
+    sendRefTemp.current = sendRef.current;
+  }, [sendRef]);
+  const { handleDraftChange: analyzeDraft } = useDraftAnalyzer({
+    minLength: DRAFT_MIN_LENGTH,
+    debounceMs: 1200,
+    onAnalysis: () => {},
+  });
+  const handleDraftChange = useCallback(
+    (draft: string) => {
+      if (!isGenerating) analyzeDraft(draft);
+    },
+    [isGenerating, analyzeDraft],
+  );
+
+  // Auto-create first chat for new users
+  useAutoCreateFirstChat({
+    allChats,
+    chats,
+    currentChatId,
+    isAuthenticated,
+    isCreatingChat,
+    propChatId,
+    propShareId,
+    propPublicId,
+    handleNewChat,
+    userSelectedChatAtRef,
+  });
+
+  // Track if we're on mobile for rendering decisions
+  const isMobile = useIsMobile(1024);
+
+  // Keyboard shortcuts and interaction handlers
+  const {
+    swipeHandlers,
+    handleToggleSidebar,
+    handleNewChatButton,
+    startNewChatSession,
+  } = useKeyboardShortcuts({
+    isMobile,
+    sidebarOpen,
+    onToggleSidebar,
+    onNewChat: async () => {
+      // Reset state first
+      userSelectedChatAtRef.current = Date.now();
+      setMessageCount(0);
+      resetFollowUp();
+      setPendingMessage("");
+
+      // Create the chat immediately
+      const newChatId = await handleNewChat();
+
+      if (!newChatId) {
+        // Navigate to home as fallback
+        await navigateWithVerification("/").catch(() => {
+          window.location.href = "/";
+        });
+      }
+    },
+    onShare: openShareModal,
+  });
+
+  // Prepare props for all child components
+  const {
+    chatSidebarProps,
+    mobileSidebarProps,
+    messageListProps,
+    messageInputProps,
+  } = useComponentProps({
+    allChats,
+    currentChatId,
+    currentChat,
+    currentMessages,
+    sidebarOpen,
+    isMobile,
+    isGenerating,
+    searchProgress,
+    isCreatingChat,
+    showShareModal,
+    isAuthenticated,
+    handleSelectChat,
+    handleToggleSidebar,
+    handleNewChatButton,
+    startNewChatSession,
+    handleDeleteLocalChat,
+    handleRequestDeleteChat,
+    handleDeleteLocalMessage,
+    handleRequestDeleteMessage,
+    handleMobileSidebarClose,
+    handleSendMessage,
+    handleDraftChange,
+    setShowShareModal,
+    userHistory,
+  });
+
+  return (
+    <ChatLayout
+      sidebarOpen={sidebarOpen}
+      isMobile={isMobile}
+      showShareModal={showShareModal}
+      showFollowUpPrompt={showFollowUpPrompt}
+      currentChatId={currentChatId}
+      currentChat={currentChat}
+      isAuthenticated={isAuthenticated}
+      allChats={allChats}
+      undoBanner={undoBanner}
+      plannerHint={plannerHint}
+      chatSidebarProps={chatSidebarProps}
+      mobileSidebarProps={mobileSidebarProps}
+      messageListProps={messageListProps}
+      messageInputProps={messageInputProps}
+      swipeHandlers={swipeHandlers}
+      setShowShareModal={setShowShareModal}
+      setUndoBanner={setUndoBanner}
+      openShareModal={openShareModal}
+      handleContinueChat={handleContinueChat}
+      handleNewChatForFollowUp={handleNewChatForFollowUp}
+      handleNewChatWithSummary={handleNewChatWithSummary}
+      chatState={chatState}
+      chatActions={chatActions}
+      updateChatPrivacy={updateChatPrivacy}
+      navigateWithVerification={navigateWithVerification}
+      buildChatPath={buildChatPath}
+      fetchJsonWithRetry={fetchJsonWithRetry}
+      resolveApi={resolveApi}
+    />
+  );
+}
+
+export default ChatInterface;

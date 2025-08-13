@@ -16,7 +16,7 @@ export default defineConfig({
   webServer: {
     command: useProxyRuntime
       ? "node server.mjs"
-      : "vite preview --strictPort --port 4173 --host 127.0.0.1",
+      : "bash -c 'npm run build && vite preview --strictPort --port 4173 --host 127.0.0.1'",
     url: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173",
     reuseExistingServer: true,
     timeout: 60_000,

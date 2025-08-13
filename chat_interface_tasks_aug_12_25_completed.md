@@ -140,7 +140,7 @@ If an audit finds issues:
   - Verify file exists and is properly formatted
   - Document findings: **File exists at docs/baselines/performance.md. Current line counts verified: http.ts (43), search.ts (486), ai.ts (10), chats.ts (42). All significantly under 500 lines.**
 
-### 0.3 Convex Type Safety Wrapper
+### 0.3 Convex Type Safety Wrapper (Deprecated - removed in Phase 4.5)
 
 - [x] **Task 0.3**: Create central type import file
 
@@ -168,7 +168,7 @@ If an audit finds issues:
   - Confirm NO type redefinitions exist
   - Verify exports match current `_generated` structure
   - Check that comments clearly warn against duplication
-  - Test import from this file works: `import { Doc } from "./convexTypes"`
+  - Confirm no files import from this path; all imports use `../_generated/*`
   - Ensure no custom types duplicate Convex auto-generated ones
   - Document findings: **CRITICAL: convexTypes.ts has been deleted per Task 4.5.1 as it was identified as an anti-pattern. All files now import directly from \_generated. This is the correct Convex pattern.**
 
@@ -236,7 +236,7 @@ If an audit finds issues:
   - Implementer: [Agent-opus4.1-002] Date: 2025-08-12T21:00:00Z - COMPLETED
   - File: `src/lib/repositories/ConvexChatRepository.ts`
   - Line 66: Change `api.chats.getChat` → `api.chats.getChatById`
-  - Import types from `convex/lib/convexTypes.ts` ONLY
+  - Import types directly from `convex/_generated/*` ONLY
   - Verify chat loading works after change
   - Time: 15 minutes
 
@@ -244,7 +244,7 @@ If an audit finds issues:
   - Auditor: [Agent-opus4.1-008] Date: 2025-08-13T02:10:00Z - COMPLETED
   - Confirm change at exact line number
   - Test chat loading functionality
-  - Verify imports use convexTypes.ts not \_generated directly
+  - Verify imports use `convex/_generated/*` and not `convexTypes.ts`
   - Check no other API calls need similar fixes
   - Run TypeScript check: `npx tsc --noEmit`
   - Document findings: **API call at line 66 is ALREADY CORRECT - uses api.chats.getChatById. However, discovered type system issue: UnifiedChat, UnifiedMessage, StreamChunk, ChatResponse types are imported but don't exist. Per AGENT.md, convexTypes.ts was deleted (Task 4.5.1) as an anti-pattern. Repository files should import directly from \_generated and use Doc<"chats">, Doc<"messages"> types. API functionality is correct but type architecture needs separate refactoring task.**
@@ -660,7 +660,7 @@ If an audit finds issues:
 
     ```typescript
     import { robustSanitize } from "../lib/security/sanitization";
-    import type { Doc, Id } from "../lib/convexTypes";
+    import type { Doc, Id } from "../_generated/dataModel";
 
     export async function buildSecureContext(
       ctx: QueryCtx,
@@ -869,8 +869,8 @@ If an audit finds issues:
   - Validation: Found violations, documented in tests/results/type-compliance.md
   - Check:
     - No duplicate type definitions
-    - All imports from convexTypes.ts
-    - No direct \_generated imports (except convexTypes.ts)
+    - No imports from `convexTypes.ts`
+    - All Convex imports are from `_generated/*`
     - No manual \_id or \_creationTime definitions
     - Using Convex validators only
   - Run: `npx tsc --noEmit`
@@ -892,7 +892,7 @@ If an audit finds issues:
 - [x] **Task 4.5.1**: Remove all convexTypes.ts usage
   - Implementer: [Agent-opus4.1-003] Date: 2025-08-12T23:10:00Z - COMPLETED
   - Priority: P0 - CRITICAL BLOCKER RESOLVED
-  - Validation: convexTypes.ts file deleted, all imports updated to use \_generated directly
+  - Validation: `convex/lib/convexTypes.ts` deleted, all imports updated to use `_generated/*` directly
   - Time: 2-3 hours
 
 #### Step-by-Step Execution Plan:
@@ -986,8 +986,8 @@ If an audit finds issues:
 
 ### Success Criteria
 
-- [x] Zero imports from convexTypes.ts ✅
-- [x] All imports use Convex patterns from \_generated ✅
+- [x] Zero imports from `convexTypes.ts` ✅
+- [x] All imports use Convex patterns from `_generated/*` ✅
 - [x] TypeScript compilation succeeds ✅
 - [x] Oxlint rule prevents re-introduction (validation script checks this) ✅
 - [x] All tests pass ✅
@@ -1020,13 +1020,11 @@ If an audit finds issues:
   - Check test coverage
   - Time: 30 minutes
 
-- [x] **Task 6.1**: Update all Convex files to use centralized imports
+- [x] **Task 6.1**: Remove centralized wrapper and use Convex direct imports
   - Implementer: [Agent-opus4.1-005] Date: 2025-08-12T23:35:00Z - COMPLETED
-  - ✅ Updated all 15+ files to import from convexTypes.ts
-  - ✅ Removed ALL direct \_generated imports
+  - ✅ Updated all files to import from `convex/_generated/*`
+  - ✅ Removed ALL wrapper references
   - ✅ TypeScript compilation verified
-  - Update 10+ files to import from convexTypes.ts
-  - Remove all direct \_generated imports
   - Verify TypeScript still compiles
   - Time: 30 minutes
 

@@ -18,6 +18,7 @@ import {
   parseLocalMessages,
 } from "../validation/localStorage";
 import { UnauthenticatedAIService } from "../services/UnauthenticatedAIService";
+import { logger } from "../logger";
 import type { LocalMessage } from "../types/message";
 
 const STORAGE_KEYS = {
@@ -291,6 +292,7 @@ export class LocalChatRepository extends BaseRepository {
       }
       yield { type: "done" };
     } catch (error) {
+      logger.error("LocalChatRepository.generateResponse error:", error);
       yield {
         type: "error",
         error: error instanceof Error ? error.message : "Unknown error",
@@ -322,32 +324,53 @@ export class LocalChatRepository extends BaseRepository {
 
     const messages = await this.getMessages(id);
 
-    // Publish to server for sharing
-    const response = await fetch("/api/publishChat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: chat.title,
-        privacy,
-        messages: messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-          timestamp: m.timestamp,
-          searchResults: m.searchResults,
-          sources: m.sources,
-        })),
-      }),
-    });
+    // Try to publish to server; if unavailable, generate local fallback IDs
+    let shareId: string | undefined;
+    let publicId: string | undefined;
 
-    if (!response.ok) {
-      throw new Error(`Failed to publish chat: ${response.statusText}`);
+    const generateLocalId = (prefix: string): string =>
+      `${prefix}_${Date.now().toString(36)}_${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
+
+    try {
+      const response = await fetch("/api/publishChat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: chat.title,
+          privacy,
+          messages: messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+            searchResults: m.searchResults,
+            sources: m.sources,
+          })),
+        }),
+      });
+
+      if (response.ok) {
+        const result = (await response.json()) as {
+          shareId?: string;
+          publicId?: string;
+        };
+        shareId = result.shareId;
+        publicId = result.publicId;
+      } else {
+        // Fallback to local IDs on non-200
+        if (privacy === "shared") shareId = generateLocalId("s");
+        else publicId = generateLocalId("p");
+      }
+    } catch {
+      // Network or proxy unavailable — fallback to local IDs
+      if (privacy === "shared") shareId = generateLocalId("s");
+      else publicId = generateLocalId("p");
     }
 
-    const result = await response.json();
-
-    // Update local chat with share IDs
-    chat.shareId = result.shareId;
-    chat.publicId = result.publicId;
+    // Update local chat with share/public IDs and privacy
+    chat.shareId = shareId ?? chat.shareId;
+    chat.publicId = publicId ?? chat.publicId;
     chat.privacy = privacy;
 
     const chats = await this.getChats();
@@ -357,7 +380,7 @@ export class LocalChatRepository extends BaseRepository {
       await this.saveChats(chats);
     }
 
-    return { shareId: result.shareId, publicId: result.publicId };
+    return { shareId, publicId };
   }
 
   async getChatByShareId(shareId: string): Promise<UnifiedChat | null> {
@@ -426,7 +449,7 @@ export class LocalChatRepository extends BaseRepository {
           }) as UnifiedMessage,
       );
     } catch (error) {
-      console.error("Failed to load messages from localStorage:", error);
+      logger.error("Failed to load messages from localStorage:", error);
       return [];
     }
   }

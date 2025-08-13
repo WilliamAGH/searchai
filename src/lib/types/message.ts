@@ -14,7 +14,7 @@ export interface SearchResult {
   title: string;
   url: string;
   snippet: string;
-  relevanceScore?: number;
+  relevanceScore: number;
 }
 
 /**

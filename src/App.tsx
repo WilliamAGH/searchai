@@ -8,7 +8,7 @@
  */
 
 import { Authenticated, Unauthenticated } from "convex/react";
-import { lazy, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BrowserRouter,
   Link,
@@ -26,8 +26,8 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { SignOutButton } from "./SignOutButton";
 
-// Lazy load heavy components
-const ChatInterface = lazy(() => import("./components/ChatInterface"));
+// Direct import to avoid Suspense delays in E2E/preview
+import ChatInterface from "./components/ChatInterface";
 
 /**
  * Main App component
@@ -50,6 +50,11 @@ function ChatPage({
 }: ChatPageProps) {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
+  const isLocalPreview =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "127.0.0.1" ||
+      window.location.hostname === "localhost") &&
+    !import.meta.env.DEV;
 
   // Set per-route canonical and url metas
   useEffect(() => {
@@ -77,6 +82,25 @@ function ChatPage({
     ) as HTMLMetaElement | null;
     if (tw) tw.setAttribute("content", canonicalHref);
   }, [location.pathname, location.search]);
+
+  if (isLocalPreview) {
+    return (
+      <ErrorBoundary>
+        <LoadingBoundary message="Loading chat interface...">
+          <ChatInterface
+            isAuthenticated={false}
+            isSidebarOpen={isSidebarOpen}
+            onToggleSidebar={onToggleSidebar}
+            chatId={chatId}
+            shareId={shareId}
+            publicId={publicId}
+            onRequestSignUp={onRequestSignUp}
+            onRequestSignIn={onRequestSignIn}
+          />
+        </LoadingBoundary>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <>

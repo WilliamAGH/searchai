@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "playwright-report/**"
+  ]
+}
+
+
+

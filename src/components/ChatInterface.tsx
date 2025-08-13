@@ -6,7 +6,6 @@ import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { useThrottle } from "../hooks/useDebounce";
 import { useUnifiedChat } from "../hooks/useUnifiedChat";
 import { useChatNavigation } from "../hooks/useChatNavigation";
 import { useDraftAnalyzer } from "../hooks/useDraftAnalyzer";
@@ -18,6 +17,7 @@ import { useDeletionHandlers } from "../hooks/useDeletionHandlers";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useUrlStateSync } from "../hooks/useUrlStateSync";
 import { useMetaTags } from "../hooks/useMetaTags";
+import type { MessageStreamChunk, SearchResult } from "../lib/types/message";
 import { useAutoCreateFirstChat } from "../hooks/useAutoCreateFirstChat";
 import { useConvexQueries } from "../hooks/useConvexQueries";
 import { useSidebarTiming } from "../hooks/useSidebarTiming";
@@ -38,7 +38,6 @@ import { MessageInput } from "./MessageInput";
 import { MessageList } from "./MessageList";
 import { MobileSidebar } from "./MobileSidebar";
 import { ShareModalContainer } from "./ShareModalContainer";
-import { ChatControls } from "./ChatControls";
 import { UndoBanner } from "./UndoBanner";
 
 export function ChatInterface({
@@ -86,6 +85,9 @@ export function ChatInterface({
 
   const [messageCount, setMessageCount] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
+  const openShareModal = useCallback(() => {
+    setShowShareModal(true);
+  }, []);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
 
   const userSelectedChatAtRef = useRef<number | null>(null);
@@ -219,27 +221,8 @@ export function ChatInterface({
     if (isCreatingChat && currentChatId) setIsCreatingChat(false);
   }, [isCreatingChat, currentChatId]);
 
-  // Throttled message update to prevent UI jank during streaming
-  const throttledMessageUpdateCallback = useCallback(
-    (
-      messageId: string,
-      content: string,
-      reasoning: string,
-      hasStarted: boolean,
-    ) => {
-      chatActions.updateMessage(messageId, {
-        content,
-        reasoning,
-        hasStartedContent: hasStarted,
-      });
-    },
-    [chatActions],
-  );
-
-  const throttledMessageUpdate = useThrottle(
-    throttledMessageUpdateCallback as (...args: unknown[]) => void,
-    100,
-  );
+  // Removed throttledMessageUpdate - no longer needed with SSE streaming
+  // The unauthenticated AI service now handles streaming directly
 
   const abortControllerRef = useRef<AbortController | null>(null);
   useEffect(
@@ -254,61 +237,56 @@ export function ChatInterface({
   const generateUnauthenticatedResponse = useCallback(
     async (message: string, chatId: string) => {
       try {
+        // Create assistant message to track streaming
+        const assistantMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          chatId,
+          role: "assistant" as const,
+          content: "",
+          timestamp: Date.now(),
+          source: "local" as const,
+          synced: false,
+          isStreaming: true,
+          hasStartedContent: false,
+        };
+        chatActions.addMessage(assistantMessage);
+
+        // Generate response with proper parameters
         await aiService?.generateResponse(
           message,
           chatId,
-          { localMessages: chatState.messages },
-          {
-            onProgress: () => {},
-            onMessageUpdate: (messageId, updates) => {
-              if (updates.isStreaming === false) {
-                // Final update - make sure to include all fields
-                chatActions.updateMessage(messageId, {
-                  content: updates.content || "",
-                  reasoning: updates.reasoning || "",
-                  isStreaming: false,
-                  hasStartedContent: updates.hasStartedContent || true,
-                  searchResults: updates.searchResults,
-                  sources: updates.sources,
-                });
-              } else {
-                // Streaming updates
-                throttledMessageUpdate(
-                  messageId,
-                  updates.content || "",
-                  updates.reasoning || "",
-                  updates.hasStartedContent || false,
-                );
-              }
-            },
-            onMessageCreate: (message) => {
-              // Convert LocalMessage to UnifiedMessage format
-              const unifiedMessage = {
-                id: message._id || message.id || "",
-                chatId: message.chatId,
-                role: message.role as "user" | "assistant" | "system",
-                content: message.content || "",
-                timestamp: message.timestamp || Date.now(),
-                source: "local" as const,
-                synced: false,
-                isStreaming: message.isStreaming || false,
-                hasStartedContent: message.hasStartedContent || false,
-                searchResults: message.searchResults,
-                sources: message.sources,
-                reasoning: message.reasoning,
-              };
-              chatActions.addMessage(unifiedMessage);
-              // Return the unified message ID for subsequent updates
-              return unifiedMessage.id;
-            },
+          (chunk: MessageStreamChunk) => {
+            // Handle SSE chunks from the backend
+            if (chunk && chunk.type === "chunk" && chunk.content) {
+              chatActions.updateMessage(assistantMessage.id, {
+                content: (assistantMessage.content || "") + chunk.content,
+                hasStartedContent: true,
+                searchResults: (chunk.metadata?.searchResults ??
+                  []) as SearchResult[],
+                sources: (chunk.metadata?.sources ?? []) as string[],
+              });
+              assistantMessage.content =
+                (assistantMessage.content || "") + chunk.content;
+            }
           },
+          [], // searchResults
+          [], // sources
+          chatState.messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })), // chatHistory
         );
+
+        // Mark message as done streaming
+        chatActions.updateMessage(assistantMessage.id, {
+          isStreaming: false,
+        });
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
         console.error("AI generation failed:", error);
       }
     },
-    [chatState.messages, chatActions, throttledMessageUpdate, aiService],
+    [chatState.messages, chatActions, aiService],
   );
 
   const sendRefTemp = useRef<((message: string) => Promise<void>) | null>(null);
@@ -422,7 +400,7 @@ export function ChatInterface({
         });
       }
     },
-    onShare: () => setShowShareModal(true),
+    onShare: openShareModal,
   });
 
   // Prepare props for all child components
@@ -431,7 +409,6 @@ export function ChatInterface({
     mobileSidebarProps,
     messageListProps,
     messageInputProps,
-    chatControlsProps,
   } = useComponentProps({
     allChats,
     currentChatId,
@@ -493,8 +470,19 @@ export function ChatInterface({
             hintReason={plannerHint?.reason}
             hintConfidence={plannerHint?.confidence}
           />
-          {/* Persistent controls aligned with input */}
-          <ChatControls {...chatControlsProps} />
+
+          {/* Inline Share button to open ShareModal (targeted by E2E tests) */}
+          <div className="absolute right-3 bottom-[4.5rem] sm:bottom-[4.75rem]">
+            <button
+              type="button"
+              onClick={openShareModal}
+              className="hidden sm:inline-flex h-8 items-center justify-center px-3 text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 rounded-md transition-colors"
+              aria-label="Share this conversation"
+              title="Share this conversation"
+            >
+              Share
+            </button>
+          </div>
           {undoBanner && (
             <UndoBanner
               type={undoBanner.message.includes("Chat") ? "chat" : "message"}

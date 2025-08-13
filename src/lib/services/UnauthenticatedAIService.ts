@@ -2,32 +2,67 @@
  * AI Service for unauthenticated users
  * Handles streaming responses via HTTP endpoints
  */
+import { logger } from "../logger";
+import type { MessageStreamChunk } from "../types/message";
 
 export class UnauthenticatedAIService {
   private convexUrl: string;
   private abortController: AbortController | null = null;
 
   constructor(convexUrl: string) {
+    if (!convexUrl) {
+      logger.warn(
+        "[UnauthenticatedAIService] Missing Convex URL - network calls may fail",
+      );
+    } else {
+      try {
+        // Validate URL format at construction time
+        const _parsed = new URL(convexUrl);
+        void _parsed;
+      } catch {
+        logger.warn(
+          "[UnauthenticatedAIService] Invalid Convex URL format:",
+          convexUrl,
+        );
+      }
+    }
     this.convexUrl = convexUrl;
   }
 
   async generateResponse(
     message: string,
     chatId: string,
-    onChunk?: (chunk: unknown) => void,
+    onChunk?: (chunk: MessageStreamChunk) => void,
+    searchResults?: Array<{
+      title: string;
+      url: string;
+      snippet: string;
+      relevanceScore: number;
+    }>,
+    sources?: string[],
+    chatHistory?: Array<{ role: "user" | "assistant"; content: string }>,
   ): Promise<void> {
     // Create new abort controller for this request
     this.abortController = new AbortController();
 
     try {
-      const response = await fetch(`${this.convexUrl}/api/chat/generate`, {
+      // In development, use the proxied path directly
+      // In production, use the full Convex URL
+      const host = window.location.hostname;
+      const isDev = host === "localhost" || host === "127.0.0.1";
+      const apiUrl = isDev ? "/api/ai" : `${this.convexUrl}/api/ai`;
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           message,
-          chatId,
+          systemPrompt: "You are a helpful AI assistant.",
+          searchResults: searchResults || [],
+          sources: sources || [],
+          chatHistory: chatHistory || [],
         }),
         signal: this.abortController.signal,
       });
@@ -49,18 +84,20 @@ export class UnauthenticatedAIService {
 
         const chunk = decoder.decode(value, { stream: true });
 
-        // Parse and emit chunks
-        try {
-          const lines = chunk.split("\n");
-          for (const line of lines) {
-            if (line.trim()) {
-              const data = JSON.parse(line);
-              onChunk?.(data);
+        // Parse SSE format (data: {...})
+        const lines = chunk.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              // Best-effort runtime guard
+              if (data && typeof data === "object" && "type" in data) {
+                onChunk?.(data as MessageStreamChunk);
+              }
+            } catch {
+              // Skip unparseable lines including "data: [DONE]"
             }
           }
-        } catch {
-          // Handle partial chunks
-          console.info("Partial chunk received:", chunk);
         }
       }
     } catch (error: unknown) {
@@ -69,7 +106,7 @@ export class UnauthenticatedAIService {
         typeof error === "object" &&
         (error as { name?: string }).name === "AbortError"
       ) {
-        console.info("Request aborted");
+        logger.info("[UnauthenticatedAIService] Request aborted");
       } else {
         throw error;
       }
@@ -84,7 +121,13 @@ export class UnauthenticatedAIService {
   }
 
   async searchWithAI(query: string): Promise<unknown> {
-    const response = await fetch(`${this.convexUrl}/api/search`, {
+    // In development, use the proxied path directly
+    // In production, use the full Convex URL
+    const host = window.location.hostname;
+    const isDev = host === "localhost" || host === "127.0.0.1";
+    const apiUrl = isDev ? "/api/search" : `${this.convexUrl}/api/search`;
+
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

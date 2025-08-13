@@ -90,6 +90,7 @@
     "dist/**",
     "convex/_generated/**",
     "node_modules/**",
+    "playwright-report/**",
     "*.config.js",
     "*.config.ts"
   ],

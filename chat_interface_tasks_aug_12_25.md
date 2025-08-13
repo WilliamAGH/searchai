@@ -181,7 +181,7 @@ If an audit finds issues:
   - Auditor: [Agent-___] Date: \_\_\_
   - Confirm all functions copied correctly
   - Check imports are properly adjusted
-  - Verify Convex type imports use convexTypes.ts
+  - Verify Convex types are imported directly from `convex/_generated/*` per `AGENT.md`
   - Test each function still works
   - Ensure no logic was changed during copy
   - Confirm originals still in place
@@ -225,7 +225,7 @@ If an audit finds issues:
   - Check for any unresolved imports
   - Verify no duplicate imports
   - Test major workflows still function
-  - Confirm using convexTypes.ts for types
+  - Confirm all Convex imports use `convex/_generated/*` (no `convexTypes.ts` wrapper)
   - Document findings: **\*\***\_\_\_**\*\***
 
 ### 2.6 Remove Old Code Locations
@@ -604,7 +604,7 @@ After thorough analysis (August 2025), we've determined that `convex/lib/convexT
 
 - [ ] Zero TypeScript errors
 - [ ] No Convex type duplications
-- [ ] All imports from convexTypes.ts
+- [ ] No imports from `convexTypes.ts`; all Convex imports are from `convex/_generated/*`
 - [ ] 100% critical path test coverage
 - [ ] All tasks audited by different agents
 
@@ -663,8 +663,8 @@ echo "Rollback initiated at $(date)" >> rollback.log
 ### Type Safety Rules
 
 1. **NEVER** create types that duplicate Convex's auto-generated types
-2. **ALWAYS** import from `convex/lib/convexTypes.ts` for types
-3. **NEVER** import directly from `_generated/` (except in convexTypes.ts)
+2. **ALWAYS** import directly from `convex/_generated/*` for types (source of truth)
+3. **NEVER** create wrapper or re-export files like `convex/lib/convexTypes.ts`
 4. **NEVER** define `_id`, `_creationTime`, or system fields
 5. **ALWAYS** use Convex validators (`v.string()`, `v.number()`, etc.)
 
