@@ -8,6 +8,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { generateOpaqueId } from "./utils";
 
 /**
@@ -112,11 +113,13 @@ export const getChat = query({
 });
 
 export const getChatByOpaqueId = query({
-  args: { chatId: v.id("chats") },
+  args: { opaqueId: v.string() },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    const chat = await ctx.db.get(args.chatId);
+    // Treat the opaque ID string as a Convex chat ID
+    const chatId = args.opaqueId as Id<"chats">;
+    const chat = await ctx.db.get(chatId);
 
     if (!chat) return null;
 
