@@ -37,11 +37,11 @@
 
 /* Additional z-index management */
 .mobile-sidebar-dialog {
-  z-index: 9999 !important;
+  /* z-50 from Tailwind (50) is sufficient, no override needed */
 }
 
 .desktop-sidebar-container {
-  z-index: 10 !important;
+  /* Normal stacking context, no special z-index needed */
 }
 
 /* Prevent layout shifts during responsive transitions */

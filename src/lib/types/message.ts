@@ -87,7 +87,7 @@ export const createLocalMessage = (
   content: string,
 ): LocalMessage => {
   return {
-    _id: `msg_${Date.now()}`,
+    _id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     chatId,
     role,
     content,
