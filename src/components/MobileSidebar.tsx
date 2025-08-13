@@ -78,7 +78,7 @@ export function MobileSidebar({
       <Dialog
         as="div"
         className="relative z-50 lg:hidden mobile-sidebar-dialog"
-        onClose={() => {}} // Prevent automatic close - handle manually
+        onClose={onClose}
         initialFocus={closeButtonRef}
       >
         <Transition.Child
@@ -90,7 +90,15 @@ export function MobileSidebar({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-900/80" onClick={onClose} />
+          <button
+            className="fixed inset-0 bg-gray-900/80"
+            onClick={onClose}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") onClose();
+            }}
+            type="button"
+            aria-label="Close sidebar overlay"
+          />
         </Transition.Child>
 
         <div className="fixed inset-0 flex">

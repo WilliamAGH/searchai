@@ -290,7 +290,7 @@ export function MessageInput({
 
   return (
     <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 safe-bottom">
-      <div className="max-w-4xl mx-auto p-3 sm:p-4">
+      <div className="p-3 sm:p-4">
         <form onSubmit={handleSubmit}>
           <div className="relative flex items-center">
             <textarea

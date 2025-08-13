@@ -59,8 +59,8 @@ interface MessageListProps {
   onShare?: () => void;
   currentChat?: Chat;
   searchProgress?: {
-    stage: "searching" | "scraping" | "analyzing" | "generating";
-    message: string;
+    stage: "idle" | "searching" | "scraping" | "analyzing" | "generating";
+    message?: string;
     urls?: string[];
     currentUrl?: string;
   } | null;
@@ -107,14 +107,14 @@ export function MessageList({
    * - Uses smooth scroll behavior
    * - Targets sentinel element
    */
-  const scrollToBottom = () => {
+  const scrollToBottom = React.useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, []);
 
   const handleScrollToBottom = React.useCallback(() => {
     scrollToBottom();
     setUserHasScrolled(false);
-  }, []);
+  }, [scrollToBottom]);
 
   const handleDeleteMessage = React.useCallback(
     async (messageId: Id<"messages"> | string | undefined) => {
@@ -147,7 +147,7 @@ export function MessageList({
     if (!userHasScrolled) {
       scrollToBottom();
     }
-  }, [userHasScrolled, messages, isGenerating]);
+  }, [userHasScrolled, scrollToBottom]);
 
   // Debug: surface message counts and rendering state
   useEffect(() => {
@@ -275,7 +275,7 @@ export function MessageList({
               </span>
               {method && (
                 <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400 truncate">
-                  via {method === "serp" ? "SERP" : method}
+                  via web search
                 </span>
               )}
             </div>
@@ -493,7 +493,35 @@ export function MessageList({
                     />
                   )}
 
-                  {/* 2) Reasoning / thinking - positioned below sources */}
+                  {/* 2) Thinking status - shows real-time AI processing */}
+                  {message.role === "assistant" &&
+                    message.thinking &&
+                    message.thinking.trim() && (
+                      <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
+                        <svg
+                          className="w-4 h-4 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        <span>{message.thinking}</span>
+                      </div>
+                    )}
+
+                  {/* 3) Reasoning / thinking - positioned below sources */}
                   {message.role === "assistant" &&
                     message.reasoning &&
                     message.reasoning.trim() && (
@@ -501,7 +529,9 @@ export function MessageList({
                         id={message._id || String(index)}
                         reasoning={message.reasoning}
                         isStreaming={message.isStreaming}
-                        hasStartedContent={message.hasStartedContent}
+                        hasStartedContent={Boolean(
+                          message.content && message.content.trim(),
+                        )}
                         collapsed={
                           collapsedById[
                             `reasoning-${message._id || String(index)}`
@@ -538,12 +568,12 @@ export function MessageList({
                             ? formatConversationWithSources([
                                 {
                                   role: message.role,
-                                  content: message.content,
+                                  content: message.content || "",
                                   searchResults: message.searchResults,
                                   sources: message.sources,
                                 },
                               ])
-                            : extractPlainText(message.content)
+                            : extractPlainText(message.content || "")
                         }
                         size="sm"
                         title="Copy message"
