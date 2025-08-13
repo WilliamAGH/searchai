@@ -143,9 +143,9 @@ export function useComponentProps({
         : !currentChatId
           ? "Start a new chat..."
           : "Type your message...",
-      onSend: handleSendMessage,
+      onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
-      userHistory,
+      history: userHistory,
     }),
     [
       isGenerating,
