@@ -18,6 +18,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { Toaster } from "sonner";
+import { ChatErrorBoundary } from "./components/errors/ChatErrorBoundary";
 import { LoadingBoundary } from "./components/LoadingBoundary";
 import { SignInModal } from "./components/SignInModal";
 import { SignUpModal } from "./components/SignUpModal";
@@ -87,32 +88,36 @@ function ChatPage({
   return (
     <>
       <Authenticated>
-        <LoadingBoundary message="Loading chat interface...">
-          <ChatInterface
-            isAuthenticated={true}
-            isSidebarOpen={isSidebarOpen}
-            onToggleSidebar={onToggleSidebar}
-            chatId={chatId}
-            shareId={shareId}
-            publicId={publicId}
-            onRequestSignUp={onRequestSignUp}
-            onRequestSignIn={onRequestSignIn}
-          />
-        </LoadingBoundary>
+        <ChatErrorBoundary>
+          <LoadingBoundary message="Loading chat interface...">
+            <ChatInterface
+              isAuthenticated={true}
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={onToggleSidebar}
+              chatId={chatId}
+              shareId={shareId}
+              publicId={publicId}
+              onRequestSignUp={onRequestSignUp}
+              onRequestSignIn={onRequestSignIn}
+            />
+          </LoadingBoundary>
+        </ChatErrorBoundary>
       </Authenticated>
       <Unauthenticated>
-        <LoadingBoundary message="Loading chat interface...">
-          <ChatInterface
-            isAuthenticated={false}
-            isSidebarOpen={isSidebarOpen}
-            onToggleSidebar={onToggleSidebar}
-            chatId={chatId}
-            shareId={shareId}
-            publicId={publicId}
-            onRequestSignUp={onRequestSignUp}
-            onRequestSignIn={onRequestSignIn}
-          />
-        </LoadingBoundary>
+        <ChatErrorBoundary>
+          <LoadingBoundary message="Loading chat interface...">
+            <ChatInterface
+              isAuthenticated={false}
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={onToggleSidebar}
+              chatId={chatId}
+              shareId={shareId}
+              publicId={publicId}
+              onRequestSignUp={onRequestSignUp}
+              onRequestSignIn={onRequestSignIn}
+            />
+          </LoadingBoundary>
+        </ChatErrorBoundary>
       </Unauthenticated>
     </>
   );
@@ -229,7 +234,9 @@ export default function App() {
   }, []);
 
   const toggleSidebar = useCallback(() => {
-    setIsSidebarOpen((prev) => !prev);
+    setIsSidebarOpen((prev) => {
+      return !prev;
+    });
     setHasManuallyToggled(true);
   }, []);
 
@@ -249,7 +256,7 @@ export default function App() {
         <div className="h-dvh overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
           <div className="h-dvh flex flex-col">
             <header className="flex-shrink-0 sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[3.75rem] sm:h-16 flex items-center justify-between">
+              <div className="h-[3.75rem] sm:h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
                   {/* Mobile menu button */}
                   <button
@@ -331,6 +338,17 @@ export default function App() {
               <Routes>
                 <Route
                   path="/"
+                  element={
+                    <ChatPage
+                      onRequestSignUp={openSignUp}
+                      onRequestSignIn={openSignIn}
+                      isSidebarOpen={isSidebarOpen}
+                      onToggleSidebar={toggleSidebar}
+                    />
+                  }
+                />
+                <Route
+                  path="/chat"
                   element={
                     <ChatPage
                       onRequestSignUp={openSignUp}

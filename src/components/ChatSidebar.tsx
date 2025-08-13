@@ -92,7 +92,9 @@ export function ChatSidebar({
           <h3 className="font-semibold">Chats</h3>
           <button
             type="button"
-            onClick={onToggle}
+            onClick={() => {
+              onToggle();
+            }}
             className="p-1 hover:bg-muted rounded transition-colors"
             title="Close sidebar"
           >
