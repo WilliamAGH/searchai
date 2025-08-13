@@ -1,7 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
-import { internal } from "./_generated/api";
 
 export const addMessage = internalMutation({
   args: {
@@ -17,7 +16,7 @@ export const addMessage = internalMutation({
           title: v.string(),
           url: v.string(),
           snippet: v.string(),
-          relevanceScore: v.optional(v.number()),
+          relevanceScore: v.number(), // Required to match schema
         }),
       ),
     ),
@@ -32,7 +31,6 @@ export const addMessage = internalMutation({
       ),
     ),
     hasRealResults: v.optional(v.boolean()),
-    hasStartedContent: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -99,7 +97,7 @@ export const updateMessageMetadata = mutation({
           title: v.string(),
           url: v.string(),
           snippet: v.string(),
-          relevanceScore: v.optional(v.number()),
+          relevanceScore: v.number(), // Required to match schema
         }),
       ),
     ),
@@ -141,7 +139,7 @@ export const updateMessage = internalMutation({
           title: v.string(),
           url: v.string(),
           snippet: v.string(),
-          relevanceScore: v.optional(v.number()),
+          relevanceScore: v.number(), // Required to match schema
         }),
       ),
     ),
@@ -156,7 +154,6 @@ export const updateMessage = internalMutation({
       ),
     ),
     hasRealResults: v.optional(v.boolean()),
-    hasStartedContent: v.optional(v.boolean()),
   },
   handler: async (ctx, { messageId, ...rest }) => {
     await ctx.db.patch(messageId, { ...rest });
@@ -200,19 +197,23 @@ export const deleteMessage = mutation({
     await ctx.db.delete(args.messageId);
 
     // Best-effort: invalidate planner cache and clear rolling summary to force regeneration
+    // TODO: Re-enable cache invalidation when circular dependency is resolved
+    // try {
+    //   await ctx.scheduler.runAfter(
+    //     0,
+    //     internal.search.invalidatePlanCacheForChat,
+    //     {
+    //       chatId: message.chatId,
+    //     },
+    //   );
+    // } catch {}
+
+    // Clear rolling summary directly to avoid circular dependency
     try {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.search.invalidatePlanCacheForChat,
-        {
-          chatId: message.chatId,
-        },
-      );
-    } catch {}
-    try {
-      await ctx.runMutation(internal.chats.updateRollingSummary, {
-        chatId: message.chatId,
-        summary: "",
+      await ctx.db.patch(message.chatId, {
+        rollingSummary: "",
+        rollingSummaryUpdatedAt: Date.now(),
+        updatedAt: Date.now(),
       });
     } catch {}
     return null;

@@ -8,6 +8,9 @@
  * - AI responses
  */
 
+// Import SearchResult from the single source of truth
+import type { SearchResult } from "./search/providers/serpapi";
+
 // Enhancement system - no convex values needed here
 
 // Extract URLs and domains from user message
@@ -81,12 +84,7 @@ export interface EnhancementRule {
   prioritizeUrls?: string[];
 }
 
-export interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-}
+// SearchResult is imported from ./search/providers/serpapi above
 
 /**
  * Creator/Author Enhancement Rule
