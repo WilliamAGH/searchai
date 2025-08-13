@@ -9,7 +9,7 @@
 - [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/components/MessageInput.tsx
 - [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/components/ShareModalContainer.tsx
 - [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/components/ChatControls.tsx
-- [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useComponentProps.ts
+- [x] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useComponentProps.ts
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useUnifiedChat.ts
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useMessageHandler.ts
 - [ ] /Users/williamcallahan/Developer/git/hybrid/searchai-io/src/hooks/useDeletionHandlers.ts
