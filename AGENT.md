@@ -110,16 +110,15 @@ This project operates under **ZERO TEMPERATURE** development standards where eve
 
 **MANDATORY FOR EVERY CODE CHANGE:**
 
-1. **MCP Documentation Lookup** (REQUIRED):
+1. **Documentation Lookup** (REQUIRED):
 
-   ```
-   @mcp__context7__resolve-library-id libraryName="react"
-   @mcp__context7__get-library-docs context7CompatibleLibraryID="[id]" topic="[specific-feature]"
-   ```
+   - Use built-in web search for library documentation
+   - Search for "[library] [version] documentation"
+   - Verify API patterns in official docs
 
 2. **Web Search for Current Patterns** (REQUIRED):
 
-   - Use @mcp**brave-search**brave_web_search for:
+   - Use built-in google_web_search for:
      - "React 19.1 [specific feature] documentation"
      - "Vite 6 [configuration] 2024"
      - "Convex [API method] typescript"
@@ -134,11 +133,32 @@ This project operates under **ZERO TEMPERATURE** development standards where eve
 
 **NEVER ALLOWED:**
 
-- Any `@ts-ignore` or `@ts-expect-error`
+- Any `@ts-ignore` or `@ts-expect-error` EXCEPT for documented Convex TS2589 issues
 - Any `eslint-disable` comments
 - Any `any` type without explicit justification
 - Any unvalidated external data
 - Any type assertions without runtime checks
+
+### 🚨 CONVEX TS2589 ERROR PREVENTION
+
+**CRITICAL RULE: Avoid TypeScript TS2589 "Type instantiation is excessively deep" errors:**
+
+- **NEVER** use `ctx.runMutation` or `ctx.runQuery` in httpAction handlers with complex nested arguments
+- **NEVER** pass arrays of objects with multiple optional fields through `ctx.runMutation`
+- **INSTEAD** simplify argument types or use `@ts-ignore` with clear documentation when unavoidable
+
+**Known Problematic Patterns:**
+
+```typescript
+// ❌ CAUSES TS2589: Complex nested types in httpAction
+await ctx.runMutation(api.chats.publishAnonymousChat, {
+  messages: Array<{ role: string; content?: string; searchResults?: Array<...> }>
+});
+
+// ✅ ACCEPTABLE WORKAROUND: Document and use @ts-ignore
+// @ts-ignore - Known Convex limitation with complex type inference
+await ctx.runMutation(api.chats.publishAnonymousChat, { ... });
+```
 
 ### Assumptions = VIOLATIONS
 
@@ -166,21 +186,61 @@ This project operates under **ZERO TEMPERATURE** development standards where eve
 - Runtime validation for all external data
 - Convex schema validation for backend
 
-### 🚨 CRITICAL: Convex Type Generation & Validation - DO NOT DUPLICATE
+### 🚨 CRITICAL: Convex Type Generation & Import Strategy
 
-**ABSOLUTELY FORBIDDEN - NEVER CREATE REDUNDANT TYPE DEFINITIONS:**
+**IMPORTANT UPDATE (August 2025):** After thorough analysis, we've determined that creating abstraction layers over Convex's `_generated` directory is an anti-pattern that should be avoided.
 
-Convex automatically generates all required TypeScript types in the `convex/_generated/` directory. These files are managed by Convex and regenerated on every `npx convex dev` or `npx convex codegen` command.
+**CONVEX TYPE IMPORT RULES:**
 
-**CONVEX PROVIDES COMPLETE TYPE SAFETY:**
+1. **ALWAYS** import directly from `convex/_generated/` directories - this is Convex's intended pattern
+2. **NEVER** create "wrapper" or "re-export" files like `convexTypes.ts`
+3. **NEVER** manually duplicate types that Convex generates
+4. **FOLLOW** Convex's official documentation patterns exactly
 
-- Automatic type generation from schema
-- Runtime validation of function arguments
-- Serialization/deserialization handled automatically
-- Client-server type synchronization via generated files
-- Single source of truth: your schema.ts
+**WHY NO ABSTRACTION LAYER:**
 
-**AUTO-GENERATED TYPES (NEVER MANUALLY CREATE):**
+- Convex's `_generated` directory IS the abstraction layer
+- Re-export files can cause circular dependencies and compilation errors
+- They add maintenance burden without benefit
+- They break IDE auto-import and discovery
+- They go against Convex framework conventions
+
+**CORRECT IMPORT PATTERNS:**
+
+```typescript
+// ✅ BACKEND FILES (in convex/ directory)
+import { query, mutation, action } from "./_generated/server";
+import { api, internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
+
+// ✅ FRONTEND FILES (in src/ directory)
+import { api } from "../../convex/_generated/api";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
+
+// Use the generated types directly
+const userId: Id<"users"> = "...";
+const user: Doc<"users"> = await ctx.db.get(userId);
+```
+
+**INCORRECT PATTERNS TO AVOID:**
+
+```typescript
+// ❌ WRONG - Creating re-export abstraction files
+// convex/lib/convexTypes.ts
+export { Doc, Id } from "../_generated/dataModel";
+
+// ❌ WRONG - Importing from abstraction instead of source
+import { Doc, Id } from "./lib/convexTypes";
+
+// ❌ WRONG - Creating duplicate type definitions
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+}
+```
+
+**AUTO-GENERATED TYPES (USE DIRECTLY):**
 
 - `Doc<TableName>` - Document types for each table with all fields
 - `Id<TableName>` - Type-safe document ID types for each table
@@ -189,46 +249,9 @@ Convex automatically generates all required TypeScript types in the `convex/_gen
 - `api` and `internal` - Type-safe function references
 - All argument and return types for Convex functions
 
-**MANDATORY RULES:**
+**TYPE SAFETY GUARANTEE:**
 
-1. **NEVER** create duplicate type definitions for database documents
-2. **NEVER** manually define types that mirror Convex schema
-3. **NEVER** create custom ID types - use `Id<TableName>` from `_generated/dataModel`
-4. **NEVER** modify or edit files in `convex/_generated/` directory
-5. **ALWAYS** import types from `convex/_generated/dataModel` and `convex/_generated/api`
-6. **ALWAYS** rely on Convex's automatic type inference for function arguments/returns
-
-**CORRECT USAGE:**
-
-```typescript
-// ✅ CORRECT - Import from generated types
-import { Doc, Id } from "../convex/_generated/dataModel";
-import { api } from "../convex/_generated/api";
-
-// Use the generated types directly
-const userId: Id<"users"> = "...";
-const user: Doc<"users"> = await ctx.db.get(userId);
-```
-
-**INCORRECT USAGE:**
-
-```typescript
-// ❌ WRONG - Creating redundant type definitions
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-}
-
-// ❌ WRONG - Duplicating what Convex already provides
-type UserId = string;
-type ChatDocument = {
-  title: string;
-  // ...
-};
-```
-
-The Convex type generation system ensures perfect synchronization between your schema and TypeScript types. Any manual type definitions for database entities are redundant and create maintenance overhead.
+Convex's type generation ensures perfect synchronization between your schema and TypeScript types. The `_generated` files update instantly when schema changes, providing complete type safety without any abstraction layers.
 
 ### ✅ LITMUS TEST: Full Convex Type Optimization
 
@@ -274,6 +297,8 @@ const result = await convex.query(api.chats.getChat, { chatId });
 
 - React 19 with latest features
 - Vite for blazing fast development
+  - **CRITICAL: Use `import.meta.env.VITE_*` for environment variables, NOT `process.env`**
+  - Example: `import.meta.env.VITE_CONVEX_URL` instead of `process.env.NEXT_PUBLIC_CONVEX_URL`
 - Convex for real-time backend
 - Tailwind CSS for styling
 - AI SDK for LLM integration
@@ -284,6 +309,7 @@ const result = await convex.query(api.chats.getChat, { chatId });
 - Comprehensive test coverage
 - Consistent code formatting
 - Accessibility compliance
+- **File Size Limits**: Maximum 500 lines per file
 
 ## 🛠️ DEVELOPMENT WORKFLOW
 
@@ -321,22 +347,102 @@ All code changes must pass:
 - Proper error handling for AI failures
 - Rate limiting and cost management
 
-## 📁 PROJECT STRUCTURE
+## 📁 PROJECT STRUCTURE & DIRECTORY BOUNDARIES
 
 ```
 searchai-io/
-├── src/                # React application source
+├── src/                # React application (FRONTEND ONLY)
 │   ├── components/     # React components
 │   ├── hooks/         # Custom React hooks
-│   ├── lib/           # Utilities and helpers
+│   ├── lib/           # Frontend utilities
+│   │   ├── validation/ # CLIENT-SIDE validation (UX only)
+│   │   ├── utils/     # Frontend helpers
+│   │   └── adapters/  # Frontend service adapters
 │   ├── types/         # UI-only types (NEVER database entities!)
 │   └── styles/        # CSS and styling
-├── convex/            # Convex backend
+├── convex/            # Convex backend (BACKEND ONLY)
 │   ├── _generated/    # Auto-generated Convex types (SOURCE OF TRUTH)
+│   ├── lib/           # Backend utilities (CANNOT import from src/)
+│   │   └── security/  # SERVER-SIDE validation & sanitization
+│   │       ├── sanitization.ts  # Input sanitization, SearchResult normalization
+│   │       ├── patterns.ts      # Security patterns
+│   │       └── webContent.ts    # Web content security
+│   ├── http/          # HTTP route handlers
+│   │   └── routes/    # Individual route modules
 │   └── *.ts          # Backend functions
 ├── tests/             # Test files
 └── public/            # Static assets
 ```
+
+### 🚨 CRITICAL DIRECTORY BOUNDARIES
+
+**FRONTEND (`src/`) vs BACKEND (`convex/`) Separation:**
+
+| Directory              | Purpose                               | Can Import From                          | CANNOT Import From                 |
+| ---------------------- | ------------------------------------- | ---------------------------------------- | ---------------------------------- |
+| `src/`                 | Frontend React app                    | `convex/_generated/`, other `src/` files | `convex/*.ts` (except \_generated) |
+| `convex/`              | Backend functions                     | Other `convex/` files, Node modules      | ANY `src/` files                   |
+| `src/lib/validation/`  | Client-side validation for UX         | `src/` files only                        | `convex/` files                    |
+| `convex/lib/security/` | Server-side validation & sanitization | `convex/` files only                     | `src/` files                       |
+
+**Why This Separation Exists:**
+
+- Convex backend runs in a separate environment from the frontend
+- Backend cannot access frontend code (different build processes)
+- Frontend can only access backend through generated API types
+
+### ⚠️ VALIDATION STRATEGY - WHERE TO PUT WHAT
+
+**Client-Side (`src/lib/validation/`):**
+
+- ✅ Form validation for immediate UX feedback
+- ✅ Input length checks for user guidance
+- ✅ Format validation (email, phone) for user hints
+- ❌ NOT for security (can be bypassed)
+- ❌ NOT for data normalization
+
+**Server-Side (`convex/lib/security/`):**
+
+- ✅ **MANDATORY** security sanitization
+- ✅ Data normalization (e.g., normalizeSearchResult)
+- ✅ HTML/XSS prevention
+- ✅ Type coercion for external data
+- ✅ Default value assignment
+
+**Example - SearchResult Normalization:**
+
+```typescript
+// ❌ WRONG: In src/lib/validation/
+export function normalizeSearchResult() { ... }
+
+// ✅ CORRECT: In convex/lib/security/sanitization.ts
+export function normalizeSearchResult(result: any): SearchResult {
+  // Ensures relevanceScore is always present
+  // Sanitizes title and snippet
+  // Used by HTTP endpoints receiving external data
+}
+```
+
+### 📋 TYPE DEFINITIONS - WHERE THEY BELONG
+
+**Database Types:**
+
+- ✅ **ONLY** from `convex/_generated/dataModel`
+- ❌ NEVER manually define database types
+
+**Business Logic Types (non-database):**
+
+- If used only in backend → Define in relevant `convex/` file
+- If used only in frontend → Define in `src/types/`
+- If shared → Define in backend, import via API response types
+
+**❌ NEVER Re-export Types:**
+
+- Don't create "convenience" re-exports (e.g., `export type { SearchResult }`)
+- Each file should import directly from the source of truth
+- Re-exports create confusion about where types are defined
+- Re-exports can mask circular dependencies
+- Direct imports make code navigation clearer
 
 **⚠️ CRITICAL DISTINCTION - src/types/ Directory:**
 
@@ -344,6 +450,130 @@ searchai-io/
 - ❌ **FORBIDDEN**: Any type that duplicates Convex schema (User, Chat, Message, etc.)
 - ❌ **FORBIDDEN**: Any ID types (use `Id<TableName>` from \_generated)
 - ❌ **FORBIDDEN**: Any database document types (use `Doc<TableName>` from \_generated)
+
+## 📏 FILE SIZE & ORGANIZATION STANDARDS
+
+### Maximum File Size: 500 Lines
+
+**MANDATORY**: No single file should exceed 500 lines of code. This ensures:
+
+- Better maintainability and readability
+- Faster IDE performance and code navigation
+- Easier code reviews and debugging
+- Clear separation of concerns
+
+### When to Split Files
+
+**Split files when approaching 400 lines by:**
+
+1. **Component Splitting** (React):
+
+   ```typescript
+   // Instead of one large ChatInterface.tsx (500+ lines)
+   // Split into:
+   components/
+   ├── ChatInterface.tsx         // Main container (< 200 lines)
+   ├── ChatHeader.tsx            // Header component (< 100 lines)
+   ├── ChatMessageList.tsx       // Message display (< 150 lines)
+   └── ChatInput.tsx             // Input controls (< 100 lines)
+   ```
+
+2. **Hook Extraction**:
+
+   ```typescript
+   // Extract complex logic into custom hooks
+   hooks/
+   ├── useChat.ts               // Chat state management
+   ├── useChatSubscription.ts   // Real-time subscriptions
+   └── useChatActions.ts        // Chat mutations
+   ```
+
+3. **Utility Function Separation**:
+
+   ```typescript
+   // Group related utilities
+   lib/
+   ├── validation/
+   │   ├── input.ts            // Input validation
+   │   └── email.ts            // Email-specific validation
+   ├── formatting/
+   │   ├── date.ts             // Date formatting
+   │   └── message.ts          // Message formatting
+   └── constants/
+       └── limits.ts           // App-wide constants
+   ```
+
+4. **Convex Function Organization**:
+   ```typescript
+   // Split large Convex files by domain
+   convex/
+   ├── chats/
+   │   ├── queries.ts          // Chat queries
+   │   ├── mutations.ts        // Chat mutations
+   │   └── subscriptions.ts    // Real-time subscriptions
+   ├── messages/
+   │   ├── queries.ts          // Message queries
+   │   └── mutations.ts        // Message mutations
+   └── users/
+       └── queries.ts          // User queries
+   ```
+
+### Circular Dependency Prevention
+
+**CRITICAL: Prevent circular dependencies through:**
+
+1. **Dependency Direction**:
+
+   ```
+   UI Components → Hooks → Services → Types
+   Never: Services → Components or Hooks → Components
+   ```
+
+2. **Type Import Strategy**:
+
+   - Import Convex types ONLY from `_generated/dataModel`
+   - Never create intermediate type files that re-export
+   - UI types stay in `src/types/` and never import from components
+
+3. **Common Anti-Patterns to Avoid**:
+
+   ```typescript
+   // ❌ WRONG: Circular dependency
+   // fileA.ts
+   import { something } from "./fileB";
+   export const utilA = () => something();
+
+   // fileB.ts
+   import { utilA } from "./fileA"; // CIRCULAR!
+
+   // ✅ CORRECT: Extract shared logic
+   // shared.ts
+   export const sharedUtil = () => {};
+
+   // fileA.ts & fileB.ts
+   import { sharedUtil } from "./shared";
+   ```
+
+4. **Barrel Exports Pattern**:
+
+   ```typescript
+   // ✅ Use index.ts for clean imports but avoid deep nesting
+   components/Chat/
+   ├── ChatHeader.tsx
+   ├── ChatBody.tsx
+   ├── ChatFooter.tsx
+   └── index.ts         // Export all chat components
+
+   // index.ts
+   export { ChatHeader } from './ChatHeader';
+   export { ChatBody } from './ChatBody';
+   export { ChatFooter } from './ChatFooter';
+   ```
+
+5. **Dependency Validation**:
+   - Run `npm run typecheck` frequently to catch circular dependencies
+   - TypeScript will error on circular imports
+   - Keep import chains shallow (max 3-4 levels deep)
 
 ## 🚀 KEY COMMANDS
 
@@ -442,10 +672,11 @@ Follow conventional commits:
 
 2. **Fetch Live Documentation**:
 
-   - React 19: @mcp**context7**resolve-library-id libraryName="react"
-   - Convex: @mcp**context7**resolve-library-id libraryName="convex"
-   - Vite: @mcp**context7**resolve-library-id libraryName="vite"
-   - AI SDK: @mcp**context7**resolve-library-id libraryName="@ai-sdk/react"
+   - Use web search for official documentation
+   - React 19: Search for "React 19 documentation"
+   - Convex: Search for "Convex documentation"
+   - Vite: Search for "Vite documentation"
+   - AI SDK: Search for "Vercel AI SDK documentation"
 
 3. **Search for Current Patterns**:
 

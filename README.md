@@ -20,6 +20,25 @@ Built with React + Vite on the frontend and Convex on the backend.
 - `src/` — React app and components
 - `convex/` — Convex functions, auth, and HTTP routes (see `convex/http.ts`)
 
+## TypeScript and Convex Types
+
+### Important: Direct Imports from \_generated
+
+**Always import Convex types directly from the `_generated` directories:**
+
+```typescript
+// Backend files (convex/*.ts)
+import { query, mutation } from "./_generated/server";
+import { api, internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
+
+// Frontend files (src/**/*.tsx)
+import { api } from "../../convex/_generated/api";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
+```
+
+**Never create abstraction layers or re-export files** - Convex's `_generated` directory is already the abstraction you need. It updates automatically when your schema changes.
+
 ## Initial Setup
 
 ### 1. Install Dependencies
