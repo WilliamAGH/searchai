@@ -1,22 +1,37 @@
 import { useMemo } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
+import type { Chat } from "../lib/types/chat";
+import type { Message } from "../lib/types/message";
 
 interface UseComponentPropsArgs {
-  allChats: any[];
+  allChats: Chat[];
   currentChatId: string | null;
-  currentChat: any;
-  currentMessages: any[];
+  currentChat: Chat | null;
+  currentMessages: Message[];
   sidebarOpen: boolean;
   isMobile: boolean;
   isGenerating: boolean;
-  searchProgress: any;
+  searchProgress: {
+    stage: string;
+    message: string;
+    progress: number;
+  } | null;
   isCreatingChat: boolean;
   showShareModal: boolean;
-  setShowShareModal: (show: boolean) => void;
+  isAuthenticated: boolean;
+  handleSelectChat: (chatId: string | Id<"chats">) => void;
+  handleToggleSidebar: () => void;
+  handleNewChatButton: () => Promise<void>;
+  startNewChatSession: () => Promise<void>;
   handleDeleteLocalChat: (chatId: string) => void;
   handleRequestDeleteChat: (chatId: Id<"chats">) => void;
-  handleSelectChat: (chatId: string) => void;
-  handleRequestNewChat: () => void;
+  handleDeleteLocalMessage: (messageId: string) => void;
+  handleRequestDeleteMessage: (messageId: Id<"messages">) => void;
+  handleMobileSidebarClose: () => void;
+  handleSendMessage: (message: string) => Promise<void>;
+  handleDraftChange: (draft: string) => void;
+  setShowShareModal: (show: boolean) => void;
+  userHistory: string[];
 }
 
 /**
@@ -33,11 +48,20 @@ export function useComponentProps({
   searchProgress,
   isCreatingChat,
   showShareModal,
-  setShowShareModal,
+  isAuthenticated,
+  handleSelectChat,
+  handleToggleSidebar,
+  handleNewChatButton,
+  startNewChatSession,
   handleDeleteLocalChat,
   handleRequestDeleteChat,
-  handleSelectChat,
-  handleRequestNewChat,
+  handleDeleteLocalMessage,
+  handleRequestDeleteMessage,
+  handleMobileSidebarClose,
+  handleSendMessage,
+  handleDraftChange,
+  setShowShareModal,
+  userHistory,
 }: UseComponentPropsArgs) {
   const chatSidebarProps = useMemo(
     () => ({
@@ -47,7 +71,7 @@ export function useComponentProps({
       onDeleteChat: currentChat?.isLocal
         ? handleDeleteLocalChat
         : handleRequestDeleteChat,
-      onNewChat: handleRequestNewChat,
+      onNewChat: handleNewChatButton,
       isCreatingChat,
     }),
     [
@@ -58,7 +82,7 @@ export function useComponentProps({
       handleSelectChat,
       handleDeleteLocalChat,
       handleRequestDeleteChat,
-      handleRequestNewChat,
+      handleNewChatButton,
     ],
   );
 
@@ -71,7 +95,8 @@ export function useComponentProps({
       onDeleteChat: currentChat?.isLocal
         ? handleDeleteLocalChat
         : handleRequestDeleteChat,
-      onNewChat: handleRequestNewChat,
+      onNewChat: handleNewChatButton,
+      onClose: handleMobileSidebarClose,
       isCreatingChat,
     }),
     [
@@ -84,7 +109,8 @@ export function useComponentProps({
       handleSelectChat,
       handleDeleteLocalChat,
       handleRequestDeleteChat,
-      handleRequestNewChat,
+      handleNewChatButton,
+      handleMobileSidebarClose,
     ],
   );
 
@@ -94,18 +120,40 @@ export function useComponentProps({
       isGenerating,
       searchProgress,
       chatId: currentChatId,
+      onDeleteMessage: isAuthenticated
+        ? handleRequestDeleteMessage
+        : handleDeleteLocalMessage,
     }),
-    [currentMessages, isGenerating, searchProgress, currentChatId],
+    [
+      currentMessages,
+      isGenerating,
+      searchProgress,
+      currentChatId,
+      isAuthenticated,
+      handleRequestDeleteMessage,
+      handleDeleteLocalMessage,
+    ],
   );
 
   const messageInputProps = useMemo(
     () => ({
-      disabled: isGenerating || !currentChatId,
+      disabled: isGenerating,
       placeholder: isGenerating
         ? "Generating response..."
-        : "Type your message...",
+        : !currentChatId
+          ? "Start a new chat..."
+          : "Type your message...",
+      onSend: handleSendMessage,
+      onDraftChange: handleDraftChange,
+      userHistory,
     }),
-    [isGenerating, currentChatId],
+    [
+      isGenerating,
+      currentChatId,
+      handleSendMessage,
+      handleDraftChange,
+      userHistory,
+    ],
   );
 
   const chatControlsProps = useMemo(
@@ -114,8 +162,17 @@ export function useComponentProps({
       showShareModal,
       setShowShareModal,
       isGenerating,
+      onNewChat: startNewChatSession,
+      onToggleSidebar: handleToggleSidebar,
     }),
-    [currentChat, showShareModal, setShowShareModal, isGenerating],
+    [
+      currentChat,
+      showShareModal,
+      setShowShareModal,
+      isGenerating,
+      startNewChatSession,
+      handleToggleSidebar,
+    ],
   );
 
   return {
