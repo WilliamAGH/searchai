@@ -164,11 +164,12 @@ export function useUnifiedChat() {
 
   // Load messages when current chat changes
   useEffect(() => {
-    if (!repository || !state.currentChatId) return;
+    const currentChatId = state.currentChatId;
+    if (!repository || !currentChatId) return;
 
     const loadMessages = async () => {
       try {
-        const messages = await repository.getMessages(state.currentChatId);
+        const messages = await repository.getMessages(currentChatId);
         setState((prev) => ({
           ...prev,
           messages,
@@ -218,8 +219,9 @@ export function useUnifiedChat() {
           setState((prev) => ({ ...prev, chats: newChats }));
 
           // If we had a current chat, try to map it to the new ID
-          if (state.currentChatId && result.mapping) {
-            const newId = result.mapping.get(state.currentChatId);
+          const currentChatId = state.currentChatId;
+          if (currentChatId && result.mapping) {
+            const newId = result.mapping.get(currentChatId);
             if (newId) {
               setState((prev) => ({ ...prev, currentChatId: newId }));
             }
@@ -366,7 +368,22 @@ export function useUnifiedChat() {
     },
 
     async sendMessage(content: string) {
-      if (!repository || !state.currentChatId) return;
+      if (!repository) return;
+
+      let chatId = state.currentChatId;
+
+      // FIX: Extract chat ID from messages if needed (race condition fix)
+      if (!chatId && state.messages.length > 0) {
+        chatId = state.messages[0].chatId;
+        setState((prev) => ({
+          ...prev,
+          currentChatId: chatId,
+          currentChat: prev.chats.find((c) => c.id === chatId) || null,
+        }));
+      }
+
+      // Still no chat ID means we need to create one
+      if (!chatId) return;
 
       const trimmed = content.trim();
       if (!trimmed) return;
@@ -389,13 +406,11 @@ export function useUnifiedChat() {
           // Update title if first message
           if (state.messages.length === 0) {
             const title = TitleUtils.generateFromContent(trimmed);
-            await repository.updateChatTitle(state.currentChatId, title);
+            await repository.updateChatTitle(chatId, title);
 
             setState((prev) => {
               const updated = prev.chats.map((c) =>
-                c.id === state.currentChatId
-                  ? { ...c, title, updatedAt: Date.now() }
-                  : c,
+                c.id === chatId ? { ...c, title, updatedAt: Date.now() } : c,
               );
 
               return {
@@ -409,7 +424,7 @@ export function useUnifiedChat() {
           }
         } else {
           // Local mode - add message then generate
-          const userMessage = await repository.addMessage(state.currentChatId, {
+          const userMessage = await repository.addMessage(chatId, {
             role: "user",
             content: trimmed,
           });
@@ -422,13 +437,11 @@ export function useUnifiedChat() {
           // Update title if first message
           if (state.messages.length === 0) {
             const title = TitleUtils.generateFromContent(trimmed);
-            await repository.updateChatTitle(state.currentChatId, title);
+            await repository.updateChatTitle(chatId, title);
 
             setState((prev) => {
               const updated = prev.chats.map((c) =>
-                c.id === state.currentChatId
-                  ? { ...c, title, updatedAt: Date.now() }
-                  : c,
+                c.id === chatId ? { ...c, title, updatedAt: Date.now() } : c,
               );
 
               return {
@@ -444,7 +457,7 @@ export function useUnifiedChat() {
           // Generate AI response placeholder for local mode
           const assistantMessage: UnifiedMessage = {
             id: IdUtils.generateLocalId("msg"),
-            chatId: state.currentChatId,
+            chatId: chatId,
             role: "assistant",
             content: "",
             timestamp: Date.now(),
@@ -460,10 +473,7 @@ export function useUnifiedChat() {
         }
 
         // Stream response - common for both modes
-        const stream = repository.generateResponse(
-          state.currentChatId,
-          trimmed,
-        );
+        const stream = repository.generateResponse(chatId, trimmed);
         let fullContent = "";
 
         for await (const chunk of stream) {
@@ -775,11 +785,11 @@ export function useUnifiedChat() {
     },
 
     async handleShare(privacy: "shared" | "public") {
-      if (!state.currentChatId) {
+      if (!chatId) {
         throw new Error("No chat selected to share");
       }
       setState((prev) => ({ ...prev, showShareModal: false }));
-      return await actions.shareChat(state.currentChatId, privacy);
+      return await actions.shareChat(chatId, privacy);
     },
 
     handleRequestDeleteChat(id: string) {
