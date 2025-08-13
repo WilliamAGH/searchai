@@ -5,7 +5,7 @@
  */
 
 import { httpAction } from "../../_generated/server";
-import { api, internal } from "../../_generated/api";
+import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, escapeHtml, formatConversationMarkdown } from "../utils";
 

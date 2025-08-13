@@ -219,3 +219,68 @@ export const deleteMessage = mutation({
     return null;
   },
 });
+
+export const addMessageWithTransaction = internalMutation({
+  args: {
+    chatId: v.id("chats"),
+    userMessage: v.string(),
+    isReplyToAssistant: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    assistantMessageId: v.optional(v.id("messages")),
+    error: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    try {
+      const chat = await ctx.db.get(args.chatId);
+      if (!chat) {
+        return { success: false, error: "Chat not found" };
+      }
+
+      const messages = await ctx.db
+        .query("messages")
+        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+        .collect();
+
+      const userMessageCount = messages.filter((m) => m.role === "user").length;
+
+      // Add user message
+      await ctx.db.insert("messages", {
+        chatId: args.chatId,
+        role: "user",
+        content: args.userMessage,
+        timestamp: Date.now(),
+      });
+
+      // Update title only for first user message
+      if (userMessageCount === 0 && !args.isReplyToAssistant) {
+        const title =
+          args.userMessage.length > 50
+            ? `${args.userMessage.substring(0, 50)}...`
+            : args.userMessage;
+
+        await ctx.db.patch(args.chatId, {
+          title,
+          updatedAt: Date.now(),
+        });
+      }
+
+      // Create assistant placeholder
+      const assistantMessageId = await ctx.db.insert("messages", {
+        chatId: args.chatId,
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+        timestamp: Date.now(),
+      });
+
+      return { success: true, assistantMessageId };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
