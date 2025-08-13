@@ -1,6 +1,8 @@
 import { useCallback, useRef } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { logger } from "../lib/logger";
+import type { Message } from "../lib/types/message";
+import type { Chat } from "../lib/types/chat";
 
 interface UseMessageHandlerDeps {
   // State
@@ -9,8 +11,11 @@ interface UseMessageHandlerDeps {
   showFollowUpPrompt: boolean;
   isAuthenticated: boolean;
   messageCount: number;
-  messages: any[];
-  chatState: any;
+  messages: Message[];
+  chatState: {
+    messages: Message[];
+    chats: Chat[];
+  };
   lastPlannerCallAtByChat: Record<string, number>;
 
   // Actions
@@ -23,15 +28,22 @@ interface UseMessageHandlerDeps {
   handleNewChat: (opts?: { userInitiated?: boolean }) => Promise<string | null>;
   resetFollowUp: () => void;
   onRequestSignUp?: () => void;
-  planSearch: any;
+  planSearch: unknown;
   isTopicChange: (current: string, previous: string) => boolean;
-  generateResponse: any;
+  generateResponse: (args: {
+    chatId: string;
+    message: string;
+    isReplyToAssistant?: boolean;
+  }) => Promise<unknown>;
   generateUnauthenticatedResponse: (
     message: string,
     chatId: string,
   ) => Promise<void>;
   maybeShowFollowUpPrompt: () => void;
-  chatActions: any;
+  chatActions: {
+    selectChat: (id: string) => Promise<void>;
+    updateChat: (id: string, updates: Partial<Chat>) => Promise<void>;
+  };
 }
 
 export function useMessageHandler(deps: UseMessageHandlerDeps) {
@@ -45,7 +57,9 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
       // FIX: Check for existing messages first to prevent new chat creation
       if (!activeChatId && deps.chatState.messages.length > 0) {
-        const existingChatId = deps.chatState.messages[0]?.chatId;
+        const existingChatId = deps.chatState.messages[0]?.chatId as
+          | string
+          | undefined;
         if (existingChatId) {
           logger.info("✅ Found existing chat from messages", {
             existingChatId,
@@ -76,7 +90,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
         if (deps.isAuthenticated) {
           await deps.generateResponse({
-            chatId: activeChatId,
+            chatId: String(activeChatId),
             message: message.trim(),
             isReplyToAssistant:
               deps.chatState.messages.length > 0 &&
@@ -86,18 +100,18 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         } else {
           await deps.generateUnauthenticatedResponse(
             message.trim(),
-            activeChatId,
+            String(activeChatId),
           );
         }
 
         // Update chat title if needed (only for first user message)
         const userMessageCount = deps.chatState.messages.filter(
-          (m: any) => m.role === "user",
+          (m) => m.role === "user",
         ).length;
         if (userMessageCount === 0) {
           const title =
             message.length > 50 ? `${message.substring(0, 50)}...` : message;
-          await deps.chatActions.updateChat(activeChatId, { title });
+          await deps.chatActions.updateChat(String(activeChatId), { title });
         }
 
         deps.maybeShowFollowUpPrompt();
