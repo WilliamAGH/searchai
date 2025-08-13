@@ -15,7 +15,7 @@ export async function fetchJsonWithRetry(
   url: string,
   options?: RequestInit,
   maxRetries = 3,
-): Promise<any> {
+): Promise<unknown> {
   // For non-Convex HTTP requests that need retry logic
   let lastError: Error | null = null;
 
@@ -36,5 +36,5 @@ export async function fetchJsonWithRetry(
     }
   }
 
-  throw lastError;
+  throw lastError ?? new Error("Unknown HTTP error");
 }
