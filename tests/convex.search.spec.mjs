@@ -2,10 +2,11 @@
 // Run with: npm test
 
 import {
-  searchWithDuckDuckGo,
   __extractKeywordsForTest as extractKW,
   __augmentQueryForTest as augmentQ,
 } from "../convex/search.ts";
+
+import { searchWithDuckDuckGo } from "../convex/search/providers/duckduckgo.ts";
 
 async function test_returnsPromise() {
   const label = "searchWithDuckDuckGo returns a Promise";

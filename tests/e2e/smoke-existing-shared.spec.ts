@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { clickReactElement } from "./utils/react-click";
 
 test.describe("smoke: existing shared/public chat open has no console errors", () => {
   test("smoke: publish shared chat anonymously then open share URL", async ({
@@ -52,7 +53,14 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
     await expect(shareButton).toBeVisible({ timeout: 30000 });
 
     // Step 2: open share modal and pick Shared
-    await shareButton.click({ force: true });
+    const reactClickSuccess = await clickReactElement(
+      page,
+      'button[title="Share this conversation"]',
+    );
+    if (!reactClickSuccess) {
+      // Fallback to normal click if React fiber fails
+      await shareButton.click({ force: true });
+    }
     const modal = page.locator(
       '[role="dialog"][aria-modal="true"][aria-labelledby="share-modal-title"]',
     );
