@@ -22,9 +22,8 @@ import { useAutoCreateFirstChat } from "../hooks/useAutoCreateFirstChat";
 import { useConvexQueries } from "../hooks/useConvexQueries";
 import { useSidebarTiming } from "../hooks/useSidebarTiming";
 import { useServices } from "../hooks/useServices";
-import type { Chat, LocalChat } from "../lib/types/chat";
+import type { Chat } from "../lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "../lib/constants/topicDetection";
-import { localChatToUnified } from "../lib/adapters/chatAdapter";
 import {
   buildApiBase,
   resolveApiPath,
@@ -69,7 +68,7 @@ export function ChatInterface({
   );
 
   const [localIsGenerating, setIsGenerating] = useState(false);
-  const { aiService, chatCreationService } = useServices(convexUrl);
+  const { aiService } = useServices(convexUrl);
 
   const { state: chatState, actions: chatActions } = useUnifiedChat();
   const currentChatId = chatState.currentChatId;
@@ -88,7 +87,6 @@ export function ChatInterface({
   const [messageCount, setMessageCount] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
-  const [optimisticChat, setOptimisticChat] = useState<Chat | null>(null);
 
   const userSelectedChatAtRef = useRef<number | null>(null);
   const deleteChat = useMutation(api.chats.deleteChat);
@@ -118,16 +116,8 @@ export function ChatInterface({
       );
     }
 
-    // Add optimistic chat if it exists and isn't already in the list
-    if (
-      optimisticChat &&
-      !baseChats.find((c) => c._id === optimisticChat._id)
-    ) {
-      return [optimisticChat, ...baseChats];
-    }
-
     return baseChats;
-  }, [isAuthenticated, chats, optimisticChat]);
+  }, [isAuthenticated, chats]);
 
   const {
     navigateWithVerification,
@@ -139,7 +129,6 @@ export function ChatInterface({
     isAuthenticated,
     onSelectChat: chatActions.selectChat,
   });
-  const createChat = useMutation(api.chats.createChat);
   const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
   const generateResponse = useAction(api.ai.generateStreamingResponse);
   const planSearch = useAction(api.search.planSearch);
@@ -206,39 +195,24 @@ export function ChatInterface({
   useMetaTags({ currentChatId, allChats });
 
   const handleNewChat = useCallback(
-    async (opts?: { userInitiated?: boolean }): Promise<string | null> => {
+    async (_opts?: { userInitiated?: boolean }): Promise<string | null> => {
       setIsCreatingChat(true);
-      const result = await chatCreationService?.createChat(
-        isAuthenticated,
-        {
-          createChat,
-          navigateWithVerification,
-          setOptimisticChat,
-          setMessageCount,
-          chatActions: {
-            addChat: (chat) => {
-              if ("isLocal" in chat && chat.isLocal) {
-                const unifiedChat = localChatToUnified(chat as LocalChat);
-                chatActions.addChat(unifiedChat);
-              } else {
-                chatActions.addChat(chat);
-              }
-            },
-            setCurrentChatId: (chatId) => chatActions.selectChat(chatId || ""),
-          },
-        },
-        opts,
-      );
+      try {
+        // Simply use the createChat action from useUnifiedChat
+        const chat = await chatActions.createChat("New Chat");
+        if (chat?.id) {
+          // Navigate to the new chat
+          await navigateWithVerification(`/chat/${chat.id}`);
+          setIsCreatingChat(false);
+          return chat.id;
+        }
+      } catch (error) {
+        console.error("Failed to create chat:", error);
+      }
       setIsCreatingChat(false);
-      return result || null;
+      return null;
     },
-    [
-      isAuthenticated,
-      createChat,
-      navigateWithVerification,
-      chatActions,
-      chatCreationService,
-    ],
+    [chatActions, navigateWithVerification],
   );
 
   useEffect(() => {
@@ -523,8 +497,11 @@ export function ChatInterface({
           <ChatControls {...chatControlsProps} />
           {undoBanner && (
             <UndoBanner
-              type={undoBanner.type}
-              onUndo={() => setUndoBanner(null)}
+              type={undoBanner.message.includes("Chat") ? "chat" : "message"}
+              onUndo={() => {
+                undoBanner.action?.();
+                setUndoBanner(null);
+              }}
             />
           )}
           <MessageInput key={currentChatId || "root"} {...messageInputProps} />

@@ -5,16 +5,16 @@ interface ShareModalContainerProps {
   isOpen: boolean;
   onClose: () => void;
   currentChatId: string | null;
-  currentChat: any;
-  allChats: any[];
+  currentChat: unknown;
+  allChats: unknown[];
   isAuthenticated: boolean;
-  chatState: any;
-  chatActions: any;
-  updateChatPrivacy: any;
-  navigateWithVerification: any;
-  buildChatPath: any;
-  fetchJsonWithRetry: any;
-  resolveApi: any;
+  chatState: unknown;
+  chatActions: unknown;
+  updateChatPrivacy: unknown;
+  navigateWithVerification: unknown;
+  buildChatPath: unknown;
+  fetchJsonWithRetry: unknown;
+  resolveApi: unknown;
 }
 
 export function ShareModalContainer(props: ShareModalContainerProps) {

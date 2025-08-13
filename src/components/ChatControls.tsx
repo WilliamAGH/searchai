@@ -5,7 +5,7 @@ interface ChatControlsProps {
   isGenerating?: boolean;
 }
 
-export function ChatControls(props: ChatControlsProps) {
+export function ChatControls(_props: ChatControlsProps) {
   // Minimal implementation - controls are handled elsewhere
   return null;
 }
