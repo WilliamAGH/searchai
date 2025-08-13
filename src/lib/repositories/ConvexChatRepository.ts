@@ -15,11 +15,7 @@ import {
   IdUtils,
   TitleUtils,
 } from "../types/unified";
-import {
-  withErrorHandling,
-  retryOperation,
-  ConvexConnectionError,
-} from "../utils/errorHandling";
+// Removed unused imports from errorHandling
 
 export class ConvexChatRepository extends BaseRepository {
   protected storageType = "convex" as const;

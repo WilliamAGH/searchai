@@ -99,8 +99,8 @@ export const TitleUtils = {
     const truncated = trimmed.substring(0, maxLength);
     const lastSpace = truncated.lastIndexOf(" ");
 
-    if (lastSpace > maxLength * 0.8) {
-      // If we have a reasonable word break point, use it
+    // Prefer word boundary if it's at least halfway into the truncated text
+    if (lastSpace >= Math.floor(maxLength / 2)) {
       return truncated.substring(0, lastSpace) + "...";
     }
 
@@ -113,7 +113,7 @@ export const TitleUtils = {
    */
   sanitize: (title: string): string => {
     return title
-      .replace(/[<>]/g, "") // Remove potential HTML
+      .replace(/</g, "") // Remove opening angle brackets to strip tags
       .replace(/\s+/g, " ") // Normalize whitespace
       .trim();
   },
@@ -163,6 +163,8 @@ export interface FeatureFlags {
   advancedSharing: boolean;
   realtimeCollaboration: boolean;
   progressiveEnhancement: boolean;
+  fixChatMessageChaining?: boolean; // NEW: Fix for chat message chaining race condition
+  chatFixRolloutPercentage?: number; // NEW: Rollout percentage for gradual deployment
 }
 
 /**
@@ -176,4 +178,7 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   advancedSharing: false, // Future feature
   realtimeCollaboration: false, // Future feature
   progressiveEnhancement: true, // Progressive feature enhancement
+  // New flags for chat message chaining fix rollout
+  fixChatMessageChaining: false, // Default off, enable via env
+  chatFixRolloutPercentage: 10, // Start with 10% rollout
 };
