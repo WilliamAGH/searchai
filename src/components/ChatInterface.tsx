@@ -358,7 +358,7 @@ export function ChatInterface({
     chatState,
   });
 
-  // Use the message handler hook
+  // Use the message handler hook with race condition fixes
   const { handleSendMessage, sendRef } = useMessageHandler({
     // State
     isGenerating,
@@ -549,3 +549,5 @@ export function ChatInterface({
     </div>
   );
 }
+
+export default ChatInterface;

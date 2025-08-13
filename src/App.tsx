@@ -18,7 +18,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { Toaster } from "sonner";
-import { ChatErrorBoundary } from "./components/errors/ChatErrorBoundary";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LoadingBoundary } from "./components/LoadingBoundary";
 import { SignInModal } from "./components/SignInModal";
 import { SignUpModal } from "./components/SignUpModal";
@@ -26,15 +26,8 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { SignOutButton } from "./SignOutButton";
 
-// Lazy load heavy components (with explicit promise chain)
-const ChatInterface = lazy(() =>
-  import("./components/ChatInterface")
-    .then((module) => ({ default: module.ChatInterface }))
-    .catch((err) => {
-      // Re-throw so Suspense error boundaries can catch
-      throw err;
-    }),
-);
+// Lazy load heavy components
+const ChatInterface = lazy(() => import("./components/ChatInterface"));
 
 /**
  * Main App component
@@ -88,7 +81,7 @@ function ChatPage({
   return (
     <>
       <Authenticated>
-        <ChatErrorBoundary>
+        <ErrorBoundary>
           <LoadingBoundary message="Loading chat interface...">
             <ChatInterface
               isAuthenticated={true}
@@ -101,10 +94,10 @@ function ChatPage({
               onRequestSignIn={onRequestSignIn}
             />
           </LoadingBoundary>
-        </ChatErrorBoundary>
+        </ErrorBoundary>
       </Authenticated>
       <Unauthenticated>
-        <ChatErrorBoundary>
+        <ErrorBoundary>
           <LoadingBoundary message="Loading chat interface...">
             <ChatInterface
               isAuthenticated={false}
@@ -117,7 +110,7 @@ function ChatPage({
               onRequestSignIn={onRequestSignIn}
             />
           </LoadingBoundary>
-        </ChatErrorBoundary>
+        </ErrorBoundary>
       </Unauthenticated>
     </>
   );
