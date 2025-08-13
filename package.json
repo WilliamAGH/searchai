@@ -19,7 +19,10 @@
     "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo '✅ Cleaned build caches'",
     "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo '✅ Cleaned everything - run npm install'",
     "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo '✅ Cleaned VSCode caches - restart VSCode'",
-    "test": "tsx ./tests/convex.search.spec.mjs && tsx ./tests/creator-detection.spec.mjs && tsx ./tests/enhancements.spec.mjs && node ./tests/error-handling.spec.mjs && node ./tests/e2e/chat-flow.spec.mjs && node ./tests/integration/convex-resilience.spec.mjs",
+    "test": "vitest run --reporter=dot",
+    "test:watch": "vitest",
+    "test:chat": "vitest src/lib/utils/__tests__/chatValidation.test.ts",
+    "test:integration:chat": "playwright test tests/integration/chat-message-chaining.test.ts",
     "test:smoke": "playwright test -g smoke --reporter=line",
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test -g smoke --reporter=line",
     "prepare": "husky",
@@ -68,7 +71,9 @@
     "tailwindcss": "~3",
     "tsx": "^4.20.3",
     "typescript": "5.9.2",
-    "vite": "6.3.5"
+    "vite": "6.3.5",
+    "vitest": "^2.1.4",
+    "@vitest/coverage-v8": "^2.1.4"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}": [
