@@ -5,7 +5,7 @@
 
 import { ConvexClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
-import { Id } from "../../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { BaseRepository } from "./ChatRepository";
 import {
   UnifiedChat,
@@ -15,6 +15,11 @@ import {
   IdUtils,
   TitleUtils,
 } from "../types/unified";
+import {
+  withErrorHandling,
+  retryOperation,
+  ConvexConnectionError,
+} from "../utils/errorHandling";
 
 export class ConvexChatRepository extends BaseRepository {
   protected storageType = "convex" as const;
@@ -63,7 +68,7 @@ export class ConvexChatRepository extends BaseRepository {
         return null;
       }
 
-      const chat = await this.client.query(api.chats.getChat, {
+      const chat = await this.client.query(api.chats.getChatById, {
         chatId: IdUtils.toConvexChatId(id),
       });
 
@@ -187,34 +192,71 @@ export class ConvexChatRepository extends BaseRepository {
         message,
       });
 
-      // Since Convex handles streaming internally, we need to poll for updates
-      // In a real implementation, this would use Convex subscriptions
-      let lastMessageCount = 0;
+      // Use Convex real-time subscriptions instead of polling
+      // Note: This is a simplified implementation that still uses polling
+      // because AsyncGenerators can't directly use Convex subscriptions.
+      // For true real-time updates, the UI should subscribe directly.
+
+      let lastContent = "";
       let iterations = 0;
       const maxIterations = 300; // 30 seconds timeout
+      const convexChatId = IdUtils.toConvexChatId(chatId);
 
       while (iterations < maxIterations) {
-        const messages = await this.getMessages(chatId);
+        // Query the subscription endpoint for real-time data
+        const updates = await this.client.query(
+          api.chats.subscribeToChatUpdates,
+          {
+            chatId: convexChatId,
+          },
+        );
 
-        if (messages.length > lastMessageCount) {
-          const newMessages = messages.slice(lastMessageCount);
-
-          for (const msg of newMessages) {
-            if (msg.role === "assistant") {
-              if (msg.content) {
-                yield { type: "content", content: msg.content };
-              }
-              if (!msg.isStreaming) {
-                yield { type: "done" };
-                return;
-              }
-            }
-          }
-
-          lastMessageCount = messages.length;
+        if (!updates) {
+          yield { type: "error", error: "Failed to get chat updates" };
+          return;
         }
 
-        // Wait a bit before next poll
+        // Check for streaming content in messages
+        const streamingMessage = updates.messages?.find(
+          (m) => m.role === "assistant" && m.isStreaming,
+        );
+
+        if (streamingMessage) {
+          // Yield new content as it arrives
+          if (
+            streamingMessage.content &&
+            streamingMessage.content !== lastContent
+          ) {
+            const newContent = streamingMessage.content.substring(
+              lastContent.length,
+            );
+            if (newContent) {
+              yield { type: "content", content: newContent };
+              lastContent = streamingMessage.content;
+            }
+          }
+        } else {
+          // Check if there's a completed assistant message
+          const completedMessage = updates.messages
+            ?.filter((m) => m.role === "assistant")
+            .pop();
+
+          if (completedMessage && completedMessage.content) {
+            // Yield any remaining content
+            if (completedMessage.content !== lastContent) {
+              const finalContent = completedMessage.content.substring(
+                lastContent.length,
+              );
+              if (finalContent) {
+                yield { type: "content", content: finalContent };
+              }
+            }
+            yield { type: "done" };
+            return;
+          }
+        }
+
+        // Wait before next check
         await new Promise((resolve) => setTimeout(resolve, 100));
         iterations++;
       }

@@ -17,7 +17,8 @@ import {
   parseLocalChats,
   parseLocalMessages,
 } from "../validation/localStorage";
-import { validateStreamChunk } from "../validation/apiResponses";
+import { UnauthenticatedAIService } from "../services/UnauthenticatedAIService";
+import type { LocalMessage } from "../types/message";
 
 const STORAGE_KEYS = {
   CHATS: "searchai_chats_v2",
@@ -27,12 +28,19 @@ const STORAGE_KEYS = {
 
 export class LocalChatRepository extends BaseRepository {
   protected storageType = "local" as const;
+  private aiService: UnauthenticatedAIService;
+  private abortController: AbortController | null = null;
 
-  constructor() {
+  constructor(convexUrl?: string) {
     super();
     if (!StorageUtils.hasLocalStorage()) {
       throw new Error("LocalStorage is not available in this browser");
     }
+
+    // Initialize AI service with convex URL
+    this.aiService = new UnauthenticatedAIService(
+      convexUrl || import.meta.env.VITE_CONVEX_URL || "",
+    );
   }
 
   // Chat operations
@@ -192,65 +200,96 @@ export class LocalChatRepository extends BaseRepository {
     chatId: string,
     message: string,
   ): AsyncGenerator<StreamChunk> {
-    // For local users, we use the HTTP API
+    // Abort any existing request
+    this.aiService.abort();
+
     try {
-      const response = await fetch("/api/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          chatId,
-          // Include recent messages for context
-          context: await this.getRecentContext(chatId),
-        }),
+      // Get messages for context
+      const localMessages = await this.getAllMessages();
+      const context = {
+        localMessages: localMessages.map(
+          (msg) =>
+            ({
+              _id: msg.id,
+              chatId: msg.chatId,
+              role: msg.role,
+              content: msg.content || "",
+              timestamp: msg.timestamp,
+              searchResults: msg.searchResults,
+              sources: msg.sources,
+              reasoning: msg.reasoning,
+              searchMethod: msg.searchMethod,
+              hasRealResults: msg.hasRealResults,
+              isLocal: true,
+              source: "local" as const,
+            }) as LocalMessage,
+        ),
+      };
+
+      let assistantMessageId: string | null = null;
+      let fullContent = "";
+      let metadata: Record<string, unknown> = {};
+
+      // Generate response using AI service
+      await this.aiService.generateResponse(message, chatId, context, {
+        onProgress: (progress) => {
+          // Yield progress updates as metadata
+          if (progress.stage !== "idle") {
+            // Note: Can't yield here directly due to async context
+            // Progress will be handled via message updates
+          }
+        },
+        onMessageCreate: async (message) => {
+          assistantMessageId = message._id;
+          // Save initial assistant message
+          await this.addMessage(chatId, {
+            role: "assistant",
+            content: "",
+            searchResults: message.searchResults,
+            sources: message.sources,
+            reasoning: message.reasoning,
+            searchMethod: message.searchMethod,
+            hasRealResults: message.hasRealResults,
+            isStreaming: true,
+          });
+
+          // Yield initial metadata
+          if (message.searchResults || message.sources) {
+            metadata = {
+              searchResults: message.searchResults,
+              sources: message.sources,
+              searchMethod: message.searchMethod,
+              hasRealResults: message.hasRealResults,
+            };
+          }
+        },
+        onMessageUpdate: async (messageId, updates) => {
+          if (updates.content !== undefined) {
+            fullContent = updates.content;
+          }
+          if (updates.reasoning) {
+            metadata.thinking = updates.reasoning;
+          }
+
+          // Update the message in storage
+          if (assistantMessageId) {
+            await this.updateMessage(assistantMessageId, {
+              content: fullContent,
+              reasoning: updates.reasoning,
+              isStreaming: updates.isStreaming,
+            });
+          }
+        },
       });
 
-      if (!response.ok) {
-        throw new Error(`AI request failed: ${response.statusText}`);
+      // Yield the complete content and metadata
+      if (fullContent) {
+        yield { type: "content", content: fullContent };
       }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          yield { type: "done" };
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") {
-              yield { type: "done" };
-              return;
-            }
-            const chunk = validateStreamChunk(data);
-            if (chunk) {
-              if (chunk.content) {
-                yield { type: "content", content: chunk.content };
-              }
-              if (chunk.thinking) {
-                yield {
-                  type: "metadata",
-                  metadata: { thinking: chunk.thinking },
-                };
-              }
-              if (chunk.error) {
-                yield { type: "error", error: chunk.error };
-              }
-            }
-          }
-        }
+      if (Object.keys(metadata).length > 0) {
+        yield { type: "metadata", metadata };
       }
+      yield { type: "done" };
     } catch (error) {
       yield {
         type: "error",

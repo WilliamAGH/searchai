@@ -5,7 +5,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useConvexAuth, useClient } from "convex/react";
+import { useConvexAuth, useConvex } from "convex/react";
 import { IChatRepository } from "../lib/repositories/ChatRepository";
 import { LocalChatRepository } from "../lib/repositories/LocalChatRepository";
 import { ConvexChatRepository } from "../lib/repositories/ConvexChatRepository";
@@ -31,6 +31,16 @@ export interface ChatState {
     message?: string;
   };
   featureFlags: typeof DEFAULT_FEATURE_FLAGS;
+  // New fields from ChatInterface
+  showFollowUpPrompt: boolean;
+  pendingMessage: string;
+  plannerHint?: { reason?: string; confidence?: number };
+  undoBanner?: { type: "chat" | "message"; id: string; expiresAt: number };
+  messageCount: number;
+  showShareModal: boolean;
+  userHistory: string[];
+  isMobile: boolean;
+  isSidebarOpen: boolean;
 }
 
 export interface ChatActions {
@@ -40,9 +50,19 @@ export interface ChatActions {
   deleteChat: (id: string) => Promise<void>;
   updateChatTitle: (id: string, title: string) => Promise<void>;
 
+  // Local storage operations (for gradual migration)
+  setChats: (chats: UnifiedChat[]) => void;
+  addChat: (chat: UnifiedChat) => void;
+  removeChat: (id: string) => void;
+  updateChat: (id: string, updates: Partial<UnifiedChat>) => void;
+
   // Message operations
   sendMessage: (content: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
+  addMessage: (message: UnifiedMessage) => void;
+  removeMessage: (id: string) => void;
+  updateMessage: (id: string, updates: Partial<UnifiedMessage>) => void;
+  setMessages: (messages: UnifiedMessage[]) => void;
 
   // Sharing
   shareChat: (
@@ -50,14 +70,31 @@ export interface ChatActions {
     privacy: "shared" | "public",
   ) => Promise<{ shareId?: string; publicId?: string }>;
 
+  // UI State Management
+  handleToggleSidebar: () => void;
+  handleContinueChat: () => void;
+  handleNewChatForFollowUp: () => Promise<void>;
+  handleNewChatWithSummary: () => Promise<void>;
+  handleDraftChange: (draft: string) => void;
+  handleShare: (
+    privacy: "shared" | "public",
+  ) => Promise<{ shareId?: string; publicId?: string }>;
+  handleRequestDeleteChat: (id: string) => void;
+  handleRequestDeleteMessage: (id: string) => void;
+  setShowFollowUpPrompt: (show: boolean) => void;
+  setShowShareModal: (show: boolean) => void;
+  setPendingMessage: (message: string) => void;
+  addToHistory: (message: string) => void;
+
   // Utility
   refreshChats: () => Promise<void>;
   clearError: () => void;
+  clearLocalStorage: () => void;
 }
 
 export function useUnifiedChat() {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
-  const convexClient = useClient();
+  const convexClient = useConvex();
 
   // Repository selection based on auth status
   const repository = useMemo<IChatRepository | null>(() => {
@@ -67,7 +104,9 @@ export function useUnifiedChat() {
       return new ConvexChatRepository(convexClient);
     }
 
-    return new LocalChatRepository();
+    // Pass convex URL to LocalChatRepository for API calls
+    const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
+    return new LocalChatRepository(convexUrl);
   }, [isAuthenticated, authLoading, convexClient]);
 
   // State management
@@ -81,6 +120,16 @@ export function useUnifiedChat() {
     error: null,
     searchProgress: { stage: "idle" },
     featureFlags: DEFAULT_FEATURE_FLAGS,
+    // New fields
+    showFollowUpPrompt: false,
+    pendingMessage: "",
+    plannerHint: undefined,
+    undoBanner: undefined,
+    messageCount: 0,
+    showShareModal: false,
+    userHistory: [],
+    isMobile: typeof window !== "undefined" && window.innerWidth < 768,
+    isSidebarOpen: false,
   });
 
   // Migration tracking
@@ -329,57 +378,88 @@ export function useUnifiedChat() {
       }));
 
       try {
-        // Add user message
-        const userMessage = await repository.addMessage(state.currentChatId, {
-          role: "user",
-          content: trimmed,
-        });
+        // Check storage mode from repository
+        const storageMode = repository.getStorageType();
 
-        setState((prev) => ({
-          ...prev,
-          messages: [...prev.messages, userMessage],
-        }));
+        // Handle message based on storage mode
+        if (storageMode === "convex") {
+          // For Convex mode, the backend handles both user and assistant messages
+          // Don't call addMessage - Convex backend handles both messages
 
-        // Update title if first message
-        if (state.messages.length === 0) {
-          const title = TitleUtils.generateFromContent(trimmed);
-          await repository.updateChatTitle(state.currentChatId, title);
+          // Update title if first message
+          if (state.messages.length === 0) {
+            const title = TitleUtils.generateFromContent(trimmed);
+            await repository.updateChatTitle(state.currentChatId, title);
 
-          setState((prev) => {
-            const updated = prev.chats.map((c) =>
-              c.id === state.currentChatId
-                ? { ...c, title, updatedAt: Date.now() }
-                : c,
-            );
+            setState((prev) => {
+              const updated = prev.chats.map((c) =>
+                c.id === state.currentChatId
+                  ? { ...c, title, updatedAt: Date.now() }
+                  : c,
+              );
 
-            return {
-              ...prev,
-              chats: updated,
-              currentChat: prev.currentChat
-                ? { ...prev.currentChat, title }
-                : null,
-            };
+              return {
+                ...prev,
+                chats: updated,
+                currentChat: prev.currentChat
+                  ? { ...prev.currentChat, title }
+                  : null,
+              };
+            });
+          }
+        } else {
+          // Local mode - add message then generate
+          const userMessage = await repository.addMessage(state.currentChatId, {
+            role: "user",
+            content: trimmed,
           });
+
+          setState((prev) => ({
+            ...prev,
+            messages: [...prev.messages, userMessage],
+          }));
+
+          // Update title if first message
+          if (state.messages.length === 0) {
+            const title = TitleUtils.generateFromContent(trimmed);
+            await repository.updateChatTitle(state.currentChatId, title);
+
+            setState((prev) => {
+              const updated = prev.chats.map((c) =>
+                c.id === state.currentChatId
+                  ? { ...c, title, updatedAt: Date.now() }
+                  : c,
+              );
+
+              return {
+                ...prev,
+                chats: updated,
+                currentChat: prev.currentChat
+                  ? { ...prev.currentChat, title }
+                  : null,
+              };
+            });
+          }
+
+          // Generate AI response placeholder for local mode
+          const assistantMessage: UnifiedMessage = {
+            id: IdUtils.generateLocalId("msg"),
+            chatId: state.currentChatId,
+            role: "assistant",
+            content: "",
+            timestamp: Date.now(),
+            source: "local",
+            synced: false,
+            isStreaming: true,
+          };
+
+          setState((prev) => ({
+            ...prev,
+            messages: [...prev.messages, assistantMessage],
+          }));
         }
 
-        // Generate AI response
-        const assistantMessage: UnifiedMessage = {
-          id: IdUtils.generateLocalId("msg"),
-          chatId: state.currentChatId,
-          role: "assistant",
-          content: "",
-          timestamp: Date.now(),
-          source: repository.getStorageType() === "convex" ? "convex" : "local",
-          synced: repository.getStorageType() === "convex",
-          isStreaming: true,
-        };
-
-        setState((prev) => ({
-          ...prev,
-          messages: [...prev.messages, assistantMessage],
-        }));
-
-        // Stream response
+        // Stream response - common for both modes
         const stream = repository.generateResponse(
           state.currentChatId,
           trimmed,
@@ -538,6 +618,244 @@ export function useUnifiedChat() {
 
     clearError() {
       setState((prev) => ({ ...prev, error: null }));
+    },
+
+    // Local storage operations for gradual migration
+    setChats(chats: UnifiedChat[]) {
+      setState((prev) => ({ ...prev, chats }));
+    },
+
+    addChat(chat: UnifiedChat) {
+      setState((prev) => {
+        // Prevent duplicate chats by checking if chat with same id already exists
+        const exists = prev.chats.some((c) => c.id === chat.id);
+        if (exists) {
+          console.warn(
+            `Chat with id ${chat.id} already exists, skipping duplicate addition`,
+          );
+          return prev;
+        }
+        return { ...prev, chats: [chat, ...prev.chats] };
+      });
+    },
+
+    removeChat(id: string) {
+      setState((prev) => ({
+        ...prev,
+        chats: prev.chats.filter((c) => c.id !== id),
+      }));
+    },
+
+    updateChat(id: string, updates: Partial<UnifiedChat>) {
+      setState((prev) => ({
+        ...prev,
+        chats: prev.chats.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+      }));
+    },
+
+    setMessages(messages: UnifiedMessage[]) {
+      setState((prev) => ({ ...prev, messages }));
+    },
+
+    addMessage(message: UnifiedMessage) {
+      setState((prev) => {
+        // Prevent duplicate messages by checking if message with same id already exists
+        const exists = prev.messages.some((m) => m.id === message.id);
+        if (exists) {
+          console.warn(
+            `Message with id ${message.id} already exists, skipping duplicate addition`,
+          );
+          return prev;
+        }
+        return { ...prev, messages: [...prev.messages, message] };
+      });
+    },
+
+    removeMessage(id: string) {
+      setState((prev) => ({
+        ...prev,
+        messages: prev.messages.filter((m) => m.id !== id),
+      }));
+    },
+
+    updateMessage(id: string, updates: Partial<UnifiedMessage>) {
+      setState((prev) => {
+        const messageIndex = prev.messages.findIndex((m) => m.id === id);
+        if (messageIndex === -1) {
+          console.error("Message not found for update!", id);
+          return prev;
+        }
+        return {
+          ...prev,
+          messages: prev.messages.map((m) =>
+            m.id === id ? { ...m, ...updates } : m,
+          ),
+        };
+      });
+    },
+
+    clearLocalStorage() {
+      // Clear local storage for gradual migration
+      setState((prev) => ({
+        ...prev,
+        chats: [],
+        messages: [],
+        currentChatId: null,
+        currentChat: null,
+      }));
+
+      // Also clear from repository if it's local storage based
+      if (repository && repository.getStorageType() === "local") {
+        // Clear the localStorage directly for local repository
+        const storageNamespace = `searchai:${window.location.host}`;
+        try {
+          window.localStorage.removeItem(`${storageNamespace}:chats`);
+          window.localStorage.removeItem(`${storageNamespace}:messages`);
+        } catch (e) {
+          console.error("Failed to clear local storage:", e);
+        }
+      }
+    },
+
+    // UI State Management Actions
+    handleToggleSidebar() {
+      setState((prev) => ({ ...prev, isSidebarOpen: !prev.isSidebarOpen }));
+    },
+
+    handleContinueChat() {
+      setState((prev) => ({
+        ...prev,
+        showFollowUpPrompt: false,
+        pendingMessage: "",
+      }));
+    },
+
+    async handleNewChatForFollowUp() {
+      // Create a new chat and move pending message there
+      const pendingMsg = state.pendingMessage;
+      setState((prev) => ({
+        ...prev,
+        showFollowUpPrompt: false,
+        pendingMessage: "",
+      }));
+
+      if (pendingMsg && repository) {
+        const newChat = await actions.createChat(
+          TitleUtils.generateFromContent(pendingMsg),
+        );
+        await actions.selectChat(newChat.id);
+        await actions.sendMessage(pendingMsg);
+      }
+    },
+
+    async handleNewChatWithSummary() {
+      // Create a new chat with a summary of the current conversation
+      if (!state.currentChat || state.messages.length === 0) return;
+
+      const summary = state.messages
+        .slice(-5)
+        .map((m) => `${m.role}: ${m.content.slice(0, 100)}`)
+        .join("\n");
+
+      const title = `Continuation of: ${state.currentChat.title}`;
+      const newChat = await actions.createChat(title);
+      await actions.selectChat(newChat.id);
+
+      // Optionally add a system message with context
+      if (repository && repository.getStorageType() === "local") {
+        await repository.addMessage(newChat.id, {
+          role: "assistant",
+          content: `This is a continuation of a previous conversation. Here's a brief summary:\n\n${summary}`,
+        });
+      }
+    },
+
+    handleDraftChange(draft: string) {
+      setState((prev) => ({ ...prev, pendingMessage: draft }));
+    },
+
+    async handleShare(privacy: "shared" | "public") {
+      if (!state.currentChatId) {
+        throw new Error("No chat selected to share");
+      }
+      setState((prev) => ({ ...prev, showShareModal: false }));
+      return await actions.shareChat(state.currentChatId, privacy);
+    },
+
+    handleRequestDeleteChat(id: string) {
+      // Set up undo banner
+      setState((prev) => ({
+        ...prev,
+        undoBanner: {
+          type: "chat",
+          id,
+          expiresAt: Date.now() + 5000, // 5 seconds to undo
+        },
+      }));
+
+      // Delete after timeout
+      setTimeout(() => {
+        setState((prev) => {
+          if (prev.undoBanner?.id === id) {
+            actions.deleteChat(id);
+            return { ...prev, undoBanner: undefined };
+          }
+          return prev;
+        });
+      }, 5000);
+    },
+
+    handleRequestDeleteMessage(id: string) {
+      // Set up undo banner
+      setState((prev) => ({
+        ...prev,
+        undoBanner: {
+          type: "message",
+          id,
+          expiresAt: Date.now() + 5000,
+        },
+      }));
+
+      // Delete after timeout
+      setTimeout(() => {
+        setState((prev) => {
+          if (prev.undoBanner?.id === id) {
+            actions.deleteMessage(id);
+            return { ...prev, undoBanner: undefined };
+          }
+          return prev;
+        });
+      }, 5000);
+    },
+
+    setShowFollowUpPrompt(show: boolean) {
+      setState((prev) => ({ ...prev, showFollowUpPrompt: show }));
+    },
+
+    setShowShareModal(show: boolean) {
+      setState((prev) => ({ ...prev, showShareModal: show }));
+    },
+
+    setPendingMessage(message: string) {
+      setState((prev) => ({ ...prev, pendingMessage: message }));
+    },
+
+    addToHistory(message: string) {
+      setState((prev) => {
+        const history = [...prev.userHistory];
+        // Remove duplicate if it exists
+        const index = history.indexOf(message);
+        if (index > -1) {
+          history.splice(index, 1);
+        }
+        // Add to beginning
+        history.unshift(message);
+        // Keep only last 50 items
+        if (history.length > 50) {
+          history.pop();
+        }
+        return { ...prev, userHistory: history };
+      });
     },
   };
 
