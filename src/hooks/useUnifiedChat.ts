@@ -383,7 +383,29 @@ export function useUnifiedChat() {
       }
 
       // Still no chat ID means we need to create one
-      if (!chatId) return;
+      if (!chatId) {
+        try {
+          // Create a new chat directly with the repository
+          const { chat } = await repository.createChat("New Chat");
+          if (!chat?.id) {
+            console.error("Failed to create chat for message");
+            return;
+          }
+          chatId = chat.id;
+
+          // Update state with the new chat
+          setState((prev) => ({
+            ...prev,
+            chats: [chat, ...prev.chats],
+            currentChatId: chat.id,
+            currentChat: chat,
+            messages: [],
+          }));
+        } catch (error) {
+          console.error("Error creating chat:", error);
+          return;
+        }
+      }
 
       const trimmed = content.trim();
       if (!trimmed) return;

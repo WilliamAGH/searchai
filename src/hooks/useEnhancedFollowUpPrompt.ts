@@ -1,24 +1,27 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 interface UseEnhancedFollowUpPromptProps {
   isAuthenticated: boolean;
   currentChatId: string | null;
   handleNewChat: (opts?: { userInitiated?: boolean }) => Promise<string | null>;
   sendRef: React.MutableRefObject<((message: string) => Promise<void>) | null>;
-  recordClientMetric?: any;
-  summarizeRecentAction?: any;
-  chatState: any;
+  recordClientMetric?: unknown;
+  summarizeRecentAction?: unknown;
+  chatState: {
+    messages?: Array<{ role?: string; content?: string }>;
+    isGenerating?: boolean;
+  } | null;
 }
 
 /**
  * Hook to manage enhanced follow-up prompts and chat continuations
  */
 export function useEnhancedFollowUpPrompt({
-  isAuthenticated,
+  isAuthenticated: _isAuthenticated,
   currentChatId,
   handleNewChat,
   sendRef,
-  recordClientMetric,
+  recordClientMetric: _recordClientMetric,
   summarizeRecentAction,
   chatState,
 }: UseEnhancedFollowUpPromptProps) {
@@ -124,7 +127,7 @@ export function useEnhancedFollowUpPrompt({
   useEffect(() => {
     if (pendingMessage && currentChatId && sendRef.current) {
       const sendMessage = async () => {
-        await sendRef.current!(pendingMessage);
+        await sendRef.current?.(pendingMessage);
         setPendingMessage(null);
       };
       sendMessage();

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 interface UseAutoCreateFirstChatProps {
   currentChatId: string | null;
-  chats: any[];
+  chats: Array<{ id?: string }>;
   isAuthenticated: boolean;
   handleNewChat: () => Promise<string | null>;
 }
@@ -13,7 +13,7 @@ interface UseAutoCreateFirstChatProps {
 export function useAutoCreateFirstChat({
   currentChatId,
   chats,
-  isAuthenticated,
+  isAuthenticated: _isAuthenticated,
   handleNewChat,
 }: UseAutoCreateFirstChatProps) {
   const hasCreatedInitialChatRef = useRef(false);
@@ -33,11 +33,15 @@ export function useAutoCreateFirstChat({
     ) {
       isCreatingRef.current = true;
 
-      handleNewChat()
+      // Don't return the Promise directly - useEffect expects a cleanup function or undefined
+      void handleNewChat()
         .then((newChatId) => {
           if (newChatId) {
             hasCreatedInitialChatRef.current = true;
           }
+        })
+        .catch(() => {
+          // Swallow errors here; UI can prompt user as needed
         })
         .finally(() => {
           isCreatingRef.current = false;

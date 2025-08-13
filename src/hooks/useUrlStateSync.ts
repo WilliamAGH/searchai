@@ -11,7 +11,7 @@ interface UseUrlStateSyncProps {
  */
 export function useUrlStateSync({
   currentChatId,
-  isAuthenticated,
+  isAuthenticated: _isAuthenticated,
 }: UseUrlStateSyncProps) {
   const navigate = useNavigate();
   const location = useLocation();

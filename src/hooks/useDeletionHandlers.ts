@@ -2,10 +2,18 @@ import { useState, useCallback } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 
 interface UseDeletionHandlersProps {
-  chatState: any;
-  chatActions: any;
-  deleteChat: any;
-  deleteMessage: any;
+  chatState: {
+    chats: Array<{ id: string; title?: string }>;
+    messages: Array<{ id: string }>;
+  };
+  chatActions: {
+    deleteChat: (id: string) => Promise<void>;
+    createChat: (chat: { id: string; title?: string }) => void;
+    deleteMessage: (id: string) => Promise<void>;
+    addMessage: (msg: { id: string }) => void;
+  };
+  deleteChat: (args: { chatId: Id<"chats"> }) => Promise<void>;
+  deleteMessage: (args: { messageId: Id<"messages"> }) => Promise<void>;
 }
 
 interface UndoBannerState {
@@ -23,15 +31,12 @@ export function useDeletionHandlers({
   deleteChat,
   deleteMessage,
 }: UseDeletionHandlersProps) {
-  const [undoBanner, setUndoBanner] = useState<UndoBannerState>({
-    show: false,
-    message: "",
-  });
+  const [undoBanner, setUndoBanner] = useState<UndoBannerState | null>(null);
 
   const handleDeleteLocalChat = useCallback(
     async (chatId: string) => {
       // Store chat data for undo
-      const chatToDelete = chatState.chats.find((c: any) => c.id === chatId);
+      const chatToDelete = chatState.chats.find((c) => c.id === chatId);
 
       if (chatToDelete) {
         // Perform deletion
@@ -43,17 +48,19 @@ export function useDeletionHandlers({
           message: `Chat "${chatToDelete.title || "Untitled"}" deleted`,
           action: () => {
             // Restore chat
-            chatActions.createChat(chatToDelete);
-            setUndoBanner({ show: false, message: "" });
+            chatActions.createChat(
+              chatToDelete as { id: string; title?: string },
+            );
+            setUndoBanner(null);
           },
         });
 
         // Auto-hide after 5 seconds
         setTimeout(() => {
           setUndoBanner((prev) =>
-            prev.message ===
+            prev?.message ===
             `Chat "${chatToDelete.title || "Untitled"}" deleted`
-              ? { show: false, message: "" }
+              ? null
               : prev,
           );
         }, 5000);
@@ -92,7 +99,7 @@ export function useDeletionHandlers({
     async (messageId: string) => {
       // Store message data for undo
       const messageToDelete = chatState.messages.find(
-        (m: any) => m.id === messageId,
+        (m) => m.id === messageId,
       );
 
       if (messageToDelete) {
@@ -106,16 +113,14 @@ export function useDeletionHandlers({
           action: () => {
             // Restore message
             chatActions.addMessage(messageToDelete);
-            setUndoBanner({ show: false, message: "" });
+            setUndoBanner(null);
           },
         });
 
         // Auto-hide after 5 seconds
         setTimeout(() => {
           setUndoBanner((prev) =>
-            prev.message === "Message deleted"
-              ? { show: false, message: "" }
-              : prev,
+            prev?.message === "Message deleted" ? null : prev,
           );
         }, 5000);
       }

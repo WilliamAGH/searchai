@@ -9,7 +9,7 @@ interface UseSidebarTimingProps {
  * Hook to manage sidebar timing and animations
  */
 export function useSidebarTiming({
-  sidebarOpen,
+  sidebarOpen: _sidebarOpen,
   onToggleSidebar,
 }: UseSidebarTimingProps) {
   const closingTimeoutRef = useRef<NodeJS.Timeout | null>(null);

@@ -1,6 +1,5 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
 
 interface UseConvexQueriesProps {
   isAuthenticated: boolean;
@@ -18,7 +17,7 @@ export function useConvexQueries({
   propChatId,
   propShareId,
   propPublicId,
-  currentChatId,
+  currentChatId: _currentChatId,
 }: UseConvexQueriesProps) {
   // Query for chat by opaque ID
   const chatByOpaqueId = useQuery(
