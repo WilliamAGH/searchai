@@ -14,7 +14,7 @@ export class UnauthenticatedAIService {
   async generateResponse(
     message: string,
     chatId: string,
-    onChunk?: (chunk: any) => void,
+    onChunk?: (chunk: unknown) => void,
   ): Promise<void> {
     // Create new abort controller for this request
     this.abortController = new AbortController();
@@ -58,14 +58,18 @@ export class UnauthenticatedAIService {
               onChunk?.(data);
             }
           }
-        } catch (e) {
+        } catch {
           // Handle partial chunks
-          console.debug("Partial chunk received:", chunk);
+          console.info("Partial chunk received:", chunk);
         }
       }
-    } catch (error: any) {
-      if (error.name === "AbortError") {
-        console.log("Request aborted");
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === "object" &&
+        (error as { name?: string }).name === "AbortError"
+      ) {
+        console.info("Request aborted");
       } else {
         throw error;
       }
@@ -79,7 +83,7 @@ export class UnauthenticatedAIService {
     this.abortController = null;
   }
 
-  async searchWithAI(query: string): Promise<any> {
+  async searchWithAI(query: string): Promise<unknown> {
     const response = await fetch(`${this.convexUrl}/api/search`, {
       method: "POST",
       headers: {

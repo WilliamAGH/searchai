@@ -5,10 +5,11 @@
 
 import { logger } from "../logger";
 import type { Id } from "../../../convex/_generated/dataModel";
+import type { LocalChat } from "../types/chat";
 
 export interface ChatCreationActions {
   setCurrentChatId: (chatId: string | null) => Promise<void>;
-  createLocalChat: (chat: any) => Promise<string>;
+  createLocalChat: (chat: LocalChat) => Promise<string>;
 }
 
 export interface ChatCreationOptions {
