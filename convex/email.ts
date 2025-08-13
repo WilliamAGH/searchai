@@ -1,8 +1,84 @@
 "use node";
 import { v } from "convex/values";
 import { action } from "./_generated/server";
-import { api } from "./_generated/api";
 
+// Helper function to send emails via MailPit
+async function sendEmailToMailPit(args: {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+}): Promise<{ success: boolean; messageId?: string }> {
+  const mailpitHost = process.env.MAILPIT_HOST;
+  const apiAuth = process.env.MP_SEND_API_AUTH;
+
+  if (!mailpitHost || !apiAuth) {
+    throw new Error("MailPit configuration missing");
+  }
+
+  try {
+    // Build payload per Mailpit Send API schema: TitleCase keys, structured objects
+    // https://mailpit.axllent.org/docs/api-v1/#send-message
+    const defaultFromEmail = "team@search-ai.io";
+    const defaultFromName = "SearchAI";
+
+    const rawFrom = args.from || `${defaultFromName} <${defaultFromEmail}>`;
+
+    // Parse "Name <email>" or plain email
+    let fromEmail = defaultFromEmail;
+    let fromName: string | undefined = defaultFromName;
+    const angleMatch = rawFrom.match(/^(.*)<\s*([^>]+)\s*>\s*$/);
+    if (angleMatch) {
+      fromName = angleMatch[1].trim() || undefined;
+      fromEmail = angleMatch[2].trim();
+    } else {
+      // If it's just an email address, keep name undefined
+      const emailLike = rawFrom.trim();
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailLike)) {
+        fromEmail = emailLike;
+        fromName = undefined;
+      }
+    }
+
+    const mailpitBody: Record<string, unknown> = {
+      From: {
+        Email: fromEmail,
+        ...(fromName ? { Name: fromName } : {}),
+      },
+      To: [
+        {
+          Email: args.to,
+        },
+      ],
+      Subject: args.subject,
+      HTML: args.html,
+    };
+
+    const response = await fetch(`${mailpitHost}/api/v1/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${btoa(apiAuth)}`,
+      },
+      body: JSON.stringify(mailpitBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`MailPit API error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    return { success: true, messageId: result.ID };
+  } catch (error) {
+    console.error("Failed to send email:", error);
+    throw new Error(
+      `Failed to send email: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
+}
+
+// Public action for sending emails (exposed to API)
 export const sendEmail = action({
   args: {
     to: v.string(),
@@ -10,74 +86,11 @@ export const sendEmail = action({
     html: v.string(),
     from: v.optional(v.string()),
   },
-  handler: async (_ctx, args) => {
-    const mailpitHost = process.env.MAILPIT_HOST;
-    const apiAuth = process.env.MP_SEND_API_AUTH;
-
-    if (!mailpitHost || !apiAuth) {
-      throw new Error("MailPit configuration missing");
-    }
-
-    try {
-      // Build payload per Mailpit Send API schema: TitleCase keys, structured objects
-      // https://mailpit.axllent.org/docs/api-v1/#send-message
-      const defaultFromEmail = "team@search-ai.io";
-      const defaultFromName = "SearchAI";
-
-      const rawFrom = args.from || `${defaultFromName} <${defaultFromEmail}>`;
-
-      // Parse "Name <email>" or plain email
-      let fromEmail = defaultFromEmail;
-      let fromName: string | undefined = defaultFromName;
-      const angleMatch = rawFrom.match(/^(.*)<\s*([^>]+)\s*>\s*$/);
-      if (angleMatch) {
-        fromName = angleMatch[1].trim() || undefined;
-        fromEmail = angleMatch[2].trim();
-      } else {
-        // If it's just an email address, keep name undefined
-        const emailLike = rawFrom.trim();
-        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailLike)) {
-          fromEmail = emailLike;
-          fromName = undefined;
-        }
-      }
-
-      const mailpitBody: Record<string, unknown> = {
-        From: {
-          Email: fromEmail,
-          ...(fromName ? { Name: fromName } : {}),
-        },
-        To: [
-          {
-            Email: args.to,
-          },
-        ],
-        Subject: args.subject,
-        HTML: args.html,
-      };
-
-      const response = await fetch(`${mailpitHost}/api/v1/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${Buffer.from(apiAuth).toString("base64")}`,
-        },
-        body: JSON.stringify(mailpitBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`MailPit API error: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      return { success: true, messageId: result.ID };
-    } catch (error) {
-      console.error("Failed to send email:", error);
-      throw new Error(
-        `Failed to send email: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
+  handler: async (
+    _ctx,
+    args,
+  ): Promise<{ success: boolean; messageId?: string }> => {
+    return await sendEmailToMailPit(args);
   },
 });
 
@@ -87,7 +100,7 @@ export const sendWelcomeEmail = action({
     userName: v.optional(v.string()),
   },
   handler: async (
-    ctx,
+    _ctx,
     args,
   ): Promise<{ success: boolean; messageId?: string; message?: string }> => {
     const welcomeHtml = `
@@ -130,7 +143,8 @@ export const sendWelcomeEmail = action({
       </html>
     `;
 
-    return await ctx.runAction(api.email.sendEmail, {
+    // Use helper function to avoid circular dependency
+    return await sendEmailToMailPit({
       to: args.userEmail,
       subject: "Welcome to SearchAI - Start searching with AI!",
       html: welcomeHtml,
