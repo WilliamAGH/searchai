@@ -1,55 +1,114 @@
+/**
+ * Message Handler Hook
+ * Core logic for sending messages and managing chat flow
+ * Handles both authenticated and unauthenticated message sending
+ * Manages chat creation, selection, and title updates
+ */
+
 import { useCallback, useRef } from "react";
 import { logger } from "../lib/logger";
 import type { Message } from "../lib/types/message";
 import type { Chat } from "../lib/types/chat";
 
+/**
+ * Dependencies required by the message handler hook
+ * @interface UseMessageHandlerDeps
+ */
 interface UseMessageHandlerDeps {
   // State
+  /** Flag indicating if AI is currently generating a response */
   isGenerating: boolean;
+  /** ID of the currently active chat, null if no chat selected */
   currentChatId: string | null;
+  /** Whether to show follow-up prompt suggestions */
   showFollowUpPrompt: boolean;
+  /** User authentication status */
   isAuthenticated: boolean;
+  /** Total number of messages sent in current session */
   messageCount: number;
+  /** List of messages in current context */
   messages: Message[];
+  /** Current chat state including messages and available chats */
   chatState: {
     messages: Message[];
     chats: Chat[];
   };
+  /** Tracking of last planner API calls by chat ID for rate limiting */
   lastPlannerCallAtByChat: Record<string, number>;
 
   // Actions
+  /** Update the generation status flag */
   setIsGenerating: (value: boolean) => void;
+  /** Update the message counter */
   setMessageCount: (value: number) => void;
+  /** Update planner call tracking */
   setLastPlannerCallAtByChat: (value: Record<string, number>) => void;
+  /** Set a pending message to be sent */
   setPendingMessage: (value: string) => void;
 
   // Functions
+  /** Create a new chat and return its ID */
   handleNewChat: (opts?: { userInitiated?: boolean }) => Promise<string | null>;
+  /** Reset follow-up prompt state */
   resetFollowUp: () => void;
+  /** Optional callback to trigger sign-up flow */
   onRequestSignUp?: () => void;
+  /** Search planning function (implementation varies) */
   planSearch: unknown;
+  /** Check if the message indicates a topic change */
   isTopicChange: (current: string, previous: string) => boolean;
+  /** Generate AI response for authenticated users */
   generateResponse: (args: {
     chatId: string;
     message: string;
     isReplyToAssistant?: boolean;
   }) => Promise<unknown>;
+  /** Generate AI response for unauthenticated users */
   generateUnauthenticatedResponse: (
     message: string,
     chatId: string,
   ) => Promise<void>;
+  /** Conditionally show follow-up prompts based on context */
   maybeShowFollowUpPrompt: () => void;
+  /** Chat management actions */
   chatActions: {
+    /** Select and activate a chat */
     selectChat: (id: string) => Promise<void>;
+    /** Update chat properties */
     updateChat: (id: string, updates: Partial<Chat>) => Promise<void>;
+    /** Send a message in the current chat */
+    sendMessage?: (message: string) => Promise<void>;
   };
 }
 
+/**
+ * Hook for handling message sending and chat management
+ *
+ * Features:
+ * - Automatic chat creation when needed
+ * - Intelligent chat reuse from existing messages
+ * - Title generation for new chats
+ * - Support for both authenticated and unauthenticated flows
+ * - Follow-up prompt management
+ *
+ * @param {UseMessageHandlerDeps} deps - Required dependencies
+ * @returns {Object} Message handler functions and refs
+ */
 export function useMessageHandler(deps: UseMessageHandlerDeps) {
   const sendRef = useRef<((message: string) => Promise<void>) | null>(null);
 
+  /**
+   * Main message sending handler
+   * Manages chat selection/creation and message dispatch
+   *
+   * @param {unknown} messageInput - The message to send (coerced to string)
+   */
   const handleSendMessage = useCallback(
-    async (message: string) => {
+    async (messageInput: unknown) => {
+      const message =
+        typeof messageInput === "string"
+          ? messageInput
+          : String(messageInput ?? "");
       if (!message.trim()) return;
 
       let activeChatId: string | null = deps.currentChatId;
@@ -89,14 +148,15 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         deps.setMessageCount(deps.messageCount + 1);
 
         if (deps.isAuthenticated) {
-          await deps.generateResponse({
-            chatId: activeChatId,
-            message: message.trim(),
-            isReplyToAssistant:
-              deps.chatState.messages.length > 0 &&
-              deps.chatState.messages[deps.chatState.messages.length - 1]
-                ?.role === "assistant",
-          });
+          // Use unified chat action which manages streaming, search progress, and refresh
+          if (deps.chatActions.sendMessage) {
+            await deps.chatActions.sendMessage(message.trim());
+          } else {
+            await deps.generateResponse({
+              chatId: activeChatId,
+              message: message.trim(),
+            });
+          }
         } else {
           await deps.generateUnauthenticatedResponse(
             message.trim(),
@@ -124,7 +184,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
     [deps],
   );
 
-  sendRef.current = handleSendMessage;
+  sendRef.current = async (msg: string) => handleSendMessage(msg);
 
   return {
     handleSendMessage,

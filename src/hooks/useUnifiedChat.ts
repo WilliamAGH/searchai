@@ -43,7 +43,6 @@ export function useUnifiedChat() {
     isGenerating: state.isGenerating,
     error: state.error,
     searchProgress: state.searchProgress,
-    featureFlags: state.featureFlags,
 
     // UI State
     showFollowUpPrompt: state.showFollowUpPrompt,

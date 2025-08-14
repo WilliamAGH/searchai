@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useMemo } from "react";
+import type { TouchEvent } from "react";
 
 interface UseKeyboardShortcutsProps {
   isMobile: boolean;
@@ -65,11 +66,11 @@ export function useKeyboardShortcuts({
     let touchStartX = 0;
     let touchEndX = 0;
 
-    const handleTouchStart = (e: React.TouchEvent) => {
+    const handleTouchStart = (e: TouchEvent) => {
       touchStartX = e.touches[0].clientX;
     };
 
-    const handleTouchEnd = (e: React.TouchEvent) => {
+    const handleTouchEnd = (e: TouchEvent) => {
       touchEndX = e.changedTouches[0].clientX;
       const swipeDistance = touchEndX - touchStartX;
 
