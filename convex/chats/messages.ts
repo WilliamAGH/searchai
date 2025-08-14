@@ -13,10 +13,14 @@ import { vSearchResult } from "../lib/validators";
  * - Validates chat ownership
  * - Returns chronological order
  * @param chatId - Chat database ID
+ * @param sessionId - Optional session ID for anonymous users
  * @returns Array of messages
  */
 export const getChatMessages = query({
-  args: { chatId: v.id("chats") },
+  args: {
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+  },
   returns: v.array(
     v.object({
       role: v.union(
@@ -40,13 +44,24 @@ export const getChatMessages = query({
 
     if (!chat) return [];
 
-    // Allow access to:
-    // - Anonymous chats (no userId)
-    // - The owner's chats
-    // - Publicly shared chats (privacy: "shared" or "public")
-    const privacy = chat.privacy;
-    const isSharedOrPublic = privacy === "shared" || privacy === "public";
-    if (chat.userId && chat.userId !== userId && !isSharedOrPublic) return [];
+    // Check authorization:
+    // For authenticated users: check userId matches
+    if (chat.userId) {
+      if (chat.userId !== userId) {
+        // Allow access to shared/public chats
+        const isSharedOrPublic =
+          chat.privacy === "shared" || chat.privacy === "public";
+        if (!isSharedOrPublic) return [];
+      }
+    }
+    // For anonymous chats: check sessionId matches
+    else if (chat.sessionId) {
+      if (!args.sessionId || chat.sessionId !== args.sessionId) return [];
+    }
+    // For shared/public chats without userId or sessionId: allow access
+    else if (chat.privacy !== "shared" && chat.privacy !== "public") {
+      return [];
+    }
 
     const docs = await ctx.db
       .query("messages")
