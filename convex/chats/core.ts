@@ -9,32 +9,35 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { generateOpaqueId } from "./utils";
+import { generateShareId, generatePublicId } from "../lib/uuid";
 
 /**
  * Create new chat
  * - Generates unique share ID
- * - Associates with authenticated user
+ * - Works for both authenticated and anonymous users
  * - Sets timestamps
  * @param title - Chat title
+ * @param sessionId - Optional session ID for anonymous users
  * @returns Chat ID
  */
 export const createChat = mutation({
   args: {
     title: v.string(),
+    sessionId: v.optional(v.string()),
   },
   returns: v.id("chats"),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
 
-    // Generate URL-safe opaque IDs without Node.js built-ins (V8 runtime safe)
-    const shareId = generateOpaqueId();
-    const publicId = generateOpaqueId();
+    // Generate UUID v7 IDs for time-sortable, collision-resistant identifiers
+    const shareId = generateShareId();
+    const publicId = generatePublicId();
 
     return await ctx.db.insert("chats", {
       title: args.title,
       userId: userId || undefined,
+      sessionId: !userId ? args.sessionId : undefined,
       shareId,
       publicId,
       privacy: "private",
@@ -46,24 +49,39 @@ export const createChat = mutation({
 
 /**
  * Get user's chats
- * - Returns empty for unauth users
+ * - Returns chats for authenticated users OR anonymous session
  * - Ordered by creation desc
+ * @param sessionId - Optional session ID for anonymous users
  * @returns Array of user's chats
  */
 export const getUserChats = query({
-  args: {},
+  args: {
+    sessionId: v.optional(v.string()),
+  },
   returns: v.array(v.any()),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
 
-    // Return empty array for unauthenticated users - they'll use local storage
-    if (!userId) return [];
+    // Authenticated users - return their chats
+    if (userId) {
+      return await ctx.db
+        .query("chats")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc")
+        .collect();
+    }
 
-    return await ctx.db
-      .query("chats")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .collect();
+    // Anonymous users - return session chats
+    if (args.sessionId) {
+      return await ctx.db
+        .query("chats")
+        .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+        .order("desc")
+        .collect();
+    }
+
+    // No userId or sessionId - return empty
+    return [];
   },
 });
 

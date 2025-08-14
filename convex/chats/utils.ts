@@ -56,11 +56,8 @@ export function buildContextSummary(params: {
 }
 
 /**
- * Generate a URL-safe opaque ID
- * Lightweight implementation that doesn't rely on Node.js APIs
+ * Generate a URL-safe opaque ID using UUID v7
+ * Provides time-sortable, collision-resistant identifiers
+ * @deprecated Use specific generators from convex/lib/uuid.ts instead
  */
-export function generateOpaqueId(): string {
-  const timePart = Date.now().toString(36);
-  const rand = () => Math.random().toString(36).slice(2, 10);
-  return (timePart + rand() + rand() + rand()).slice(0, 32);
-}
+export { generateOpaqueId } from "../lib/uuid";

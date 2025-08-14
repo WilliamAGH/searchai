@@ -8,7 +8,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, internalMutation } from "../_generated/server";
-import { generateOpaqueId } from "./utils";
+import { generateShareId, generatePublicId } from "../lib/uuid";
 
 /**
  * Update chat title
@@ -111,10 +111,10 @@ export const updateChatPrivacy = mutation({
     let shareId = (chat as unknown as { shareId?: string }).shareId;
     let publicId = (chat as unknown as { publicId?: string }).publicId;
     if (args.privacy === "shared" && !shareId) {
-      shareId = generateOpaqueId();
+      shareId = generateShareId();
     }
     if (args.privacy === "public" && !publicId) {
-      publicId = generateOpaqueId();
+      publicId = generatePublicId();
     }
 
     await ctx.db.patch(args.chatId, {
