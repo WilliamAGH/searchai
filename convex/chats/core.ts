@@ -86,65 +86,83 @@ export const getUserChats = query({
 });
 
 /**
+ * Helper function to validate chat access
+ */
+async function validateChatAccess(
+  ctx: any,
+  chatId: Id<"chats">,
+  sessionId?: string,
+) {
+  const userId = await getAuthUserId(ctx);
+  const chat = await ctx.db.get(chatId);
+
+  if (!chat) return null;
+
+  // For authenticated users: check userId matches
+  if (chat.userId) {
+    if (chat.userId !== userId) return null;
+  }
+  // For anonymous chats: check sessionId matches
+  else if (chat.sessionId) {
+    if (!sessionId || chat.sessionId !== sessionId) return null;
+  }
+  // For shared/public chats: check privacy setting
+  else if (chat.privacy === "shared" || chat.privacy === "public") {
+    // Allow access to shared/public chats
+    return chat;
+  }
+
+  return chat;
+}
+
+/**
  * Get chat by ID
- * - Validates ownership
- * - Allows anonymous chats
+ * - Validates ownership for authenticated users
+ * - Validates sessionId for anonymous users
  * @param chatId - Chat database ID
+ * @param sessionId - Optional session ID for anonymous users
  * @returns Chat or null
  */
 export const getChatById = query({
-  args: { chatId: v.id("chats") },
+  args: {
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+  },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    const chat = await ctx.db.get(args.chatId);
-
-    if (!chat) return null;
-
-    // Allow access to chats without userId (anonymous chats) or user's own chats
-    if (chat.userId && chat.userId !== userId) return null;
-
-    return chat;
+    return await validateChatAccess(ctx, args.chatId, args.sessionId);
   },
 });
 
 /**
  * Alias for getChatById to maintain frontend compatibility
  * @param chatId - Chat database ID
+ * @param sessionId - Optional session ID for anonymous users
  * @returns Chat or null
  */
 export const getChat = query({
-  args: { chatId: v.id("chats") },
+  args: {
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+  },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
-    // Alias to getChatById for frontend compatibility
-    const userId = await getAuthUserId(ctx);
-    const chat = await ctx.db.get(args.chatId);
-
-    if (!chat) return null;
-
-    // Allow access to chats without userId (anonymous chats) or user's own chats
-    if (chat.userId && chat.userId !== userId) return null;
-
-    return chat;
+    // Reuse validation logic
+    return await validateChatAccess(ctx, args.chatId, args.sessionId);
   },
 });
 
 export const getChatByOpaqueId = query({
-  args: { opaqueId: v.string() },
+  args: {
+    opaqueId: v.string(),
+    sessionId: v.optional(v.string()),
+  },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
     // Treat the opaque ID string as a Convex chat ID
     const chatId = args.opaqueId as Id<"chats">;
-    const chat = await ctx.db.get(chatId);
-
-    if (!chat) return null;
-
-    // Allow access to chats without userId (anonymous chats) or user's own chats
-    if (chat.userId && chat.userId !== userId) return null;
-
-    return chat;
+    // Reuse validation logic
+    return await validateChatAccess(ctx, chatId, args.sessionId);
   },
 });
 

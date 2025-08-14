@@ -170,7 +170,7 @@ export const generationStep = internalAction({
 
       // Add search planning results to reasoning
       accumulatedReasoning += plan.shouldSearch
-        ? `\nSearching the web with ${plan.queries.length} queries:\n${plan.queries.map((q, i) => `  ${i + 1}. ${q}`).join("\n")}\n\nReason: ${plan.reasons}\n`
+        ? `\nSearching the web with ${plan.queries.length} queries:\n${plan.queries.map((q: string, i: number) => `  ${i + 1}. ${q}`).join("\n")}\n\nReason: ${plan.reasons}\n`
         : `\nNo search needed. Reason: ${plan.reasons}\n`;
 
       await ctx.runMutation(internal.messages.updateMessage, {
