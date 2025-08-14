@@ -1,27 +1,28 @@
 /**
  * Chat Repository Hook
- * Manages repository selection based on authentication status
+ * Manages repository selection - ALWAYS uses Convex for all users
  */
 
 import { useMemo } from "react";
-import { useConvexAuth, useConvex } from "convex/react";
+import { useConvex } from "convex/react";
 import type { IChatRepository } from "../lib/repositories/ChatRepository";
-import { LocalChatRepository } from "../lib/repositories/LocalChatRepository";
 import { ConvexChatRepository } from "../lib/repositories/ConvexChatRepository";
+import { useAnonymousSession } from "./useAnonymousSession";
 
 export function useChatRepository(): IChatRepository | null {
-  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const convexClient = useConvex();
+  const sessionId = useAnonymousSession();
 
   const repository = useMemo<IChatRepository | null>(() => {
-    if (authLoading) return null;
-
-    if (isAuthenticated && convexClient) {
-      return new ConvexChatRepository(convexClient);
+    // ALWAYS use Convex repository when client is available
+    // This works for both authenticated and unauthenticated users
+    if (convexClient) {
+      return new ConvexChatRepository(convexClient, sessionId || undefined);
     }
 
-    return new LocalChatRepository();
-  }, [isAuthenticated, authLoading, convexClient]);
+    // Only return null if Convex is not available (should rarely happen)
+    return null;
+  }, [convexClient, sessionId]);
 
   return repository;
 }
