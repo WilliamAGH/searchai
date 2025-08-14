@@ -4,18 +4,45 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 
+/**
+ * Props for the ChatSidebar component
+ * @interface ChatSidebarProps
+ */
 interface ChatSidebarProps {
+  /** List of all available chats to display */
   chats: Chat[];
+  /** ID of the currently selected/active chat */
   currentChatId: Id<"chats"> | string | null;
+  /** Callback fired when user selects a chat from the list */
   onSelectChat: (chatId: Id<"chats"> | string | null) => void;
+  /** Callback fired when user clicks the "New Chat" button */
   onNewChat: () => void;
+  /** Optional callback to delete a local (non-synced) chat */
   onDeleteLocalChat?: (chatId: string) => void;
+  /** Optional callback to request deletion of a synced chat */
   onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
+  /** Controls whether the sidebar is visible (mobile) or expanded (desktop) */
   isOpen: boolean;
+  /** Callback to toggle sidebar open/closed state */
   onToggle: () => void;
+  /** Indicates if a new chat is currently being created (shows loading state) */
   isCreatingChat?: boolean;
 }
 
+/**
+ * ChatSidebar component - Main navigation sidebar for chat selection and management
+ *
+ * Provides:
+ * - List of all available chats with titles
+ * - Chat selection functionality
+ * - New chat creation button
+ * - Chat deletion capabilities
+ * - Responsive behavior (drawer on mobile, sidebar on desktop)
+ *
+ * @component
+ * @param {ChatSidebarProps} props - Component props
+ * @returns {JSX.Element} Rendered sidebar component
+ */
 export function ChatSidebar({
   chats,
   currentChatId,

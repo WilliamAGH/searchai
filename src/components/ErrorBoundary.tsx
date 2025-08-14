@@ -1,29 +1,77 @@
+/**
+ * Error Boundary Component
+ * Catches JavaScript errors anywhere in the child component tree
+ * Logs error information and displays a fallback UI
+ * Essential for production stability and user experience
+ */
+
 import React, { Component, ReactNode } from "react";
 import { logger } from "../lib/logger";
 
+/**
+ * Props for the ErrorBoundary component
+ * @interface Props
+ */
 interface Props {
+  /** Child components to be wrapped by the error boundary */
   children: ReactNode;
+  /** Optional custom fallback UI to display on error */
   fallback?: ReactNode;
+  /** Optional error handler callback for custom error processing */
   onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
 }
 
+/**
+ * Internal state for error boundary
+ * @interface State
+ */
 interface State {
+  /** Flag indicating if an error has been caught */
   hasError: boolean;
+  /** The caught error object, null if no error */
   error: Error | null;
+  /** React error info including component stack */
   errorInfo: React.ErrorInfo | null;
 }
 
+/**
+ * ErrorBoundary component class
+ *
+ * Features:
+ * - Catches JavaScript errors in child components
+ * - Logs errors for debugging
+ * - Displays user-friendly error UI
+ * - Provides recovery options (reset, reload)
+ * - Supports custom fallback UI
+ *
+ * @class ErrorBoundary
+ * @extends {Component<Props, State>}
+ */
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
+  /**
+   * Update state when an error is caught
+   * Called during the render phase
+   *
+   * @param {Error} error - The error that was thrown
+   * @returns {State} New state with error information
+   */
   static getDerivedStateFromError(error: Error): State {
     // Update state so the next render will show the fallback UI
     return { hasError: true, error, errorInfo: null };
   }
 
+  /**
+   * Log error details and call custom error handler
+   * Called after an error has been thrown
+   *
+   * @param {Error} error - The error that was thrown
+   * @param {React.ErrorInfo} errorInfo - React error information
+   */
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log error details for debugging
     logger.error("❌ ErrorBoundary caught error:", {
@@ -44,6 +92,10 @@ export class ErrorBoundary extends Component<Props, State> {
     });
   }
 
+  /**
+   * Reset error state and navigate to home page
+   * Provides a way for users to recover from errors
+   */
   handleReset = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
     // Try to navigate back to home
@@ -125,7 +177,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-// Hook for functional components to reset error boundary
+/**
+ * Hook for functional components to trigger error boundary reset
+ * Forces a re-render which can help recover from certain errors
+ *
+ * @returns {Function} Reset function to trigger re-render
+ */
 export function useErrorReset() {
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
   return () => forceUpdate();

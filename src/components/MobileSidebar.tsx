@@ -2,7 +2,7 @@
 
 import { Dialog, Transition } from "@headlessui/react";
 import { useMutation } from "convex/react";
-import React, { Fragment, useRef } from "react";
+import { Fragment, useRef, useCallback } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
@@ -35,13 +35,13 @@ export function MobileSidebar({
   // Ensure Headless UI Dialog has a stable initial focusable element on open
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleNewChat = React.useCallback(() => {
+  const handleNewChat = useCallback(() => {
     logger.info("🖱️ New Chat button clicked in MobileSidebar");
     onNewChat();
     onClose();
   }, [onNewChat, onClose]);
 
-  const handleSelectChat = React.useCallback(
+  const handleSelectChat = useCallback(
     (chatId: Id<"chats"> | string) => {
       onSelectChat(chatId);
       onClose();
@@ -49,14 +49,14 @@ export function MobileSidebar({
     [onSelectChat, onClose],
   );
 
-  const handleOverlayKeyDown = React.useCallback(
+  const handleOverlayKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLButtonElement>) => {
       if (e.key === "Escape") onClose();
     },
     [onClose],
   );
 
-  const handleSelectChatFromBtn = React.useCallback(
+  const handleSelectChatFromBtn = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const id = e.currentTarget.getAttribute("data-chat-id");
       if (!id) return;
@@ -65,7 +65,7 @@ export function MobileSidebar({
     [handleSelectChat],
   );
 
-  const handleDeleteChatFromBtn = React.useCallback(
+  const handleDeleteChatFromBtn = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const id = e.currentTarget.getAttribute("data-chat-id");
       const isCurrent = e.currentTarget.getAttribute("data-current") === "1";
@@ -75,7 +75,7 @@ export function MobileSidebar({
     [handleDeleteChat],
   );
 
-  const handleDeleteChat = React.useCallback(
+  const handleDeleteChat = useCallback(
     async (chatId: Id<"chats"> | string, isCurrentChat: boolean) => {
       try {
         if (!window.confirm("Delete this chat? This cannot be undone.")) return;
