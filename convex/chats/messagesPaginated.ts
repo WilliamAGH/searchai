@@ -142,16 +142,19 @@ export const getRecentChatMessages = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Get auth
+    // Auth and chat
     const userId = await getAuthUserId(ctx);
-
-    // Get the chat to verify ownership
     const chat = await ctx.db.get(args.chatId);
-    if (!chat) throw new Error("Chat not found");
+    if (!chat) return [];
 
-    // Check authorization
-    if (chat.userId !== userId) {
-      throw new Error("Unauthorized");
+    // Authorization aligned with paginated variant:
+    // - allow owner
+    // - allow anonymous chats (no userId)
+    // - allow publicly shared chats (privacy: "shared" | "public")
+    const privacy = chat.privacy;
+    const isSharedOrPublic = privacy === "shared" || privacy === "public";
+    if (chat.userId && chat.userId !== userId && !isSharedOrPublic) {
+      return [];
     }
 
     // Get messages directly
