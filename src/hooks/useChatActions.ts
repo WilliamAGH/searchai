@@ -14,7 +14,9 @@ const storageService = {
   clearAll() {
     try {
       localStorage.clear();
-    } catch {}
+    } catch (error) {
+      logger.error("Failed to clear localStorage", { error });
+    }
   },
 };
 

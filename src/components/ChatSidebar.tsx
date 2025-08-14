@@ -3,6 +3,7 @@ import React from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
+import { logger } from "../lib/logger";
 
 /**
  * Props for the ChatSidebar component
@@ -96,8 +97,6 @@ export function ChatSidebar({
       } catch (err) {
         // Only log warnings in dev to avoid noise in production
         if (import.meta.env.DEV) {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { logger } = require("../lib/logger");
           logger.warn("Chat deletion failed:", err);
         }
       }

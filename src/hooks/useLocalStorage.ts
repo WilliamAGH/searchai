@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { logger } from "../lib/logger";
 
 /**
  * LocalStorage hook with debounced persistence.
@@ -20,8 +21,6 @@ export function useLocalStorage<T>(
       const item = window.localStorage.getItem(key);
       return item ? (JSON.parse(item) as T) : initialValue;
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { logger } = require("../lib/logger");
       logger.error(`Error reading localStorage key "${key}":`, error);
       return initialValue;
     }
@@ -39,8 +38,6 @@ export function useLocalStorage<T>(
     try {
       window.localStorage.setItem(key, JSON.stringify(latestRef.current));
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { logger } = require("../lib/logger");
       logger.error(`Error setting localStorage key "${key}":`, error);
     }
   }, [key]);

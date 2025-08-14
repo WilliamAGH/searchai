@@ -49,8 +49,17 @@ export function registerAIRoutes(http: HttpRouter) {
         );
       }
 
+      // Define expected payload structure
+      interface AIRequestPayload {
+        message?: unknown;
+        systemPrompt?: unknown;
+        sources?: unknown;
+        chatHistory?: unknown;
+        searchResults?: unknown;
+      }
+
       // Validate and normalize input
-      const payload = rawPayload as any;
+      const payload = rawPayload as AIRequestPayload;
       const message = String(payload.message || "").slice(0, 10000);
       const systemPrompt = payload.systemPrompt
         ? String(payload.systemPrompt).slice(0, 2000)
@@ -58,17 +67,20 @@ export function registerAIRoutes(http: HttpRouter) {
       const sources = Array.isArray(payload.sources)
         ? payload.sources
             .slice(0, 20)
-            .filter((s: any) => typeof s === "string")
-            .map((s: any) => String(s).slice(0, 2048))
+            .filter((s: unknown) => typeof s === "string")
+            .map((s: unknown) => String(s).slice(0, 2048))
         : undefined;
       const chatHistory = Array.isArray(payload.chatHistory)
-        ? payload.chatHistory.slice(0, 50).map((m: any) => ({
-            role:
-              m.role === "user" || m.role === "assistant"
-                ? m.role
-                : "assistant",
-            content: String(m.content || "").slice(0, 10000),
-          }))
+        ? payload.chatHistory.slice(0, 50).map((m: unknown) => {
+            const msg = m as { role?: unknown; content?: unknown };
+            return {
+              role:
+                msg.role === "user" || msg.role === "assistant"
+                  ? msg.role
+                  : ("assistant" as const),
+              content: String(msg.content || "").slice(0, 10000),
+            };
+          })
         : undefined;
 
       // Normalize searchResults to ensure relevanceScore is always present
@@ -144,7 +156,7 @@ export function registerAIRoutes(http: HttpRouter) {
           effectiveSystemPrompt,
           message,
           searchResults || [],
-          sources,
+          sources || [],
         );
       }
 
@@ -152,10 +164,10 @@ export function registerAIRoutes(http: HttpRouter) {
         return await handleOpenRouterStreaming(
           OPENROUTER_API_KEY,
           effectiveSystemPrompt,
-          chatHistory,
+          chatHistory || [],
           message,
           searchResults || [],
-          sources,
+          sources || [],
           enh,
           SITE_URL,
           SITE_TITLE,
@@ -173,7 +185,7 @@ export function registerAIRoutes(http: HttpRouter) {
           effectiveSystemPrompt,
           message,
           searchResults || [],
-          sources,
+          sources || [],
         );
       }
     }),

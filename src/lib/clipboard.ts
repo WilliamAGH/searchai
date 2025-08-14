@@ -2,6 +2,8 @@
  * Clipboard utilities for copying text
  */
 
+import { logger } from "./logger";
+
 /**
  * Copy text to clipboard with fallback support
  * @param text - Text to copy to clipboard
@@ -31,8 +33,6 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       textArea.remove();
     }
   } catch (error) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { logger } = require("./logger");
     logger.error("Failed to copy text:", error);
     return false;
   }

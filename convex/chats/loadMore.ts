@@ -19,7 +19,7 @@ import { v } from "convex/values";
 export const loadMoreMessages = action({
   args: {
     chatId: v.id("chats"),
-    cursor: v.string(),
+    cursor: v.id("messages"),
     limit: v.optional(v.number()),
   },
   returns: v.object({
@@ -50,20 +50,30 @@ export const loadMoreMessages = action({
         reasoning: v.optional(v.string()),
       }),
     ),
-    nextCursor: v.optional(v.string()),
+    nextCursor: v.optional(v.id("messages")),
     hasMore: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const result: any = await ctx.runQuery(
-      // @ts-ignore - Known Convex TS2589 issue with complex type inference
-      api.chats.messagesPaginated.getChatMessagesPaginated,
-      {
-        chatId: args.chatId,
-        cursor: args.cursor,
-        limit: args.limit,
-      },
-    );
+    try {
+      const result: any = await ctx.runQuery(
+        // @ts-ignore - Known Convex TS2589 issue with complex type inference
+        api.chats.messagesPaginated.getChatMessagesPaginated,
+        {
+          chatId: args.chatId,
+          cursor: args.cursor,
+          limit: args.limit,
+        },
+      );
 
-    return result;
+      return result;
+    } catch (error) {
+      console.error("Failed to load more messages:", error);
+      // Return empty result to maintain API contract
+      return {
+        messages: [],
+        nextCursor: undefined,
+        hasMore: false,
+      };
+    }
   },
 });

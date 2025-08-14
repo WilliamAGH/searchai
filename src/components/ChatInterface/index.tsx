@@ -4,7 +4,13 @@
  */
 
 import { useAction, useMutation } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useUnifiedChat } from "../../hooks/useUnifiedChat";
@@ -36,7 +42,7 @@ import { isTopicChange } from "../../lib/utils/topicDetection";
 import { mapMessagesToLocal } from "../../lib/utils/messageMapper";
 import { buildUserHistory } from "../../lib/utils/chatHistory";
 
-export function ChatInterface({
+function ChatInterfaceComponent({
   isAuthenticated,
   isSidebarOpen = false,
   onToggleSidebar,
@@ -461,4 +467,5 @@ export function ChatInterface({
   );
 }
 
+export const ChatInterface = React.memo(ChatInterfaceComponent);
 export default ChatInterface;

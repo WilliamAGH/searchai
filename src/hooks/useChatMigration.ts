@@ -20,18 +20,31 @@ export function useChatMigration(
   useEffect(() => {
     if (!repository || !isAuthenticated || hasMigratedRef.current) return;
 
+    // Only migrate if we're using Convex repository
+    if (repository.storageType !== "convex") return;
+
     const migrate = async () => {
       try {
-        const migrationService = new MigrationService();
-        const hasPendingMigration =
-          await migrationService.hasPendingMigration();
+        // Create LocalChatRepository for migration source
+        const { LocalChatRepository } = await import(
+          "../lib/repositories/LocalChatRepository"
+        );
+        const localRepo = new LocalChatRepository();
 
-        if (hasPendingMigration && repository.storageType === "convex") {
+        // Create MigrationService with both repositories
+        const migrationService = new MigrationService(localRepo, repository);
+
+        // Check if migration is needed
+        const needsMigration = await migrationService.isMigrationNeeded();
+
+        if (needsMigration) {
           logger.info("Starting migration to Convex");
-          const result = await migrationService.migrateToConvex(repository);
+          const result = await migrationService.migrateUserData();
 
           if (result.success) {
-            logger.info(`Migration completed: ${result.migratedChats} chats`);
+            logger.info(
+              `Migration completed: ${result.migratedChats} chats migrated`,
+            );
             hasMigratedRef.current = true;
 
             // Refresh chats after migration
@@ -39,6 +52,9 @@ export function useChatMigration(
           } else if (result.error) {
             logger.error("Migration failed:", result.error);
           }
+        } else {
+          // No migration needed, mark as complete
+          hasMigratedRef.current = true;
         }
       } catch (error) {
         logger.error("Migration error:", error);

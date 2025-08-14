@@ -14,6 +14,7 @@ import React, {
 } from "react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { logger } from "../lib/logger";
 
 /**
  * Storage keys for theme persistence
@@ -147,8 +148,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           await updatePrefs({ theme: newTheme });
         } catch (error) {
           // Log error if it occurs for authenticated users
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { logger } = require("../lib/logger");
           logger.error("Failed to save theme preference:", error);
         }
       }
