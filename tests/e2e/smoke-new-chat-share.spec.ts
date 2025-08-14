@@ -50,8 +50,8 @@ test.describe("smoke: new chat share flow has no console errors", () => {
     const shareButton = page.getByTitle("Share this conversation");
     await expect(shareButton).toBeVisible({ timeout: 10000 });
 
-    // Add delay before clicking
-    await page.waitForTimeout(1000);
+    // Wait for any animations or state updates to complete
+    await page.waitForLoadState("networkidle");
 
     // Debug: Check if modal exists before click
     const modalCountBefore = await page
@@ -130,8 +130,13 @@ test.describe("smoke: new chat share flow has no console errors", () => {
     await expect(shareButton).toBeVisible();
     await shareButton.click({ force: true });
 
-    // Wait a moment for the modal to appear
-    await page.waitForTimeout(1000);
+    // Wait for modal to appear and be fully visible
+    await page
+      .waitForSelector('[role="dialog"][aria-modal="true"]', {
+        state: "visible",
+        timeout: 2000,
+      })
+      .catch(() => {});
 
     // Check if modal appeared
     const modalCount = await page

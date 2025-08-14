@@ -1,3 +1,10 @@
+/**
+ * Theme Provider Component
+ * Manages application theme (light/dark mode) with persistence
+ * Syncs theme preferences between localStorage and user preferences
+ * Provides theme context to entire application
+ */
+
 import React, {
   createContext,
   useContext,
@@ -8,21 +15,94 @@ import React, {
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
+/**
+ * Storage keys for theme persistence
+ */
+const STORAGE_KEYS = {
+  THEME: "searchai_theme",
+} as const;
+
+/**
+ * Minimal storage service for theme persistence
+ * Provides safe localStorage access with error handling
+ */
+const storageService = {
+  /**
+   * Get parsed value from localStorage
+   * @template T - Expected type of stored value
+   * @param {string} key - Storage key
+   * @returns {T | null} Parsed value or null if not found/invalid
+   */
+  get<T>(key: string): T | null {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  },
+  /**
+   * Store value in localStorage
+   * @template T - Type of value to store
+   * @param {string} key - Storage key
+   * @param {T} value - Value to store
+   */
+  set<T>(key: string, value: T): void {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // ignore storage errors
+    }
+  },
+  /**
+   * Check if key exists in localStorage
+   * @param {string} key - Storage key
+   * @returns {boolean} True if key exists
+   */
+  has(key: string): boolean {
+    try {
+      return localStorage.getItem(key) !== null;
+    } catch {
+      return false;
+    }
+  },
+};
+
+/** Available theme options */
 type Theme = "light" | "dark";
 
+/**
+ * Theme context interface
+ * @interface ThemeContextType
+ */
 interface ThemeContextType {
+  /** Current theme setting */
   theme: Theme;
+  /** Function to update theme */
   setTheme: (theme: Theme) => void;
+  /** Resolved theme (same as theme, for compatibility) */
   actualTheme: "light" | "dark";
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+/**
+ * ThemeProvider component
+ *
+ * Features:
+ * - Initializes theme from localStorage or system preference
+ * - Syncs with user preferences for authenticated users
+ * - Applies theme class to document root
+ * - Provides theme context to children
+ *
+ * @param {Object} props - Component props
+ * @param {React.ReactNode} props.children - Child components
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     // Initialize based on system preference or localStorage
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("theme") as Theme;
+      const stored = storageService.get<Theme>(STORAGE_KEYS.THEME);
       if (stored === "light" || stored === "dark") {
         return stored;
       }
@@ -43,7 +123,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (
       userPrefs?.theme &&
       userPrefs.theme !== "system" &&
-      !localStorage.getItem("theme")
+      !storageService.has(STORAGE_KEYS.THEME)
     ) {
       setThemeState(userPrefs.theme);
     }
@@ -59,7 +139,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     async (newTheme: Theme) => {
       // Update state immediately for instant UI response
       setThemeState(newTheme);
-      localStorage.setItem("theme", newTheme);
+      storageService.set(STORAGE_KEYS.THEME, newTheme);
 
       // Only update user preferences if authenticated
       if (isAuthenticated) {
@@ -88,6 +168,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Hook to access theme context
+ * Must be used within a ThemeProvider
+ *
+ * @returns {ThemeContextType} Theme context with current theme and setter
+ * @throws {Error} If used outside of ThemeProvider
+ */
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) {
