@@ -7,7 +7,7 @@
 import { v } from "convex/values";
 import { action, internalAction } from "../_generated/server";
 import { api, internal } from "../_generated/api";
-import { buildContextSummary } from "./context";
+import { buildContextSummary } from "../chats/utils";
 import { applyEnhancements } from "../enhancements";
 import { streamOpenRouter } from "./streaming";
 import type { ActionCtx } from "../_generated/server";
@@ -116,8 +116,16 @@ export const generationStep = internalAction({
       chatId: args.chatId,
     });
 
-    // Build context from messages
-    const contextSummary = buildContextSummary(messages.slice(-50));
+    // Build context from messages - use the sophisticated version from chats/utils
+    const contextSummary = buildContextSummary({
+      messages: messages.slice(-50).map((m) => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+      })),
+      rollingSummary: chat?.rollingSummary,
+      maxChars: 1600,
+    });
     const shouldUpdateSummary =
       !chat?.rollingSummaryUpdatedAt ||
       Date.now() - chat.rollingSummaryUpdatedAt > 5 * 60 * 1000;
@@ -190,19 +198,12 @@ export const generationStep = internalAction({
       }> = [];
       if (plan.shouldSearch) {
         // Augment queries with context keywords for better recall
-        // Build a fresh, recency-weighted summary to extract terms (robust if planner summary is sparse)
-        const allMsgs: Array<{
-          role: "user" | "assistant" | "system";
-          content?: string;
-          timestamp?: number;
-        }> = await ctx.runQuery(api.chats.getChatMessages, {
-          chatId: args.chatId,
-        });
-        const freshSummary = buildContextSummary(allMsgs);
+        // Use the sophisticated context from planSearch instead of rebuilding
+        const planContextSummary = plan.contextSummary;
         // Merge enhancement search terms to enrich context-derived terms
         const ctxTerms = Array.from(
           new Set([
-            ...(freshSummary || "")
+            ...(planContextSummary || "")
               .toLowerCase()
               .split(/[^a-z0-9]+/)
               .filter(Boolean),
@@ -210,7 +211,7 @@ export const generationStep = internalAction({
           ]),
         ).slice(0, 18);
         // Extract up to 2 quoted bigrams/trigrams for precision
-        const tokens = (freshSummary || "")
+        const tokens = (planContextSummary || "")
           .toLowerCase()
           .split(/[^a-z0-9]+/)
           .filter(Boolean);
@@ -251,8 +252,9 @@ export const generationStep = internalAction({
       }
 
       // 5. Build system prompt with context and search results
+      // CRITICAL FIX: Use the sophisticated context from planSearch instead of rebuilding
       const systemPrompt = buildSystemPrompt({
-        context: secureContext.summary,
+        context: plan.contextSummary, // Use the good context from planSearch!
         searchResults: aggregated.slice(0, 5), // Top 5 results
         enhancedInstructions: enhancements.enhancedSystemPrompt || "",
       });
