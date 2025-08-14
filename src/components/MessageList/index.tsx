@@ -161,7 +161,7 @@ export function MessageList({
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Auto-collapse sources when thinking begins
+  // Auto-collapse sources and reasoning appropriately
   useEffect(() => {
     setCollapsedById((prev) => {
       const updates: Record<string, boolean> = {};
@@ -174,19 +174,22 @@ export function MessageList({
         const hasContent = Boolean(m.content && m.content.trim());
         const isStreaming = Boolean(m.isStreaming);
 
-        // Sources should collapse when streaming begins
+        // Sources should NOT be collapsed initially - let users see search results
+        // Only collapse after content has been generated
         if (m.searchResults && m.searchResults.length > 0) {
           const sourceId = id;
           if (prev[sourceId] === undefined) {
-            updates[sourceId] = isStreaming || hasReasoning || hasContent;
+            // Don't collapse sources initially - only after content is complete
+            updates[sourceId] = !isStreaming && hasContent;
           }
         }
 
-        // Reasoning should only collapse when content starts
+        // Reasoning should expand while streaming, collapse when content starts
         if (hasReasoning) {
           const reasoningId = `reasoning-${id}`;
           if (prev[reasoningId] === undefined) {
-            updates[reasoningId] = hasContent;
+            // Show reasoning while it's being generated, collapse when content arrives
+            updates[reasoningId] = hasContent && !isStreaming;
           }
         }
       });
