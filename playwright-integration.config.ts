@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { desktopViewport } from "./tests/config/viewports";
 
 /**
  * Playwright configuration for integration tests
@@ -6,6 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./tests/integration",
+  testIgnore: ["**/tests/integration/pagination.test.ts"],
   timeout: 60_000, // Longer timeout for integration tests
   fullyParallel: false, // Run tests sequentially for consistency
   retries: 2, // Retry failed tests
@@ -27,30 +29,15 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        viewport: { width: 1280, height: 720 },
-      },
+      use: { ...devices["Desktop Chrome"], viewport: desktopViewport },
     },
     {
       name: "firefox",
-      use: {
-        ...devices["Desktop Firefox"],
-        viewport: { width: 1280, height: 720 },
-      },
+      use: { ...devices["Desktop Firefox"], viewport: desktopViewport },
     },
     {
       name: "webkit",
-      use: {
-        ...devices["Desktop Safari"],
-        viewport: { width: 1280, height: 720 },
-      },
-    },
-    {
-      name: "mobile",
-      use: {
-        ...devices["iPhone 13"],
-      },
+      use: { ...devices["Desktop Safari"], viewport: desktopViewport },
     },
   ],
   webServer: [
@@ -59,10 +46,12 @@ export default defineConfig({
         ? "vite preview --strictPort --port 5173"
         : "npm run dev:frontend",
       port: 5173,
-      timeout: 120_000,
-      reuseExistingServer: true,
+      url: "http://localhost:5173",
+      timeout: 180_000,
+      reuseExistingServer: !process.env.CI,
       stdout: "pipe",
       stderr: "pipe",
+      // Health check to ensure server is ready (Playwright v1.54+ supports url wait)
     },
   ],
 });

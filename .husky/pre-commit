@@ -7,8 +7,10 @@ echo "🔍 Running comprehensive pre-commit checks..."
 
 # 1. TypeScript type checking (catch type errors)
 echo "📝 TypeScript type check..."
+set +e
 npm run typecheck > /tmp/tsc-precommit.log 2>&1
 TSC_EXIT=$?
+set -e
 if [ $TSC_EXIT -ne 0 ]; then
   echo "❌ TypeScript errors detected (pre-commit)."
   echo "📄 Log: /tmp/tsc-precommit.log"
@@ -26,8 +28,10 @@ fi
 
 # 2. Quick Vite build check (catches import/syntax errors early!)
 echo "🏗️ Quick build validation..."
+set +e
 npm run build --silent > /tmp/build-check.log 2>&1
 BUILD_EXIT_CODE=$?
+set -e
 if [ $BUILD_EXIT_CODE -ne 0 ]; then
   echo "❌ Build failed! This would break deployment."
   echo "📄 Log: /tmp/build-check.log"

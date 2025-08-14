@@ -19,13 +19,19 @@ fi
 
 # 2. Full TypeScript check (including Convex)
 echo "📝 Full TypeScript validation..."
-if ! npx --no-install tsc -p . --noEmit --pretty false; then
+MAIN_TSC_LOG="$(mktemp -t tsc-main.XXXXXX.log)"
+if ! npx --no-install tsc -p . --noEmit --pretty false > "$MAIN_TSC_LOG" 2>&1; then
   echo "❌ TypeScript errors in main project!"
+  echo "📄 Log: $MAIN_TSC_LOG"
+  grep -nE "error TS[0-9]+" "$MAIN_TSC_LOG" | head -n 20 || sed -n '1,60p' "$MAIN_TSC_LOG"
   exit 1
 fi
 
-if ! npx --no-install tsc -p convex --noEmit --pretty false; then
+CONVEX_TSC_LOG="$(mktemp -t tsc-convex.XXXXXX.log)"
+if ! npx --no-install tsc -p convex --noEmit --pretty false > "$CONVEX_TSC_LOG" 2>&1; then
   echo "❌ TypeScript errors in Convex functions!"
+  echo "📄 Log: $CONVEX_TSC_LOG"
+  grep -nE "error TS[0-9]+" "$CONVEX_TSC_LOG" | head -n 20 || sed -n '1,60p' "$CONVEX_TSC_LOG"
   exit 1
 fi
 
@@ -35,7 +41,7 @@ CONVEX_LOG="$(mktemp -t convex-deploy.XXXXXX.log)"
 # Use documented --typecheck=enable for strict validation
 if ! npx --no-install convex dev --once --typecheck=enable > "$CONVEX_LOG" 2>&1; then
   echo "❌ CRITICAL: Convex deployment would fail!"
-  echo "📄 Log: /tmp/convex-deploy.log"
+  echo "📄 Log: $CONVEX_LOG"
   echo "🗂️  Changed files in convex/ (staged):"
   git diff --name-only --cached -- convex 2>/dev/null | sed -n '1,50p' || true
   echo "🗂️  Changed files in convex/ (unstaged):"
