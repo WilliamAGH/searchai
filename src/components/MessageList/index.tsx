@@ -12,9 +12,21 @@ import { logger } from "../../lib/logger";
 import { EmptyState } from "./EmptyState";
 import { ScrollToBottomFab } from "./ScrollToBottomFab";
 import { MessageItem } from "./MessageItem";
+import { LoadMoreButton } from "../LoadMoreButton";
+import {
+  MessageSkeleton,
+  LoadingMoreIndicator,
+  LoadErrorState,
+} from "./MessageSkeleton";
+import { VirtualizedMessageList } from "./VirtualizedMessageList";
 import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
 
+/**
+ * Public props for `MessageList` UI component.
+ * This component renders a scrollable list of chat messages with pagination,
+ * error states, skeletons, and controls.
+ */
 interface MessageListProps {
   messages: Message[];
   isGenerating: boolean;
@@ -29,10 +41,21 @@ interface MessageListProps {
   } | null;
   onDeleteLocalMessage?: (messageId: string) => void;
   onRequestDeleteMessage?: (messageId: string) => void;
+  // Pagination props
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => Promise<void>;
+  isLoadingMessages?: boolean;
+  loadError?: Error | null;
+  retryCount?: number;
+  onClearError?: () => void;
 }
 
 /**
  * Main message list component
+ */
+/**
+ * Render the message list for a chat conversation with pagination support.
  */
 export function MessageList({
   messages,
@@ -43,10 +66,20 @@ export function MessageList({
   searchProgress,
   onDeleteLocalMessage,
   onRequestDeleteMessage,
+  // Pagination props
+  isLoadingMore = false,
+  hasMore = false,
+  onLoadMore,
+  isLoadingMessages = false,
+  loadError,
+  retryCount = 0,
+  onClearError,
 }: MessageListProps) {
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const previousMessagesLengthRef = useRef(messages.length);
+  const isLoadingMoreRef = useRef(false);
   const [collapsedById, setCollapsedById] = React.useState<
     Record<string, boolean>
   >({});
@@ -54,6 +87,9 @@ export function MessageList({
   const [hoveredSourceUrl, setHoveredSourceUrl] = React.useState<string | null>(
     null,
   );
+  const [_hoveredCitationUrl, setHoveredCitationUrl] = React.useState<
+    string | null
+  >(null);
 
   /**
    * Scroll to bottom of messages
@@ -169,6 +205,51 @@ export function MessageList({
     setCollapsedById((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
+  // Handle load more with scroll position preservation
+  const handleLoadMore = React.useCallback(async () => {
+    if (!onLoadMore || isLoadingMoreRef.current) return;
+
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Save scroll height before loading
+    const prevScrollHeight = container.scrollHeight;
+    const prevScrollTop = container.scrollTop;
+
+    isLoadingMoreRef.current = true;
+
+    try {
+      await onLoadMore();
+
+      // After messages are loaded, restore scroll position
+      requestAnimationFrame(() => {
+        if (container) {
+          const newScrollHeight = container.scrollHeight;
+          const scrollDiff = newScrollHeight - prevScrollHeight;
+          container.scrollTop = prevScrollTop + scrollDiff;
+        }
+      });
+    } finally {
+      isLoadingMoreRef.current = false;
+    }
+  }, [onLoadMore]);
+
+  // Track when messages change to preserve scroll on load more
+  useEffect(() => {
+    const prevLength = previousMessagesLengthRef.current;
+    const currLength = messages.length;
+
+    // If messages increased and we were loading more, preserve scroll
+    if (currLength > prevLength && isLoadingMoreRef.current) {
+      const container = scrollContainerRef.current;
+      if (container) {
+        // Scroll preservation is handled in handleLoadMore
+      }
+    }
+
+    previousMessagesLengthRef.current = currLength;
+  }, [messages.length]);
+
   return (
     <div
       ref={scrollContainerRef}
@@ -179,26 +260,82 @@ export function MessageList({
         onClick={handleScrollToBottom}
       />
 
-      {messages.length === 0 ? (
+      {/* Show skeleton when initially loading messages */}
+      {isLoadingMessages && messages.length === 0 ? (
+        <div className="px-4 sm:px-6 py-6 sm:py-8">
+          <MessageSkeleton count={5} />
+        </div>
+      ) : messages.length === 0 ? (
         <EmptyState onToggleSidebar={onToggleSidebar} />
       ) : (
         <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
-          {messages.map((message, index) => (
-            <MessageItem
-              key={
-                message._id ||
-                `message-${index}-${message.timestamp || Date.now()}`
-              }
-              message={message}
-              index={index}
-              collapsedById={collapsedById}
-              hoveredSourceUrl={hoveredSourceUrl}
-              onToggleCollapsed={toggleCollapsed}
-              onDeleteMessage={handleDeleteMessage}
-              onSourceHover={setHoveredSourceUrl}
-              onCitationHover={setHoveredCitationUrl}
+          {/* Error state for pagination */}
+          {loadError && onClearError && (
+            <LoadErrorState
+              error={loadError}
+              onRetry={onClearError}
+              retryCount={retryCount}
             />
-          ))}
+          )}
+
+          {/* Test hook: hidden count for E2E smoke assertions */}
+          <span data-testid="count" style={{ display: "none" }}>
+            {messages.length}
+          </span>
+
+          {/* Load More Button at the top for loading older messages */}
+          {hasMore && onLoadMore && !loadError && (
+            <LoadMoreButton
+              onClick={handleLoadMore}
+              isLoading={isLoadingMore}
+              hasMore={hasMore}
+            />
+          )}
+
+          {/* Loading indicator when fetching more messages */}
+          {isLoadingMore && !loadError && <LoadingMoreIndicator />}
+
+          {/* Use virtualization for large message lists (100+ messages) */}
+          {messages.length > 100 ? (
+            <VirtualizedMessageList
+              messages={messages}
+              className="space-y-6 sm:space-y-8"
+              estimatedItemHeight={150}
+              renderItem={(message, index) => (
+                <MessageItem
+                  key={
+                    message._id ||
+                    `message-${index}-${message.timestamp || Date.now()}`
+                  }
+                  message={message}
+                  index={index}
+                  collapsedById={collapsedById}
+                  hoveredSourceUrl={hoveredSourceUrl}
+                  onToggleCollapsed={toggleCollapsed}
+                  onDeleteMessage={handleDeleteMessage}
+                  onSourceHover={setHoveredSourceUrl}
+                  onCitationHover={setHoveredCitationUrl}
+                />
+              )}
+            />
+          ) : (
+            messages.map((message, index) => (
+              <MessageItem
+                key={
+                  message._id ||
+                  `message-${index}-${message.timestamp || Date.now()}`
+                }
+                message={message}
+                index={index}
+                collapsedById={collapsedById}
+                hoveredSourceUrl={hoveredSourceUrl}
+                onToggleCollapsed={toggleCollapsed}
+                onDeleteMessage={handleDeleteMessage}
+                onSourceHover={setHoveredSourceUrl}
+                onCitationHover={setHoveredCitationUrl}
+              />
+            ))
+          )}
 
           {/* Show "AI is thinking" when in generating stage */}
           {isGenerating &&
