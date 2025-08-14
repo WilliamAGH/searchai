@@ -224,9 +224,14 @@ export const planSearch = action({
     // Cache key: chat + normalized message (first 200 chars)
     const normMsg = args.newMessage.toLowerCase().trim().slice(0, 200);
     // Strengthen cache key with message count to avoid over-hit on same prefix
-    const messageCountKey = (
-      await ctx.runQuery(api.chats.getChatMessages, { chatId: args.chatId })
-    ).length;
+    const recentMessages = await ctx.runQuery(
+      api.chats.messagesPaginated.getRecentChatMessages,
+      {
+        chatId: args.chatId,
+        limit: 25,
+      },
+    );
+    const messageCountKey = recentMessages.length;
     const cacheKey = `${args.chatId}|${normMsg}|${messageCountKey}`;
     // Rate limit check
     const { isLimited } = checkRateLimit(args.chatId, now);
@@ -254,10 +259,8 @@ export const planSearch = action({
 
     const maxContext = Math.max(1, Math.min(args.maxContextMessages ?? 10, 25));
 
-    // Load recent messages for lightweight context summary
-    const messages = await ctx.runQuery(api.chats.getChatMessages, {
-      chatId: args.chatId,
-    });
+    // Use the recent messages we already fetched above
+    const messages = recentMessages;
     // Prefer server-stored rolling summary if present (reduces tokens)
     const chat = await ctx.runQuery(api.chats.getChatById, {
       chatId: args.chatId,
