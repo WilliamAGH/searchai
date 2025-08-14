@@ -42,6 +42,7 @@ import type * as http_routes_scrape from "../http/routes/scrape.js";
 import type * as http_routes_search from "../http/routes/search.js";
 import type * as http_utils from "../http/utils.js";
 import type * as http from "../http.js";
+import type * as lib_convexTypes from "../lib/convexTypes.js";
 import type * as lib_security_patterns from "../lib/security/patterns.js";
 import type * as lib_security_sanitization from "../lib/security/sanitization.js";
 import type * as lib_security_webContent from "../lib/security/webContent.js";
@@ -102,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   "http/routes/search": typeof http_routes_search;
   "http/utils": typeof http_utils;
   http: typeof http;
+  "lib/convexTypes": typeof lib_convexTypes;
   "lib/security/patterns": typeof lib_security_patterns;
   "lib/security/sanitization": typeof lib_security_sanitization;
   "lib/security/webContent": typeof lib_security_webContent;
