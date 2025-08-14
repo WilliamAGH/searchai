@@ -96,6 +96,25 @@ EMAIL_ENV_KEY: CONVEX_RESEND_API_KEY
 
 This project operates under **ZERO TEMPERATURE** development standards where every decision must be explicitly verified through live documentation, no assumptions are permitted, and type safety is absolute.
 
+## 📚 Documentation Source of Truth
+
+- Single Source: `.cursor/rules/*.mdc` is the authoritative location for our engineering guidelines and non-task documentation.
+- Docs Folder: `docs/` may contain transient or historical materials only; do not duplicate content between `docs/` and `.cursor/rules/`.
+- Consolidation Rule: For each broad topic (e.g., Testing, Convex, Pagination, Chat domain, Migrations), maintain exactly one `.mdc` rule file in `.cursor/rules/`.
+- Migration Policy: When adding or updating guidance, place it under `.cursor/rules/*.mdc`. If related markdown exists in `docs/`, migrate or merge it into the appropriate `.mdc` and remove the duplicate.
+
+## 📐 Project Rules (Canonical)
+
+The following rule files contain the canonical guidance for each topic:
+
+- Testing: `.cursor/rules/testing.mdc` — Vitest/Playwright setup, CI strategy, coverage, and best practices
+- Convex: `.cursor/rules/convex_rules.mdc` — Verified patterns for validators, generated types, function refs, and HTTP validation
+- Pagination: `.cursor/rules/pagination.mdc` — Architecture, usage, retries, guards, and migration guidance
+- Chat Domain: `.cursor/rules/chat.mdc` — Architecture overview and phased refactoring plan (types, performance, validation)
+- Migrations (UUID v7): `.cursor/rules/migrations-uuid.mdc` — Rationale, implementation checklist, and rollback considerations
+
+Always consult these files for up-to-date patterns and verified references.
+
 ## 🚨 ZERO TOLERANCE - MANDATORY VERIFICATION PROTOCOL
 
 ### CRITICAL: Never Use Training Data - Always Use Live Documentation
