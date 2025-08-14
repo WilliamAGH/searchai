@@ -79,8 +79,8 @@ export function ChatLayout({
   showFollowUpPrompt,
   currentChatId,
   currentChat,
-  isAuthenticated,
-  allChats,
+  isAuthenticated: _isAuthenticated,
+  allChats: _allChats,
   undoBanner,
   plannerHint,
   chatSidebarProps,
@@ -94,12 +94,12 @@ export function ChatLayout({
   handleContinueChat,
   handleNewChatForFollowUp,
   handleNewChatWithSummary,
-  chatState,
+  chatState: _chatState,
   chatActions,
-  updateChatPrivacy,
-  navigateWithVerification,
-  buildChatPath,
-  fetchJsonWithRetry,
+  updateChatPrivacy: _updateChatPrivacy,
+  navigateWithVerification: _navigateWithVerification,
+  buildChatPath: _buildChatPath,
+  fetchJsonWithRetry: _fetchJsonWithRetry,
   resolveApi,
 }: ChatLayoutProps) {
   return (
@@ -167,14 +167,7 @@ export function ChatLayout({
         onClose={() => setShowShareModal(false)}
         currentChatId={currentChatId}
         currentChat={currentChat}
-        allChats={allChats}
-        isAuthenticated={isAuthenticated}
-        chatState={chatState}
         chatActions={chatActions}
-        updateChatPrivacy={updateChatPrivacy}
-        navigateWithVerification={navigateWithVerification}
-        buildChatPath={buildChatPath}
-        fetchJsonWithRetry={fetchJsonWithRetry}
         resolveApi={resolveApi}
       />
     </div>

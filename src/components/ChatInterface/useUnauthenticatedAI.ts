@@ -79,12 +79,17 @@ export function useUnauthenticatedAI({
             role: m.role,
             content: m.content,
           })), // chatHistory
+          () => {
+            // onComplete callback - mark message as done streaming
+            chatActions.updateMessage(assistantMessage.id, {
+              isStreaming: false,
+            });
+            logger.info("AI response completed", {
+              messageId: assistantMessage.id,
+              contentLength: assistantMessage.content?.length || 0,
+            });
+          },
         );
-
-        // Mark message as done streaming
-        chatActions.updateMessage(assistantMessage.id, {
-          isStreaming: false,
-        });
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
         logger.error("AI generation failed:", error);

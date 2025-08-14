@@ -22,10 +22,12 @@ import { useAutoCreateFirstChat } from "../../hooks/useAutoCreateFirstChat";
 import { useConvexQueries } from "../../hooks/useConvexQueries";
 import { useSidebarTiming } from "../../hooks/useSidebarTiming";
 import { useServices } from "../../hooks/useServices";
+import { usePaginatedMessages } from "../../hooks/usePaginatedMessages";
 import { useUnauthenticatedAI } from "./useUnauthenticatedAI";
 import { logger } from "../../lib/logger";
 import { ChatLayout } from "./ChatLayout";
 import type { Chat } from "../../lib/types/chat";
+import { createChatFromData } from "../../lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "../../lib/constants/topicDetection";
 import {
   buildApiBase,
@@ -65,7 +67,9 @@ export function ChatInterface({
   const [localIsGenerating, setIsGenerating] = useState(false);
   const { aiService } = useServices(convexUrl);
 
-  const { state: chatState, actions: chatActions } = useUnifiedChat();
+  const unified = useUnifiedChat();
+  const chatState = unified;
+  const chatActions = unified;
   const currentChatId = chatState.currentChatId;
   const isGenerating = chatState.isGenerating || localIsGenerating;
   const searchProgress = chatState.searchProgress;
@@ -97,20 +101,21 @@ export function ChatInterface({
     // The unified hook handles both authenticated and unauthenticated states
     // Convert from unified format to local format for compatibility
     if (chats && chats.length > 0) {
-      baseChats = chats.map(
-        (chat) =>
-          ({
+      baseChats = chats.map((chat) =>
+        createChatFromData(
+          {
             _id: chat.id || chat._id,
             title: chat.title,
             createdAt: chat.createdAt,
             updatedAt: chat.updatedAt,
-            privacy: chat.privacy || "private",
+            privacy: chat.privacy,
             shareId: chat.shareId,
             publicId: chat.publicId,
-            isLocal: !isAuthenticated,
-            source: isAuthenticated ? "convex" : "local",
             userId: chat.userId,
-          }) as Chat,
+            _creationTime: chat._creationTime,
+          },
+          isAuthenticated,
+        ),
       );
     }
 
@@ -168,9 +173,48 @@ export function ChatInterface({
     [navHandleSelectChat],
   );
 
+  // Use paginated messages for authenticated users with Convex chats
+  const {
+    messages: paginatedMessages,
+    isLoading: isLoadingMessages,
+    isLoadingMore,
+    hasMore,
+    error: loadError,
+    retryCount,
+    loadMore,
+    refresh: _refreshMessages,
+    clearError,
+  } = usePaginatedMessages({
+    chatId:
+      isAuthenticated && currentChatId && !currentChat?.isLocal
+        ? currentChatId
+        : null,
+    initialLimit: 50,
+    enabled: isAuthenticated && !!currentChatId && !currentChat?.isLocal,
+  });
+
+  // Use paginated messages when available, fallback to regular messages
+  const effectiveMessages = useMemo(() => {
+    if (
+      isAuthenticated &&
+      currentChatId &&
+      !currentChat?.isLocal &&
+      paginatedMessages.length > 0
+    ) {
+      return paginatedMessages;
+    }
+    return messages;
+  }, [
+    isAuthenticated,
+    currentChatId,
+    currentChat?.isLocal,
+    paginatedMessages,
+    messages,
+  ]);
+
   const currentMessages = useMemo(
-    () => mapMessagesToLocal(messages, isAuthenticated),
-    [messages, isAuthenticated],
+    () => mapMessagesToLocal(effectiveMessages, isAuthenticated),
+    [effectiveMessages, isAuthenticated],
   );
   const userHistory = useMemo(
     () => buildUserHistory(currentMessages),
@@ -368,6 +412,14 @@ export function ChatInterface({
     handleDraftChange,
     setShowShareModal,
     userHistory,
+    // Pagination props
+    isLoadingMore,
+    hasMore,
+    onLoadMore: loadMore,
+    isLoadingMessages,
+    loadError,
+    retryCount,
+    onClearError: clearError,
   });
 
   return (
