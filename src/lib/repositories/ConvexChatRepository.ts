@@ -62,6 +62,7 @@ export class ConvexChatRepository extends BaseRepository {
         // Try to find by opaque ID or share ID
         const byOpaque = await this.client.query(api.chats.getChatByOpaqueId, {
           opaqueId: id,
+          sessionId: this.sessionId,
         });
         if (byOpaque) {
           return this.convexToUnifiedChat(byOpaque);
@@ -71,6 +72,7 @@ export class ConvexChatRepository extends BaseRepository {
 
       const chat = await this.client.query(api.chats.getChatById, {
         chatId: IdUtils.toConvexChatId(id),
+        sessionId: this.sessionId,
       });
 
       return chat ? this.convexToUnifiedChat(chat) : null;
@@ -158,6 +160,7 @@ export class ConvexChatRepository extends BaseRepository {
     try {
       const messages = await this.client.query(api.chats.getChatMessages, {
         chatId: IdUtils.toConvexChatId(chatId),
+        sessionId: this.sessionId,
       });
 
       if (!messages) return [];
