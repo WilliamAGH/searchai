@@ -35,9 +35,10 @@ export function useEnhancedFollowUpPrompt({
   // Generate follow-up suggestions based on last assistant message
   useEffect(() => {
     const messages = chatState?.messages || [];
-    // Do not show on empty or first exchange
+    // Do not show until there are 2+ user messages and 1+ assistant message
     const userMessages = messages.filter((m) => m?.role === "user");
-    if (userMessages.length === 0) {
+    const assistantMessages = messages.filter((m) => m?.role === "assistant");
+    if (userMessages.length < 2 || assistantMessages.length === 0) {
       setShowFollowUpPrompt(false);
       return;
     }
