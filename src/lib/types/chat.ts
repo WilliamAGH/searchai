@@ -122,3 +122,99 @@ export interface ChatMigrationMapping {
   localId: string;
   serverId: Id<"chats">;
 }
+
+/**
+ * Type guard to validate if an object is a valid Chat
+ * Checks for all required properties based on the Chat union type
+ */
+export function isValidChat(obj: unknown): obj is Chat {
+  if (!obj || typeof obj !== "object") return false;
+
+  const chat = obj as Record<string, unknown>;
+
+  // Check common required fields
+  if (typeof chat._id !== "string") return false;
+  if (typeof chat.title !== "string") return false;
+  if (typeof chat.createdAt !== "number") return false;
+  if (typeof chat.updatedAt !== "number") return false;
+
+  // Check privacy field
+  const validPrivacy = ["private", "shared", "public"];
+  if (!chat.privacy || !validPrivacy.includes(chat.privacy as string))
+    return false;
+
+  // Check if it's a LocalChat
+  if ("isLocal" in chat && chat.isLocal === true) {
+    return chat.source === "local";
+  }
+
+  // Check if it's a server chat (Doc<"chats">)
+  if ("_creationTime" in chat) {
+    return typeof chat._creationTime === "number";
+  }
+
+  // If it has neither isLocal nor _creationTime, it's not a valid Chat
+  return false;
+}
+
+/**
+ * Safe conversion to Chat type with validation
+ * Returns null if the object is not a valid Chat
+ */
+export function toChat(obj: unknown): Chat | null {
+  if (isValidChat(obj)) {
+    return obj;
+  }
+  return null;
+}
+
+/**
+ * Create a Chat object from partial data with defaults
+ * Used for safe conversion from unified format
+ */
+export function createChatFromData(
+  data: {
+    _id?: string;
+    id?: string;
+    title?: string;
+    createdAt?: number;
+    updatedAt?: number;
+    privacy?: string;
+    shareId?: string;
+    publicId?: string;
+    userId?: string;
+    _creationTime?: number;
+  },
+  isAuthenticated: boolean,
+): Chat {
+  const id = data._id || data.id || "";
+  const now = Date.now();
+
+  if (isAuthenticated && data._creationTime) {
+    // Server chat (Doc<"chats">)
+    return {
+      _id: id as Id<"chats">,
+      _creationTime: data._creationTime,
+      title: data.title || "Untitled Chat",
+      createdAt: data.createdAt || now,
+      updatedAt: data.updatedAt || now,
+      privacy: (data.privacy as "private" | "shared" | "public") || "private",
+      shareId: data.shareId,
+      publicId: data.publicId,
+      userId: data.userId as Id<"users"> | undefined,
+    } as Doc<"chats">;
+  } else {
+    // Local chat
+    return {
+      _id: id,
+      title: data.title || "Untitled Chat",
+      createdAt: data.createdAt || now,
+      updatedAt: data.updatedAt || now,
+      privacy: (data.privacy as "private" | "shared" | "public") || "private",
+      shareId: data.shareId,
+      publicId: data.publicId,
+      isLocal: true,
+      source: "local",
+    };
+  }
+}

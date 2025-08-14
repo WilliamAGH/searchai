@@ -63,10 +63,13 @@ export const IdUtils = {
   },
 
   /**
-   * Generate a local ID with timestamp
+   * Generate a local ID using UUID v7
+   * @deprecated Use UUID v7 directly via generateUuidV7() from utils/uuid.ts
    */
-  generateLocalId: (prefix: "chat" | "msg" = "chat"): string => {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  generateLocalId: (_prefix: "chat" | "msg" = "chat"): string => {
+    // Import dynamically to avoid circular dependency
+    const { uuidv7 } = require("uuidv7");
+    return uuidv7();
   },
 
   /**
@@ -151,34 +154,4 @@ export const StorageUtils = {
   },
 };
 
-/**
- * Feature Flags Type
- * Runtime feature configuration
- */
-export interface FeatureFlags {
-  unifiedChatInterface: boolean;
-  aiTitleGeneration: boolean;
-  offlineSync: boolean;
-  autoMigration: boolean;
-  advancedSharing: boolean;
-  realtimeCollaboration: boolean;
-  progressiveEnhancement: boolean;
-  fixChatMessageChaining?: boolean; // NEW: Fix for chat message chaining race condition
-  chatFixRolloutPercentage?: number; // NEW: Rollout percentage for gradual deployment
-}
-
-/**
- * Default Feature Flags
- */
-export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
-  unifiedChatInterface: true, // Enable unified interface
-  aiTitleGeneration: false, // Start with simple title generation
-  offlineSync: false, // Future feature
-  autoMigration: true, // Auto-migrate on auth
-  advancedSharing: false, // Future feature
-  realtimeCollaboration: false, // Future feature
-  progressiveEnhancement: true, // Progressive feature enhancement
-  // New flags for chat message chaining fix rollout
-  fixChatMessageChaining: false, // Default off, enable via env
-  chatFixRolloutPercentage: 10, // Start with 10% rollout
-};
+// Feature flags removed - not being used in the codebase
