@@ -3,11 +3,12 @@
  * Provides efficient message loading with cursor-based pagination
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useQuery } from "convex/react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { UnifiedMessage } from "../lib/types/unified";
+import type { SearchResult } from "../lib/types/message";
 import { logger } from "../lib/logger";
 
 interface UsePaginatedMessagesOptions {
@@ -22,8 +23,10 @@ interface PaginatedMessagesState {
   isLoadingMore: boolean;
   hasMore: boolean;
   error: Error | null;
+  retryCount: number;
   loadMore: () => Promise<void>;
   refresh: () => Promise<void>;
+  clearError: () => void;
 }
 
 /**
@@ -40,7 +43,14 @@ export function usePaginatedMessages({
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const loadingRef = useRef(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout>();
+  // Session guard to avoid applying stale results after chat/navigation changes
+  const sessionRef = useRef(0);
+
+  // Get the load more action
+  const loadMoreAction = useAction(api.chats.loadMore.loadMoreMessages);
 
   // Query for initial messages
   const initialMessages = useQuery(
@@ -53,34 +63,62 @@ export function usePaginatedMessages({
       : "skip",
   );
 
-  // Load initial messages when they arrive
+  // Track initial load time
+  const initialLoadStartRef = useRef<number>();
+
+  useEffect(() => {
+    if (enabled && chatId && !initialLoadStartRef.current) {
+      initialLoadStartRef.current = performance.now();
+    }
+  }, [enabled, chatId]);
+
+  // Pre-map initial messages for immediate render to avoid UI flicker in tests/SSR
+  const initialUnifiedMessages = useMemo<UnifiedMessage[]>(() => {
+    if (!initialMessages) return [];
+    const convexMessages = initialMessages.messages || [];
+    return convexMessages.map((msg) => ({
+      id: msg._id,
+      chatId:
+        chatId ?? String((msg as unknown as { chatId?: string }).chatId ?? ""),
+      role: msg.role,
+      content: msg.content || "",
+      timestamp: msg.timestamp || Date.now(),
+      isStreaming: msg.isStreaming,
+      streamedContent: msg.streamedContent,
+      thinking: msg.thinking,
+      searchResults: msg.searchResults,
+      sources: msg.sources,
+      reasoning: msg.reasoning,
+      synced: true,
+      source: "convex" as const,
+    }));
+  }, [initialMessages, chatId]);
+
+  // Load initial messages when they arrive (stateful for subsequent appends)
   useEffect(() => {
     if (initialMessages) {
-      const convexMessages = initialMessages.messages || [];
-      const unifiedMessages: UnifiedMessage[] = convexMessages.map((msg) => ({
-        id: msg._id,
-        chatId: chatId ?? String(msg.chatId ?? ""),
-        role: msg.role,
-        content: msg.content || "",
-        timestamp: msg.timestamp || Date.now(),
-        isStreaming: msg.isStreaming,
-        streamedContent: msg.streamedContent,
-        thinking: msg.thinking,
-        searchResults: msg.searchResults,
-        sources: msg.sources,
-        reasoning: msg.reasoning,
-        synced: true,
-        source: "convex" as const,
-      }));
+      const unifiedMessages = initialUnifiedMessages;
+
+      // Log initial load performance
+      if (initialLoadStartRef.current) {
+        const loadTime = performance.now() - initialLoadStartRef.current;
+        logger.info("Initial messages loaded", {
+          chatId,
+          messagesLoaded: unifiedMessages.length,
+          loadTime: Math.round(loadTime),
+          hasMore: initialMessages.hasMore,
+        });
+        initialLoadStartRef.current = undefined;
+      }
 
       setMessages(unifiedMessages);
       setCursor(initialMessages.nextCursor);
       setHasMore(initialMessages.hasMore);
       setError(null);
     }
-  }, [initialMessages, chatId]);
+  }, [initialMessages, chatId, initialUnifiedMessages]);
 
-  // Load more messages
+  // Load more messages with retry logic
   const loadMore = useCallback(async () => {
     if (!chatId || !cursor || !hasMore || loadingRef.current) return;
 
@@ -88,41 +126,126 @@ export function usePaginatedMessages({
     setIsLoadingMore(true);
     setError(null);
 
-    try {
-      // Since we can't use hooks conditionally, we'll need to make a direct API call
-      // This would typically be done through a Convex action or by refactoring
-      // For now, we'll use a pattern that works with the existing setup
-      logger.debug("Loading more messages", { chatId, cursor });
+    const currentSession = sessionRef.current;
+    const loadStartTime = performance.now();
 
-      // Note: In a real implementation, you'd want to expose this through
-      // a proper action or mutation that can be called imperatively
-      // For demonstration, we'll show the structure:
+    const attemptLoad = async (attempt = 1): Promise<void> => {
+      const attemptStartTime = performance.now();
 
-      // const moreMessages = await loadMoreMessages({
-      //   chatId: chatId as Id<"chats">,
-      //   cursor,
-      //   limit: initialLimit,
-      // });
+      try {
+        logger.debug("Loading more messages", { chatId, cursor, attempt });
 
-      // if (moreMessages) {
-      //   const newUnifiedMessages = moreMessages.messages.map(...);
-      //   setMessages(prev => [...prev, ...newUnifiedMessages]);
-      //   setCursor(moreMessages.nextCursor);
-      //   setHasMore(moreMessages.hasMore);
-      // }
+        const moreMessages = await loadMoreAction({
+          chatId: chatId as Id<"chats">,
+          cursor,
+          limit: initialLimit,
+        });
 
-      // Placeholder for now - you'll need to implement the actual loading
-      logger.info(
-        "Load more functionality needs backend action implementation",
-      );
-    } catch (err) {
-      logger.error("Failed to load more messages", err);
-      setError(err as Error);
-    } finally {
+        // Track performance metrics
+        const loadTime = performance.now() - attemptStartTime;
+        logger.info("Pagination load completed", {
+          chatId,
+          loadTime: Math.round(loadTime),
+          messagesLoaded: moreMessages?.messages?.length || 0,
+          attempt,
+          hasMore: moreMessages?.hasMore,
+        });
+
+        if (moreMessages) {
+          const newUnifiedMessages: UnifiedMessage[] =
+            moreMessages.messages.map((msg) => ({
+              id: msg._id,
+              chatId: chatId,
+              role: msg.role,
+              content: msg.content || "",
+              timestamp: msg.timestamp || Date.now(),
+              isStreaming: msg.isStreaming,
+              streamedContent: msg.streamedContent,
+              thinking: msg.thinking,
+              searchResults: msg.searchResults,
+              sources: msg.sources,
+              reasoning: msg.reasoning,
+              synced: true,
+              source: "convex" as const,
+            }));
+
+          // Stale-guard: if session changed during async call, ignore results
+          if (sessionRef.current !== currentSession) {
+            logger.info(
+              "Discarding stale loadMore results due to session change",
+            );
+            return;
+          }
+          setMessages((prev) => [...prev, ...newUnifiedMessages]);
+          setCursor(moreMessages.nextCursor);
+          setHasMore(moreMessages.hasMore);
+          setRetryCount(0); // Reset retry count on success
+        }
+      } catch (err) {
+        const error = err as Error;
+        const failTime = performance.now() - attemptStartTime;
+
+        logger.error(`Failed to load more messages (attempt ${attempt})`, {
+          error: error.message,
+          chatId,
+          attempt,
+          failTime: Math.round(failTime),
+        });
+
+        // Retry logic with exponential backoff
+        const maxRetries = 3;
+        if (attempt < maxRetries) {
+          const delay = computeBackoffDelay(attempt);
+          logger.info(`Retrying in ${delay}ms...`, {
+            chatId,
+            nextAttempt: attempt + 1,
+            delay,
+          });
+
+          setRetryCount(attempt);
+
+          // Clear any existing timeout
+          if (retryTimeoutRef.current) {
+            clearTimeout(retryTimeoutRef.current);
+          }
+
+          retryTimeoutRef.current = setTimeout(() => {
+            // If session changed while waiting, do not retry
+            if (sessionRef.current !== currentSession) return;
+            attemptLoad(attempt + 1);
+          }, delay);
+        } else {
+          // Max retries reached
+          const totalTime = performance.now() - loadStartTime;
+          logger.error("All pagination retries exhausted", {
+            chatId,
+            totalAttempts: attempt,
+            totalTime: Math.round(totalTime),
+            error: error.message,
+          });
+
+          setError(error);
+          setRetryCount(0);
+          setIsLoadingMore(false);
+          loadingRef.current = false;
+        }
+      }
+    };
+
+    await attemptLoad();
+
+    if (!error) {
+      const totalTime = performance.now() - loadStartTime;
+      logger.info("Pagination operation completed", {
+        chatId,
+        totalTime: Math.round(totalTime),
+        success: true,
+      });
+
       setIsLoadingMore(false);
       loadingRef.current = false;
     }
-  }, [chatId, cursor, hasMore]);
+  }, [chatId, cursor, hasMore, initialLimit, loadMoreAction, error]);
 
   // Refresh messages (reload from beginning)
   const refresh = useCallback(async () => {
@@ -136,22 +259,47 @@ export function usePaginatedMessages({
     // The query will automatically re-run
   }, [chatId]);
 
+  // Clear error manually
+  const clearError = useCallback(() => {
+    setError(null);
+    setRetryCount(0);
+  }, []);
+
   // Reset when chat changes
   useEffect(() => {
+    // Bump session to invalidate any in-flight async operations
+    sessionRef.current++;
     setMessages([]);
     setCursor(undefined);
     setHasMore(true);
     setError(null);
+    setRetryCount(0);
+
+    // Clear any pending retry timeouts
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+    }
   }, [chatId]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return {
-    messages,
+    messages: messages.length > 0 ? messages : initialUnifiedMessages,
     isLoading: !initialMessages && enabled && !!chatId,
     isLoadingMore,
     hasMore,
     error,
+    retryCount,
     loadMore,
     refresh,
+    clearError,
   };
 }
 
@@ -180,4 +328,72 @@ export function useScrollTopDetection(
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
   }, [containerRef, threshold, onNearTop]);
+}
+/**
+ * Compute exponential backoff delay (ms) capped at 5s.
+ * attempt=1 => 1000ms, 2 => 2000ms, 3 => 4000ms, >=4 => 5000ms
+ */
+export function computeBackoffDelay(attempt: number): number {
+  const base = Math.pow(2, Math.max(0, attempt - 1));
+  return Math.min(1000 * base, 5000);
+}
+
+/**
+ * Map Convex message documents to unified message shape for UI.
+ * Performs minimal coercion and preserves optional fields.
+ */
+export function mapConvexMessagesToUnified(
+  chatId: string | null,
+  docs: Array<{
+    _id: string;
+    role: "user" | "assistant" | "system";
+    content?: string;
+    timestamp?: number;
+    isStreaming?: boolean;
+    streamedContent?: string;
+    thinking?: string;
+    searchResults?: unknown;
+    sources?: unknown;
+    reasoning?: string;
+  }>,
+) {
+  const toSearchResults = (value: unknown): SearchResult[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const items: SearchResult[] = [];
+    for (const v of value) {
+      if (
+        v &&
+        typeof v === "object" &&
+        typeof (v as { title?: unknown }).title === "string" &&
+        typeof (v as { url?: unknown }).url === "string" &&
+        typeof (v as { snippet?: unknown }).snippet === "string" &&
+        typeof (v as { relevanceScore?: unknown }).relevanceScore === "number"
+      ) {
+        items.push(v as SearchResult);
+      }
+    }
+    return items.length ? items : undefined;
+  };
+
+  const toSources = (value: unknown): string[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const items = value.filter((x): x is string => typeof x === "string");
+    return items.length ? items : undefined;
+  };
+
+  return docs.map((msg) => ({
+    id: msg._id,
+    chatId: chatId ?? "",
+    role: msg.role,
+    content: msg.content || "",
+    timestamp: msg.timestamp || Date.now(),
+    isStreaming: msg.isStreaming,
+    streamedContent: msg.streamedContent,
+    thinking: msg.thinking,
+    searchResults: toSearchResults(msg.searchResults),
+    sources: toSources(msg.sources),
+    reasoning: msg.reasoning,
+    synced: true as const,
+    source: "convex" as const,
+  }));
 }

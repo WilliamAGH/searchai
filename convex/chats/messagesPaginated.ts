@@ -7,6 +7,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { vSearchResult } from "../lib/validators";
 
 /**
@@ -72,58 +73,62 @@ export const getChatMessagesPaginated = query({
 
     const pageSize = Math.min(args.limit || 50, 100); // Max 100 messages per page
 
+    // Helper: fetch a page (newest first, then reverse) with nextCursor/hasMore
+    const fetchPage = async (q: any) => {
+      const docs = await q.take(pageSize + 1);
+      const hasMorePage = docs.length > pageSize;
+      const pageDocs = docs.slice(0, pageSize);
+      const reversed = pageDocs.reverse();
+      const formatted = reversed.map((m: any) => ({
+        _id: m._id,
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+        isStreaming: m.isStreaming,
+        streamedContent: m.streamedContent,
+        thinking: m.thinking,
+        searchResults: m.searchResults || [],
+        sources: m.sources || [],
+        reasoning: m.reasoning,
+      }));
+      const nextCursorPage =
+        hasMorePage && pageDocs.length > 0
+          ? pageDocs[pageDocs.length - 1]._id
+          : undefined;
+      return {
+        messages: formatted,
+        nextCursor: nextCursorPage,
+        hasMore: hasMorePage,
+      };
+    };
+
     // Build the query
-    let query = ctx.db
+    let baseQuery = ctx.db
       .query("messages")
       .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
       .order("desc"); // Get newest first, we'll reverse later
 
-    // If we have a cursor, start after it
+    // If we have a cursor, validate and start after it
     if (args.cursor) {
-      const cursorDoc = await ctx.db.get(args.cursor as any);
-      if (cursorDoc) {
-        // Continue from the cursor position
-        query = query.filter((q) =>
-          q.lt(q.field("_creationTime"), cursorDoc._creationTime),
-        );
+      // The cursor we return is a message _id. Type it to narrow return type
+      const cursorMessage = await ctx.db.get(args.cursor as Id<"messages">);
+      if (!cursorMessage) {
+        // Invalid/expired cursor: recover by returning the most recent page
+        return await fetchPage(baseQuery);
       }
+      // Verify the cursor is from the same chat
+      if (cursorMessage.chatId !== args.chatId) {
+        // Cursor from different chat: return the most recent page
+        return await fetchPage(baseQuery);
+      }
+      // Continue from the cursor position
+      baseQuery = baseQuery.filter((q) =>
+        q.lt(q.field("_creationTime"), cursorMessage._creationTime),
+      );
     }
 
-    // Get one extra to determine if there are more pages
-    const docs = await query.take(pageSize + 1);
-
-    // Check if there are more messages
-    const hasMore = docs.length > pageSize;
-    const messages = docs.slice(0, pageSize);
-
-    // Reverse to get chronological order (oldest to newest)
-    const reversedMessages = messages.reverse();
-
-    // Map to validated/minimal shape with IDs for cursor
-    const formattedMessages = reversedMessages.map((m) => ({
-      _id: m._id,
-      role: m.role,
-      content: m.content,
-      timestamp: m.timestamp,
-      isStreaming: m.isStreaming,
-      streamedContent: m.streamedContent,
-      thinking: m.thinking,
-      searchResults: m.searchResults || [],
-      sources: m.sources || [],
-      reasoning: m.reasoning,
-    }));
-
-    // Get the cursor for the next page (the oldest message in this batch)
-    const nextCursor =
-      hasMore && messages.length > 0
-        ? messages[messages.length - 1]._id
-        : undefined;
-
-    return {
-      messages: formattedMessages,
-      nextCursor,
-      hasMore,
-    };
+    // Normal page fetch
+    return await fetchPage(baseQuery);
   },
 });
 
