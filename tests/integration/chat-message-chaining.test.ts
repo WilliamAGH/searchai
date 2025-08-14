@@ -39,7 +39,8 @@ test.describe("Chat Message Chaining", () => {
     for (const msg of messages) {
       await page.fill('[data-testid="message-input"]', msg);
       await page.press('[data-testid="message-input"]', "Enter");
-      await page.waitForTimeout(100); // Small delay
+      // Wait for message to appear before sending next
+      await page.waitForSelector(`text="${msg}"`, { timeout: 1000 });
     }
 
     // All messages should be in same chat

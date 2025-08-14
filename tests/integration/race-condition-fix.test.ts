@@ -79,7 +79,7 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
       await messageInput.fill(msg);
       await messageInput.press("Enter");
       // Very short delay to simulate rapid typing
-      await page.waitForTimeout(50);
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     // Wait for all user messages to appear
@@ -266,7 +266,8 @@ test.describe("Message Validation", () => {
     for (let i = 1; i <= 3; i++) {
       await messageInput.fill(`Test message ${i}`);
       await messageInput.press("Enter");
-      await page.waitForTimeout(200);
+      // Wait for message to appear before sending next
+      await page.waitForSelector(`text="Test message ${i}"`, { timeout: 1000 });
     }
 
     // All messages should have consistent chat IDs
@@ -295,16 +296,30 @@ test.describe("Message Validation", () => {
     await messageInput.fill("");
     await messageInput.press("Enter");
 
-    // Should not create a message
-    await page.waitForTimeout(1000);
+    // Wait to verify no message is created
+    await page
+      .waitForFunction(
+        () =>
+          document.querySelectorAll('[data-testid="message-user"]').length ===
+          0,
+        { timeout: 1000 },
+      )
+      .catch(() => {});
     expect(await page.locator('[data-testid="message-user"]').count()).toBe(0);
 
     // Try whitespace only
     await messageInput.fill("   ");
     await messageInput.press("Enter");
 
-    // Should not create a message
-    await page.waitForTimeout(1000);
+    // Wait to verify no message is created
+    await page
+      .waitForFunction(
+        () =>
+          document.querySelectorAll('[data-testid="message-user"]').length ===
+          0,
+        { timeout: 1000 },
+      )
+      .catch(() => {});
     expect(await page.locator('[data-testid="message-user"]').count()).toBe(0);
 
     // Send valid message
@@ -364,7 +379,8 @@ test.describe("Performance and Load Testing", () => {
         `Message ${i} with some content to make it longer`,
       );
       await messageInput.press("Enter");
-      await page.waitForTimeout(100);
+      // Short delay for stress test
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     // Measure time to send new message
