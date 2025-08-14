@@ -35,8 +35,9 @@ export function useEnhancedFollowUpPrompt({
   // Generate follow-up suggestions based on last assistant message
   useEffect(() => {
     const messages = chatState?.messages || [];
-    // Do not show on empty or first-message chats
-    if (messages.length < 2) {
+    // Do not show on empty or first exchange
+    const userMessages = messages.filter((m) => m?.role === "user");
+    if (userMessages.length === 0) {
       setShowFollowUpPrompt(false);
       return;
     }
@@ -66,13 +67,12 @@ export function useEnhancedFollowUpPrompt({
   }, []);
 
   const maybeShowFollowUpPrompt = useCallback(() => {
-    // Only consider showing when there is at least one user message
-    // and at least two total messages (a minimal back-and-forth)
+    // Only consider showing after at least one full exchange
     const messages = chatState?.messages || [];
-    if (messages.length < 2 || chatState?.isGenerating) return;
-    const hasUserHistory = messages.some((m) => m?.role === "user");
-    const lastMessage = messages[messages.length - 1];
-    if (hasUserHistory && lastMessage?.role === "assistant") {
+    if (chatState?.isGenerating) return;
+    const userMessages = messages.filter((m) => m?.role === "user");
+    const assistantMessages = messages.filter((m) => m?.role === "assistant");
+    if (userMessages.length >= 2 && assistantMessages.length >= 1) {
       setShowFollowUpPrompt(true);
     }
   }, [chatState?.messages, chatState?.isGenerating]);
