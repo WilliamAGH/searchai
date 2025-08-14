@@ -95,15 +95,17 @@ export function MessageItem({
       <div className="flex-1 min-w-0 overflow-hidden">
         {/* 1) Sources (compact/collapsed) first */}
         {message.role === "assistant" && safeResults.length > 0 && (
-          <MessageSources
-            id={messageId}
-            results={safeResults}
-            method={message.searchMethod}
-            collapsed={collapsedById[messageId] ?? true}
-            onToggle={onToggleCollapsed}
-            hoveredSourceUrl={hoveredSourceUrl}
-            onSourceHover={onSourceHover}
-          />
+          <div className="mb-4">
+            <MessageSources
+              id={messageId}
+              results={safeResults}
+              method={message.searchMethod}
+              collapsed={collapsedById[messageId] ?? true}
+              onToggle={onToggleCollapsed}
+              hoveredSourceUrl={hoveredSourceUrl}
+              onSourceHover={onSourceHover}
+            />
+          </div>
         )}
 
         {/* 2) Thinking status - shows real-time AI processing */}
@@ -138,16 +140,18 @@ export function MessageItem({
         {message.role === "assistant" &&
           message.reasoning &&
           message.reasoning.trim() && (
-            <ReasoningDisplay
-              id={messageId}
-              reasoning={message.reasoning}
-              isStreaming={message.isStreaming}
-              hasStartedContent={Boolean(
-                message.content && message.content.trim(),
-              )}
-              collapsed={collapsedById[`reasoning-${messageId}`] ?? false}
-              onToggle={onToggleCollapsed}
-            />
+            <div className="mb-4">
+              <ReasoningDisplay
+                id={messageId}
+                reasoning={message.reasoning}
+                isStreaming={message.isStreaming}
+                hasStartedContent={Boolean(
+                  message.content && message.content.trim(),
+                )}
+                collapsed={collapsedById[`reasoning-${messageId}`] ?? false}
+                onToggle={onToggleCollapsed}
+              />
+            </div>
           )}
 
         {/* 4) AI/user content last – always appears under sources/thinking */}
