@@ -21,34 +21,8 @@ interface OpenRouterBody {
   stream?: boolean;
 }
 
-/**
- * Normalize URLs for stable deduplication and deterministic ranking
- */
-export function normalizeUrlForKey(rawUrl: string): string {
-  try {
-    const u = new URL(rawUrl);
-    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
-    // Strip common tracking params
-    const paramsToStrip = [
-      "utm_source",
-      "utm_medium",
-      "utm_campaign",
-      "utm_term",
-      "utm_content",
-      "gclid",
-      "fbclid",
-      "ref",
-    ];
-    paramsToStrip.forEach((p) => u.searchParams.delete(p));
-    u.hash = "";
-    if (u.pathname !== "/" && u.pathname.endsWith("/")) {
-      u.pathname = u.pathname.slice(0, -1);
-    }
-    return u.toString();
-  } catch {
-    return rawUrl.trim();
-  }
-}
+// Re-export from shared utility
+export { normalizeUrlForKey } from "../lib/url";
 
 /**
  * Stream chunks from OpenRouter API

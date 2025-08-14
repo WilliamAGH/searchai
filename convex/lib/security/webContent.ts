@@ -46,8 +46,10 @@ const DANGEROUS_PATTERNS = [
 
 /**
  * Event handler patterns to remove
+ * Matches quoted and unquoted attribute values
  */
-const EVENT_HANDLER_PATTERN = /\s*on\w+\s*=\s*["'][^"']*["']/gi;
+const EVENT_HANDLER_PATTERN =
+  /\s*on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 /**
  * Dangerous protocols to remove
@@ -131,7 +133,7 @@ export function validateScrapedContent(html: string): ValidationResult {
 
     // Update risk based on injection severity
     if (injectionRisk === "critical") {
-      risk = "high"; // Map critical to high since our interface only supports low/medium/high
+      risk = "critical";
     } else if (injectionRisk === "high") {
       risk = "high";
     } else if (injectionRisk === "medium" && risk === "low") {
@@ -146,7 +148,15 @@ export function validateScrapedContent(html: string): ValidationResult {
   const cleanedLength = sanitized.length;
   const removedPercentage =
     originalLength > 0
-      ? Math.round(((originalLength - cleanedLength) / originalLength) * 100)
+      ? Math.round(
+          Math.min(
+            100,
+            Math.max(
+              0,
+              ((originalLength - cleanedLength) / originalLength) * 100,
+            ),
+          ),
+        )
       : 0;
 
   // 7. Adjust risk based on how much was removed
@@ -268,6 +278,9 @@ export function sanitizeCss(css: string): string {
 
   let clean = css;
 
+  // Remove CSS comments which can hide payloads
+  clean = clean.replace(/\/\*[\s\S]*?\*\//g, "");
+
   // Remove javascript: protocol in CSS
   clean = clean.replace(/javascript:/gi, "");
 
@@ -282,6 +295,9 @@ export function sanitizeCss(css: string): string {
 
   // Remove -moz-binding (Firefox specific)
   clean = clean.replace(/-moz-binding\s*:\s*[^;]+;/gi, "");
+
+  // Remove url(data:...) to prevent SVG/script vectors embedded as images
+  clean = clean.replace(/url\(\s*(['"]?)\s*data:[^)]+\)/gi, "url()");
 
   return clean;
 }

@@ -17,19 +17,8 @@ export const dlog = (...args: unknown[]) => {
  * @param status - HTTP status code (default 200)
  * @returns Response with CORS headers
  */
-export function corsResponse(body: string, status = 200) {
-  return new Response(body, {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Max-Age": "600",
-      Vary: "Origin",
-    },
-  });
-}
+// Re-export from the canonical location
+export { corsResponse } from "./cors";
 
 /**
  * Compute CORS headers based on request Origin and allowed origins list.

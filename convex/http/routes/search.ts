@@ -8,6 +8,7 @@ import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
+import { normalizeUrlForKey } from "../../lib/url";
 
 /**
  * Register search routes on the HTTP router
@@ -110,31 +111,8 @@ export function registerSearchRoutes(http: HttpRouter) {
             relevanceScore?: number;
           }
         >();
-        const normalize = (rawUrl: string) => {
-          try {
-            const u = new URL(rawUrl);
-            u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
-            [
-              "utm_source",
-              "utm_medium",
-              "utm_campaign",
-              "utm_term",
-              "utm_content",
-              "gclid",
-              "fbclid",
-              "ref",
-            ].forEach((p) => u.searchParams.delete(p));
-            u.hash = "";
-            if (u.pathname !== "/" && u.pathname.endsWith("/")) {
-              u.pathname = u.pathname.slice(0, -1);
-            }
-            return u.toString();
-          } catch {
-            return (rawUrl || "").trim();
-          }
-        };
         for (const r of mergedResults) {
-          const key = normalize(r.url);
+          const key = normalizeUrlForKey(r.url);
           const prev = byUrl.get(key);
           const curScore =
             typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;

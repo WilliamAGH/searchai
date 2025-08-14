@@ -49,26 +49,44 @@ export function registerAIRoutes(http: HttpRouter) {
         );
       }
 
-      // Define expected payload structure
-      interface AIRequestPayload {
-        message?: unknown;
-        systemPrompt?: unknown;
-        sources?: unknown;
-        chatHistory?: unknown;
-        searchResults?: unknown;
+      // Validate payload structure
+      if (!rawPayload || typeof rawPayload !== "object") {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid request payload" }),
+          400,
+        );
       }
+      const payload = rawPayload as Record<string, unknown>;
 
-      // Validate and normalize input
-      const payload = rawPayload as AIRequestPayload;
-      const message = String(payload.message || "").slice(0, 10000);
+      // Validate and sanitize message (required field)
+      if (!payload.message || typeof payload.message !== "string") {
+        return corsResponse(
+          JSON.stringify({ error: "Message must be a string" }),
+          400,
+        );
+      }
+      // Remove control characters and null bytes, then limit length
+      const message = String(payload.message)
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+        .slice(0, 10000);
+
+      // Sanitize optional systemPrompt
       const systemPrompt = payload.systemPrompt
-        ? String(payload.systemPrompt).slice(0, 2000)
+        ? String(payload.systemPrompt)
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+            .slice(0, 2000)
         : undefined;
+
+      // Validate and sanitize sources array
       const sources = Array.isArray(payload.sources)
         ? payload.sources
             .slice(0, 20)
             .filter((s: unknown) => typeof s === "string")
-            .map((s: unknown) => String(s).slice(0, 2048))
+            .map((s: unknown) =>
+              String(s)
+                .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+                .slice(0, 2048),
+            )
         : undefined;
       const chatHistory = Array.isArray(payload.chatHistory)
         ? payload.chatHistory.slice(0, 50).map((m: unknown) => {
