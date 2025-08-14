@@ -21,9 +21,7 @@ import { useMetaTags } from "../../hooks/useMetaTags";
 import { useAutoCreateFirstChat } from "../../hooks/useAutoCreateFirstChat";
 import { useConvexQueries } from "../../hooks/useConvexQueries";
 import { useSidebarTiming } from "../../hooks/useSidebarTiming";
-import { useServices } from "../../hooks/useServices";
 import { usePaginatedMessages } from "../../hooks/usePaginatedMessages";
-import { useUnauthenticatedAI } from "./useUnauthenticatedAI";
 import { logger } from "../../lib/logger";
 import { ChatLayout } from "./ChatLayout";
 import type { Chat } from "../../lib/types/chat";
@@ -65,7 +63,7 @@ export function ChatInterface({
   );
 
   const [localIsGenerating, setIsGenerating] = useState(false);
-  const { aiService } = useServices(convexUrl);
+  // aiService removed - no longer needed with unified flow
 
   const unified = useUnifiedChat();
   const chatState = unified;
@@ -261,12 +259,19 @@ export function ChatInterface({
     if (isCreatingChat && currentChatId) setIsCreatingChat(false);
   }, [isCreatingChat, currentChatId]);
 
-  // Use unauthenticated AI hook
-  const { generateUnauthenticatedResponse } = useUnauthenticatedAI({
-    chatState,
-    chatActions,
-    aiService,
-  });
+  // Unified flow: generateResponse is now used for all users
+  // The Convex action handles both authenticated and anonymous users via sessionId
+  const generateUnauthenticatedResponse = useCallback(
+    async (message: string, chatId: string) => {
+      // This function is kept for backwards compatibility but now uses the unified flow
+      // The generateResponse action will use sessionId for anonymous users
+      await generateResponse({
+        chatId: chatId as Id<"chats">, // Proper type cast
+        message,
+      });
+    },
+    [generateResponse],
+  );
 
   const sendRefTemp = useRef<((message: string) => Promise<void>) | null>(null);
   const {
