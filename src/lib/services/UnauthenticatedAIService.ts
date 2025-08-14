@@ -66,6 +66,13 @@ export class UnauthenticatedAIService {
     // Create new abort controller for this request
     this.abortController = new AbortController();
 
+    logger.info("[UnauthenticatedAIService] Starting generateResponse", {
+      message: message.substring(0, 50),
+      chatId,
+      hasOnChunk: !!onChunk,
+      hasOnComplete: !!onComplete,
+    });
+
     try {
       // In development, use the proxied path directly
       // In production, use the full Convex URL
@@ -73,23 +80,43 @@ export class UnauthenticatedAIService {
       const isDev = host === "localhost" || host === "127.0.0.1";
       const apiUrl = isDev ? "/api/ai" : `${this.convexUrl}/api/ai`;
 
+      logger.debug("[UnauthenticatedAIService] API URL", { apiUrl, isDev });
+
+      const requestBody = {
+        message,
+        systemPrompt: "You are a helpful AI assistant.",
+        searchResults: searchResults || [],
+        sources: sources || [],
+        chatHistory: chatHistory || [],
+      };
+
+      logger.debug("[UnauthenticatedAIService] Sending request", {
+        bodySize: JSON.stringify(requestBody).length,
+      });
+
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          message,
-          systemPrompt: "You are a helpful AI assistant.",
-          searchResults: searchResults || [],
-          sources: sources || [],
-          chatHistory: chatHistory || [],
-        }),
+        body: JSON.stringify(requestBody),
         signal: this.abortController.signal,
       });
 
+      logger.info("[UnauthenticatedAIService] Response received", {
+        status: response.status,
+        ok: response.ok,
+      });
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text().catch(() => "No error text");
+        logger.error("[UnauthenticatedAIService] HTTP error", {
+          status: response.status,
+          errorText,
+        });
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`,
+        );
       }
 
       const reader = response.body?.getReader();
@@ -98,11 +125,15 @@ export class UnauthenticatedAIService {
       }
 
       const decoder = new TextDecoder();
+      let chunksReceived = 0;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
           // Stream completed successfully - notify completion
+          logger.info("[UnauthenticatedAIService] Stream completed", {
+            chunksReceived,
+          });
           onComplete?.();
           break;
         }
@@ -117,10 +148,16 @@ export class UnauthenticatedAIService {
               const data = JSON.parse(line.slice(6));
               // Best-effort runtime guard
               if (data && typeof data === "object" && "type" in data) {
+                chunksReceived++;
                 onChunk?.(data as MessageStreamChunk);
               }
             } catch {
               // Skip unparseable lines including "data: [DONE]"
+              if (line !== "data: [DONE]") {
+                logger.debug("[UnauthenticatedAIService] Skipped line", {
+                  line: line.substring(0, 100),
+                });
+              }
             }
           }
         }
@@ -133,6 +170,7 @@ export class UnauthenticatedAIService {
       ) {
         logger.info("[UnauthenticatedAIService] Request aborted");
       } else {
+        logger.error("[UnauthenticatedAIService] Request failed", error);
         throw error;
       }
     } finally {
