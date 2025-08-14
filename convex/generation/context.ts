@@ -34,7 +34,12 @@ export function buildContextSummary(
   // Build summary with more context per message
   const summary = recentMessages
     .map((msg) => {
-      const role = msg.role === "user" ? "User" : "Assistant";
+      const role =
+        msg.role === "user"
+          ? "User"
+          : msg.role === "assistant"
+            ? "Assistant"
+            : "System";
       // Increase content limit to 500 chars to preserve more context
       const content = ((msg as any).content || "").slice(0, 500);
       return `${role}: ${content}`;
@@ -82,7 +87,8 @@ export async function buildSecureContext(
 
   return {
     summary: robustSanitize(summary),
-    recentMessages: sanitized.slice(-5),
+    // Newest 5, returned in chronological order
+    recentMessages: sanitized.slice(0, 5).reverse(),
     shouldUpdateSummary,
   };
 }

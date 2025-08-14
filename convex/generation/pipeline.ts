@@ -11,6 +11,7 @@ import { buildContextSummary } from "./context";
 import { applyEnhancements } from "../enhancements";
 import { streamOpenRouter } from "./streaming";
 import type { ActionCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 
 /**
  * Generate streaming AI response
@@ -348,7 +349,7 @@ function buildSystemPrompt(args: {
  */
 async function streamResponseToMessage(args: {
   ctx: ActionCtx;
-  messageId: any; // Using any since we're passing Id<"messages"> from internalAction
+  messageId: Id<"messages">;
   systemPrompt: string;
   userMessage: string;
   searchResults: Array<{
