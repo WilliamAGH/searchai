@@ -153,9 +153,13 @@ export const generationStep = internalAction({
 
     try {
       // 4. Plan and perform context-aware web search
+      // Build up reasoning content to show thinking process
+      let accumulatedReasoning = "Planning search...\n";
+
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
         thinking: "Planning search...",
+        reasoning: accumulatedReasoning,
       });
 
       const plan = await ctx.runAction(api.search.planSearch, {
@@ -164,11 +168,17 @@ export const generationStep = internalAction({
         maxContextMessages: 10,
       });
 
+      // Add search planning results to reasoning
+      accumulatedReasoning += plan.shouldSearch
+        ? `\nSearching the web with ${plan.queries.length} queries:\n${plan.queries.map((q, i) => `  ${i + 1}. ${q}`).join("\n")}\n\nReason: ${plan.reasons}\n`
+        : `\nNo search needed. Reason: ${plan.reasons}\n`;
+
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
         thinking: plan.shouldSearch
           ? `Searching the web (queries: ${plan.queries.length})...`
           : "Analyzing without search...",
+        reasoning: accumulatedReasoning,
       });
 
       let aggregated: Array<{
@@ -246,10 +256,18 @@ export const generationStep = internalAction({
         enhancedInstructions: enhancements.enhancedSystemPrompt || "",
       });
 
+      // Add search results info to reasoning
+      if (aggregated.length > 0) {
+        accumulatedReasoning += `\nFound ${aggregated.length} search results. Using top ${Math.min(5, aggregated.length)} for context.\n`;
+      }
+
       // 6. Start streaming generation
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
         thinking: "Generating response...",
+        reasoning:
+          accumulatedReasoning +
+          "\nGenerating response based on search results and context...",
       });
 
       // Stream the response using OpenRouter
@@ -260,6 +278,7 @@ export const generationStep = internalAction({
         userMessage: enhancedUserMessage,
         searchResults: aggregated,
         model: "anthropic/claude-3.5-sonnet",
+        existingReasoning: accumulatedReasoning,
       });
     } catch (error) {
       console.error("Generation step failed:", {
@@ -339,9 +358,17 @@ async function streamResponseToMessage(args: {
     relevanceScore: number;
   }>;
   model: string;
+  existingReasoning?: string;
 }) {
-  const { ctx, messageId, systemPrompt, userMessage, searchResults, model } =
-    args;
+  const {
+    ctx,
+    messageId,
+    systemPrompt,
+    userMessage,
+    searchResults,
+    model,
+    existingReasoning = "",
+  } = args;
 
   console.info("🚀 Starting AI response streaming:", {
     messageId,
@@ -396,12 +423,21 @@ async function streamResponseToMessage(args: {
         if (now - lastUpdateTime >= updateInterval) {
           // Work around TS2589: Known Convex limitation with complex type inference
           // @ts-ignore - Deep type instantiation error
-          await ctx.runMutation(internal.messages.updateMessage, {
-            messageId,
-            content: accumulatedContent,
-            isStreaming: true,
-            thinking: "",
-          });
+          const now = Date.now();
+          if (now - lastUpdateTime >= updateInterval) {
+            // Work around TS2589: Known Convex limitation with complex type inference
+            // @ts-ignore - Deep type instantiation error
+            await ctx.runMutation(internal.messages.updateMessage, {
+              messageId,
+              content: accumulatedContent,
+              streamedContent: newContent, // Send just the new chunk for streaming
+              isStreaming: true,
+              thinking: "",
+              // Preserve reasoning during streaming
+              reasoning: existingReasoning,
+            });
+            lastUpdateTime = now;
+          }
           lastUpdateTime = now;
         }
       }
@@ -425,6 +461,8 @@ async function streamResponseToMessage(args: {
       thinking: "",
       sources,
       searchResults: searchResults.slice(0, 10), // Include the full search results for display
+      // Preserve reasoning in final update
+      reasoning: existingReasoning,
     });
   } catch (error) {
     console.error("Streaming failed:", error);
