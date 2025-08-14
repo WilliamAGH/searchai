@@ -4,6 +4,13 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { waitForSidebarAnimation } from "../helpers/wait-conditions";
+import { viewports } from "../config/viewports";
+import {
+  ensureSidebarOpen,
+  getNewChatButton,
+  createNewChat,
+} from "../helpers/sidebar-helpers";
 
 test.describe("New Chat Functionality E2E", () => {
   test.beforeEach(async ({ page }) => {
@@ -15,65 +22,44 @@ test.describe("New Chat Functionality E2E", () => {
   test("should create new chat when clicking New Chat button", async ({
     page,
   }) => {
-    // First, check if we need to open the sidebar (desktop)
-    // Try to find the sidebar toggle button
-    const sidebarToggle = page
-      .locator('button[aria-label="Toggle sidebar"]')
-      .first();
-
-    // Check if sidebar needs to be opened
-    let newChatButton = page.locator('button:has-text("New Chat")').first();
-    const isNewChatVisible = await newChatButton
-      .isVisible({ timeout: 1000 })
-      .catch(() => false);
-
-    if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
-      // Open sidebar if New Chat is not visible
-      await sidebarToggle.click();
-      await page.waitForTimeout(500); // Wait for sidebar animation
-    }
-
-    // Now find the New Chat button
-    newChatButton = page.locator('button:has-text("New Chat")').first();
+    // Ensure sidebar is open and get New Chat button
+    const newChatButton = await getNewChatButton(page);
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
+    await expect(newChatButton).toBeEnabled();
 
-    // Check initial URL
+    // Get initial URL and extract chat ID if present
     const initialUrl = page.url();
+    const initialMatch = initialUrl.match(/\/(chat|p|s)\/([^/?]+)/);
+    const initialChatId = initialMatch ? initialMatch[2] : null;
 
-    // Click New Chat button
-    await newChatButton.click();
+    // Create new chat and get the chat ID
+    const newChatId = await createNewChat(page);
+    expect(newChatId).toBeTruthy();
 
-    // Should show loading state OR navigate quickly
-    // Check if we see the loading state or if navigation happens immediately
-    const loadingVisible = await page
-      .locator('button:has-text("Creating...")')
-      .first()
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-
-    if (loadingVisible) {
-      // If we saw loading, wait for it to disappear
-      await expect(
-        page.locator('button:has-text("Creating...")').first(),
-      ).not.toBeVisible({ timeout: 5000 });
+    // If we started on a chat page, verify we got a different chat
+    if (initialChatId) {
+      expect(newChatId).not.toBe(initialChatId);
     }
 
-    // Should navigate to new chat URL
-    await page.waitForURL(/\/chat\/.+/, { timeout: 10000 });
+    // Verify we're on a chat page
+    const currentUrl = page.url();
+    expect(currentUrl).toMatch(/\/(chat|p|s)\/[^/]+/);
+    expect(currentUrl).toContain(newChatId);
 
-    // Verify URL changed
-    const newUrl = page.url();
-    expect(newUrl).not.toBe(initialUrl);
-    expect(newUrl).toMatch(/\/chat\/.+/);
+    // Message input should be visible and ready
+    const messageInput = page.locator('textarea, [role="textbox"]').first();
+    await expect(messageInput).toBeVisible({ timeout: 5000 });
+    await expect(messageInput).toBeEnabled();
 
-    // Should not show loading state anymore - check all buttons are not "Creating..."
+    // Should not show creating state anymore
     const creatingButtons = await page
       .locator('button:has-text("Creating...")')
       .count();
     expect(creatingButtons).toBe(0);
 
     // New Chat button should be enabled again
-    await expect(newChatButton).toBeEnabled();
+    const newButton = await getNewChatButton(page);
+    await expect(newButton).toBeEnabled();
   });
 
   test("should prevent multiple simultaneous chat creations", async ({
@@ -90,7 +76,7 @@ test.describe("New Chat Functionality E2E", () => {
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     newChatButton = page.locator('button:has-text("New Chat")').first();
@@ -128,20 +114,14 @@ test.describe("New Chat Functionality E2E", () => {
 
   test("should create chat from mobile sidebar", async ({ page }) => {
     // Set mobile viewport
-    await page.setViewportSize({ width: 375, height: 667 });
+    await page.setViewportSize(viewports.iPhoneSE);
 
-    // Open mobile sidebar
-    const hamburgerButton = page
-      .locator('button[aria-label="Toggle sidebar"]')
-      .first();
-    await expect(hamburgerButton).toBeVisible();
-    await hamburgerButton.click();
+    // Ensure mobile sidebar is open (helper handles this)
+    await ensureSidebarOpen(page);
 
-    // Wait for sidebar dialog to be visible and stable (accounting for animations)
+    // Verify sidebar dialog is visible
     const sidebarDialog = page.locator('[role="dialog"]');
-    await expect(sidebarDialog).toBeVisible({ timeout: 10000 });
-    // Additional wait for animation to complete
-    await page.waitForTimeout(500);
+    await expect(sidebarDialog).toBeVisible({ timeout: 5000 });
 
     // Find New Chat button in mobile sidebar
     const mobileNewChatButton = page.locator(
@@ -201,14 +181,14 @@ test.describe("New Chat Functionality E2E", () => {
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     newChatButton = page.locator('button:has-text("New Chat")').first();
     await newChatButton.click();
 
-    // Wait to see if navigation error was logged
-    await page.waitForTimeout(2000);
+    // Wait for any navigation errors to be logged
+    await page.waitForLoadState("networkidle", { timeout: 2000 });
 
     // Should have logged navigation errors
     expect(
@@ -241,7 +221,7 @@ test.describe("New Chat Functionality E2E", () => {
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     newChatButton = page.locator('button:has-text("New Chat")').first();
@@ -282,7 +262,7 @@ test.describe("New Chat Functionality E2E", () => {
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     newChatButton = page.locator('button:has-text("New Chat")').first();
@@ -336,7 +316,7 @@ test.describe("New Chat Functionality E2E", () => {
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     // Create first chat
@@ -346,8 +326,11 @@ test.describe("New Chat Functionality E2E", () => {
     await page.waitForURL(/\/chat\/.+/, { timeout: 10000 });
     const firstChatUrl = page.url();
 
-    // Wait for chat to be ready before creating second
-    await page.waitForTimeout(1000);
+    // Wait for chat to be fully loaded before creating second
+    await page.waitForSelector('[data-testid="message-input"]', {
+      state: "visible",
+    });
+    await page.waitForLoadState("networkidle");
 
     // May need to reopen sidebar for second chat
     const isStillVisible = await newChatButton
@@ -355,7 +338,7 @@ test.describe("New Chat Functionality E2E", () => {
       .catch(() => false);
     if (!isStillVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     // Create second chat
@@ -374,12 +357,12 @@ test.describe("New Chat Functionality E2E", () => {
 
     // Go back
     await page.goBack();
-    await page.waitForTimeout(500); // Allow for history state update
+    await page.waitForURL(firstChatUrl, { timeout: 1000 });
     expect(page.url()).toBe(firstChatUrl);
 
     // Go forward
     await page.goForward();
-    await page.waitForTimeout(500); // Allow for history state update
+    await page.waitForURL(secondChatUrl, { timeout: 1000 });
     expect(page.url()).toBe(secondChatUrl);
   });
 
@@ -406,8 +389,15 @@ test.describe("New Chat Functionality E2E", () => {
       }, 100);
     });
 
-    // Wait a bit for error to propagate
-    await page.waitForTimeout(500);
+    // Wait for error to propagate using a proper wait condition
+    await page
+      .waitForFunction(
+        () =>
+          window.location.pathname === "/" ||
+          document.querySelector("[data-error-boundary]"),
+        { timeout: 2000 },
+      )
+      .catch(() => {});
 
     // Check if error boundary UI appears (may not always trigger in E2E)
     const errorBoundaryVisible = await page
@@ -436,8 +426,12 @@ test.describe("New Chat Functionality E2E", () => {
   test("should handle network delays gracefully", async ({ page, context }) => {
     // Add artificial delay to API calls
     await context.route("**/api/**", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      await route.continue();
+      // Fetch the response once
+      const response = await route.fetch();
+      // Add delay to simulate slow network
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Intentional delay for testing slow network
+      // Fulfill with the fetched response
+      await route.fulfill({ response });
     });
 
     // Open sidebar if needed
@@ -451,7 +445,7 @@ test.describe("New Chat Functionality E2E", () => {
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     newChatButton = page.locator('button:has-text("New Chat")').first();
@@ -483,7 +477,7 @@ test.describe("New Chat Functionality E2E", () => {
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     // Create a new chat
@@ -492,8 +486,8 @@ test.describe("New Chat Functionality E2E", () => {
     await newChatButton.click();
     await page.waitForURL(/\/chat\/.+/, { timeout: 10000 });
 
-    // Wait for sidebar to update
-    await page.waitForTimeout(1000);
+    // Wait for sidebar to update with new chat
+    await page.waitForSelector('a[href^="/chat/"]', { timeout: 2000 });
 
     // Open sidebar to verify chat appears (if it auto-closed)
     const sidebarStillOpen = await page
@@ -506,7 +500,7 @@ test.describe("New Chat Functionality E2E", () => {
         .first();
       if (await sidebarToggleForVerify.isVisible()) {
         await sidebarToggleForVerify.click();
-        await page.waitForTimeout(500);
+        await waitForSidebarAnimation(page);
       }
     }
 
@@ -534,7 +528,7 @@ test.describe("New Chat Stress Tests", () => {
 
       if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
         await sidebarToggle.click();
-        await page.waitForTimeout(500);
+        await waitForSidebarAnimation(page);
       }
 
       newChatButton = page.locator('button:has-text("New Chat")').first();
@@ -563,8 +557,8 @@ test.describe("New Chat Stress Tests", () => {
         chatUrls.push(currentUrl);
       }
 
-      // Wait a bit before next creation
-      await page.waitForTimeout(500);
+      // Wait for chat to be ready before next creation
+      await page.waitForLoadState("networkidle");
     }
 
     // Should have created multiple unique chats (allow for some failures in stress test)
@@ -595,7 +589,7 @@ test.describe("New Chat Stress Tests", () => {
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();
-      await page.waitForTimeout(500);
+      await waitForSidebarAnimation(page);
     }
 
     // Now create a new chat

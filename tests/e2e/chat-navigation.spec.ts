@@ -2,6 +2,7 @@
 // Run: npm run test:smoke (or playwright test)
 
 import { test, expect } from "@playwright/test";
+import { viewports } from "../config/viewports";
 
 const HOME = "/";
 
@@ -25,7 +26,7 @@ test.describe("chat navigation", () => {
     await expect(page).toHaveURL(/\/$/);
 
     // Allow idle; auto-create may occur after delay if truly no chats
-    await page.waitForTimeout(900);
+    await page.waitForLoadState("networkidle", { timeout: 1000 });
 
     // Either still on home or navigated to /chat/:id
     // This asserts no immediate hard redirect happened before idle
@@ -37,7 +38,7 @@ test.describe("chat navigation", () => {
     page,
     baseURL,
   }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(viewports.iPhone12);
     await page.goto((baseURL ?? "http://localhost:4173") + HOME, {
       waitUntil: "domcontentloaded",
     });
@@ -89,7 +90,7 @@ test.describe("chat navigation", () => {
   test.fixme(
     "mobile swipe open/close is idempotent",
     async ({ page, baseURL }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
+      await page.setViewportSize(viewports.iPhone12);
       await page.goto((baseURL ?? "http://localhost:4173") + HOME);
       // Implement swipe gestures with Playwright touch simulation when CI supports it
     },

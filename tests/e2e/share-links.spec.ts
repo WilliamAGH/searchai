@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { clickReactElement } from "./utils/react-click";
+import { waitForNetworkIdle } from "../helpers/wait-conditions";
 
 test.describe("share modal link variants", () => {
   test("smoke: shared/public/llm show correct URL shapes", async ({ page }) => {
@@ -115,8 +116,16 @@ test.describe("share modal link variants", () => {
       }
     }
 
-    // Wait for React to process the state change
-    await page.waitForTimeout(1000);
+    // Wait for React to process the state change and URL to appear
+    await page.waitForFunction(
+      () => {
+        const input = document.querySelector(
+          'input[type="text"]',
+        ) as HTMLInputElement;
+        return input && input.value.includes("/");
+      },
+      { timeout: 2000 },
+    );
 
     // Verify the radio is checked and URL input is visible
     await expect(sharedRadio).toBeChecked({ timeout: 5000 });
@@ -148,7 +157,16 @@ test.describe("share modal link variants", () => {
 
     // First try: Direct click
     await genBtn.click();
-    await page.waitForTimeout(1000);
+    // Wait for URL generation to complete
+    await page.waitForFunction(
+      () => {
+        const input = document.querySelector(
+          'input[type="text"]',
+        ) as HTMLInputElement;
+        return input && input.value.includes("/");
+      },
+      { timeout: 2000 },
+    );
 
     let buttonText = await genBtn.textContent();
     console.log("Button text after direct click:", buttonText);
@@ -157,7 +175,7 @@ test.describe("share modal link variants", () => {
     if (buttonText === "Generate URL") {
       console.log("Direct click failed, trying force click...");
       await genBtn.click({ force: true });
-      await page.waitForTimeout(1000);
+      await waitForNetworkIdle(page);
       buttonText = await genBtn.textContent();
       console.log("Button text after force click:", buttonText);
     }
@@ -166,7 +184,7 @@ test.describe("share modal link variants", () => {
     if (buttonText === "Generate URL") {
       console.log("Force click failed, trying event dispatch...");
       await genBtn.dispatchEvent("click");
-      await page.waitForTimeout(1000);
+      await waitForNetworkIdle(page);
       buttonText = await genBtn.textContent();
       console.log("Button text after event dispatch:", buttonText);
     }
@@ -237,7 +255,7 @@ test.describe("share modal link variants", () => {
       });
       // Simple retry to allow publish to propagate
       for (let i = 0; i < 4 && resp.status() !== 200; i++) {
-        await page.waitForTimeout(500);
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Retry delay
         resp = await page.request.get(llmUrl, {
           headers: { Accept: "text/plain" },
         });
