@@ -147,21 +147,17 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         deps.setIsGenerating(true);
         deps.setMessageCount(deps.messageCount + 1);
 
-        if (deps.isAuthenticated) {
-          // Use unified chat action which manages streaming, search progress, and refresh
-          if (deps.chatActions.sendMessage) {
-            await deps.chatActions.sendMessage(message.trim());
-          } else {
-            await deps.generateResponse({
-              chatId: activeChatId,
-              message: message.trim(),
-            });
-          }
+        // Use unified chat action for ALL users (authenticated and anonymous)
+        // This ensures messages are always persisted to Convex
+        if (deps.chatActions.sendMessage) {
+          await deps.chatActions.sendMessage(message.trim());
         } else {
-          await deps.generateUnauthenticatedResponse(
-            message.trim(),
-            activeChatId,
-          );
+          // Direct generation fallback - always use unified Convex flow
+          // Both authenticated and anonymous users should use the same pipeline
+          await deps.generateResponse({
+            chatId: activeChatId,
+            message: message.trim(),
+          });
         }
 
         // Update chat title if needed (only for first user message)
