@@ -13,7 +13,8 @@ import {
   parseLocalMessages,
 } from "../validation/localStorage";
 import { logger } from "../logger";
-import { storageService, STORAGE_KEYS } from "./StorageService";
+// Storage keys for migration tracking
+const MIGRATION_VERSION_KEY = "searchai:migrationVersion";
 
 const MIGRATION_ARCHIVE_PREFIX = "searchai_archive_";
 
@@ -42,9 +43,8 @@ export class MigrationService {
    */
   private getMigrationStatus(): MigrationStatus {
     try {
-      const stored = storageService.get<MigrationStatus>(
-        STORAGE_KEYS.MIGRATION_VERSION,
-      );
+      const item = localStorage.getItem(MIGRATION_VERSION_KEY);
+      const stored = item ? (JSON.parse(item) as MigrationStatus) : null;
       if (stored) {
         return stored;
       }
@@ -64,7 +64,7 @@ export class MigrationService {
    */
   private saveMigrationStatus(status: MigrationStatus): void {
     try {
-      storageService.set(STORAGE_KEYS.MIGRATION_VERSION, status);
+      localStorage.setItem(MIGRATION_VERSION_KEY, JSON.stringify(status));
     } catch (error) {
       logger.error("Failed to save migration status:", error);
     }
@@ -239,7 +239,7 @@ export class MigrationService {
 
       // If all chats migrated successfully, clear local data
       if (failedCount === 0) {
-        // Clear the main storage keys
+        // Clear the main storage keys using raw localStorage for legacy keys
         localStorage.removeItem("searchai_chats_v2");
         localStorage.removeItem("searchai_messages_v2");
 
@@ -295,9 +295,9 @@ export class MigrationService {
    * Reset migration status (for debugging)
    */
   resetMigrationStatus(): void {
-    localStorage.removeItem(MIGRATION_KEY);
+    localStorage.removeItem(MIGRATION_VERSION_KEY);
 
-    // Clear all archives
+    // Clear all archives - using raw localStorage for dynamic keys
     const keys = Object.keys(localStorage);
     for (const key of keys) {
       if (key.startsWith(MIGRATION_ARCHIVE_PREFIX)) {

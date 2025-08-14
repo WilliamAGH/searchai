@@ -5,10 +5,20 @@
 import { logger } from "../logger";
 import type { MessageStreamChunk } from "../types/message";
 
+/**
+ * Service for invoking unauthenticated HTTP endpoints with streaming.
+ *
+ * Uses `/api/*` proxy paths in development and `VITE_CONVEX_URL`-prefixed
+ * absolute URLs in production builds.
+ */
 export class UnauthenticatedAIService {
   private convexUrl: string;
   private abortController: AbortController | null = null;
 
+  /**
+   * Create a new unauthenticated AI service.
+   * @param convexUrl - Base Convex URL (e.g. `https://<deployment>.convex.cloud`).
+   */
   constructor(convexUrl: string) {
     if (!convexUrl) {
       logger.warn(
@@ -29,6 +39,16 @@ export class UnauthenticatedAIService {
     this.convexUrl = convexUrl;
   }
 
+  /**
+   * Generate a streamed AI response via SSE.
+   * @param message - User message to send to the AI.
+   * @param chatId - The current chat identifier.
+   * @param onChunk - Optional handler for streamed message chunks.
+   * @param searchResults - Optional normalized search results to include.
+   * @param sources - Optional list of source URLs.
+   * @param chatHistory - Optional prior messages for context.
+   * @param onComplete - Optional callback invoked when the stream completes.
+   */
   async generateResponse(
     message: string,
     chatId: string,
@@ -41,6 +61,7 @@ export class UnauthenticatedAIService {
     }>,
     sources?: string[],
     chatHistory?: Array<{ role: "user" | "assistant"; content: string }>,
+    onComplete?: () => void,
   ): Promise<void> {
     // Create new abort controller for this request
     this.abortController = new AbortController();
@@ -80,7 +101,11 @@ export class UnauthenticatedAIService {
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          // Stream completed successfully - notify completion
+          onComplete?.();
+          break;
+        }
 
         const chunk = decoder.decode(value, { stream: true });
 
@@ -115,11 +140,18 @@ export class UnauthenticatedAIService {
     }
   }
 
+  /**
+   * Abort any in-flight streaming request.
+   */
   abort(): void {
     this.abortController?.abort();
     this.abortController = null;
   }
 
+  /**
+   * Execute the web search endpoint with a natural language query.
+   * @param query - Search query text.
+   */
   async searchWithAI(query: string): Promise<unknown> {
     // In development, use the proxied path directly
     // In production, use the full Convex URL
