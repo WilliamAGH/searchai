@@ -18,7 +18,10 @@ import type { Doc } from "../_generated/dataModel";
  * @returns Chat state with messages
  */
 export const subscribeToChatUpdates = query({
-  args: { chatId: v.id("chats") },
+  args: {
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
@@ -30,10 +33,15 @@ export const subscribeToChatUpdates = query({
     const isSharedOrPublic = privacy === "shared" || privacy === "public";
 
     // Allow access to:
-    // - Owner's chats
-    // - Anonymous chats (no userId on chat)
+    // - Owner's chats (authenticated)
+    // - Anonymous chats with matching sessionId
     // - Publicly shared chats
     if (chat.userId && chat.userId !== userId && !isSharedOrPublic) {
+      return null;
+    }
+
+    // For anonymous chats, verify sessionId matches
+    if (!chat.userId && chat.sessionId && chat.sessionId !== args.sessionId) {
       return null;
     }
 

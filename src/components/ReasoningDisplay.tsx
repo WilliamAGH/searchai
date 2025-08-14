@@ -31,7 +31,7 @@ export function ReasoningDisplay({
       <button
         type="button"
         onClick={handleToggle}
-        className="w-full text-left px-2 py-1 rounded bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 active:bg-blue-200/50 dark:active:bg-blue-900/40 transition-colors touch-manipulation"
+        className="w-full text-left px-2 py-3 rounded bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 active:bg-blue-200/50 dark:active:bg-blue-900/40 transition-colors touch-manipulation"
         aria-expanded={!collapsed ? "true" : "false"}
         aria-label="Toggle AI thinking display"
       >

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import type { MutableRefObject } from "react";
 import { logger } from "../lib/logger";
+import { isTopicChange } from "../lib/utils/topicDetection";
 
 interface UseEnhancedFollowUpPromptProps {
   isAuthenticated: boolean;
@@ -35,27 +36,45 @@ export function useEnhancedFollowUpPrompt({
   // Generate follow-up suggestions based on last assistant message
   useEffect(() => {
     const messages = chatState?.messages || [];
-    // Do not show until there are 2+ user messages and 1+ assistant message
+    // Require at least 4 user messages before ever showing the prompt
     const userMessages = messages.filter((m) => m?.role === "user");
     const assistantMessages = messages.filter((m) => m?.role === "assistant");
-    if (userMessages.length < 2 || assistantMessages.length === 0) {
+    if (userMessages.length < 4 || assistantMessages.length === 0) {
       setShowFollowUpPrompt(false);
       return;
     }
 
     const lastMessage = messages[messages.length - 1];
     const hasUserHistory = messages.some((m) => m?.role === "user");
+
+    // Check for actual topic change before showing prompt
+    const lastUserMessage = userMessages[userMessages.length - 1];
+    const previousUserMessage = userMessages[userMessages.length - 2];
+
     if (
       hasUserHistory &&
       lastMessage?.role === "assistant" &&
-      lastMessage.content
+      lastMessage.content &&
+      lastUserMessage?.content &&
+      previousUserMessage?.content
     ) {
-      // Simple follow-up generation - can be enhanced with AI
-      const suggestions = generateFollowUpSuggestions(lastMessage.content);
-      setFollowUpSuggestions(suggestions);
-      // Show follow-up if there are suggestions and not currently generating
-      if (suggestions.length > 0 && !chatState?.isGenerating) {
-        setShowFollowUpPrompt(true);
+      // Only show if there's a topic change
+      const hasTopicChanged = isTopicChange(
+        lastUserMessage.content,
+        previousUserMessage.content,
+      );
+
+      if (hasTopicChanged) {
+        // Simple follow-up generation - can be enhanced with AI
+        const suggestions = generateFollowUpSuggestions(lastMessage.content);
+        setFollowUpSuggestions(suggestions);
+        // Show follow-up if there are suggestions and not currently generating
+        if (suggestions.length > 0 && !chatState?.isGenerating) {
+          setShowFollowUpPrompt(true);
+        }
+      } else {
+        // No topic change, don't show the prompt
+        setShowFollowUpPrompt(false);
       }
     }
   }, [chatState?.messages, chatState?.isGenerating]);
@@ -68,13 +87,32 @@ export function useEnhancedFollowUpPrompt({
   }, []);
 
   const maybeShowFollowUpPrompt = useCallback(() => {
-    // Only consider showing after at least one full exchange
+    // Only consider showing after sufficient conversation history
     const messages = chatState?.messages || [];
     if (chatState?.isGenerating) return;
+
     const userMessages = messages.filter((m) => m?.role === "user");
     const assistantMessages = messages.filter((m) => m?.role === "assistant");
-    if (userMessages.length >= 2 && assistantMessages.length >= 1) {
-      setShowFollowUpPrompt(true);
+
+    // Require at least 4 user messages to avoid premature prompts
+    if (userMessages.length < 4 || assistantMessages.length < 1) {
+      return;
+    }
+
+    // Get the last two user messages to check for topic change
+    const lastUserMessage = userMessages[userMessages.length - 1];
+    const previousUserMessage = userMessages[userMessages.length - 2];
+
+    if (lastUserMessage?.content && previousUserMessage?.content) {
+      // Only show follow-up prompt if there's an actual topic change
+      const hasTopicChanged = isTopicChange(
+        lastUserMessage.content,
+        previousUserMessage.content,
+      );
+
+      if (hasTopicChanged) {
+        setShowFollowUpPrompt(true);
+      }
     }
   }, [chatState?.messages, chatState?.isGenerating]);
 

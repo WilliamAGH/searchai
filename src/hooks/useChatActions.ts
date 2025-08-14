@@ -34,7 +34,7 @@ export interface ChatActions {
   updateChat: (id: string, updates: Partial<UnifiedChat>) => void;
 
   // Message operations
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (chatId: string, content: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   addMessage: (message: UnifiedMessage) => void;
   removeMessage: (id: string) => void;
@@ -265,16 +265,32 @@ export function createChatActions(
     },
 
     // Message operations
-    async sendMessage(content: string) {
-      if (!repository || !state.currentChatId) return;
+    async sendMessage(chatId: string, content: string) {
+      // Validate inputs
+      if (!repository || !chatId || !content) {
+        logger.warn("sendMessage called with invalid parameters", {
+          hasRepository: !!repository,
+          chatId,
+          contentLength: content?.length,
+        });
+        return;
+      }
 
-      setState((prev) => ({ ...prev, isGenerating: true, error: null }));
+      // Update state to show generation is starting
+      // Also ensure we have the correct chat object for UI display
+      setState((prev) => ({
+        ...prev,
+        isGenerating: true,
+        error: null,
+        // Ensure currentChatId and currentChat match the chat we're sending to
+        currentChatId: chatId,
+        currentChat:
+          prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+      }));
 
       try {
-        const generator = repository.generateResponse(
-          state.currentChatId,
-          content,
-        );
+        // Send message and get streaming response
+        const generator = repository.generateResponse(chatId, content);
 
         let fullContent = "";
         for await (const chunk of generator) {
@@ -290,13 +306,23 @@ export function createChatActions(
           }
         }
 
-        // Refresh messages after generation
-        const messages = await repository.getMessages(state.currentChatId);
+        // Refresh messages after generation completes
+        // This is critical for displaying the new messages
+        const messages = await repository.getMessages(chatId);
+        logger.debug("Messages refreshed after generation", {
+          chatId,
+          messageCount: messages.length,
+        });
+
         setState((prev) => ({
           ...prev,
           messages,
           isGenerating: false,
           searchProgress: { stage: "idle" },
+          // Ensure currentChatId and currentChat are still set correctly
+          currentChatId: chatId,
+          currentChat:
+            prev.chats.find((c) => c.id === chatId) || prev.currentChat,
         }));
       } catch (error) {
         setState((prev) => ({

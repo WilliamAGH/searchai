@@ -16,10 +16,32 @@ function generateSessionId(): string {
 }
 
 export function useAnonymousSession(): string | null {
-  const { isAuthenticated } = useConvexAuth();
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    // Initialize immediately for unauthenticated users
+    // This ensures sessionId is available on first render
+    if (typeof window === "undefined") return null;
+
+    // If we're still loading auth state, check localStorage
+    // to see if we should prepare a session ID
+    const existingId = localStorage.getItem(SESSION_KEY);
+    if (existingId) return existingId;
+
+    // If no existing ID and not loading, create one immediately
+    // This prevents race conditions where repository is created without sessionId
+    if (!isLoading && !isAuthenticated) {
+      const newId = generateSessionId();
+      localStorage.setItem(SESSION_KEY, newId);
+      return newId;
+    }
+
+    return null;
+  });
 
   useEffect(() => {
+    // Skip if auth is still loading
+    if (isLoading) return;
+
     // Only need session ID for unauthenticated users
     if (!isAuthenticated) {
       // Check for existing session ID
@@ -37,7 +59,7 @@ export function useAnonymousSession(): string | null {
       setSessionId(null);
       localStorage.removeItem(SESSION_KEY);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isLoading]);
 
   return sessionId;
 }

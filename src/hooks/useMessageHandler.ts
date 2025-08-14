@@ -77,7 +77,7 @@ interface UseMessageHandlerDeps {
     /** Update chat properties */
     updateChat: (id: string, updates: Partial<Chat>) => Promise<void>;
     /** Send a message in the current chat */
-    sendMessage?: (message: string) => Promise<void>;
+    sendMessage?: (chatId: string, message: string) => Promise<void>;
   };
 }
 
@@ -150,7 +150,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         // Use unified chat action for ALL users (authenticated and anonymous)
         // This ensures messages are always persisted to Convex
         if (deps.chatActions.sendMessage) {
-          await deps.chatActions.sendMessage(message.trim());
+          await deps.chatActions.sendMessage(activeChatId, message.trim());
         } else {
           // Direct generation fallback - always use unified Convex flow
           // Both authenticated and anonymous users should use the same pipeline

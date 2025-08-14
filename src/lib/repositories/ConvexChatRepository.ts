@@ -27,6 +27,21 @@ export class ConvexChatRepository extends BaseRepository {
     super();
     this.client = client;
     this.sessionId = sessionId;
+
+    // Log initialization for debugging
+    logger.debug("ConvexChatRepository initialized", {
+      hasSessionId: !!sessionId,
+      sessionId,
+    });
+  }
+
+  // Allow updating sessionId after creation
+  setSessionId(sessionId: string | undefined) {
+    this.sessionId = sessionId;
+    logger.debug("ConvexChatRepository sessionId updated", {
+      hasSessionId: !!sessionId,
+      sessionId,
+    });
   }
 
   // Chat operations
@@ -85,8 +100,19 @@ export class ConvexChatRepository extends BaseRepository {
   async createChat(title?: string): Promise<ChatResponse> {
     try {
       const finalTitle = title || "New Chat";
+      logger.debug("Creating chat", {
+        title: finalTitle,
+        sessionId: this.sessionId,
+        hasSessionId: !!this.sessionId,
+      });
+
       const chatId = await this.client.mutation(api.chats.createChat, {
         title: TitleUtils.sanitize(finalTitle),
+        sessionId: this.sessionId,
+      });
+
+      logger.debug("Chat created with ID", {
+        chatId,
         sessionId: this.sessionId,
       });
 
@@ -95,7 +121,10 @@ export class ConvexChatRepository extends BaseRepository {
 
       return { chat, isNew: true };
     } catch (error) {
-      logger.error("Failed to create chat in Convex:", error);
+      logger.error("Failed to create chat in Convex:", {
+        error,
+        sessionId: this.sessionId,
+      });
       throw error;
     }
   }
@@ -158,16 +187,34 @@ export class ConvexChatRepository extends BaseRepository {
   // Message operations
   async getMessages(chatId: string): Promise<UnifiedMessage[]> {
     try {
+      logger.debug("Fetching messages for chat", {
+        chatId,
+        sessionId: this.sessionId,
+        hasSessionId: !!this.sessionId,
+      });
+
       const messages = await this.client.query(api.chats.getChatMessages, {
         chatId: IdUtils.toConvexChatId(chatId),
         sessionId: this.sessionId,
       });
 
-      if (!messages) return [];
+      if (!messages) {
+        logger.warn("No messages returned from Convex", { chatId });
+        return [];
+      }
+
+      logger.debug("Messages fetched successfully", {
+        chatId,
+        count: messages.length,
+      });
 
       return messages.map((msg) => this.convexToUnifiedMessage(msg));
     } catch (error) {
-      logger.error("Failed to fetch messages from Convex:", error);
+      logger.error("Failed to fetch messages from Convex:", {
+        error,
+        chatId,
+        sessionId: this.sessionId,
+      });
       return [];
     }
   }
@@ -357,6 +404,7 @@ export class ConvexChatRepository extends BaseRepository {
           api.chats.subscribeToChatUpdates,
           {
             chatId: convexChatId,
+            sessionId: this.sessionId,
           },
         );
 

@@ -70,26 +70,62 @@ function jaccard(a: string[], b: string[]): number {
  * - Ignores stopwords and punctuation
  * - Uses Jaccard similarity with length guards
  * - Only flags change on substantial difference
+ * - Recognizes contextual follow-ups like "What about X?"
  */
 export function isTopicChange(
   currentMessage: string,
   previousMessage: string,
 ): boolean {
   if (!previousMessage) return false;
-  const cur = (currentMessage || "").trim();
-  const prev = (previousMessage || "").trim();
+  const cur = (currentMessage || "").trim().toLowerCase();
+  const prev = (previousMessage || "").trim().toLowerCase();
+
+  // Too short to determine
   if (cur.length < 10 || prev.length < 10) return false;
 
-  // Length disparity guard (huge difference likely a change)
+  // Check for contextual follow-up patterns
+  const followUpPatterns = [
+    /^what about/i,
+    /^how about/i,
+    /^and \w+\?/i,
+    /^similarly/i,
+    /^likewise/i,
+    /^also/i,
+    /^in the same way/i,
+    /^same question/i,
+    /^same for/i,
+  ];
+
+  // If message starts with a follow-up pattern, it's likely continuing the topic
+  if (followUpPatterns.some((pattern) => pattern.test(cur))) {
+    return false; // NOT a topic change
+  }
+
+  // Check for explicit topic change indicators
+  const topicChangePatterns = [
+    /^(let'?s |can we |could we |i want to )?(change|switch|move|talk about|discuss)/i,
+    /^(on )?(another|different|new|separate) (topic|subject|question|note)/i,
+    /^(anyway|anyways|moving on|by the way|btw)/i,
+  ];
+
+  if (topicChangePatterns.some((pattern) => pattern.test(cur))) {
+    return true; // IS a topic change
+  }
+
+  // Length disparity guard (huge difference might indicate a change)
   const lenMax = Math.max(cur.length, prev.length);
   const lenDelta = Math.abs(cur.length - prev.length) / lenMax;
 
   // Token similarity
-  const toksCur = normalize(cur);
-  const toksPrev = normalize(prev);
+  const toksCur = normalize(currentMessage);
+  const toksPrev = normalize(previousMessage);
   const jac = jaccard(toksCur, toksPrev);
 
-  // Consider a change only if tokens barely overlap AND lengths differ enough
-  // Thresholds tuned conservatively to avoid false positives on first turns
-  return jac < 0.2 && lenDelta > 0.25;
+  // Consider a change if:
+  // 1. Tokens have very low overlap (completely different topics)
+  // 2. OR significant length difference with some topic divergence
+  // More nuanced to catch actual topic changes
+  if (jac < 0.1) return true; // Almost no common words = topic change
+  if (jac < 0.2 && lenDelta > 0.5) return true; // Low overlap + big length diff
+  return false; // Default to assuming continuation
 }
