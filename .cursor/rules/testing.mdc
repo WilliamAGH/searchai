@@ -52,7 +52,7 @@ TEST_SMOKE_COMMAND: npm run test:smoke
 
 ## 🎯 Vitest Configuration & Best Practices
 
-### Worker Pool Selection (Vitest)
+### Worker Pool Selection (Vitest) and CI Strategy
 
 Use cases and commands (from official Vitest docs):
 
@@ -67,6 +67,12 @@ vitest run --pool=threads
 vitest --inspect-brk --pool threads --poolOptions.threads.singleThread
 ```
 
+In CI we standardize on `vmForks` with a single worker to avoid tinypool recursion/stack issues in constrained runners:
+
+```bash
+vitest run --pool=vmForks --poolOptions.vmForks.singleFork
+```
+
 Config snippets:
 
 ```ts
@@ -74,7 +80,11 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    pool: 'forks',
+    pool: process.env.CI ? 'vmForks' : 'forks',
+    ...(process.env.CI && {
+      minThreads: 1,
+      maxThreads: 1,
+    }),
     // Optional tuning
     // poolOptions: { forks: { singleFork: false, isolate: true } }
   }
