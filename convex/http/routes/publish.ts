@@ -51,27 +51,6 @@ export function registerPublishRoutes(http: HttpRouter) {
     path: "/api/publishChat",
     method: "POST",
     handler: httpAction(async (ctx, request): Promise<Response> => {
-      interface PublishPayloadMessage {
-        role: "user" | "assistant";
-        content?: string;
-        searchResults?: Array<{
-          title: string;
-          url: string;
-          snippet: string;
-          relevanceScore: number;
-        }>;
-        sources?: string[];
-        timestamp?: number;
-      }
-      // Keep local payload shape inline in parsing logic to avoid unused type warnings
-      type PublishPayload = {
-        title?: string;
-        privacy?: string;
-        shareId?: string;
-        publicId?: string;
-        messages?: PublishPayloadMessage[];
-      };
-
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
@@ -87,8 +66,8 @@ export function registerPublishRoutes(http: HttpRouter) {
         });
       }
 
-      // Validate basic structure and extract payload
-      const payload = rawPayload as PublishPayload;
+      // Validate basic structure and extract payload (validated inline below)
+      const payload: any = rawPayload;
 
       // Business logic validation
       const title = (payload.title || "Shared Chat").trim().slice(0, 200);

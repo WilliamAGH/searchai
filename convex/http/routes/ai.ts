@@ -39,13 +39,49 @@ export function registerAIRoutes(http: HttpRouter) {
     path: "/api/ai",
     method: "POST",
     handler: httpAction(async (_ctx, request) => {
-      const payload = await request.json();
-      const { message, systemPrompt, sources, chatHistory } = payload;
+      let rawPayload: unknown;
+      try {
+        rawPayload = await request.json();
+      } catch {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          400,
+        );
+      }
+
+      // Validate and normalize input
+      const payload = rawPayload as any;
+      const message = String(payload.message || "").slice(0, 10000);
+      const systemPrompt = payload.systemPrompt
+        ? String(payload.systemPrompt).slice(0, 2000)
+        : undefined;
+      const sources = Array.isArray(payload.sources)
+        ? payload.sources
+            .slice(0, 20)
+            .filter((s: any) => typeof s === "string")
+            .map((s: any) => String(s).slice(0, 2048))
+        : undefined;
+      const chatHistory = Array.isArray(payload.chatHistory)
+        ? payload.chatHistory.slice(0, 50).map((m: any) => ({
+            role:
+              m.role === "user" || m.role === "assistant"
+                ? m.role
+                : "assistant",
+            content: String(m.content || "").slice(0, 10000),
+          }))
+        : undefined;
 
       // Normalize searchResults to ensure relevanceScore is always present
       const searchResults = payload.searchResults
         ? normalizeSearchResults(payload.searchResults)
         : [];
+
+      if (!message.trim()) {
+        return corsResponse(
+          JSON.stringify({ error: "Message is required" }),
+          400,
+        );
+      }
 
       dlog("🤖 AI ENDPOINT CALLED:");
       dlog("Message length:", typeof message === "string" ? message.length : 0);

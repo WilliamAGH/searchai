@@ -37,8 +37,25 @@ export function registerSearchRoutes(http: HttpRouter) {
     path: "/api/search",
     method: "POST",
     handler: httpAction(async (ctx, request) => {
-      const { query, maxResults } = await request.json();
-      if (!query || String(query).trim().length === 0) {
+      let rawPayload: unknown;
+      try {
+        rawPayload = await request.json();
+      } catch {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          400,
+        );
+      }
+
+      // Validate and normalize input
+      const payload = rawPayload as any;
+      const query = String(payload.query || "").slice(0, 1000);
+      const maxResults =
+        typeof payload.maxResults === "number"
+          ? Math.max(1, Math.min(payload.maxResults, 50))
+          : 5;
+
+      if (!query.trim()) {
         return corsResponse(
           JSON.stringify({
             results: [],
