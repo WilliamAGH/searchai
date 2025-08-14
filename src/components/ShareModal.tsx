@@ -9,6 +9,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { logger } from "../lib/logger";
 import { copyToClipboard } from "../lib/clipboard";
+import { formatConversationMarkdown } from "../lib/utils";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -25,6 +26,13 @@ interface ShareModalProps {
   publicId?: string;
   /** Base URL for export endpoint, e.g., https://*.convex.site/api/exportChat */
   exportBase?: string;
+  /** Optional chat messages for markdown export */
+  messages?: Array<{
+    role: "user" | "assistant" | "system";
+    content?: string;
+    searchResults?: Array<{ title?: string; url?: string }> | undefined;
+    sources?: string[] | undefined;
+  }>;
 }
 
 export function ShareModal({
@@ -37,17 +45,20 @@ export function ShareModal({
   shareId,
   publicId: _publicId,
   exportBase,
+  messages,
 }: ShareModalProps) {
   const [selectedPrivacy, setSelectedPrivacy] = useState<
     "private" | "shared" | "public" | "llm"
   >(privacy);
-  const [copied, setCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
+  const [markdownCopied, setMarkdownCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string>("");
   const [generatedFor, setGeneratedFor] = useState<
     "shared" | "public" | "llm" | null
   >(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const openedAtRef = useRef<number>(0);
 
@@ -66,15 +77,25 @@ export function ShareModal({
       if (copyTimeoutRef.current !== null) {
         clearTimeout(copyTimeoutRef.current);
       }
+      if (markdownTimeoutRef.current !== null) {
+        clearTimeout(markdownTimeoutRef.current);
+      }
     };
   }, []);
 
   // Clear copy feedback when closing the modal
   useEffect(() => {
-    if (!isOpen && copyTimeoutRef.current !== null) {
-      clearTimeout(copyTimeoutRef.current);
-      copyTimeoutRef.current = null;
-      setCopied(false);
+    if (!isOpen) {
+      if (copyTimeoutRef.current !== null) {
+        clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = null;
+      }
+      if (markdownTimeoutRef.current !== null) {
+        clearTimeout(markdownTimeoutRef.current);
+        markdownTimeoutRef.current = null;
+      }
+      setUrlCopied(false);
+      setMarkdownCopied(false);
     }
   }, [isOpen]);
 
@@ -96,16 +117,31 @@ export function ShareModal({
   const displayUrl = generatedUrl;
 
   // Generate a fresh URL for the selected option, or copy if already generated
+  // Generate markdown for exporting
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- Known oxlint bug: props incorrectly flagged as "outer scope values"
+  const markdownContent = React.useMemo(() => {
+    const messagesToFormat = messages;
+    if (!messagesToFormat) return "";
+    return formatConversationMarkdown({
+      messages: messagesToFormat.map((m) => ({
+        role: m.role,
+        content: m.content || "",
+        searchResults: m.searchResults,
+        sources: m.sources,
+      })),
+    });
+  }, [messages]);
+
   const handleGenerateOrCopy = React.useCallback(async () => {
     // If already generated for the current selection, copy it
     if (displayUrl && generatedFor === selectedPrivacy) {
       try {
         const ok = await copyToClipboard(displayUrl);
         if (ok) {
-          setCopied(true);
+          setUrlCopied(true);
           if (copyTimeoutRef.current !== null)
             clearTimeout(copyTimeoutRef.current);
-          copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+          copyTimeoutRef.current = setTimeout(() => setUrlCopied(false), 2000);
         }
       } catch (error) {
         logger.error("Failed to copy URL", { error });
@@ -412,7 +448,7 @@ export function ShareModal({
                   disabled={busy}
                 >
                   {displayUrl ? (
-                    copied ? (
+                    urlCopied ? (
                       "Copied!"
                     ) : (
                       "Copy"
@@ -448,13 +484,54 @@ export function ShareModal({
             </div>
           )}
 
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium"
-            >
-              Close
-            </button>
+          <div className="space-y-4">
+            {messages && messages.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Export as Markdown
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={markdownContent}
+                    readOnly
+                    className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    onClick={async () => {
+                      try {
+                        const ok = await copyToClipboard(markdownContent);
+                        if (ok) {
+                          setMarkdownCopied(true);
+                          // Clear any existing timeout
+                          if (markdownTimeoutRef.current !== null) {
+                            clearTimeout(markdownTimeoutRef.current);
+                          }
+                          // Set new timeout
+                          markdownTimeoutRef.current = setTimeout(() => {
+                            setMarkdownCopied(false);
+                            markdownTimeoutRef.current = null;
+                          }, 2000);
+                        }
+                      } catch (error) {
+                        logger.error("Failed to copy markdown", { error });
+                      }
+                    }}
+                    className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-60"
+                  >
+                    {markdownCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -65,16 +65,6 @@ export function MobileSidebar({
     [handleSelectChat],
   );
 
-  const handleDeleteChatFromBtn = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
-      const id = e.currentTarget.getAttribute("data-chat-id");
-      const isCurrent = e.currentTarget.getAttribute("data-current") === "1";
-      if (!id) return;
-      void handleDeleteChat(id, isCurrent);
-    },
-    [handleDeleteChat],
-  );
-
   const handleDeleteChat = useCallback(
     async (chatId: Id<"chats"> | string, isCurrentChat: boolean) => {
       try {
@@ -98,6 +88,16 @@ export function MobileSidebar({
       }
     },
     [onRequestDeleteChat, onDeleteLocalChat, deleteChat, onSelectChat],
+  );
+
+  const handleDeleteChatFromBtn = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const id = e.currentTarget.getAttribute("data-chat-id");
+      const isCurrent = e.currentTarget.getAttribute("data-current") === "1";
+      if (!id) return;
+      void handleDeleteChat(id, isCurrent);
+    },
+    [handleDeleteChat],
   );
 
   return (

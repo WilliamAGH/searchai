@@ -36,7 +36,7 @@ export function FollowUpPrompt({
   return (
     <div
       role="status"
-      className="fixed bottom-0 left-0 right-0 w-full px-3 sm:px-4 py-2 animate-slide-up z-40"
+      className="absolute bottom-[4.5rem] w-full max-w-3xl mx-auto left-0 right-0 px-3 animate-slide-up z-40"
     >
       <div className="w-full border border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200 rounded-md">
         <div className="px-3 sm:px-4 py-2">

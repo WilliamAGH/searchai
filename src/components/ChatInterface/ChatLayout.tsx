@@ -90,7 +90,7 @@ export function ChatLayout({
   swipeHandlers,
   setShowShareModal,
   setUndoBanner,
-  openShareModal,
+  openShareModal: _openShareModal,
   handleContinueChat,
   handleNewChatForFollowUp,
   handleNewChatWithSummary,
@@ -124,10 +124,7 @@ export function ChatLayout({
         <div className="flex-1 flex flex-col min-h-0">
           <MessageList key={String(currentChatId)} {...messageListProps} />
         </div>
-        <div className="flex-shrink-0 relative">
-          {showFollowUpPrompt && (
-            <div aria-hidden="true" className="h-12 sm:h-12" />
-          )}
+        <div className="flex-shrink-0 relative pb-16">
           <FollowUpPrompt
             isOpen={showFollowUpPrompt}
             onContinue={handleContinueChat}
@@ -137,18 +134,7 @@ export function ChatLayout({
             hintConfidence={plannerHint?.confidence}
           />
 
-          {/* Inline Share button to open ShareModal (targeted by E2E tests) */}
-          <div className="absolute right-3 bottom-[4.5rem] sm:bottom-[4.75rem]">
-            <button
-              type="button"
-              onClick={openShareModal}
-              className="hidden sm:inline-flex h-8 items-center justify-center px-3 text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 rounded-md transition-colors"
-              aria-label="Share this conversation"
-              title="Share this conversation"
-            >
-              Share
-            </button>
-          </div>
+          {/* Remove share button - now using icon in MessageInput */}
           {undoBanner && (
             <UndoBanner
               type={undoBanner.message.includes("Chat") ? "chat" : "message"}

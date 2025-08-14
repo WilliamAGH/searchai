@@ -41,6 +41,12 @@ interface ShareModalContainerProps {
     privacy?: ChatPrivacy;
     shareId?: string;
     publicId?: string;
+    messages?: Array<{
+      role: "user" | "assistant" | "system";
+      content?: string;
+      searchResults?: Array<{ title?: string; url?: string }> | undefined;
+      sources?: string[] | undefined;
+    }>;
   } | null;
   chatActions?: ShareChatActions;
   resolveApi?: (path: string) => string;
@@ -56,7 +62,10 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
     if (typeof resolveApi === "function") {
       try {
         return resolveApi("/api/chatTextMarkdown");
-      } catch {}
+      } catch (error) {
+        // Fall back to default if resolveApi fails
+        console.debug("Failed to resolve API path", error);
+      }
     }
     return `${window.location.origin}/api/chatTextMarkdown`;
   }, [resolveApi]);
@@ -99,6 +108,7 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
       shareId={shareId}
       publicId={publicId}
       exportBase={exportBase}
+      messages={props.currentChat?.messages}
     />
   );
 }
