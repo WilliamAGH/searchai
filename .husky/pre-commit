@@ -3,6 +3,11 @@
 # Exit on unset and any error
 set -eu
 
+# Source Husky init script if it exists (for PATH setup)
+if [ -f "$HOME/.config/husky/init.sh" ]; then
+  . "$HOME/.config/husky/init.sh"
+fi
+
 echo "🔍 Running comprehensive pre-commit checks..."
 
 # 1. TypeScript type checking (catch type errors)

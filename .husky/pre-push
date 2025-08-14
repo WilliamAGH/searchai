@@ -3,6 +3,11 @@
 # Exit on unset and any error
 set -eu
 
+# Source Husky init script if it exists (for PATH setup)
+if [ -f "$HOME/.config/husky/init.sh" ]; then
+  . "$HOME/.config/husky/init.sh"
+fi
+
 echo "🚀 Running comprehensive pre-push validation..."
 
 # 1. Full production build (catches ALL issues!)
