@@ -20,6 +20,7 @@ const applicationTables = {
   chats: defineTable({
     title: v.string(),
     userId: v.optional(v.id("users")),
+    sessionId: v.optional(v.string()),
     shareId: v.optional(v.string()),
     publicId: v.optional(v.string()),
     privacy: v.optional(
@@ -31,6 +32,7 @@ const applicationTables = {
     rollingSummaryUpdatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
+    .index("by_sessionId", ["sessionId"])
     .index("by_share_id", ["shareId"])
     .index("by_public_id", ["publicId"]),
 

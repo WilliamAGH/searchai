@@ -8,7 +8,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { generateOpaqueId } from "./utils";
+import { generateShareId, generatePublicId } from "../lib/uuid";
 
 /**
  * Import locally stored chats/messages into the authenticated account
@@ -66,21 +66,21 @@ export const importLocalChats = mutation({
     for (const ch of args.chats) {
       const now = Date.now();
       // Try to preserve provided shareId/publicId when unique
-      let shareId = ch.shareId || generateOpaqueId();
+      let shareId = ch.shareId || generateShareId();
       if (ch.shareId) {
         const existingShare = await ctx.db
           .query("chats")
           .withIndex("by_share_id", (q) => q.eq("shareId", ch.shareId ?? ""))
           .unique();
-        if (existingShare) shareId = generateOpaqueId();
+        if (existingShare) shareId = generateShareId();
       }
-      let publicId = ch.publicId || generateOpaqueId();
+      let publicId = ch.publicId || generatePublicId();
       if (ch.publicId) {
         const existingPublic = await ctx.db
           .query("chats")
           .withIndex("by_public_id", (q) => q.eq("publicId", ch.publicId ?? ""))
           .unique();
-        if (existingPublic) publicId = generateOpaqueId();
+        if (existingPublic) publicId = generatePublicId();
       }
 
       const chatId = await ctx.db.insert("chats", {
@@ -170,21 +170,21 @@ export const publishAnonymousChat = mutation({
   }),
   handler: async (ctx, args) => {
     // Ensure unique IDs, preserve when available
-    let shareId = args.shareId || generateOpaqueId();
+    let shareId = args.shareId || generateShareId();
     if (args.shareId) {
       const existingShare = await ctx.db
         .query("chats")
         .withIndex("by_share_id", (q) => q.eq("shareId", args.shareId ?? ""))
         .unique();
-      if (existingShare) shareId = generateOpaqueId();
+      if (existingShare) shareId = generateShareId();
     }
-    let publicId = args.publicId || generateOpaqueId();
+    let publicId = args.publicId || generatePublicId();
     if (args.publicId) {
       const existingPublic = await ctx.db
         .query("chats")
         .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId ?? ""))
         .unique();
-      if (existingPublic) publicId = generateOpaqueId();
+      if (existingPublic) publicId = generatePublicId();
     }
 
     const now = Date.now();
