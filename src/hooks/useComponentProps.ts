@@ -32,6 +32,14 @@ interface UseComponentPropsArgs {
   handleDraftChange: (draft: string) => void;
   setShowShareModal: (show: boolean) => void;
   userHistory: string[];
+  // Pagination props
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => Promise<void>;
+  isLoadingMessages?: boolean;
+  loadError?: Error | null;
+  retryCount?: number;
+  onClearError?: () => void;
 }
 
 /**
@@ -59,6 +67,14 @@ export function useComponentProps({
   handleDraftChange,
   setShowShareModal,
   userHistory,
+  // Pagination props
+  isLoadingMore,
+  hasMore,
+  onLoadMore,
+  isLoadingMessages,
+  loadError,
+  retryCount,
+  onClearError,
 }: UseComponentPropsArgs) {
   const chatSidebarProps = useMemo(
     () => ({
@@ -120,6 +136,14 @@ export function useComponentProps({
       onDeleteMessage: isAuthenticated
         ? handleRequestDeleteMessage
         : handleDeleteLocalMessage,
+      // Pagination props (optional, passed through)
+      isLoadingMore,
+      hasMore,
+      onLoadMore,
+      isLoadingMessages,
+      loadError,
+      retryCount,
+      onClearError,
     }),
     [
       currentMessages,
@@ -129,6 +153,13 @@ export function useComponentProps({
       isAuthenticated,
       handleRequestDeleteMessage,
       handleDeleteLocalMessage,
+      isLoadingMore,
+      hasMore,
+      onLoadMore,
+      isLoadingMessages,
+      loadError,
+      retryCount,
+      onClearError,
     ],
   );
 

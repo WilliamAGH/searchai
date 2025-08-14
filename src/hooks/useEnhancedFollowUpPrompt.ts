@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
+import type { MutableRefObject } from "react";
 import { logger } from "../lib/logger";
 
 interface UseEnhancedFollowUpPromptProps {
   isAuthenticated: boolean;
   currentChatId: string | null;
   handleNewChat: (opts?: { userInitiated?: boolean }) => Promise<string | null>;
-  sendRef: React.MutableRefObject<((message: string) => Promise<void>) | null>;
+  sendRef: MutableRefObject<((message: string) => Promise<void>) | null>;
   recordClientMetric?: unknown;
   summarizeRecentAction?: unknown;
   chatState: {
@@ -34,13 +35,19 @@ export function useEnhancedFollowUpPrompt({
   // Generate follow-up suggestions based on last assistant message
   useEffect(() => {
     const messages = chatState?.messages || [];
-    if (messages.length === 0) {
+    // Do not show on empty or first-message chats
+    if (messages.length < 2) {
       setShowFollowUpPrompt(false);
       return;
     }
 
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.role === "assistant" && lastMessage.content) {
+    const hasUserHistory = messages.some((m) => m?.role === "user");
+    if (
+      hasUserHistory &&
+      lastMessage?.role === "assistant" &&
+      lastMessage.content
+    ) {
       // Simple follow-up generation - can be enhanced with AI
       const suggestions = generateFollowUpSuggestions(lastMessage.content);
       setFollowUpSuggestions(suggestions);
@@ -59,13 +66,14 @@ export function useEnhancedFollowUpPrompt({
   }, []);
 
   const maybeShowFollowUpPrompt = useCallback(() => {
-    // Logic to determine if follow-up should be shown
+    // Only consider showing when there is at least one user message
+    // and at least two total messages (a minimal back-and-forth)
     const messages = chatState?.messages || [];
-    if (messages.length > 0 && !chatState?.isGenerating) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.role === "assistant") {
-        setShowFollowUpPrompt(true);
-      }
+    if (messages.length < 2 || chatState?.isGenerating) return;
+    const hasUserHistory = messages.some((m) => m?.role === "user");
+    const lastMessage = messages[messages.length - 1];
+    if (hasUserHistory && lastMessage?.role === "assistant") {
+      setShowFollowUpPrompt(true);
     }
   }, [chatState?.messages, chatState?.isGenerating]);
 

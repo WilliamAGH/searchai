@@ -1,5 +1,24 @@
+/**
+ * Performance optimization hooks for rate-limiting function calls
+ * Provides debounce and throttle utilities for React components
+ */
+
 import { useEffect, useRef, useCallback } from "react";
 
+/**
+ * Debounce hook - delays function execution until after wait period
+ * Function will only execute after it stops being called for the specified delay
+ *
+ * Use cases:
+ * - Search input handling
+ * - Window resize events
+ * - Form validation
+ *
+ * @template T - Function type to debounce
+ * @param {T} callback - Function to debounce
+ * @param {number} delay - Delay in milliseconds
+ * @returns {T} Debounced version of the callback
+ */
 export function useDebounce<T extends (...args: unknown[]) => void>(
   callback: T,
   delay: number,
@@ -37,6 +56,20 @@ export function useDebounce<T extends (...args: unknown[]) => void>(
   return debouncedCallback;
 }
 
+/**
+ * Throttle hook - limits function execution to once per time period
+ * Ensures function runs at most once per specified delay
+ *
+ * Use cases:
+ * - Scroll event handlers
+ * - Mouse move tracking
+ * - API rate limiting
+ *
+ * @template T - Function type to throttle
+ * @param {T} callback - Function to throttle
+ * @param {number} delay - Minimum time between executions in milliseconds
+ * @returns {T} Throttled version of the callback
+ */
 export function useThrottle<T extends (...args: unknown[]) => void>(
   callback: T,
   delay: number,
