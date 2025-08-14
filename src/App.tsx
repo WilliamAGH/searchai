@@ -25,6 +25,7 @@ import { SignUpModal } from "./components/SignUpModal";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { SignOutButton } from "./SignOutButton";
+import { useClaimAnonymousChats } from "./hooks/useClaimAnonymousChats";
 
 // Direct import to avoid Suspense delays in E2E/preview
 import ChatInterface from "./components/ChatInterface";
@@ -213,6 +214,9 @@ export default function App() {
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
+
+  // Claim anonymous chats when user signs in
+  useClaimAnonymousChats();
 
   // Handle responsive sidebar behavior
   useEffect(() => {

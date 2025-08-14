@@ -23,12 +23,9 @@ import { useConvexQueries } from "../hooks/useConvexQueries";
 import { useSidebarTiming } from "../hooks/useSidebarTiming";
 import { useServices } from "../hooks/useServices";
 import type { Chat } from "../lib/types/chat";
+import { createChatFromData } from "../lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "../lib/constants/topicDetection";
-import {
-  buildApiBase,
-  resolveApiPath,
-  fetchJsonWithRetry,
-} from "../lib/utils/httpUtils";
+import { buildApiBase, resolveApiPath } from "../lib/utils/httpUtils";
 import { isTopicChange } from "../lib/utils/topicDetection";
 import { mapMessagesToLocal } from "../lib/utils/messageMapper";
 import { buildUserHistory } from "../lib/utils/chatHistory";
@@ -70,7 +67,61 @@ export function ChatInterface({
   const [localIsGenerating, setIsGenerating] = useState(false);
   const { aiService } = useServices(convexUrl);
 
-  const { state: chatState, actions: chatActions } = useUnifiedChat();
+  const unified = useUnifiedChat();
+  const chatState = {
+    chats: unified.chats,
+    currentChatId: unified.currentChatId,
+    currentChat: unified.currentChat,
+    messages: unified.messages,
+    isLoading: unified.isLoading,
+    isGenerating: unified.isGenerating,
+    error: unified.error,
+    searchProgress: unified.searchProgress,
+    showFollowUpPrompt: unified.showFollowUpPrompt,
+    pendingMessage: unified.pendingMessage,
+    plannerHint: unified.plannerHint,
+    undoBanner: unified.undoBanner,
+    messageCount: unified.messageCount,
+    showShareModal: unified.showShareModal,
+    userHistory: unified.userHistory,
+    isMobile: unified.isMobile,
+    isSidebarOpen: unified.isSidebarOpen,
+  } as const;
+  const chatActions = useMemo(
+    () => ({
+      createChat: unified.createChat,
+      selectChat: unified.selectChat,
+      deleteChat: unified.deleteChat,
+      updateChatTitle: unified.updateChatTitle,
+      setChats: unified.setChats,
+      addChat: unified.addChat,
+      removeChat: unified.removeChat,
+      updateChat: unified.updateChat,
+      sendMessage: unified.sendMessage,
+      deleteMessage: unified.deleteMessage,
+      addMessage: unified.addMessage,
+      removeMessage: unified.removeMessage,
+      updateMessage: unified.updateMessage,
+      setMessages: unified.setMessages,
+      shareChat: unified.shareChat,
+      handleToggleSidebar: unified.handleToggleSidebar,
+      handleContinueChat: unified.handleContinueChat,
+      handleNewChatForFollowUp: unified.handleNewChatForFollowUp,
+      handleNewChatWithSummary: unified.handleNewChatWithSummary,
+      handleDraftChange: unified.handleDraftChange,
+      handleShare: unified.handleShare,
+      handleRequestDeleteChat: unified.handleRequestDeleteChat,
+      handleRequestDeleteMessage: unified.handleRequestDeleteMessage,
+      setShowFollowUpPrompt: unified.setShowFollowUpPrompt,
+      setShowShareModal: unified.setShowShareModal,
+      setPendingMessage: unified.setPendingMessage,
+      addToHistory: unified.addToHistory,
+      refreshChats: unified.refreshChats,
+      clearError: unified.clearError,
+      clearLocalStorage: unified.clearLocalStorage,
+    }),
+    [unified],
+  );
   const currentChatId = chatState.currentChatId;
   const isGenerating = chatState.isGenerating || localIsGenerating;
   const searchProgress = chatState.searchProgress;
@@ -102,37 +153,34 @@ export function ChatInterface({
     // The unified hook handles both authenticated and unauthenticated states
     // Convert from unified format to local format for compatibility
     if (chats && chats.length > 0) {
-      baseChats = chats.map(
-        (chat) =>
-          ({
+      baseChats = chats.map((chat) =>
+        createChatFromData(
+          {
             _id: chat.id || chat._id,
             title: chat.title,
             createdAt: chat.createdAt,
             updatedAt: chat.updatedAt,
-            privacy: chat.privacy || "private",
+            privacy: chat.privacy,
             shareId: chat.shareId,
             publicId: chat.publicId,
-            isLocal: !isAuthenticated,
-            source: isAuthenticated ? "convex" : "local",
             userId: chat.userId,
-          }) as Chat,
+            _creationTime: chat._creationTime,
+          },
+          isAuthenticated,
+        ),
       );
     }
 
     return baseChats;
   }, [isAuthenticated, chats]);
 
-  const {
-    navigateWithVerification,
-    buildChatPath,
-    handleSelectChat: navHandleSelectChat,
-  } = useChatNavigation({
-    currentChatId,
-    allChats,
-    isAuthenticated,
-    onSelectChat: chatActions.selectChat,
-  });
-  const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
+  const { navigateWithVerification, handleSelectChat: navHandleSelectChat } =
+    useChatNavigation({
+      currentChatId,
+      allChats,
+      isAuthenticated,
+      onSelectChat: chatActions.selectChat,
+    });
   const generateResponse = useAction(api.ai.generateStreamingResponse);
   const planSearch = useAction(api.search.planSearch);
   const recordClientMetric = useAction(api.search.recordClientMetric);
@@ -502,14 +550,7 @@ export function ChatInterface({
         onClose={() => setShowShareModal(false)}
         currentChatId={currentChatId}
         currentChat={currentChat}
-        allChats={allChats}
-        isAuthenticated={isAuthenticated}
-        chatState={chatState}
         chatActions={chatActions}
-        updateChatPrivacy={updateChatPrivacy}
-        navigateWithVerification={navigateWithVerification}
-        buildChatPath={buildChatPath}
-        fetchJsonWithRetry={fetchJsonWithRetry}
         resolveApi={resolveApi}
       />
     </div>

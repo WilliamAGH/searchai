@@ -1,42 +1,65 @@
 // ShareModalContainer - wrapper for ShareModal with additional logic
+/**
+ * ShareModalContainer
+ *
+ * Lightweight wrapper around ShareModal that adapts current chat state
+ * to the ShareModal API (privacy, share/public IDs, and export URL).
+ *
+ * Notes
+ * - Intentionally keeps props minimal to avoid leaking unrelated UI state.
+ * - Uses optional `chatActions.shareChat` to persist/upgrade sharing mode.
+ * - Computes `exportBase` via optional `resolveApi` helper or window.origin.
+ */
 import { useMemo } from "react";
 import { ShareModal } from "./ShareModal";
 
+type ChatPrivacy = "private" | "shared" | "public";
+
+/**
+ * Contract for share-related actions used by ShareModalContainer.
+ * If provided, `shareChat` should persist a new privacy state and return
+ * any newly-created identifiers for shared or public links.
+ */
+interface ShareChatActions {
+  shareChat?: (
+    id: string,
+    privacy: Exclude<ChatPrivacy, "private">,
+  ) => Promise<{ shareId?: string; publicId?: string }>;
+}
+
+/**
+ * Minimal prop surface needed by ShareModalContainer.
+ * - `currentChat` supplies existing privacy and IDs (if any).
+ * - `chatActions` provides an optional `shareChat` action to persist changes.
+ * - `resolveApi` maps a relative API path to an absolute URL for export.
+ */
 interface ShareModalContainerProps {
   isOpen: boolean;
   onClose: () => void;
   currentChatId: string | null;
   currentChat: {
-    privacy?: "private" | "shared" | "public";
+    privacy?: ChatPrivacy;
     shareId?: string;
     publicId?: string;
   } | null;
-  allChats: unknown[];
-  isAuthenticated: boolean;
-  chatState: unknown;
-  chatActions: unknown;
-  updateChatPrivacy: unknown;
-  navigateWithVerification: unknown;
-  buildChatPath?: unknown;
-  fetchJsonWithRetry?: unknown;
-  resolveApi?: unknown;
+  chatActions?: ShareChatActions;
+  resolveApi?: (path: string) => string;
 }
 
 export function ShareModalContainer(props: ShareModalContainerProps) {
+  const { resolveApi } = props;
   const privacy = props.currentChat?.privacy || "private";
   const shareId = props.currentChat?.shareId || undefined;
   const publicId = props.currentChat?.publicId || undefined;
 
   const exportBase = useMemo(() => {
-    if (typeof props.resolveApi === "function") {
+    if (typeof resolveApi === "function") {
       try {
-        return (props.resolveApi as (p: string) => string)(
-          "/api/chatTextMarkdown",
-        );
+        return resolveApi("/api/chatTextMarkdown");
       } catch {}
     }
     return `${window.location.origin}/api/chatTextMarkdown`;
-  }, [props.resolveApi]);
+  }, [resolveApi]);
 
   const shareUrl = useMemo(() => {
     if (privacy === "shared" && shareId)
@@ -47,18 +70,12 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
   }, [privacy, shareId, publicId]);
 
   const onShare = async (
-    p: "private" | "shared" | "public",
+    p: ChatPrivacy,
   ): Promise<{ shareId?: string; publicId?: string } | void> => {
-    const anyActions = props.chatActions as unknown as {
-      shareChat?: (
-        id: string,
-        privacy: "shared" | "public",
-      ) => Promise<{ shareId?: string; publicId?: string }>;
-    };
     if (!props.currentChatId) return;
     if (p === "private") return;
-    if (anyActions && typeof anyActions.shareChat === "function") {
-      const result = await anyActions.shareChat(
+    if (props.chatActions?.shareChat) {
+      const result = await props.chatActions.shareChat(
         props.currentChatId,
         p === "shared" ? "shared" : "public",
       );
@@ -73,7 +90,7 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
       onClose={props.onClose}
       onShare={onShare}
       shareUrl={shareUrl}
-      privacy={privacy as "private" | "shared" | "public"}
+      privacy={privacy as ChatPrivacy}
       llmTxtUrl={
         shareId
           ? `${exportBase}?shareId=${encodeURIComponent(shareId)}`
