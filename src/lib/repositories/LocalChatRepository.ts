@@ -21,6 +21,7 @@ import { UnauthenticatedAIService } from "../services/UnauthenticatedAIService";
 import { logger } from "../logger";
 import type { LocalMessage } from "../types/message";
 
+// Use legacy keys directly for backward compatibility
 const STORAGE_KEYS = {
   CHATS: "searchai_chats_v2",
   MESSAGES: "searchai_messages_v2",
@@ -47,6 +48,7 @@ export class LocalChatRepository extends BaseRepository {
   // Chat operations
   async getChats(): Promise<UnifiedChat[]> {
     try {
+      // Using raw localStorage for backward compatibility with legacy keys
       const stored = localStorage.getItem(STORAGE_KEYS.CHATS);
       if (!stored) return [];
 

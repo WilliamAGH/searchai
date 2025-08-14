@@ -21,16 +21,20 @@ import { logger } from "../logger";
 export class ConvexChatRepository extends BaseRepository {
   protected storageType = "convex" as const;
   private client: ConvexClient;
+  private sessionId?: string;
 
-  constructor(client: ConvexClient) {
+  constructor(client: ConvexClient, sessionId?: string) {
     super();
     this.client = client;
+    this.sessionId = sessionId;
   }
 
   // Chat operations
   async getChats(): Promise<UnifiedChat[]> {
     try {
-      const chats = await this.client.query(api.chats.getUserChats, {});
+      const chats = await this.client.query(api.chats.getUserChats, {
+        sessionId: this.sessionId,
+      });
       if (!chats) return [];
 
       return chats.map((chat) => ({
@@ -57,7 +61,7 @@ export class ConvexChatRepository extends BaseRepository {
       if (!IdUtils.isConvexId(id)) {
         // Try to find by opaque ID or share ID
         const byOpaque = await this.client.query(api.chats.getChatByOpaqueId, {
-          chatId: id as Id<"chats">,
+          opaqueId: id,
         });
         if (byOpaque) {
           return this.convexToUnifiedChat(byOpaque);
@@ -81,7 +85,7 @@ export class ConvexChatRepository extends BaseRepository {
       const finalTitle = title || "New Chat";
       const chatId = await this.client.mutation(api.chats.createChat, {
         title: TitleUtils.sanitize(finalTitle),
-        privacy: "private",
+        sessionId: this.sessionId,
       });
 
       const chat = await this.getChatById(IdUtils.toUnifiedId(chatId));
@@ -94,6 +98,12 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Update the title of an existing chat
+   * @param id - Chat ID to update
+   * @param title - New title for the chat
+   * @throws {Error} If update fails
+   */
   async updateChatTitle(id: string, title: string): Promise<void> {
     try {
       await this.client.mutation(api.chats.updateChatTitle, {
@@ -106,6 +116,12 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Update the privacy setting of a chat
+   * @param id - Chat ID to update
+   * @param privacy - New privacy setting (private, shared, or public)
+   * @throws {Error} If update fails
+   */
   async updateChatPrivacy(
     id: string,
     privacy: "private" | "shared" | "public",
@@ -121,6 +137,11 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Delete a chat and all its messages
+   * @param id - Chat ID to delete
+   * @throws {Error} If deletion fails
+   */
   async deleteChat(id: string): Promise<void> {
     try {
       await this.client.mutation(api.chats.deleteChat, {
@@ -145,6 +166,58 @@ export class ConvexChatRepository extends BaseRepository {
     } catch (error) {
       logger.error("Failed to fetch messages from Convex:", error);
       return [];
+    }
+  }
+
+  /**
+   * Get paginated messages for a chat
+   * Used for performance optimization in chats with many messages
+   * @param chatId - ID of the chat to get messages for
+   * @param limit - Maximum number of messages to return (default: 50)
+   * @param cursor - Pagination cursor for fetching next batch
+   * @returns Object containing messages array, next cursor, and hasMore flag
+   */
+  async getMessagesPaginated(
+    chatId: string,
+    limit = 50,
+    cursor?: string,
+  ): Promise<{
+    messages: UnifiedMessage[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    try {
+      const result = await this.client.query(
+        api.chats.messagesPaginated.getChatMessagesPaginated,
+        {
+          chatId: IdUtils.toConvexChatId(chatId),
+          limit,
+          cursor,
+        },
+      );
+
+      if (!result) {
+        return {
+          messages: [],
+          hasMore: false,
+        };
+      }
+
+      const messages = result.messages.map((msg) =>
+        this.convexToUnifiedMessage(msg),
+      );
+
+      return {
+        messages,
+        nextCursor: result.nextCursor,
+        hasMore: result.hasMore,
+      };
+    } catch (error) {
+      logger.error("Failed to fetch paginated messages from Convex:", error);
+      return {
+        messages: [],
+        hasMore: false,
+      };
     }
   }
 
