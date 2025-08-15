@@ -60,20 +60,9 @@ export function useStreamingChat(
   // Update local state when streaming data changes
   useEffect(() => {
     if (streamingData?.streamingState) {
-      // FIXED: Implement proper streaming that shows incremental updates
-      const newContent = streamingData.streamingState.content || "";
-      const currentContent = localState.streamingContent;
-
-      // For streaming, always use the latest content to show incremental updates
-      let accumulatedContent = currentContent;
-      if (streamingData.streamingState.isStreaming) {
-        // During streaming, always use the latest content from backend
-        // This ensures we see incremental updates as they arrive
-        accumulatedContent = newContent;
-      } else if (newContent) {
-        // Not streaming, use final content
-        accumulatedContent = newContent;
-      }
+      // FIXED: Use content field directly from backend which contains accumulated content
+      // The backend sends accumulated content in the 'content' field during streaming
+      const accumulatedContent = streamingData.streamingState.content || "";
 
       setLocalState({
         isStreaming: streamingData.streamingState.isStreaming ?? false,
@@ -93,7 +82,7 @@ export function useStreamingChat(
         messages: streamingData?.messages,
       });
     }
-  }, [streamingData, localState.streamingContent]);
+  }, [streamingData]);
 
   return localState;
 }

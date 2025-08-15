@@ -278,7 +278,7 @@ export function createChatActions(
 
       // Create a temporary ID for the streaming AI message
       const tempAIMessageId = `streaming-${Date.now()}`;
-      
+
       // Add user message immediately
       const userMessage: UnifiedMessage = {
         id: `user-${Date.now()}`,
@@ -288,7 +288,17 @@ export function createChatActions(
         isStreaming: false,
       };
 
-      // Update state to show generation is starting and add user message
+      // FIXED: Add placeholder AI message immediately to show loading state
+      const placeholderAIMessage: UnifiedMessage = {
+        id: tempAIMessageId,
+        role: "assistant",
+        content: "", // Empty content initially
+        timestamp: Date.now(),
+        isStreaming: true,
+        thinking: "Processing your request...", // Show thinking state immediately
+      };
+
+      // Update state to show generation is starting with both messages
       setState((prev) => ({
         ...prev,
         isGenerating: true,
@@ -296,7 +306,11 @@ export function createChatActions(
         currentChatId: chatId,
         currentChat:
           prev.chats.find((c) => c.id === chatId) || prev.currentChat,
-        messages: [...prev.messages, userMessage],
+        messages: [...prev.messages, userMessage, placeholderAIMessage],
+        searchProgress: {
+          stage: "searching",
+          message: "Searching for information...",
+        },
       }));
 
       try {
@@ -304,38 +318,28 @@ export function createChatActions(
         const generator = repository.generateResponse(chatId, content);
 
         let fullContent = "";
-        let aiMessageAdded = false;
-        
+
         for await (const chunk of generator) {
           if (chunk.type === "content") {
             fullContent += chunk.content;
-            
-            if (!aiMessageAdded) {
-              // Add the AI message with initial content
-              const aiMessage: UnifiedMessage = {
-                id: tempAIMessageId,
-                role: "assistant",
-                content: fullContent,
-                timestamp: Date.now(),
-                isStreaming: true,
-              };
-              
-              setState((prev) => ({
-                ...prev,
-                messages: [...prev.messages, aiMessage],
-              }));
-              aiMessageAdded = true;
-            } else {
-              // Update the streaming AI message content
-              setState((prev) => ({
-                ...prev,
-                messages: prev.messages.map((msg) =>
-                  msg.id === tempAIMessageId
-                    ? { ...msg, content: fullContent }
-                    : msg
-                ),
-              }));
-            }
+
+            // FIXED: Update the existing placeholder message instead of adding a new one
+            setState((prev) => ({
+              ...prev,
+              messages: prev.messages.map((msg) =>
+                msg.id === tempAIMessageId
+                  ? {
+                      ...msg,
+                      content: fullContent,
+                      thinking: fullContent ? "" : "Processing...", // Clear thinking when content starts
+                      isStreaming: true,
+                    }
+                  : msg,
+              ),
+              searchProgress: fullContent
+                ? { stage: "generating" }
+                : prev.searchProgress,
+            }));
           } else if (chunk.type === "metadata" && chunk.metadata?.thinking) {
             // Update thinking/reasoning if provided
             setState((prev) => ({
@@ -343,7 +347,7 @@ export function createChatActions(
               messages: prev.messages.map((msg) =>
                 msg.id === tempAIMessageId
                   ? { ...msg, thinking: chunk.metadata.thinking }
-                  : msg
+                  : msg,
               ),
             }));
           } else if (chunk.type === "error") {

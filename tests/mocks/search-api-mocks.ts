@@ -208,7 +208,7 @@ export const searchHandlers = [
           })),
         });
 
-      default:
+      default: {
         const results = generateSearchResults(query, num);
         return HttpResponse.json({
           organic_results: results.map((r) => ({
@@ -217,6 +217,7 @@ export const searchHandlers = [
             snippet: r.snippet,
           })),
         });
+      }
     }
   }),
 
