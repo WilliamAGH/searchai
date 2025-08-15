@@ -20,8 +20,8 @@ interface OpenRouterBody {
   presence_penalty?: number;
   stream?: boolean;
   reasoning?: {
-    max_tokens?: number;  // Optional - can use either max_tokens OR effort
-    effort?: "low" | "medium" | "high";  // Optional - can use either effort OR max_tokens
+    max_tokens?: number; // Optional - can use either max_tokens OR effort
+    effort?: "low" | "medium" | "high"; // Optional - can use either effort OR max_tokens
   };
 }
 

@@ -166,7 +166,9 @@ export const generationStep = internalAction({
     try {
       // 4. Plan and perform context-aware web search
       // Build up reasoning content to show thinking process
-      let accumulatedReasoning = "Planning search...\n";
+      // Only show detailed search planning in development mode
+      const isDevelopment = process.env.NODE_ENV === "development";
+      let accumulatedReasoning = isDevelopment ? "Planning search...\n" : "";
 
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
@@ -180,10 +182,12 @@ export const generationStep = internalAction({
         maxContextMessages: 10,
       });
 
-      // Add search planning results to reasoning
-      accumulatedReasoning += plan.shouldSearch
-        ? `\nSearching the web with ${plan.queries.length} queries:\n${plan.queries.map((q: string, i: number) => `  ${i + 1}. ${q}`).join("\n")}\n\nReason: ${plan.reasons}\n`
-        : `\nNo search needed. Reason: ${plan.reasons}\n`;
+      // Add search planning results to reasoning only in development mode
+      if (isDevelopment) {
+        accumulatedReasoning += plan.shouldSearch
+          ? `\nSearching the web with ${plan.queries.length} queries:\n${plan.queries.map((q: string, i: number) => `  ${i + 1}. ${q}`).join("\n")}\n\nReason: ${plan.reasons}\n`
+          : `\nNo search needed. Reason: ${plan.reasons}\n`;
+      }
 
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
@@ -283,8 +287,8 @@ export const generationStep = internalAction({
         enhancedInstructions: enhancements.enhancedSystemPrompt || "",
       });
 
-      // Add search results info to reasoning
-      if (aggregated.length > 0) {
+      // Add search results info to reasoning only in development mode
+      if (isDevelopment && aggregated.length > 0) {
         accumulatedReasoning += `\nFound ${aggregated.length} search results. Using top ${Math.min(TOP_RESULTS, aggregated.length)} for context.\n`;
       }
 
@@ -292,9 +296,10 @@ export const generationStep = internalAction({
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
         thinking: "Generating response...",
-        reasoning:
-          accumulatedReasoning +
-          "\nGenerating response based on search results and context...",
+        reasoning: isDevelopment
+          ? accumulatedReasoning +
+            "\nGenerating response based on search results and context..."
+          : accumulatedReasoning, // In production, reasoning is empty until LLM starts
       });
 
       // Stream the response using OpenRouter
