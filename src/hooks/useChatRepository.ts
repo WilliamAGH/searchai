@@ -17,8 +17,7 @@ export function useChatRepository(): IChatRepository | null {
 
   const repository = useMemo<IChatRepository | null>(() => {
     // Treat missing Convex URL as "service unavailable" for the UI guards.
-    const metaEnv = (import.meta as { env?: Record<string, unknown> })?.env;
-    const convexUrl = metaEnv?.VITE_CONVEX_URL as string | undefined;
+    const convexUrl = import.meta.env.VITE_CONVEX_URL;
     if (!convexUrl) {
       console.error(
         "VITE_CONVEX_URL is not set — repository not initialized (Convex-only mode)",
