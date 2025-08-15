@@ -86,9 +86,9 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Wait for the AI response to complete (not just thinking status)
     await expect(async () => {
-      const thinkingElements = page.locator('text=AI is thinking, text=Composing response...');
-      const thinkingCount = await thinkingElements.count();
-      expect(thinkingCount).toBe(0);
+      const a = await page.locator('text=AI is thinking').count();
+      const b = await page.locator('text=Composing response...').count();
+      expect(a + b).toBe(0);
     }).toPass({ timeout: 30000 });
 
     // Wait for the assistant message to appear and be visible
@@ -123,9 +123,9 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Wait for the AI response to complete (not just thinking status)
     await expect(async () => {
-      const thinkingElements = page.locator('text=AI is thinking, text=Composing response...');
-      const thinkingCount = await thinkingElements.count();
-      expect(thinkingCount).toBe(0);
+      const a = await page.locator('text=AI is thinking').count();
+      const b = await page.locator('text=Composing response...').count();
+      expect(a + b).toBe(0);
     }).toPass({ timeout: 30000 });
 
     // Wait for the assistant message to appear
@@ -181,9 +181,9 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Wait for the AI response to complete (not just thinking status)
     await expect(async () => {
-      const thinkingElements = page.locator('text=AI is thinking, text=Composing response...');
-      const thinkingCount = await thinkingElements.count();
-      expect(thinkingCount).toBe(0);
+      const a = await page.locator('text=AI is thinking').count();
+      const b = await page.locator('text=Composing response...').count();
+      expect(a + b).toBe(0);
     }).toPass({ timeout: 30000 });
 
     // Wait for the assistant message to appear and be visible
@@ -212,9 +212,9 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Wait for the AI response to complete (not just thinking status)
     await expect(async () => {
-      const thinkingElements = page.locator('text=AI is thinking, text=Composing response...');
-      const thinkingCount = await thinkingElements.count();
-      expect(thinkingCount).toBe(0);
+      const a = await page.locator('text=AI is thinking').count();
+      const b = await page.locator('text=Composing response...').count();
+      expect(a + b).toBe(0);
     }).toPass({ timeout: 30000 });
 
     // Wait for the assistant message to appear and be visible
