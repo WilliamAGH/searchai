@@ -550,7 +550,8 @@ function createStreamingResponse(
                 const streamData = {
                   type: "chunk",
                   content: chunkContent,
-                  thinking: "",
+                  // Pass through thinking data from the chunk if available
+                  thinking: chunk.choices?.[0]?.delta?.thinking || undefined,
                   reasoning: chunk.choices?.[0]?.delta?.reasoning || "",
                   searchResults,
                   sources,
