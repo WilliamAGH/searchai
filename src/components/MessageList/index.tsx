@@ -91,7 +91,6 @@ export const MessageList = React.memo(function MessageList({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingMoreRef = useRef(false);
-  const previousMessagesLengthRef = useRef(0);
   const [collapsedById, setCollapsedById] = React.useState<
     Record<string, boolean>
   >({});
@@ -107,28 +106,27 @@ export const MessageList = React.memo(function MessageList({
   const enhancedMessages = React.useMemo(() => {
     // If we have real-time messages from the subscription, use those
     if (streamingState?.messages && streamingState.messages.length > 0) {
-      // Map subscription messages to the expected format
       const realtimeMessages = streamingState.messages.map((msg: unknown) => {
-        // Type guard for message structure
-        const message = msg as Record<string, unknown>;
-        const msgId = message._id || message.id;
+        // Loosely type the incoming message
+        const m = msg as Record<string, unknown>;
+        const rawId = (m["_id"] ?? m["id"]) as unknown;
+        const streamingId = streamingState.streamingMessageId;
+        const isStreamingTarget =
+          streamingId !== null && String(rawId) === String(streamingId);
 
         return {
-          ...message,
-          id: msgId,
+          ...m,
+          id: rawId,
           // Mark the streaming message
-          isStreaming:
-            msgId === streamingState.streamingMessageId || message.isStreaming,
-          // Use the full content from the streaming message
-          content:
-            msgId === streamingState.streamingMessageId &&
-            streamingState.streamingContent
-              ? streamingState.streamingContent
-              : (message.content as string) || "",
-          thinking:
-            msgId === streamingState.streamingMessageId
-              ? streamingState.thinking
-              : message.thinking,
+          isStreaming: isStreamingTarget || Boolean(m["isStreaming"]),
+          // Always overlay streamingContent for the target, even if it's an empty string
+          content: isStreamingTarget
+            ? (streamingState.streamingContent ??
+               ((m["content"] as string | undefined) ?? ""))
+            : ((m["content"] as string | undefined) ?? ""),
+          thinking: isStreamingTarget
+            ? streamingState.thinking
+            : (m["thinking"] as string | undefined),
         };
       });
       return realtimeMessages;
@@ -136,24 +134,20 @@ export const MessageList = React.memo(function MessageList({
 
     // Fallback: enhance existing messages with streaming content
     if (streamingState?.isStreaming && streamingState?.streamingMessageId) {
+      const streamingIdStr = String(streamingState.streamingMessageId);
       return messages.map((msg) => {
-        // Compare IDs properly - handle both string and Convex ID types
-        const msgId = typeof msg.id === "string" ? msg.id : msg._id;
-        if (msgId === streamingState.streamingMessageId) {
-          // FIXED: Use the accumulated streaming content from the hook
-          // This ensures content appears as it streams in, not all at once
-          const finalContent = streamingState.streamingContent || msg.content || "";
-          
-          return {
-            ...msg,
-            content: finalContent,
-            isStreaming: true,
-            thinking: streamingState.thinking,
-            // Preserve the streamedContent for incremental updates
-            streamedContent: (msg as any).streamedContent || "",
-          };
-        }
-        return msg;
+        const msgIdStr = String((msg as Record<string, unknown>).id ?? (msg as Record<string, unknown>)._id);
+        const isStreamingTarget = msgIdStr === streamingIdStr;
+        if (!isStreamingTarget) return msg;
+        return {
+          ...msg,
+          // Prefer streamingContent even if it's an empty string
+          content:
+            streamingState.streamingContent ??
+            (msg.content ?? ""),
+          isStreaming: true,
+          thinking: streamingState.thinking,
+        };
       });
     }
 
@@ -165,6 +159,7 @@ export const MessageList = React.memo(function MessageList({
   const messagesLength = currentMessages.length;
 
   // Initialize ref with correct length on first render
+  const previousMessagesLengthRef = useRef(0);
   if (previousMessagesLengthRef.current === 0 && messagesLength > 0) {
     previousMessagesLengthRef.current = messagesLength;
   }
