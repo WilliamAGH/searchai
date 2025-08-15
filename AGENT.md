@@ -48,13 +48,26 @@ BUILD_TOOL: Vite
 BUILD_TOOL_VERSION: 6.x
 BACKEND: Convex
 
-# Testing
-TEST_RUNNER: Playwright
-TEST_FRAMEWORK: Playwright Test
-TEST_CONFIG_PATH: playwright.config.ts
-TEST_COVERAGE_COMMAND: npm run test:coverage
-TEST_WATCH_COMMAND: npm run test:watch
-TEST_SMOKE_COMMAND: npm run test:smoke
+# Testing Configuration
+# This section defines the testing framework and tools used by this project.
+# The test.md command uses these variables to adapt its guidance.
+TEST_RUNNER: Playwright              # The test runner executable (Jest, Vitest, Playwright, Mocha, etc.)
+TEST_FRAMEWORK: Playwright Test       # The testing framework/library (Jest, Vitest, Playwright Test, Mocha+Chai, etc.)
+TEST_CONFIG_PATH: playwright.config.ts # Path to the test configuration file
+TEST_FILE_PATTERN: **/*.{test,spec}.{ts,tsx,js,jsx}  # Pattern for test files
+TEST_COVERAGE_COMMAND: npm run test:coverage  # Command to run tests with coverage
+TEST_WATCH_COMMAND: npm run test:watch        # Command to run tests in watch mode
+TEST_SMOKE_COMMAND: npm run test:smoke        # Command to run smoke tests
+TEST_UNIT_COMMAND: npm run test:unit          # Command to run unit tests (if applicable)
+TEST_E2E_COMMAND: npm run test:e2e            # Command to run E2E tests (if applicable)
+
+# Test Environment
+TEST_ENV: node                        # Environment tests run in (node, jsdom, happy-dom, etc.)
+TEST_TIMEOUT: 30000                   # Default test timeout in milliseconds
+
+# Mocking Libraries (if used)
+MOCK_LIBRARY: built-in                # Mocking library (jest.fn, vi.fn, sinon, etc.)
+ASSERTION_LIBRARY: expect             # Assertion library (expect, chai, assert, etc.)
 
 # Code Quality
 LINTER: Oxlint v1.x
@@ -95,6 +108,129 @@ EMAIL_ENV_KEY: CONVEX_RESEND_API_KEY
 ```
 
 This project operates under **ZERO TEMPERATURE** development standards where every decision must be explicitly verified through live documentation, no assumptions are permitted, and type safety is absolute.
+
+## 🔥 ZERO_TEMPERATURE RULE: Always Use Existing Code
+
+### The Cardinal Rule of Code Reuse
+
+**CRITICAL MANDATE:** When looking for bugs, issues, fixes, code improvements, refactors, or new features, we ALWAYS look for existing code first and make changes with the least intervention necessary. We only rebuild from scratch when it would constitute a substantial improvement.
+
+### Our Biggest Enemy: Code Redundancy
+
+**THE PROBLEM:**
+
+- Redundant code exists in multiple places
+- Some code references it in one place, some in another
+- This makes fixing things an enormous battle
+- A single bug fix requires changes in multiple locations
+- Features break because not all instances were updated
+- Maintenance becomes exponentially harder over time
+
+### The ZERO_TEMPERATURE Solution
+
+**MANDATORY WORKFLOW:**
+
+1. **ALWAYS Search First**:
+
+   - Before writing ANY new code, search for existing implementations
+   - Use grep/find to locate similar functionality
+   - Check if the pattern already exists in the codebase
+   - Look for utilities, helpers, or shared components that could be reused
+
+2. **Immediate Redundancy Response**:
+
+   - The moment redundant code is observed → STOP
+   - Create an immediate TODO to fix and de-duplicate it
+   - Document where the redundancy exists
+   - If not fixed immediately, the issue WILL persist and multiply
+
+3. **Minimal Intervention Principle**:
+   - Make the smallest change necessary to fix the issue
+   - Extend existing code rather than replacing it
+   - Add parameters to existing functions rather than creating new ones
+   - Use composition over duplication
+
+### Practical Examples
+
+**❌ WRONG - Creating New Code:**
+
+```typescript
+// Found a bug in chat validation
+// Writing a new validation function from scratch
+export function validateChatMessage(message: string) {
+  // New implementation
+}
+```
+
+**✅ CORRECT - Finding and Fixing Existing Code:**
+
+```typescript
+// Step 1: Search for existing validation
+// grep -r "validate.*message" --include="*.ts"
+// Found: convex/lib/security/validation.ts has validateMessage()
+
+// Step 2: Fix the existing function
+// Extend it if needed, but don't duplicate
+```
+
+### Redundancy Detection Checklist
+
+**BEFORE ANY CODE CHANGE, ASK:**
+
+- [ ] Have I searched for existing implementations?
+- [ ] Am I about to duplicate functionality that exists elsewhere?
+- [ ] Could I extend an existing function instead of creating a new one?
+- [ ] Is there a shared utility that handles this pattern?
+- [ ] Have I checked both frontend (`src/`) and backend (`convex/`) for similar code?
+
+### When You Find Redundancy
+
+**IMMEDIATE ACTIONS:**
+
+1. **Document It**:
+
+   ```typescript
+   // TODO: REDUNDANCY ALERT - De-duplicate this function
+   // Duplicate found in:
+   // - src/lib/validation/chat.ts
+   // - convex/lib/security/chatValidation.ts
+   // Should be consolidated into single source of truth
+   ```
+
+2. **Create a Task**:
+
+   - Add to immediate TODO list
+   - Mark as HIGH PRIORITY
+   - Fix before continuing with feature work
+
+3. **Consolidate to Single Source**:
+   - Choose the most appropriate location
+   - Migrate all usages to the single source
+   - Delete redundant implementations
+   - Update all imports
+
+### The Cost of Ignoring This Rule
+
+**GUARANTEED CONSEQUENCES:**
+
+- Bug fixes only work in some places
+- Features behave inconsistently
+- Code becomes increasingly difficult to maintain
+- Simple changes require hunting through multiple files
+- Technical debt compounds exponentially
+- New developers can't understand which version to use
+
+### ZERO_TEMPERATURE Mindset
+
+**REMEMBER:**
+
+- You're ALWAYS improving existing code, not writing new code
+- The repository already has most of what you need
+- Your job is to find it, fix it, and reuse it
+- Every line of new code should be questioned: "Does this already exist?"
+- Redundancy prevention is not optional - it's mandatory
+
+**THE RULE:** Use existing code. Find it in the repo, don't start from scratch. Zero temperature means zero tolerance for redundancy.
 
 ## 📚 Documentation Source of Truth
 
