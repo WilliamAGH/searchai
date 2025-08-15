@@ -7,8 +7,8 @@ import type { Message } from "../../src/lib/types/message";
 // Mock Convex React hooks used inside MessageList
 vi.mock("convex/react", () => ({
   useMutation: vi.fn(() => {
-    // Return a no-op mutation function
-    return (_args: unknown) => Promise.resolve(undefined);
+    // Return a no-op mutation function that returns a resolved promise
+    return vi.fn().mockResolvedValue(undefined);
   }),
 }));
 
