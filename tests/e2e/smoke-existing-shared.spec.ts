@@ -47,15 +47,13 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
     await input.type("Smoke publish shared");
     await page.keyboard.press("Enter");
     // Wait for share controls to become available
-    const shareButton = page
-      .locator('button[title="Share this conversation"]')
-      .first();
+    const shareButton = page.locator('button[aria-label="Share chat"]').first();
     await expect(shareButton).toBeVisible({ timeout: 30000 });
 
     // Step 2: open share modal and pick Shared
     const reactClickSuccess = await clickReactElement(
       page,
-      'button[title="Share this conversation"]',
+      'button[aria-label="Share chat"]',
     );
     if (!reactClickSuccess) {
       // Fallback to normal click if React fiber fails

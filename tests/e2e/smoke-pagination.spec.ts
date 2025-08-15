@@ -71,13 +71,15 @@ test.describe("smoke: pagination", () => {
     ];
 
     for (const msg of messages) {
-      // Wait for input to be ready
+      // Wait for input to be ready (not disabled by AI response)
       const msgInput = page.locator('textarea, [role="textbox"]').first();
-      await expect(msgInput).toBeEnabled({ timeout: 5000 });
+      await expect(msgInput).toBeEnabled({ timeout: 30000 });
       await msgInput.fill(msg);
       await page.keyboard.press("Enter");
-      // Small delay between messages
-      await page.waitForTimeout(500);
+      // Wait for AI response to start before sending next message
+      await expect(msgInput).toBeDisabled({ timeout: 5000 });
+      // Then wait for it to be enabled again (AI finished responding)
+      await expect(msgInput).toBeEnabled({ timeout: 30000 });
     }
 
     // Check for message list container - look for the scrollable area

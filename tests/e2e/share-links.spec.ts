@@ -26,7 +26,7 @@ test.describe("share modal link variants", () => {
     ).not.toBeVisible({ timeout: 30000 });
 
     // Wait for share controls to be available
-    const shareButton = page.locator('button[title="Share this conversation"]');
+    const shareButton = page.locator('button[aria-label="Share chat"]');
     await expect(shareButton).toBeVisible({ timeout: 10000 });
     // Open share modal via the button near the input (use the last toolbar button)
     // Toolbar has: toggle sidebar, Copy, Share — select the Share button by its SVG and position
@@ -34,7 +34,7 @@ test.describe("share modal link variants", () => {
     // Use the already-located share button with React fiber workaround
     const reactClickSuccess = await clickReactElement(
       page,
-      'button[title="Share this conversation"]',
+      'button[aria-label="Share chat"]',
     );
     if (!reactClickSuccess) {
       // Fallback to normal click if React fiber fails
@@ -236,7 +236,7 @@ test.describe("share modal link variants", () => {
     // Re-open modal
     const reactClickSuccess2 = await clickReactElement(
       page,
-      'button[title="Share this conversation"]',
+      'button[aria-label="Share chat"]',
     );
     if (!reactClickSuccess2) {
       // Fallback to normal click if React fiber fails

@@ -47,7 +47,7 @@ test.describe("smoke: new chat share flow has no console errors", () => {
     await page.keyboard.press("Enter");
 
     // Wait for the share button to be visible and click it
-    const shareButton = page.getByTitle("Share this conversation");
+    const shareButton = page.locator('button[aria-label="Share chat"]');
     await expect(shareButton).toBeVisible({ timeout: 10000 });
 
     // Wait for any animations or state updates to complete
@@ -94,7 +94,7 @@ test.describe("smoke: new chat share flow has no console errors", () => {
       try {
         // Find the share button and get its React fiber
         const shareButton = document.querySelector(
-          '[title="Share this conversation"]',
+          'button[aria-label="Share chat"]',
         );
         if (!shareButton) return { error: "Share button not found" };
 
