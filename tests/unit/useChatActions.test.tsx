@@ -29,6 +29,10 @@ describe("useChatActions", () => {
       createChat: vi.fn(),
       deleteChat: vi.fn().mockResolvedValue(undefined),
       getMessages: vi.fn().mockResolvedValue([]),
+      // Minimal stream stub: yields no chunks and ends
+      generateResponse: vi.fn().mockImplementation(async function* () {
+        // Empty generator that immediately returns
+      }),
       deleteMessage: vi.fn().mockResolvedValue(undefined),
       updateChatTitle: vi.fn().mockResolvedValue(undefined),
       updateChatPrivacy: vi.fn().mockResolvedValue(undefined),
