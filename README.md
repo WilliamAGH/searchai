@@ -26,6 +26,7 @@ Built with React + Vite on the frontend and Convex on the backend.
 - Deep links: Visiting `/chat/:chatId`, `/s/:shareId`, or `/p/:publicId` selects the corresponding chat. Share/public routes remain on their canonical URLs.
 
 Troubleshooting:
+
 - Ensure `VITE_CONVEX_URL` is set. If not, `useChatRepository()` will not initialize and the UI will show a service-unavailable message for chat actions.
 - If you see navigation issues, verify routes and query params match the expected patterns above.
 
@@ -349,7 +350,7 @@ npm test
 - Install dependencies once: `npm i -D @playwright/test` then:
   - macOS/Windows: `npx playwright install`
   - Linux/CI: `npx playwright install --with-deps`
-- Serve the built app on <http://localhost:4173> via `npm run preview` (the Playwright config handles this automatically via `webServer`).
+- Serve the built app on <http://localhost:5173> via `npm run preview` (the Playwright config handles this automatically via `webServer`).
 - Run manually: `npx playwright test -g smoke --reporter=line` or `npm run test:smoke`.
 - The Husky pre-push hook runs this smoke test and fails the push if there are console errors or failed network requests on the home page.
 

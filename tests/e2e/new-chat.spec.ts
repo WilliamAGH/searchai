@@ -423,7 +423,7 @@ test.describe("New Chat Functionality E2E", () => {
       await homeButton.click();
 
       // Should navigate to home
-      await page.waitForURL(/^http:\/\/(localhost:5173|127\.0\.0\.1:4173)\/$/, {
+      await page.waitForURL(/^http:\/\/localhost:5173\/$/, {
         timeout: 5000,
       });
     } else {
