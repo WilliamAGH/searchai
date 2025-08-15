@@ -122,7 +122,8 @@ export const MessageList = React.memo(function MessageList({
           // Always overlay streamingContent for the target, even if it's an empty string
           content: isStreamingTarget
             ? (streamingState.streamingContent ??
-               ((m["content"] as string | undefined) ?? ""))
+              (m["content"] as string | undefined) ??
+              "")
             : ((m["content"] as string | undefined) ?? ""),
           thinking: isStreamingTarget
             ? streamingState.thinking
@@ -136,15 +137,16 @@ export const MessageList = React.memo(function MessageList({
     if (streamingState?.isStreaming && streamingState?.streamingMessageId) {
       const streamingIdStr = String(streamingState.streamingMessageId);
       return messages.map((msg) => {
-        const msgIdStr = String((msg as Record<string, unknown>).id ?? (msg as Record<string, unknown>)._id);
+        const msgIdStr = String(
+          (msg as Record<string, unknown>).id ??
+            (msg as Record<string, unknown>)._id,
+        );
         const isStreamingTarget = msgIdStr === streamingIdStr;
         if (!isStreamingTarget) return msg;
         return {
           ...msg,
           // Prefer streamingContent even if it's an empty string
-          content:
-            streamingState.streamingContent ??
-            (msg.content ?? ""),
+          content: streamingState.streamingContent ?? msg.content ?? "",
           isStreaming: true,
           thinking: streamingState.thinking,
         };
