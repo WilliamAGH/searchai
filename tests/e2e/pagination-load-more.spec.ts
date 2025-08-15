@@ -5,7 +5,7 @@ test.describe("smoke: pagination load more", () => {
   test("increases count after load more (if chat present)", async ({
     page,
   }) => {
-    await page.goto(process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173");
+    await page.goto("/");
 
     // If no message list is rendered (no chat/seed), gracefully skip
     const countLocator = page.locator('[data-testid="count"]');

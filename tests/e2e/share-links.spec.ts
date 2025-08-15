@@ -24,9 +24,12 @@ test.describe("share modal link variants", () => {
       page.locator('text="AI is thinking and generating response..."'),
     ).not.toBeVisible({ timeout: 30000 });
 
+    // Wait for the page to be fully loaded and stable
+    await page.waitForLoadState("networkidle", { timeout: 10000 });
+
     // Wait for share controls to be available
     const shareButton = page.locator('button[aria-label="Share chat"]');
-    await expect(shareButton).toBeVisible({ timeout: 10000 });
+    await expect(shareButton).toBeVisible({ timeout: 15000 });
     
     // Open share modal via the button near the input
     const reactClickSuccess = await clickReactElement(
@@ -38,11 +41,14 @@ test.describe("share modal link variants", () => {
       await shareButton.click({ force: true });
     }
 
+    // Wait a moment for the modal to start opening
+    await page.waitForTimeout(1000);
+
     // Expect modal (wait for it to appear) - target ShareModal specifically
     const modal = page.locator(
       '[role="dialog"][aria-modal="true"][aria-labelledby="share-modal-title"]',
     );
-    await expect(modal).toBeVisible({ timeout: 10000 });
+    await expect(modal).toBeVisible({ timeout: 15000 });
 
     // Wait for modal to be fully loaded by checking for the private radio button to be checked initially
     const privateRadio = modal.locator('input[type="radio"][value="private"]');

@@ -41,7 +41,7 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
     }
   });
 
-  const target = baseURL ?? "http://localhost:4173";
+  const target = baseURL ?? "http://localhost:5180";
   await page.goto(target, { waitUntil: "domcontentloaded" });
 
   // Basic sanity: page renders something meaningful

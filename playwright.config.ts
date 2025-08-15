@@ -15,4 +15,18 @@ export default defineConfig({
   },
   // Don't start a web server since we're using the existing dev server
   webServer: undefined,
+  
+  // Projects for different test types
+  projects: [
+    {
+      name: "smoke",
+      testMatch: /.*smoke.*\.spec\.ts/,
+      workers: 2, // Reduce workers for smoke tests to avoid race conditions
+    },
+    {
+      name: "default",
+      testMatch: /.*\.spec\.ts/,
+      workers: 8, // Default worker count for other tests
+    },
+  ],
 });

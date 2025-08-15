@@ -37,10 +37,18 @@ test.describe("Authentication Flow", () => {
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
+    // Wait a moment for the form submission to process
+    await page.waitForTimeout(1000);
+
     // Either modal closes or remains (auth depends on environment). Close if still open.
-    const closeBtn = page.getByLabel("Close sign in modal");
-    if (await closeBtn.isVisible().catch(() => false)) {
-      await closeBtn.click();
+    try {
+      const closeBtn = page.getByLabel("Close sign in modal");
+      if (await closeBtn.isVisible({ timeout: 2000 })) {
+        await closeBtn.click();
+      }
+    } catch (_error) {
+      // Modal might have already closed, which is fine
+      console.log("Modal already closed or close button not found");
     }
 
     // Back at main app

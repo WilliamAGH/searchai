@@ -35,7 +35,7 @@ test.describe("smoke: new chat share flow has no console errors", () => {
         responseFailures.push(`${res.request().method()} ${url} -> ${status}`);
     });
 
-    await page.goto(baseURL ?? "http://localhost:4173", {
+    await page.goto(baseURL ?? "http://localhost:5180", {
       waitUntil: "domcontentloaded",
     });
 

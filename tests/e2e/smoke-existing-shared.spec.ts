@@ -37,7 +37,7 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
     });
 
     // Step 1: create a local chat by sending a message
-    await page.goto(baseURL ?? "http://localhost:4173", {
+    await page.goto(baseURL ?? "http://localhost:5180", {
       waitUntil: "domcontentloaded",
     });
     const input = page.locator('textarea, [role="textbox"]').first();

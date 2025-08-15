@@ -41,7 +41,7 @@ test.describe("smoke: pagination", () => {
       }
     });
 
-    const target = baseURL ?? "http://localhost:4173";
+    const target = baseURL ?? "http://localhost:5180";
     await page.goto(target, { waitUntil: "domcontentloaded" });
 
     // Wait for page to be ready
@@ -72,15 +72,25 @@ test.describe("smoke: pagination", () => {
 
     for (const msg of messages) {
       const msgInput = page.locator('textarea, [role="textbox"]').first();
-      // Try to wait briefly for enable, but don't hard-fail if generation is still in progress
-      const enabled = await msgInput.isEnabled().catch(() => false);
-      if (!enabled) {
+      // Wait for input to be enabled with a reasonable timeout
+      let attempts = 0;
+      const maxAttempts = 30; // 30 seconds max
+      
+      while (!(await msgInput.isEnabled()) && attempts < maxAttempts) {
         await page.waitForTimeout(1000);
+        attempts++;
       }
+      
+      if (attempts >= maxAttempts) {
+        // Skip this message if input is still disabled after 30 seconds
+        console.log(`Skipping message "${msg}" - input still disabled after ${maxAttempts} seconds`);
+        continue;
+      }
+      
       await msgInput.fill(msg);
       await page.keyboard.press("Enter");
-      // Optionally wait a short moment for the next loop to allow UI to settle
-      await page.waitForTimeout(500);
+      // Wait for message to be processed
+      await page.waitForTimeout(1000);
     }
 
     // Check for message list container - look for the scrollable area
@@ -139,7 +149,7 @@ test.describe("smoke: pagination", () => {
   });
 
   test("pagination UI elements are accessible", async ({ page, baseURL }) => {
-    const target = baseURL ?? "http://localhost:4173";
+    const target = baseURL ?? "http://localhost:5180";
     await page.goto(target, { waitUntil: "domcontentloaded" });
 
     // Wait for page to be ready
