@@ -292,13 +292,20 @@ const currentEventsEnhancement: EnhancementRule = {
 
   enhanceQuery: (query: string) => {
     const year = new Date().getFullYear();
-    return `${query} ${year} latest recent`;
+    // Only add year if it's not already present
+    if (!query.includes(year.toString())) {
+      return `${query} ${year}`;
+    }
+    return query;
   },
 
   enhanceSearchTerms: (terms: string[]) => {
     const year = new Date().getFullYear().toString();
-    const month = new Date().toLocaleDateString("en-US", { month: "long" });
-    return [...terms, year, month, "latest", "recent"];
+    // Only add year if it's not already present
+    if (!terms.includes(year)) {
+      return [...terms, year];
+    }
+    return terms;
   },
 };
 
