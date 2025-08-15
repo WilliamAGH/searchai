@@ -316,25 +316,25 @@ export const planSearch = action({
     };
     // Diversify queries (MMR) from simple context-derived variants
     try {
-    // Prevent role labels and generic WH-words from polluting search queries
-    const AUGMENT_STOPWORDS = new Set([
-      // Role/metadata tokens
-      "user",
-      "assistant",
-      "system",
-      // Common WH-words and filler
-      "what",
-      "which",
-      "when",
-      "where",
-      "why",
-      "how",
-      "about",
-    ]);
+      // Prevent role labels and generic WH-words from polluting search queries
+      const AUGMENT_STOPWORDS = new Set([
+        // Role/metadata tokens
+        "user",
+        "assistant",
+        "system",
+        // Common WH-words and filler
+        "what",
+        "which",
+        "when",
+        "where",
+        "why",
+        "how",
+        "about",
+      ]);
 
-    const ctxTokens = Array.from(tokSet(contextSummary))
-      .filter((t) => t.length > 3 && !AUGMENT_STOPWORDS.has(t))
-      .slice(0, 10);
+      const ctxTokens = Array.from(tokSet(contextSummary))
+        .filter((t) => t.length > 3 && !AUGMENT_STOPWORDS.has(t))
+        .slice(0, 10);
       const variants: string[] = [args.newMessage];
       if (ctxTokens.length >= 2)
         variants.push(`${args.newMessage} ${ctxTokens[0]} ${ctxTokens[1]}`);
@@ -347,8 +347,11 @@ export const planSearch = action({
       if (selected.length > 0) defaultPlan.queries = selected;
       // Surgical guard: if any variant accidentally appended stopwords like "user what",
       // sanitize by removing trailing standalone stopwords.
-      const stripTrailing = /\b(user|assistant|system|what|which|when|where|why|how|about)\s*$/i;
-      defaultPlan.queries = defaultPlan.queries.map((q) => q.replace(stripTrailing, '').trim());
+      const stripTrailing =
+        /\b(user|assistant|system|what|which|when|where|why|how|about)\s*$/i;
+      defaultPlan.queries = defaultPlan.queries.map((q) =>
+        q.replace(stripTrailing, "").trim(),
+      );
     } catch {}
 
     // If no API key present, skip LLM planning

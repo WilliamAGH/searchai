@@ -32,16 +32,18 @@ interface SmartEnhancementOptions {
 interface EnhancedQuery {
   original: string;
   enhanced: string;
-  enhancementType: 'none' | 'context' | 'entity' | 'followup';
+  enhancementType: "none" | "context" | "entity" | "followup";
   confidence: number;
 }
 
 /**
  * Smart query enhancement with resilience and intelligent decision making
  */
-async function smartEnhanceQueries(options: SmartEnhancementOptions): Promise<string[]> {
+async function smartEnhanceQueries(
+  options: SmartEnhancementOptions,
+): Promise<string[]> {
   const { queries, context, userMessage, enhancements, maxQueries } = options;
-  
+
   // Log input parameters for debugging
   console.info("🔧 SmartEnhanceQueries input:", {
     queriesCount: queries.length,
@@ -53,7 +55,7 @@ async function smartEnhanceQueries(options: SmartEnhancementOptions): Promise<st
     maxQueries,
     timestamp: new Date().toISOString(),
   });
-  
+
   try {
     // Early return if no context or queries
     if (!context || !queries.length) {
@@ -61,7 +63,7 @@ async function smartEnhanceQueries(options: SmartEnhancementOptions): Promise<st
     }
 
     const enhancedQueries: EnhancedQuery[] = [];
-    
+
     for (let i = 0; i < Math.min(queries.length, maxQueries); i++) {
       const originalQuery = queries[i].trim();
       if (!originalQuery) continue;
@@ -81,21 +83,25 @@ async function smartEnhanceQueries(options: SmartEnhancementOptions): Promise<st
     // Sort by confidence and return enhanced queries
     const finalQueries = enhancedQueries
       .sort((a, b) => b.confidence - a.confidence)
-      .map(eq => eq.enhanced)
+      .map((eq) => eq.enhanced)
       .filter(Boolean);
-    
+
     // Log final output for debugging
     console.info("🔧 SmartEnhanceQueries output:", {
       inputQueries: queries.slice(0, 3),
       outputQueries: finalQueries.slice(0, 3),
-      enhancedCount: enhancedQueries.filter(eq => eq.enhancementType !== 'none').length,
+      enhancedCount: enhancedQueries.filter(
+        (eq) => eq.enhancementType !== "none",
+      ).length,
       timestamp: new Date().toISOString(),
     });
-    
-    return finalQueries;
 
+    return finalQueries;
   } catch (error) {
-    console.warn("Smart enhancement failed, falling back to original queries:", error);
+    console.warn(
+      "Smart enhancement failed, falling back to original queries:",
+      error,
+    );
     return queries.slice(0, maxQueries);
   }
 }
@@ -112,17 +118,21 @@ async function analyzeAndEnhanceQuery(options: {
   queryIndex: number;
 }): Promise<EnhancedQuery> {
   const { query, context, userMessage, enhancements, isPrimaryQuery } = options;
-  
+
   try {
     // Base case: no enhancement
     let enhancedQuery = query;
-    let enhancementType: EnhancedQuery['enhancementType'] = 'none';
+    let enhancementType: EnhancedQuery["enhancementType"] = "none";
     let confidence = 1.0;
 
     // Only enhance primary queries or when it makes sense
     if (isPrimaryQuery) {
-      const analysis = await analyzeQueryEnhancement(query, context, userMessage);
-      
+      const analysis = await analyzeQueryEnhancement(
+        query,
+        context,
+        userMessage,
+      );
+
       if (analysis.shouldEnhance && analysis.enhancement) {
         enhancedQuery = `${query} ${analysis.enhancement}`.trim();
         enhancementType = analysis.type;
@@ -132,11 +142,16 @@ async function analyzeAndEnhanceQuery(options: {
 
     // Apply enhancement search terms if they're highly relevant
     if (enhancements.length > 0 && isPrimaryQuery) {
-      const relevantEnhancements = filterRelevantEnhancements(enhancements, query, context);
+      const relevantEnhancements = filterRelevantEnhancements(
+        enhancements,
+        query,
+        context,
+      );
       if (relevantEnhancements.length > 0) {
         const beforeEnhancement = enhancedQuery;
-        enhancedQuery = `${enhancedQuery} ${relevantEnhancements.slice(0, 2).join(" ")}`.trim();
-        
+        enhancedQuery =
+          `${enhancedQuery} ${relevantEnhancements.slice(0, 2).join(" ")}`.trim();
+
         // Log when enhancement terms are applied
         console.info("🔧 Smart enhancement applied:", {
           originalQuery: query,
@@ -146,9 +161,9 @@ async function analyzeAndEnhanceQuery(options: {
           isPrimaryQuery,
           timestamp: new Date().toISOString(),
         });
-        
-        if (enhancementType === 'none') {
-          enhancementType = 'context';
+
+        if (enhancementType === "none") {
+          enhancementType = "context";
           confidence = 0.8;
         }
       }
@@ -160,13 +175,12 @@ async function analyzeAndEnhanceQuery(options: {
       enhancementType,
       confidence,
     };
-
   } catch (error) {
     console.warn(`Query enhancement analysis failed for "${query}":`, error);
     return {
       original: query,
       enhanced: query,
-      enhancementType: 'none',
+      enhancementType: "none",
       confidence: 0.5,
     };
   }
@@ -178,22 +192,25 @@ async function analyzeAndEnhanceQuery(options: {
 async function analyzeQueryEnhancement(
   query: string,
   context: string,
-  _userMessage: string
+  _userMessage: string,
 ): Promise<{
   shouldEnhance: boolean;
   enhancement?: string;
-  type: EnhancedQuery['enhancementType'];
+  type: EnhancedQuery["enhancementType"];
   confidence: number;
 }> {
   try {
     // Detect follow-up questions that need context
     if (isFollowUpQuestion(query)) {
       const contextEntity = extractMostRelevantEntity(context, query);
-      if (contextEntity && !query.toLowerCase().includes(contextEntity.toLowerCase())) {
+      if (
+        contextEntity &&
+        !query.toLowerCase().includes(contextEntity.toLowerCase())
+      ) {
         return {
           shouldEnhance: true,
           enhancement: contextEntity,
-          type: 'followup',
+          type: "followup",
           confidence: 0.9,
         };
       }
@@ -206,7 +223,7 @@ async function analyzeQueryEnhancement(
         return {
           shouldEnhance: true,
           enhancement: contextEntity,
-          type: 'context',
+          type: "context",
           confidence: 0.7,
         };
       }
@@ -215,15 +232,14 @@ async function analyzeQueryEnhancement(
     // No enhancement needed
     return {
       shouldEnhance: false,
-      type: 'none',
+      type: "none",
       confidence: 1.0,
     };
-
   } catch (error) {
     console.warn("Query enhancement analysis failed:", error);
     return {
       shouldEnhance: false,
-      type: 'none',
+      type: "none",
       confidence: 0.5,
     };
   }
@@ -240,8 +256,8 @@ function isFollowUpQuestion(query: string): boolean {
     /^(tell me more about|explain|describe)\b/i,
     /^(what else|anything else|other)\b/i,
   ];
-  
-  return followUpPatterns.some(pattern => pattern.test(query));
+
+  return followUpPatterns.some((pattern) => pattern.test(query));
 }
 
 /**
@@ -250,89 +266,168 @@ function isFollowUpQuestion(query: string): boolean {
 function isContextDependentQuery(query: string): boolean {
   // Short queries often need context
   if (query.split(/\s+/).length <= 3) return true;
-  
+
   // Queries with pronouns need context
-  if (/\b(it|they|this|that|these|those|here|there)\b/i.test(query)) return true;
-  
+  if (/\b(it|they|this|that|these|those|here|there)\b/i.test(query))
+    return true;
+
   // Queries that reference previous content
   if (/\b(above|previous|earlier|mentioned|said)\b/i.test(query)) return true;
-  
+
   return false;
 }
 
 /**
  * Extract the most relevant entity from context for a given query
  */
-function extractMostRelevantEntity(context: string, query: string): string | null {
+function extractMostRelevantEntity(
+  context: string,
+  query: string,
+): string | null {
   try {
     // Extract named entities (companies, people, places, technical terms)
     const entities = extractNamedEntities(context);
-    
+
     if (entities.length === 0) return null;
-    
+
     // Find the most relevant entity to the query
     let bestEntity = null;
     let bestScore = 0;
-    
+
     for (const entity of entities) {
       const score = calculateEntityRelevance(entity, query, context);
-      if (score > bestScore && score > 0.3) { // Minimum relevance threshold
+      if (score > bestScore && score > 0.3) {
+        // Minimum relevance threshold
         bestScore = score;
         bestEntity = entity;
       }
     }
-    
+
     return bestEntity;
-    
   } catch {
     return null;
   }
 }
+
+// Entity configuration for named entity extraction
+const ENTITY_CONFIG = {
+  companies: [
+    "Apple",
+    "Google",
+    "Microsoft",
+    "Amazon",
+    "Meta",
+    "Tesla",
+    "OpenAI",
+    "Anthropic",
+    "IBM",
+    "Oracle",
+    "Samsung",
+    "Netflix",
+    "Twitter",
+    "SpaceX",
+    "GitHub",
+    "Stack Overflow",
+    "Wikipedia",
+    "Reddit",
+    "YouTube",
+    "LinkedIn",
+    "Facebook",
+    "Instagram",
+    "WhatsApp",
+    "Discord",
+    "Slack",
+    "Zoom",
+    "Notion",
+    "Figma",
+    "Framer",
+    "Vercel",
+    "Netlify",
+    "Heroku",
+    "AWS",
+    "Azure",
+    "GCP",
+    "Cloudflare",
+    "Stripe",
+    "PayPal",
+    "Square",
+    "Shopify",
+    "Magento",
+    "WooCommerce",
+    "WordPress",
+    "Drupal",
+    "Joomla",
+  ],
+  techTerms: [
+    "headquarters",
+    "HQ",
+    "office",
+    "campus",
+    "based",
+    "located",
+    "founded",
+    "CEO",
+    "founder",
+    "product",
+    "service",
+    "cloud",
+    "AI",
+    "machine learning",
+    "artificial intelligence",
+    "algorithm",
+    "database",
+    "API",
+    "framework",
+    "library",
+    "tool",
+    "platform",
+    "software",
+    "hardware",
+    "network",
+    "security",
+    "privacy",
+    "compliance",
+    "governance",
+    "risk",
+    "quality",
+    "testing",
+    "monitoring",
+    "observability",
+    "logging",
+    "tracing",
+    "metrics",
+    "alerting",
+  ],
+};
 
 /**
  * Extract named entities from context text
  */
 function extractNamedEntities(context: string): string[] {
   if (!context) return [];
-  
+
   const entities: string[] = [];
-  
+
   try {
-    // Common company names and brands (simplified pattern to avoid regex issues)
-    const companyNames = [
-      'Apple', 'Google', 'Microsoft', 'Amazon', 'Meta', 'Tesla', 'OpenAI', 'Anthropic',
-      'IBM', 'Oracle', 'Samsung', 'Netflix', 'Twitter', 'SpaceX', 'GitHub', 'Stack Overflow',
-      'Wikipedia', 'Reddit', 'YouTube', 'LinkedIn', 'Facebook', 'Instagram', 'WhatsApp',
-      'Discord', 'Slack', 'Zoom', 'Notion', 'Figma', 'Framer', 'Vercel', 'Netlify',
-      'Heroku', 'AWS', 'Azure', 'GCP', 'Cloudflare', 'Stripe', 'PayPal', 'Square',
-      'Shopify', 'Magento', 'WooCommerce', 'WordPress', 'Drupal', 'Joomla'
-    ];
-    
+    const { companies: companyNames, techTerms } = ENTITY_CONFIG;
+
     for (const company of companyNames) {
       if (context.toLowerCase().includes(company.toLowerCase())) {
         entities.push(company.toLowerCase());
       }
     }
-    
-    // Technical terms and concepts (simplified approach)
-    const techTerms = [
-      'headquarters', 'HQ', 'office', 'campus', 'based', 'located', 'founded',
-      'CEO', 'founder', 'product', 'service', 'cloud', 'AI', 'machine learning',
-      'artificial intelligence', 'algorithm', 'database', 'API', 'framework',
-      'library', 'tool', 'platform', 'software', 'hardware', 'network', 'security',
-      'privacy', 'compliance', 'governance', 'risk', 'quality', 'testing',
-      'monitoring', 'observability', 'logging', 'tracing', 'metrics', 'alerting'
-    ];
-    
+
     for (const term of techTerms) {
-      if (context.toLowerCase().includes(term.toLowerCase()) && entities.length < 8) {
+      if (
+        context.toLowerCase().includes(term.toLowerCase()) &&
+        entities.length < 8
+      ) {
         entities.push(term.toLowerCase());
       }
     }
-    
+
     // Remove duplicates and return most relevant entities
     return [...new Set(entities)].slice(0, 8);
-    
   } catch (error) {
     console.warn("Named entity extraction failed:", error);
     return [];
@@ -342,28 +437,32 @@ function extractNamedEntities(context: string): string[] {
 /**
  * Calculate how relevant an entity is to a query and context
  */
-function calculateEntityRelevance(entity: string, query: string, context: string): number {
+function calculateEntityRelevance(
+  entity: string,
+  query: string,
+  context: string,
+): number {
   try {
     const entityLower = entity.toLowerCase();
     const queryLower = query.toLowerCase();
     const contextLower = context.toLowerCase();
-    
+
     let score = 0;
-    
+
     // Entity appears in query (high relevance)
     if (queryLower.includes(entityLower)) {
       score += 0.8;
     }
-    
+
     // Entity appears in context (medium relevance)
     if (contextLower.includes(entityLower)) {
       score += 0.4;
     }
-    
+
     // Entity is semantically related to query terms
     const queryWords = queryLower.split(/\s+/);
     const entityWords = entityLower.split(/\s+/);
-    
+
     for (const queryWord of queryWords) {
       for (const entityWord of entityWords) {
         if (queryWord.length > 2 && entityWord.length > 2) {
@@ -372,7 +471,10 @@ function calculateEntityRelevance(entity: string, query: string, context: string
             score += 0.6;
           }
           // Partial match
-          else if (queryWord.includes(entityWord) || entityWord.includes(queryWord)) {
+          else if (
+            queryWord.includes(entityWord) ||
+            entityWord.includes(queryWord)
+          ) {
             score += 0.3;
           }
           // Similar words (basic similarity)
@@ -382,10 +484,9 @@ function calculateEntityRelevance(entity: string, query: string, context: string
         }
       }
     }
-    
+
     // Normalize score to 0-1 range
     return Math.min(1.0, Math.max(0.0, score));
-    
   } catch (error) {
     console.warn("Entity relevance calculation failed:", error);
     return 0.0;
@@ -399,20 +500,19 @@ function calculateWordSimilarity(word1: string, word2: string): number {
   try {
     if (word1 === word2) return 1.0;
     if (word1.length < 3 || word2.length < 3) return 0.0;
-    
+
     // Simple character-based similarity
     const longer = word1.length > word2.length ? word1 : word2;
     const shorter = word1.length > word2.length ? word2 : word1;
-    
+
     let matches = 0;
     for (let i = 0; i < shorter.length; i++) {
       if (longer.includes(shorter[i])) {
         matches++;
       }
     }
-    
+
     return matches / longer.length;
-    
   } catch {
     return 0.0;
   }
@@ -424,32 +524,31 @@ function calculateWordSimilarity(word1: string, word2: string): number {
 function filterRelevantEnhancements(
   enhancements: string[],
   query: string,
-  context: string
+  context: string,
 ): string[] {
   try {
     if (!enhancements.length) return [];
-    
+
     const relevantEnhancements: string[] = [];
     const queryLower = query.toLowerCase();
     const contextLower = context.toLowerCase();
-    
+
     for (const enhancement of enhancements) {
       const enhancementLower = enhancement.toLowerCase();
-      
+
       // Skip if enhancement is already in query
       if (queryLower.includes(enhancementLower)) continue;
-      
+
       // Skip if enhancement is too generic
       if (enhancementLower.length < 3) continue;
-      
+
       // Check if enhancement is relevant to context
       if (contextLower.includes(enhancementLower)) {
         relevantEnhancements.push(enhancement);
       }
     }
-    
+
     return relevantEnhancements.slice(0, 3); // Limit to top 3
-    
   } catch (error) {
     console.warn("Enhancement filtering failed:", error);
     return [];
@@ -647,13 +746,16 @@ export const generationStep = internalAction({
         // SMART QUERY ENHANCEMENT: Only enhance when it adds value
         // Use the sophisticated context from planSearch instead of rebuilding
         const planContextSummary = plan.contextSummary;
-        
+
         // SAFETY SWITCH: Temporarily disable smart enhancement if needed
-        const DISABLE_SMART_ENHANCEMENT = process.env.DISABLE_SMART_ENHANCEMENT === "true";
-        
+        const DISABLE_SMART_ENHANCEMENT =
+          process.env.DISABLE_SMART_ENHANCEMENT === "true";
+
         let enhancedQueries: string[];
         if (DISABLE_SMART_ENHANCEMENT) {
-          console.warn("🚨 Smart query enhancement DISABLED - using original queries only");
+          console.warn(
+            "🚨 Smart query enhancement DISABLED - using original queries only",
+          );
           enhancedQueries = plan.queries.slice(0, TOP_RESULTS);
         } else {
           // Smart query enhancement with resilience and fallbacks
@@ -668,7 +770,7 @@ export const generationStep = internalAction({
 
         // Execute only the top enhanced queries and aggregate results
         const queriesToRun = enhancedQueries.slice(0, TOP_RESULTS);
-        
+
         // Log the queries being executed for debugging (development only)
         if (isDevelopment) {
           console.info("🔍 Executing search queries:", {
@@ -684,34 +786,44 @@ export const generationStep = internalAction({
             try {
               // Add small delay between queries to avoid rate limiting
               if (index > 0) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise((resolve) => setTimeout(resolve, 100));
               }
-              
-              return await ctx.runAction(api.search.searchWeb, { 
-                query: query.trim(), 
-                maxResults: 5 
+
+              return await ctx.runAction(api.search.searchWeb, {
+                query: query.trim(),
+                maxResults: 5,
               });
             } catch (error) {
               console.warn(`Search query failed for "${query}":`, error);
-              return { results: [], searchMethod: "fallback" as const, hasRealResults: false };
+              return {
+                results: [],
+                searchMethod: "fallback" as const,
+                hasRealResults: false,
+              };
             }
-          })
+          }),
         );
 
         // Aggregate successful results with proper error handling
         for (const result of allResults) {
-          if (result.status === 'fulfilled' && result.value.results && result.value.results.length > 0) {
+          if (
+            result.status === "fulfilled" &&
+            result.value.results &&
+            result.value.results.length > 0
+          ) {
             aggregated.push(...result.value.results);
           }
         }
 
         // Fallback: if no results from enhanced queries, try original queries
         if (aggregated.length === 0 && plan.queries.length > 0) {
-          console.warn("No results from enhanced queries, falling back to original queries");
+          console.warn(
+            "No results from enhanced queries, falling back to original queries",
+          );
           try {
-            const fallbackResult = await ctx.runAction(api.search.searchWeb, { 
-              query: plan.queries[0], 
-              maxResults: 5 
+            const fallbackResult = await ctx.runAction(api.search.searchWeb, {
+              query: plan.queries[0],
+              maxResults: 5,
             });
             if (fallbackResult.results && fallbackResult.results.length > 0) {
               aggregated.push(...fallbackResult.results);
@@ -766,6 +878,7 @@ export const generationStep = internalAction({
       });
 
       // Stream the response using OpenRouter
+      // Note: Gemini models support reasoning parameters for enhanced responses
       await streamResponseToMessage({
         ctx,
         messageId: args.assistantMessageId,
