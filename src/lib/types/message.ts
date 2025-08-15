@@ -130,7 +130,7 @@ export interface MessageStreamChunk {
  * Search progress state for UI updates
  */
 export interface SearchProgress {
-  stage: "searching" | "scraping" | "analyzing" | "generating";
+  stage: "idle" | "searching" | "scraping" | "analyzing" | "generating";
   message: string;
   urls?: string[];
   currentUrl?: string;
