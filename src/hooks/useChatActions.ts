@@ -276,16 +276,27 @@ export function createChatActions(
         return;
       }
 
-      // Update state to show generation is starting
-      // Also ensure we have the correct chat object for UI display
+      // Create a temporary ID for the streaming AI message
+      const tempAIMessageId = `streaming-${Date.now()}`;
+      
+      // Add user message immediately
+      const userMessage: UnifiedMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content,
+        timestamp: Date.now(),
+        isStreaming: false,
+      };
+
+      // Update state to show generation is starting and add user message
       setState((prev) => ({
         ...prev,
         isGenerating: true,
         error: null,
-        // Ensure currentChatId and currentChat match the chat we're sending to
         currentChatId: chatId,
         currentChat:
           prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+        messages: [...prev.messages, userMessage],
       }));
 
       try {
@@ -293,21 +304,55 @@ export function createChatActions(
         const generator = repository.generateResponse(chatId, content);
 
         let fullContent = "";
+        let aiMessageAdded = false;
+        
         for await (const chunk of generator) {
           if (chunk.type === "content") {
             fullContent += chunk.content;
-            // Update UI with streaming content
+            
+            if (!aiMessageAdded) {
+              // Add the AI message with initial content
+              const aiMessage: UnifiedMessage = {
+                id: tempAIMessageId,
+                role: "assistant",
+                content: fullContent,
+                timestamp: Date.now(),
+                isStreaming: true,
+              };
+              
+              setState((prev) => ({
+                ...prev,
+                messages: [...prev.messages, aiMessage],
+              }));
+              aiMessageAdded = true;
+            } else {
+              // Update the streaming AI message content
+              setState((prev) => ({
+                ...prev,
+                messages: prev.messages.map((msg) =>
+                  msg.id === tempAIMessageId
+                    ? { ...msg, content: fullContent }
+                    : msg
+                ),
+              }));
+            }
+          } else if (chunk.type === "metadata" && chunk.metadata?.thinking) {
+            // Update thinking/reasoning if provided
             setState((prev) => ({
               ...prev,
-              searchProgress: { stage: "generating", message: fullContent },
+              messages: prev.messages.map((msg) =>
+                msg.id === tempAIMessageId
+                  ? { ...msg, thinking: chunk.metadata.thinking }
+                  : msg
+              ),
             }));
           } else if (chunk.type === "error") {
             throw new Error(chunk.error);
           }
         }
 
-        // Refresh messages after generation completes
-        // This is critical for displaying the new messages
+        // Refresh messages after generation completes to get the final state
+        // with proper IDs and any additional metadata from the backend
         const messages = await repository.getMessages(chatId);
         logger.debug("Messages refreshed after generation", {
           chatId,
@@ -319,14 +364,15 @@ export function createChatActions(
           messages,
           isGenerating: false,
           searchProgress: { stage: "idle" },
-          // Ensure currentChatId and currentChat are still set correctly
           currentChatId: chatId,
           currentChat:
             prev.chats.find((c) => c.id === chatId) || prev.currentChat,
         }));
       } catch (error) {
+        // Remove the temporary streaming message on error
         setState((prev) => ({
           ...prev,
+          messages: prev.messages.filter((msg) => msg.id !== tempAIMessageId),
           isGenerating: false,
           error:
             error instanceof Error ? error.message : "Failed to send message",
