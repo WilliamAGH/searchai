@@ -1,0 +1,6 @@
+{
+  "snapshot": "snapshot-20250815-3b742a97-7edc-453c-ac24-e8f0730dc774",
+  "install": "npm install",
+  "start": "npm run dev",
+  "terminals": []
+}
