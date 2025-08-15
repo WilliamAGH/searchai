@@ -167,6 +167,46 @@ http.route({
 export default http;
 ```
 
+### TS2589 Error Resolution for HTTP -> Internal Action Calls
+
+When calling internal actions from HTTP endpoints, you may encounter:
+```
+error TS2589: Type instantiation is excessively deep and possibly infinite
+```
+
+This is a known TypeScript limitation with Convex's deep type system. 
+
+**FORBIDDEN SOLUTIONS:**
+- ❌ Never use `@ts-ignore` or `@ts-expect-error`
+- ❌ Never use `eslint-disable` comments
+
+**ACCEPTABLE WORKAROUND (Last Resort Only):**
+
+```typescript
+/**
+ * IMPORTANT TS2589 WORKAROUND:
+ * Document why this pattern is necessary
+ */
+// Use require to avoid TS2589 at import time
+const { internal } = require("../../_generated/api") as any;
+
+// In the handler:
+const result = await ctx.runAction(internal.yourNamespace.yourAction, args);
+```
+
+**Prerequisites for using this pattern:**
+1. Exhausted all other solutions (helper functions, simplified types)
+2. Added comprehensive JSDoc explaining why it's necessary
+3. Validated all inputs at runtime
+4. Used internal actions (not public) for security
+5. Document the exact input/output types expected
+
+**Better alternatives to try first:**
+1. Create helper functions with simpler types
+2. Break complex operations into smaller steps
+3. Use type assertions on results only (not the action)
+4. Consider restructuring to avoid HTTP -> internal action pattern
+
 ## References
 
 - [Convex Docs](https://docs.convex.dev)

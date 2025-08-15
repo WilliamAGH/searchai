@@ -448,22 +448,33 @@ grep -r "functionName" --include="*.md" --include="*.ts" --include="*.tsx"
 
 **Forbidden:**
 
-- Any `@ts-ignore` except documented Convex TS2589 issues
-- Any `eslint-disable` comments
-- Any `any` type without justification
+- **ANY `@ts-ignore` comments - NO EXCEPTIONS**
+- **ANY `@ts-expect-error` comments - NO EXCEPTIONS**
+- **ANY `eslint-disable` comments - NO EXCEPTIONS**
+- Any `any` type without proper type narrowing
 - Assumptions about API behavior
 
 ### TypeScript TS2589 Prevention
 
-```typescript
-// ❌ Complex nested types in httpAction cause TS2589
-await ctx.runMutation(api.chats.publish, {
-  messages: Array<{ role: string; content?: string; ... }>
-});
+**NEVER use `@ts-ignore` - even for TS2589 errors. Fix them properly:**
 
-// ✅ Workaround with documentation
-// @ts-ignore - Known Convex limitation with complex type inference
+```typescript
+// ❌ FORBIDDEN - Never use @ts-ignore
+// @ts-ignore - Known Convex limitation
 await ctx.runMutation(api.chats.publish, { ... });
+
+// ✅ CORRECT - Refactor to avoid deep type instantiation
+// Option 1: Simplify the type structure
+const simpleMessages = messages.map(m => ({ role: m.role, content: m.content }));
+await ctx.runMutation(api.chats.publish, { messages: simpleMessages });
+
+// Option 2: Use helper functions to break up complex operations
+async function publishMessages(ctx: MutationCtx, messages: Message[]) {
+  // Helper function with simpler types
+}
+
+// Option 3: Increase TypeScript recursion limit in tsconfig.json
+// "compilerOptions": { "typeInstantiationDepth": 200 }
 ```
 
 ## 🏗️ PROJECT STRUCTURE & BOUNDARIES
