@@ -7,10 +7,10 @@ test.describe("Authentication Flow", () => {
     await page.goto("/");
 
     // Wait for the app to load by checking for the main content
-    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
 
     // Expect app header present - look for the SearchAI text in the header
-    await expect(page.locator('header').getByText(/SearchAI/i)).toBeVisible({
+    await expect(page.locator("header").getByText(/SearchAI/i)).toBeVisible({
       timeout: 15000,
     });
 
@@ -33,7 +33,9 @@ test.describe("Authentication Flow", () => {
     await password.fill(MOCK_USER_A.password);
 
     // Submit - use the submit button specifically
-    const submitBtn = page.locator('form').getByRole("button", { name: /^sign in$/i });
+    const submitBtn = page
+      .locator("form")
+      .getByRole("button", { name: /^sign in$/i });
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
@@ -52,6 +54,6 @@ test.describe("Authentication Flow", () => {
     }
 
     // Back at main app
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator("main")).toBeVisible();
   });
 });

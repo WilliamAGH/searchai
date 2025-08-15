@@ -75,18 +75,20 @@ test.describe("smoke: pagination", () => {
       // Wait for input to be enabled with a reasonable timeout
       let attempts = 0;
       const maxAttempts = 10; // 10 seconds max instead of 30
-      
+
       while (!(await msgInput.isEnabled()) && attempts < maxAttempts) {
         await page.waitForTimeout(1000);
         attempts++;
       }
-      
+
       if (attempts >= maxAttempts) {
         // Skip this message if input is still disabled after 10 seconds
-        console.log(`Skipping message "${msg}" - input still disabled after ${maxAttempts} seconds`);
+        console.log(
+          `Skipping message "${msg}" - input still disabled after ${maxAttempts} seconds`,
+        );
         continue;
       }
-      
+
       await msgInput.fill(msg);
       await page.keyboard.press("Enter");
       // Wait for message to be processed
