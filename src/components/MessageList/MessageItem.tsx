@@ -126,9 +126,10 @@ export const MessageItem = React.memo(
                 <Spinner size="sm" aria-label="AI is thinking" />
                 <LoadingText message={message.thinking} className="flex-1">
                   {/* Only show animated dots if text doesn't already contain static dots */}
-                  {shouldShowAnimatedDots(message.thinking, message.isStreaming || false) && (
-                    <ThreeDots size="sm" color="bg-blue-500" />
-                  )}
+                  {shouldShowAnimatedDots(
+                    message.thinking,
+                    message.isStreaming || false,
+                  ) && <ThreeDots size="sm" color="bg-blue-500" />}
                 </LoadingText>
               </div>
             )}
