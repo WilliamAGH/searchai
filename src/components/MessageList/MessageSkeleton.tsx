@@ -91,7 +91,7 @@ export function MessageSkeleton({
       >
         <span className="sr-only">Loading content, please wait...</span>
         {Array.from({ length: lines }).map((_, i) => (
-          <LineSkeleton key={i} width={lineWidths[i % lineWidths.length]} />
+          <LineSkeleton key={`line-${i}-${Date.now()}`} width={lineWidths[i % lineWidths.length]} />
         ))}
       </div>
     );
@@ -106,7 +106,7 @@ export function MessageSkeleton({
       >
         <span className="sr-only">Loading, please wait...</span>
         {Array.from({ length: count }).map((_, i) => (
-          <SimpleSkeletonItem key={i} />
+          <SimpleSkeletonItem key={`simple-${i}-${Date.now()}`} />
         ))}
       </div>
     );
@@ -121,7 +121,7 @@ export function MessageSkeleton({
     >
       <span className="sr-only">Loading messages, please wait...</span>
       {Array.from({ length: count }).map((_, index) => (
-        <MessageSkeletonItem key={index} />
+        <MessageSkeletonItem key={`skeleton-${index}-${Date.now()}`} />
       ))}
     </div>
   );
