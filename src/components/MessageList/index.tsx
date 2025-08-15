@@ -55,6 +55,8 @@ interface MessageListProps {
     streamingContent: string;
     streamingMessageId?: Id<"messages"> | string;
     thinking?: string;
+    // Real-time messages from subscription (loosely typed on purpose)
+    messages?: ReadonlyArray<unknown>;
   };
 }
 
