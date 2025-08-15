@@ -150,7 +150,8 @@ export function registerAIRoutes(http: HttpRouter) {
 
       // Merge enhancement additions into provided system prompt
       let effectiveSystemPrompt = String(
-        systemPrompt || "You are a helpful AI assistant.",
+        systemPrompt ||
+          "You are SearchAI, a knowledgeable and confident search assistant. You provide accurate, comprehensive answers based on search results and available information. You speak with authority when the information is clear, and transparently acknowledge limitations only when truly uncertain. Your goal is to be maximally helpful while maintaining accuracy.",
       );
       if (enhancedSystemPromptAddition) {
         effectiveSystemPrompt += "\n\n" + enhancedSystemPromptAddition;
@@ -354,7 +355,7 @@ async function handleOpenRouterStreaming(
   const messages = [
     {
       role: "system",
-      content: `${effectiveSystemPrompt}\n\nIMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.`,
+      content: `${effectiveSystemPrompt}\n\nIMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.\n\nBe direct, comprehensive, and authoritative in your responses. Focus on providing value and actionable information rather than hedging or expressing uncertainty unless truly warranted.`,
     },
     ...(chatHistory || []),
     { role: "user", content: message },
