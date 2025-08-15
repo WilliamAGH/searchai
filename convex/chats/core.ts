@@ -58,7 +58,18 @@ export const getUserChats = query({
   args: {
     sessionId: v.optional(v.string()),
   },
-  returns: v.array(v.any()),
+  returns: v.array(v.object({
+    _id: v.id("chats"),
+    title: v.string(),
+    userId: v.optional(v.id("users")),
+    sessionId: v.optional(v.string()),
+    shareId: v.optional(v.string()),
+    publicId: v.optional(v.string()),
+    privacy: v.optional(v.union(v.literal("private"), v.literal("shared"), v.literal("public"))),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    rollingSummary: v.optional(v.string()),
+  })),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
 
@@ -98,21 +109,23 @@ async function validateChatAccess(
 
   if (!chat) return null;
 
-  // For authenticated users: check userId matches
-  if (chat.userId) {
-    if (chat.userId !== userId) return null;
+  // FIX: Allow authenticated users to access their own chats
+  if (chat.userId && userId && chat.userId === userId) {
+    return chat;
   }
-  // For anonymous chats: check sessionId matches
-  else if (chat.sessionId) {
-    if (!sessionId || chat.sessionId !== sessionId) return null;
+  
+  // FIX: Allow anonymous users to access their session chats
+  if (chat.sessionId && sessionId && chat.sessionId === sessionId) {
+    return chat;
   }
-  // For shared/public chats: check privacy setting
-  else if (chat.privacy === "shared" || chat.privacy === "public") {
-    // Allow access to shared/public chats
+  
+  // FIX: Allow access to shared/public chats
+  if (chat.privacy === "shared" || chat.privacy === "public") {
     return chat;
   }
 
-  return chat;
+  // Default: deny access
+  return null;
 }
 
 /**
@@ -128,7 +141,18 @@ export const getChatById = query({
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
   },
-  returns: v.union(v.any(), v.null()),
+  returns: v.union(v.object({
+    _id: v.id("chats"),
+    title: v.string(),
+    userId: v.optional(v.id("users")),
+    sessionId: v.optional(v.string()),
+    shareId: v.optional(v.string()),
+    publicId: v.optional(v.string()),
+    privacy: v.optional(v.union(v.literal("private"), v.literal("shared"), v.literal("public"))),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    rollingSummary: v.optional(v.string()),
+  }), v.null()),
   handler: async (ctx, args) => {
     return await validateChatAccess(ctx, args.chatId, args.sessionId);
   },
@@ -145,7 +169,18 @@ export const getChat = query({
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
   },
-  returns: v.union(v.any(), v.null()),
+  returns: v.union(v.object({
+    _id: v.id("chats"),
+    title: v.string(),
+    userId: v.optional(v.id("users")),
+    sessionId: v.optional(v.string()),
+    shareId: v.optional(v.string()),
+    publicId: v.optional(v.string()),
+    privacy: v.optional(v.union(v.literal("private"), v.literal("shared"), v.literal("public"))),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    rollingSummary: v.optional(v.string()),
+  }), v.null()),
   handler: async (ctx, args) => {
     // Reuse validation logic
     return await validateChatAccess(ctx, args.chatId, args.sessionId);
