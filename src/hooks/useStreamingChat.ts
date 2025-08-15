@@ -30,6 +30,13 @@ const defaultStreamingState: StreamingState = {
   messages: undefined,
 };
 
+// Runtime type guard for Convex ID validation
+function isConvexChatId(id: string): id is Id<"chats"> {
+  // Convex IDs are typically 24-character hex strings
+  // This pattern matches the actual Convex ID format
+  return /^[0-9a-f]{24}$/.test(id);
+}
+
 export function useStreamingChat(
   chatId: string | null,
   sessionId?: string | null,
@@ -40,8 +47,8 @@ export function useStreamingChat(
 
   const streamingData = useQuery(
     api.chats.subscribeToChatUpdates,
-    chatId
-      ? { chatId: chatId as Id<"chats">, sessionId: sessionId || undefined }
+    chatId && isConvexChatId(chatId)
+      ? { chatId, sessionId: sessionId || undefined }
       : "skip",
   );
 
