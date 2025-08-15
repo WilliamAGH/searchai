@@ -13,6 +13,7 @@ import React, {
 } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { isConvexChatId } from "../../lib/utils/id";
 import { useUnifiedChat } from "../../hooks/useUnifiedChat";
 import { useNavigate } from "react-router-dom";
 import { useChatNavigation } from "../../hooks/useChatNavigation";
@@ -279,10 +280,18 @@ function ChatInterfaceComponent({
     async (message: string, chatId: string) => {
       // This function is kept for backwards compatibility but now uses the unified flow
       // The generateResponse action will use sessionId for anonymous users
-      await generateResponse({
-        chatId: chatId as Id<"chats">, // Proper type cast
-        message,
-      });
+      // Only call the API if we have a valid Convex chat ID
+      if (isConvexChatId(chatId)) {
+        await generateResponse({
+          chatId,
+          message,
+        });
+      } else {
+        console.error(
+          "Cannot generate response: Invalid Convex chat ID",
+          chatId,
+        );
+      }
     },
     [generateResponse],
   );
@@ -394,9 +403,7 @@ function ChatInterfaceComponent({
     onToggleSidebar,
     onNewChat: async () => {
       if (!isServiceAvailable) {
-        toast.error(
-          "Service unavailable: Cannot create new chats right now.",
-        );
+        toast.error("Service unavailable: Cannot create new chats right now.");
         return;
       }
       // Reset state first
