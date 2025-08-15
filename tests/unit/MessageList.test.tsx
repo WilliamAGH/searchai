@@ -215,7 +215,7 @@ describe("MessageList", () => {
   });
 
   test("should handle load more click", async () => {
-    mockOnLoadMore.mockResolvedValue(undefined);
+    mockOnLoadMore.mockResolvedValue();
 
     const { container } = render(
       <MessageList

@@ -10,7 +10,7 @@ import { ReasoningDisplay } from "../ReasoningDisplay";
 import { CopyButton } from "../CopyButton";
 import { MessageSources } from "./MessageSources";
 import { Spinner } from "../ui/Spinner";
-import { LoadingText, LoadingMessages } from "../ui/LoadingText";
+import { LoadingText } from "../ui/LoadingText";
 import { ThreeDots } from "../ui/ThreeDots";
 import {
   extractPlainText,

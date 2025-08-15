@@ -11,7 +11,7 @@ describe.skip("usePaginatedMessages (minimal)", () => {
     // mock convex/react before importing hook
     setupConvexReactMock({
       queryImpl: (_name, args) => {
-        if (args === "skip") return undefined;
+        if (args === "skip") return;
         return {
           messages: [
             { _id: "m1", role: "user", content: "hello", timestamp: 1000 },

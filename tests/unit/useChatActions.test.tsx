@@ -27,15 +27,15 @@ describe("useChatActions", () => {
       getChats: vi.fn().mockResolvedValue([]),
       getChatById: vi.fn().mockResolvedValue(null),
       createChat: vi.fn(),
-      deleteChat: vi.fn().mockResolvedValue(undefined),
+      deleteChat: vi.fn().mockResolvedValue(),
       getMessages: vi.fn().mockResolvedValue([]),
       // Minimal stream stub: yields no chunks and ends
       generateResponse: vi.fn().mockImplementation(async function* () {
         // Empty generator that immediately returns
       }),
-      deleteMessage: vi.fn().mockResolvedValue(undefined),
-      updateChatTitle: vi.fn().mockResolvedValue(undefined),
-      updateChatPrivacy: vi.fn().mockResolvedValue(undefined),
+      deleteMessage: vi.fn().mockResolvedValue(),
+      updateChatTitle: vi.fn().mockResolvedValue(),
+      updateChatPrivacy: vi.fn().mockResolvedValue(),
       subscribeToChat: vi.fn(),
       supportsStreaming: vi.fn().mockReturnValue(false),
       getMessagesPaginated: vi.fn(),

@@ -78,7 +78,15 @@ test.describe("Critical User Paths", () => {
     await input.fill("Message to share");
     await input.press("Enter");
 
-    // Look for share button
+    // Wait for the message to be processed and chat to be created
+    await expect(
+      page.locator('text="Message to share"'),
+    ).toBeVisible({ timeout: 15000 });
+
+    // Wait a bit for the chat to be fully created
+    await page.waitForTimeout(2000);
+
+    // Look for share button - it should now be visible
     const shareBtn = page
       .locator('[title*="Share"], button:has-text("Share")')
       .first();

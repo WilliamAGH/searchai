@@ -38,7 +38,7 @@ vi.mock("../../src/hooks/useChatRepository", () => ({
     listChats: vi.fn().mockResolvedValue([]),
     createChat: vi.fn().mockResolvedValue({ id: "test-chat-1" }),
     getChat: vi.fn().mockResolvedValue(null),
-    deleteChat: vi.fn().mockResolvedValue(undefined),
+    deleteChat: vi.fn().mockResolvedValue(),
     sendMessage: vi.fn().mockResolvedValue({ id: "test-message-1" }),
   })),
 }));

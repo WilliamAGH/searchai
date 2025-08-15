@@ -3,15 +3,16 @@
  * Handles chat operations for authenticated users using Convex backend
  */
 
-import { ConvexClient } from "convex/browser";
+import type { ConvexClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { BaseRepository } from "./ChatRepository";
-import {
+import type {
   UnifiedChat,
   UnifiedMessage,
   StreamChunk,
-  ChatResponse,
+  ChatResponse} from "../types/unified";
+import {
   IdUtils,
   TitleUtils,
 } from "../types/unified";

@@ -4,7 +4,7 @@
  * Per AGENT.md: NO database entity types - use Doc<T> from Convex directly
  */
 
-import { Id } from "../../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 /**
  * Operation for offline-first sync (future feature)

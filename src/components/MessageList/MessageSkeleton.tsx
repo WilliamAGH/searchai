@@ -5,6 +5,8 @@
 
 import React from "react";
 import { Spinner } from "../ui/Spinner";
+import type { ErrorStateProps} from "../../lib/constants/errorStates";
+import { ErrorMessages, RetryConfig } from "../../lib/constants/errorStates";
 
 interface MessageSkeletonProps {
   count?: number;
@@ -143,40 +145,48 @@ export function LoadingMoreIndicator() {
 
 /**
  * Error state with retry button
+ * Uses standardized error state props
  */
 export function LoadErrorState({
   error: _error,
   onRetry,
   retryCount = 0,
-}: {
-  error: Error;
-  onRetry: () => void;
-  retryCount?: number;
-}) {
+  maxRetries = RetryConfig.DEFAULT_MAX_RETRIES,
+  message = ErrorMessages.MESSAGES_FAILED,
+  className = "",
+}: ErrorStateProps) {
+  const canRetry = retryCount < maxRetries && onRetry;
+  
   return (
     <div
-      className="flex flex-col items-center justify-center py-8 text-sm"
+      className={`flex flex-col items-center justify-center py-8 text-sm ${className}`}
       role="alert"
       aria-live="polite"
     >
       <div className="text-red-500 dark:text-red-400 mb-2">
-        Failed to load messages
+        {message}
       </div>
-      {retryCount > 0 && (
+      {retryCount > 0 && canRetry && (
         <div
           className="text-gray-500 dark:text-gray-400 mb-2"
           aria-live="polite"
         >
-          Retry attempt {retryCount} of 3
+          Retry attempt {retryCount} of {maxRetries}
         </div>
       )}
-      <button
-        onClick={onRetry}
-        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        aria-label="Retry loading messages"
-      >
-        Try Again
-      </button>
+      {canRetry ? (
+        <button
+          onClick={onRetry}
+          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          aria-label="Retry loading messages"
+        >
+          Try Again
+        </button>
+      ) : retryCount >= maxRetries ? (
+        <div className="text-gray-500 dark:text-gray-400">
+          {ErrorMessages.RETRY_EXHAUSTED}
+        </div>
+      ) : null}
     </div>
   );
 }

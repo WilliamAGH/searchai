@@ -4,10 +4,10 @@
  * Provides seamless transition when users authenticate
  */
 
-import { LocalChatRepository } from "../repositories/LocalChatRepository";
-import { ConvexChatRepository } from "../repositories/ConvexChatRepository";
-import { IChatRepository } from "../repositories/ChatRepository";
-import { MigrationResult } from "../types/unified";
+import type { LocalChatRepository } from "../repositories/LocalChatRepository";
+import type { ConvexChatRepository } from "../repositories/ConvexChatRepository";
+import type { IChatRepository } from "../repositories/ChatRepository";
+import type { MigrationResult } from "../types/unified";
 import {
   parseLocalChats,
   parseLocalMessages,

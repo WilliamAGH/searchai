@@ -1,6 +1,44 @@
 import { test, expect } from "@playwright/test";
 
+/**
+ * ⚠️ CRITICAL TEST - DO NOT MODIFY WITHOUT UNDERSTANDING THE REGRESSION HISTORY ⚠️
+ * 
+ * This test validates that the Share button appears ONLY after:
+ * 1. A chat has been created in the database (currentChatId exists)
+ * 2. At least one message has been sent and rendered
+ * 
+ * REGRESSION HISTORY:
+ * - The Share/Copy toolbar has repeatedly appeared on empty chats
+ * - This happens when developers remove the messages.length > 0 check
+ * - They do this to "fix" this test when it fails
+ * - This creates a UX bug where users see Share/Copy buttons with nothing to share
+ * 
+ * THE CORRECT BEHAVIOR:
+ * - Share button should NOT appear on a new, empty chat
+ * - Share button should ONLY appear after messages exist
+ * - The toolbar visibility requires: currentChatId && messages.length > 0
+ * 
+ * IF THIS TEST FAILS:
+ * ✅ DO: Fix the timing - ensure the chat is created and messages are rendered
+ * ✅ DO: Check if the message selectors are correct
+ * ✅ DO: Add more robust waits for async operations
+ * ❌ DON'T: Remove the messages.length check from ChatInterface.tsx
+ * ❌ DON'T: Make the Share button always visible
+ * ❌ DON'T: Remove the wait for messages from this test
+ * 
+ * See: docs/CHAT_TOOLBAR_REGRESSION_PREVENTION.md for full details
+ */
 test.describe("smoke: new chat share flow has no console errors", () => {
+  /**
+   * Test the complete flow of creating a chat, sending a message, and sharing.
+   * 
+   * CRITICAL SEQUENCE:
+   * 1. Navigate to the app
+   * 2. Send a message (this creates the chat and adds the first message)
+   * 3. Wait for the message to appear in the DOM
+   * 4. Only then should the Share button become visible
+   * 5. Click Share and verify the modal opens
+   */
   test("smoke: create chat, send message, open share modal", async ({
     page,
     baseURL,
@@ -41,6 +79,17 @@ test.describe("smoke: new chat share flow has no console errors", () => {
 
     await page.goto(baseURL ?? "http://localhost:5180", {
       waitUntil: "domcontentloaded",
+    });
+
+    // CRITICAL REGRESSION CHECK: Share button must NOT be visible on empty chat
+    // If this fails, someone has broken the conditional rendering
+    const shareButtonInitial = page.locator('button[aria-label="Share chat"]');
+    await expect(shareButtonInitial).not.toBeVisible({ timeout: 2000 }).catch(() => {
+      throw new Error(
+        "REGRESSION DETECTED: Share button is visible on empty chat! " +
+        "The ChatToolbar should NOT render when there are no messages. " +
+        "Check ChatInterface.tsx line ~562 - it must have: currentChatId && messages.length > 0"
+      );
     });
 
     const input = page.locator('textarea, [role="textbox"]').first();

@@ -5,7 +5,7 @@ describe("currentChat derivation", () => {
     currentChatId: string | null,
     allChats: Array<{ _id: string; title: string }>,
   ) {
-    if (!currentChatId) return undefined;
+    if (!currentChatId) return;
     const idStr = String(currentChatId);
     return allChats.find((c) => String(c._id) === idStr);
   }

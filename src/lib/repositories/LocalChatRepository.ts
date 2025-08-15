@@ -4,11 +4,12 @@
  */
 
 import { BaseRepository } from "./ChatRepository";
-import {
+import type {
   UnifiedChat,
   UnifiedMessage,
   StreamChunk,
-  ChatResponse,
+  ChatResponse} from "../types/unified";
+import {
   IdUtils,
   TitleUtils,
   StorageUtils,

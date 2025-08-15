@@ -3,7 +3,7 @@
  * Demonstrates 100% synthetic behavior testing with MSW mocks
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { setupMockServer, mockSearchResponse } from "../mocks/server";
 import {
   setSearchTestScenario,
@@ -352,7 +352,7 @@ describe("Search API with 100% Synthetic Behavior", () => {
       );
 
       expect(results).toHaveLength(5);
-      results.forEach((result, index) => {
+      results.forEach((result) => {
         expect(result.results).toBeDefined();
         expect(result.searchMethod).toBeDefined();
       });

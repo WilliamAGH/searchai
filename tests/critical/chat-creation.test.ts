@@ -205,7 +205,7 @@ describe("Chat Creation Critical Path", () => {
       };
 
       mockState.chats = [chatToDelete];
-      mockRepository.deleteChat = vi.fn().mockResolvedValue(undefined);
+      mockRepository.deleteChat = vi.fn().mockResolvedValue();
 
       const actions = createChatActions(
         mockRepository,
@@ -232,7 +232,7 @@ describe("Chat Creation Critical Path", () => {
 
       mockState.chats = [chatToDelete];
       mockState.currentChatId = "chat-to-delete";
-      mockRepository.deleteChat = vi.fn().mockResolvedValue(undefined);
+      mockRepository.deleteChat = vi.fn().mockResolvedValue();
 
       const actions = createChatActions(
         mockRepository,
@@ -280,7 +280,7 @@ describe("Chat Creation Critical Path", () => {
       };
 
       mockState.chats = [chat];
-      mockRepository.updateChatTitle = vi.fn().mockResolvedValue(undefined);
+      mockRepository.updateChatTitle = vi.fn().mockResolvedValue();
 
       const actions = createChatActions(
         mockRepository,
@@ -309,7 +309,7 @@ describe("Chat Creation Critical Path", () => {
       };
 
       mockState.chats = [chat];
-      mockRepository.updateChatTitle = vi.fn().mockResolvedValue(undefined);
+      mockRepository.updateChatTitle = vi.fn().mockResolvedValue();
 
       const actions = createChatActions(
         mockRepository,

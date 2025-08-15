@@ -1,9 +1,15 @@
 import { test, expect } from "@playwright/test";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test.describe("Chat Flow Smoke Test", () => {
   test.beforeEach(async ({ page }) => {
+    await setupMSWForTest(page);
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupMSWForTest(page);
   });
 
   test("should complete full chat flow: create, send, and receive message", async ({

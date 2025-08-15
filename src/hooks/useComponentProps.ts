@@ -191,7 +191,7 @@ export function useComponentProps(args: UseComponentPropsArgs) {
     () => ({
       disabled: isGenerating,
       placeholder: isGenerating
-        ? "Generating response..."
+        ? LoadingMessages.GENERATING
         : !currentChatId
           ? "Start a new chat..."
           : "Type your message...",

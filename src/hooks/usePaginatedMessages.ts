@@ -39,7 +39,7 @@ export function usePaginatedMessages({
   enabled = true,
 }: UsePaginatedMessagesOptions): PaginatedMessagesState {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [cursor, setCursor] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);

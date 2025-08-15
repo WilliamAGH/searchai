@@ -2,7 +2,7 @@
  * Helper functions for handling console errors in Playwright tests
  */
 
-import { Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 /**
  * Sets up console error collection with filtering for known non-issue errors

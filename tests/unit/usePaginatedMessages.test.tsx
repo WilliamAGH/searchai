@@ -54,7 +54,7 @@ describe("usePaginatedMessages", () => {
 
     // Set up mock implementations
     mockUseAction.mockReturnValue(mockLoadMore);
-    mockUseQuery.mockReturnValue(undefined);
+    mockUseQuery.mockReturnValue(null);
   });
 
   test("should initialize with default state when chatId is null", () => {
@@ -178,7 +178,7 @@ describe("usePaginatedMessages", () => {
   });
 
   test("should handle disabled state", () => {
-    mockUseQuery.mockReturnValue(undefined);
+    mockUseQuery.mockReturnValue(null);
 
     const { result } = renderHook(() =>
       usePaginatedMessages({
@@ -313,7 +313,7 @@ describe("usePaginatedMessages", () => {
   });
 
   test("should handle custom initial limit", () => {
-    mockUseQuery.mockReturnValue(undefined);
+    mockUseQuery.mockReturnValue(null);
 
     renderHook(() =>
       usePaginatedMessages({
@@ -361,7 +361,7 @@ describe("usePaginatedMessages", () => {
   });
 
   test("should handle undefined initial messages", () => {
-    mockUseQuery.mockReturnValue(undefined);
+    mockUseQuery.mockReturnValue(null);
 
     const { result } = renderHook(() =>
       usePaginatedMessages({

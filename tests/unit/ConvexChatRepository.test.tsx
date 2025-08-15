@@ -270,7 +270,7 @@ describe("ConvexChatRepository", () => {
 
   describe("deleteChat", () => {
     test("should delete a chat by ID", async () => {
-      mockClient.mutation.mockResolvedValue(undefined);
+      mockClient.mutation.mockResolvedValue(null);
 
       await repository.deleteChat("chat-to-delete");
 

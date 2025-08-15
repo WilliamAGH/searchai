@@ -188,13 +188,12 @@ export const MessageList = React.memo(function MessageList({
           return;
         if (onRequestDeleteMessage) {
           onRequestDeleteMessage(String(messageId));
+        } else if (
+          String(messageId).startsWith("local_") ||
+          String(messageId).startsWith("msg_")
+        ) {
+          onDeleteLocalMessage?.(String(messageId));
         } else {
-          if (
-            String(messageId).startsWith("local_") ||
-            String(messageId).startsWith("msg_")
-          ) {
-            onDeleteLocalMessage?.(String(messageId));
-          } else {
             await deleteMessage({ messageId: messageId as Id<"messages"> });
           }
         }

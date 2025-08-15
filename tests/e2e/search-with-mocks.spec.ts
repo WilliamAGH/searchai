@@ -4,27 +4,22 @@
  */
 
 import { test, expect } from "@playwright/test";
-import {
-  setSearchTestScenario,
-  SEARCH_TEST_SCENARIOS,
-  setResponseDelay,
-} from "../mocks/search-api-mocks";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test.describe("Search Functionality with Mocked APIs", () => {
   test.beforeEach(async ({ page }) => {
-    // Reset to standard scenario before each test
-    setSearchTestScenario(SEARCH_TEST_SCENARIOS.STANDARD);
-    setResponseDelay(0);
-
+    await setupMSWForTest(page);
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupMSWForTest(page);
   });
 
   test("should display search results for technical queries", async ({
     page,
   }) => {
-    // Set scenario for technical documentation
-    setSearchTestScenario(SEARCH_TEST_SCENARIOS.TECHNICAL_QUERY);
 
     const messageInput = page.locator('textarea, [role="textbox"]').first();
     await expect(messageInput).toBeVisible({ timeout: 15000 });
@@ -40,14 +35,12 @@ test.describe("Search Functionality with Mocked APIs", () => {
     // Verify search results are integrated in the response
     // The mocked results should include React documentation
     const messageContent = page
-      .locator('[data-testid="message-assistant"]')
+      .locator('[data-role="assistant"]')
       .last();
     await expect(messageContent).toContainText(/React/, { timeout: 10000 });
   });
 
   test("should handle creator detection queries", async ({ page }) => {
-    // Set scenario for creator queries
-    setSearchTestScenario(SEARCH_TEST_SCENARIOS.CREATOR_QUERY);
 
     const messageInput = page.locator('textarea, [role="textbox"]').first();
     await expect(messageInput).toBeVisible({ timeout: 15000 });
@@ -62,7 +55,7 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Verify the response mentions William Callahan
     const messageContent = page
-      .locator('[data-testid="message-assistant"]')
+      .locator('[data-role="assistant"]')
       .last();
     await expect(messageContent).toContainText(/William Callahan/i, {
       timeout: 10000,
@@ -70,8 +63,6 @@ test.describe("Search Functionality with Mocked APIs", () => {
   });
 
   test("should gracefully handle search API errors", async ({ page }) => {
-    // Set error scenario
-    setSearchTestScenario(SEARCH_TEST_SCENARIOS.ERROR);
 
     const messageInput = page.locator('textarea, [role="textbox"]').first();
     await expect(messageInput).toBeVisible({ timeout: 15000 });
@@ -85,14 +76,12 @@ test.describe("Search Functionality with Mocked APIs", () => {
     await expect(messageInput).toBeEnabled({ timeout: 30000 });
 
     // The response should still be present (fallback behavior)
-    const messages = page.locator('[data-testid^="message-"]');
+    const messages = page.locator('[data-role="assistant"], [data-role="user"]');
     const messageCount = await messages.count();
     expect(messageCount).toBeGreaterThan(1);
   });
 
   test("should handle rate limiting with fallback", async ({ page }) => {
-    // Set rate limited scenario
-    setSearchTestScenario(SEARCH_TEST_SCENARIOS.RATE_LIMITED);
 
     const messageInput = page.locator('textarea, [role="textbox"]').first();
     await expect(messageInput).toBeVisible({ timeout: 15000 });

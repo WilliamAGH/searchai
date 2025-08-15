@@ -3,7 +3,7 @@
  * Replaces arbitrary timeouts with proper Playwright wait conditions
  */
 
-import { Page, Locator } from "@playwright/test";
+import type { Page, Locator } from "@playwright/test";
 
 /**
  * Wait for sidebar animation to complete

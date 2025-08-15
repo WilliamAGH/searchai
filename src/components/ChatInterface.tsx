@@ -559,6 +559,28 @@ export function ChatInterface({
               }}
             />
           )}
+          {/* 
+            ⚠️ CRITICAL: DO NOT REMOVE THE messages.length > 0 CHECK! ⚠️
+            
+            The ChatToolbar (Copy/Share buttons) should ONLY appear when:
+            1. currentChatId exists (chat is created in database) AND
+            2. messages.length > 0 (there are actual messages to copy/share)
+            
+            REGRESSION HISTORY:
+            - This check has been incorrectly removed multiple times
+            - Removing it causes the toolbar to appear on empty chats
+            - Users see Copy/Share buttons with nothing to copy/share
+            
+            IF THE TEST FAILS:
+            - DO NOT remove messages.length > 0 to "fix" the test
+            - The test should wait for messages before expecting the button
+            - See tests/e2e/smoke-new-chat-share.spec.ts for correct pattern
+            
+            WHY BOTH CHECKS:
+            - currentChatId alone is NOT enough (chat can exist without messages)
+            - messages.length alone is NOT enough (stale messages during navigation)
+            - BOTH conditions must be true for correct UX
+          */}
           {currentChatId && messages.length > 0 && (
             <ChatToolbar
               onShare={openShareModal}

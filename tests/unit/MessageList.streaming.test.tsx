@@ -8,7 +8,7 @@ import type { Message } from "../../src/lib/types/message";
 vi.mock("convex/react", () => ({
   useMutation: vi.fn(() => {
     // Return a no-op mutation function that returns a resolved promise
-    return vi.fn().mockResolvedValue(undefined);
+    return vi.fn().mockResolvedValue();
   }),
 }));
 
