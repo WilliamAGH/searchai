@@ -484,6 +484,8 @@ export function ChatInterface({
     handleDraftChange,
     setShowShareModal,
     userHistory,
+    // Pass streaming state through so MessageList can render chunks incrementally
+    streamingState: unified.streamingState,
   });
 
   return (
@@ -530,11 +532,13 @@ export function ChatInterface({
               }}
             />
           )}
-          <ChatToolbar
-            onShare={openShareModal}
-            messages={messages}
-            chatTitle={currentChat?.title}
-          />
+          {currentChatId && messages.length > 0 && (
+            <ChatToolbar
+              onShare={openShareModal}
+              messages={messages}
+              chatTitle={currentChat?.title}
+            />
+          )}
           <MessageInput key={currentChatId || "root"} {...messageInputProps} />
         </div>
       </div>
