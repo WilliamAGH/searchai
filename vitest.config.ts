@@ -30,7 +30,6 @@ export default defineConfig({
       "node_modules",
       "dist",
       "tests/e2e/**",
-      "tests/integration/**",
       "tests/**/*.spec.ts",
       "tests/smoke/**",
       "convex/_generated/**",
