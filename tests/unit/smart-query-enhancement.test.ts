@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 interface EnhancedQuery {
   original: string;
   enhanced: string;
-  enhancementType: 'none' | 'context' | 'entity' | 'followup';
+  enhancementType: "none" | "context" | "entity" | "followup";
   confidence: number;
 }
 
@@ -27,33 +27,33 @@ function mockSmartEnhanceQueries(options: {
   maxQueries: number;
 }): EnhancedQuery[] {
   const { queries, context, userMessage, _enhancements, maxQueries } = options;
-  
+
   // Handle edge cases properly
   if (!queries || queries.length === 0) {
     return [];
   }
-  
+
   // Filter out empty queries first
-  const validQueries = queries.filter(q => q && q.trim().length > 0);
-  
+  const validQueries = queries.filter((q) => q && q.trim().length > 0);
+
   if (validQueries.length === 0) {
     return [];
   }
-  
+
   if (!context) {
-    return validQueries.slice(0, maxQueries).map(q => ({
+    return validQueries.slice(0, maxQueries).map((q) => ({
       original: q,
       enhanced: q,
-      enhancementType: 'none',
+      enhancementType: "none",
       confidence: 1.0,
     }));
   }
 
   const enhancedQueries: EnhancedQuery[] = [];
-  
+
   for (const query of validQueries.slice(0, maxQueries)) {
     const analysis = mockAnalyzeQueryEnhancement(query, context, userMessage);
-    
+
     if (analysis.shouldEnhance && analysis.enhancement) {
       enhancedQueries.push({
         original: query,
@@ -65,12 +65,12 @@ function mockSmartEnhanceQueries(options: {
       enhancedQueries.push({
         original: query,
         enhanced: query,
-        enhancementType: 'none',
+        enhancementType: "none",
         confidence: 1.0,
       });
     }
   }
-  
+
   return enhancedQueries;
 }
 
@@ -80,64 +80,73 @@ function mockSmartEnhanceQueries(options: {
 function mockAnalyzeQueryEnhancement(
   query: string,
   context: string,
-  _userMessage: string
+  _userMessage: string,
 ): {
   shouldEnhance: boolean;
   enhancement?: string;
-  type: 'none' | 'context' | 'entity' | 'followup';
+  type: "none" | "context" | "entity" | "followup";
   confidence: number;
 } {
   // Don't enhance simple, clear queries
-  if (query.toLowerCase().includes('what is') && query.split(/\s+/).length <= 4) {
+  if (
+    query.toLowerCase().includes("what is") &&
+    query.split(/\s+/).length <= 4
+  ) {
     return {
       shouldEnhance: false,
-      type: 'none',
+      type: "none",
       confidence: 1.0,
     };
   }
-  
+
   // Special case: "tell me more" is context-dependent, not follow-up
-  if (query.toLowerCase().trim() === 'tell me more') {
+  if (query.toLowerCase().trim() === "tell me more") {
     const contextEntity = mockExtractMostRelevantEntity(context, query);
     if (contextEntity) {
       return {
         shouldEnhance: true,
         enhancement: contextEntity,
-        type: 'context',
+        type: "context",
         confidence: 0.8,
       };
     }
   }
-  
+
   // Detect follow-up questions that need context
   if (mockIsFollowUpQuestion(query)) {
     const contextEntity = mockExtractMostRelevantEntity(context, query);
-    if (contextEntity && !query.toLowerCase().includes(contextEntity.toLowerCase())) {
+    if (
+      contextEntity &&
+      !query.toLowerCase().includes(contextEntity.toLowerCase())
+    ) {
       return {
         shouldEnhance: true,
         enhancement: contextEntity,
-        type: 'followup',
+        type: "followup",
         confidence: 0.9,
       };
     }
   }
-  
+
   // Detect context-dependent queries
   if (mockIsContextDependentQuery(query)) {
     const contextEntity = mockExtractMostRelevantEntity(context, query);
-    if (contextEntity && !query.toLowerCase().includes(contextEntity.toLowerCase())) {
+    if (
+      contextEntity &&
+      !query.toLowerCase().includes(contextEntity.toLowerCase())
+    ) {
       return {
         shouldEnhance: true,
         enhancement: contextEntity,
-        type: 'context',
+        type: "context",
         confidence: 0.7,
       };
     }
   }
-  
+
   return {
     shouldEnhance: false,
-    type: 'none',
+    type: "none",
     confidence: 1.0,
   };
 }
@@ -162,8 +171,8 @@ function mockIsFollowUpQuestion(query: string): boolean {
     // Catch "how does that work?" pattern
     /^(how|what)\s+does\s+(that|this|it)\s+\w+/i,
   ];
-  
-  return followUpPatterns.some(pattern => pattern.test(query));
+
+  return followUpPatterns.some((pattern) => pattern.test(query));
 }
 
 /**
@@ -172,44 +181,49 @@ function mockIsFollowUpQuestion(query: string): boolean {
 function mockIsContextDependentQuery(query: string): boolean {
   // Short queries often need context
   if (query.split(/\s+/).length <= 3) return true;
-  
+
   // Queries with pronouns need context
-  if (/\b(it|they|this|that|these|those|here|there)\b/i.test(query)) return true;
-  
+  if (/\b(it|they|this|that|these|those|here|there)\b/i.test(query))
+    return true;
+
   // Queries that reference previous content
   if (/\b(above|previous|earlier|mentioned|said)\b/i.test(query)) return true;
-  
+
   // Very short queries like "tell me more"
   if (query.trim().length <= 15) return true;
-  
+
   return false;
 }
 
 /**
  * Mock implementation of entity extraction
  */
-function mockExtractMostRelevantEntity(context: string, query: string): string | null {
+function mockExtractMostRelevantEntity(
+  context: string,
+  query: string,
+): string | null {
   const entities = mockExtractNamedEntities(context);
-  
+
   if (entities.length === 0) return null;
-  
+
   // Find the most relevant entity to the query
   let bestEntity = null;
   let bestScore = 0;
-  
+
   for (const entity of entities) {
     // Skip if entity is already in the query
     if (query.toLowerCase().includes(entity.toLowerCase())) {
       continue;
     }
-    
+
     const score = mockCalculateEntityRelevance(entity, query, context);
-    if (score > bestScore && score > 0.7) { // Much higher threshold for relevance
+    if (score > bestScore && score > 0.7) {
+      // Much higher threshold for relevance
       bestScore = score;
       bestEntity = entity;
     }
   }
-  
+
   return bestEntity;
 }
 
@@ -218,36 +232,74 @@ function mockExtractMostRelevantEntity(context: string, query: string): string |
  */
 function mockExtractNamedEntities(context: string): string[] {
   if (!context) return [];
-  
+
   const entities: string[] = [];
-  
+
   // Common company names and brands
   const companyNames = [
-    'Apple', 'Google', 'Microsoft', 'Amazon', 'Meta', 'Tesla', 'OpenAI', 'Anthropic',
-    'IBM', 'Oracle', 'Samsung', 'Netflix', 'Twitter', 'SpaceX', 'GitHub'
+    "Apple",
+    "Google",
+    "Microsoft",
+    "Amazon",
+    "Meta",
+    "Tesla",
+    "OpenAI",
+    "Anthropic",
+    "IBM",
+    "Oracle",
+    "Samsung",
+    "Netflix",
+    "Twitter",
+    "SpaceX",
+    "GitHub",
   ];
-  
+
   for (const company of companyNames) {
     if (context.toLowerCase().includes(company.toLowerCase())) {
       entities.push(company.toLowerCase());
     }
   }
-  
+
   // Technical terms - be more inclusive for testing
   const techTerms = [
-    'headquarters', 'HQ', 'office', 'campus', 'based', 'located', 'founded',
-    'CEO', 'founder', 'product', 'service', 'cloud', 'AI', 'machine learning',
-    'artificial intelligence', 'neural networks', 'deep learning', 'data science',
-    'programming', 'software', 'hardware', 'algorithm', 'database', 'API',
-    'framework', 'library', 'tool', 'platform', 'system', 'technology'
+    "headquarters",
+    "HQ",
+    "office",
+    "campus",
+    "based",
+    "located",
+    "founded",
+    "CEO",
+    "founder",
+    "product",
+    "service",
+    "cloud",
+    "AI",
+    "machine learning",
+    "artificial intelligence",
+    "neural networks",
+    "deep learning",
+    "data science",
+    "programming",
+    "software",
+    "hardware",
+    "algorithm",
+    "database",
+    "API",
+    "framework",
+    "library",
+    "tool",
+    "platform",
+    "system",
+    "technology",
   ];
-  
+
   for (const term of techTerms) {
     if (context.toLowerCase().includes(term.toLowerCase())) {
       entities.push(term.toLowerCase());
     }
   }
-  
+
   // Extract multi-word phrases that might be entities
   const words = context.toLowerCase().split(/\s+/);
   for (let i = 0; i < words.length - 1; i++) {
@@ -256,44 +308,57 @@ function mockExtractNamedEntities(context: string): string[] {
       entities.push(phrase);
     }
   }
-  
+
   return entities;
 }
 
 /**
  * Mock implementation of entity relevance calculation
  */
-function mockCalculateEntityRelevance(entity: string, query: string, context: string): number {
+function mockCalculateEntityRelevance(
+  entity: string,
+  query: string,
+  context: string,
+): number {
   const entityLower = entity.toLowerCase();
   const queryLower = query.toLowerCase();
   const contextLower = context.toLowerCase();
-  
+
   let score = 0;
-  
+
   // Entity appears in query (high relevance)
   if (queryLower.includes(entityLower)) {
     score += 0.8;
   }
-  
+
   // Entity appears in context (medium relevance)
   if (contextLower.includes(entityLower)) {
     score += 0.4;
   }
-  
+
   // Special case: if query mentions "headquarters" or similar, prioritize location entities
-  if (queryLower.includes('headquarters') || queryLower.includes('location') || queryLower.includes('where')) {
-    if (entityLower.includes('mountain') || entityLower.includes('redmond') || entityLower.includes('california') || entityLower.includes('washington')) {
+  if (
+    queryLower.includes("headquarters") ||
+    queryLower.includes("location") ||
+    queryLower.includes("where")
+  ) {
+    if (
+      entityLower.includes("mountain") ||
+      entityLower.includes("redmond") ||
+      entityLower.includes("california") ||
+      entityLower.includes("washington")
+    ) {
       score += 0.6;
     }
-    if (entityLower.includes('google') || entityLower.includes('microsoft')) {
+    if (entityLower.includes("google") || entityLower.includes("microsoft")) {
       score += 0.5;
     }
   }
-  
+
   // Entity is semantically related to query terms
   const queryWords = queryLower.split(/\s+/);
   const entityWords = entityLower.split(/\s+/);
-  
+
   for (const queryWord of queryWords) {
     for (const entityWord of entityWords) {
       if (queryWord.length > 2 && entityWord.length > 2) {
@@ -302,19 +367,22 @@ function mockCalculateEntityRelevance(entity: string, query: string, context: st
           score += 0.6;
         }
         // Partial match
-        else if (queryWord.includes(entityWord) || entityWord.includes(queryWord)) {
+        else if (
+          queryWord.includes(entityWord) ||
+          entityWord.includes(queryWord)
+        ) {
           score += 0.3;
         }
       }
     }
   }
-  
+
   // Lower the threshold for relevance - be more lenient
   // This ensures we find entities even when the scoring is not perfect
   if (contextLower.includes(entityLower)) {
     score += 0.2; // Bonus for context presence
   }
-  
+
   return Math.min(1.0, Math.max(0.0, score));
 }
 
@@ -324,29 +392,32 @@ function mockCalculateEntityRelevance(entity: string, query: string, context: st
 function mockFilterRelevantEnhancements(
   enhancements: string[],
   query: string,
-  context: string
+  context: string,
 ): string[] {
   if (!enhancements.length) return [];
-  
+
   const relevantEnhancements: string[] = [];
   const queryLower = query.toLowerCase();
   const contextLower = context.toLowerCase();
-  
+
   for (const enhancement of enhancements) {
     const enhancementLower = enhancement.toLowerCase();
-    
+
     // Skip if enhancement is already in query
     if (queryLower.includes(enhancementLower)) continue;
-    
+
     // Skip if enhancement is too generic
     if (enhancementLower.length < 3) continue;
-    
+
     // Check if enhancement is relevant to context AND not too generic
-    if (contextLower.includes(enhancementLower) && enhancementLower.length > 3) {
+    if (
+      contextLower.includes(enhancementLower) &&
+      enhancementLower.length > 3
+    ) {
       relevantEnhancements.push(enhancement);
     }
   }
-  
+
   return relevantEnhancements.slice(0, 2); // Limit to top 2
 }
 
@@ -354,10 +425,11 @@ describe("Smart Query Enhancement System", () => {
   describe("Basic Query Enhancement", () => {
     it("should not enhance simple, clear queries", () => {
       const queries = ["what is ai?"];
-      const context = "We discussed artificial intelligence and machine learning";
+      const context =
+        "We discussed artificial intelligence and machine learning";
       const userMessage = "what is ai?";
       const enhancements: string[] = [];
-      
+
       const result = mockSmartEnhanceQueries({
         queries,
         context,
@@ -365,7 +437,7 @@ describe("Smart Query Enhancement System", () => {
         enhancements,
         maxQueries: 3,
       });
-      
+
       expect(result).toHaveLength(1);
       // The query should remain clean - no enhancement needed
       expect(result[0].enhanced).toBe("what is ai?");
@@ -375,10 +447,11 @@ describe("Smart Query Enhancement System", () => {
 
     it("should enhance follow-up questions with context", () => {
       const queries = ["what about machine learning?"];
-      const context = "We discussed artificial intelligence and machine learning. AI is a broad field.";
+      const context =
+        "We discussed artificial intelligence and machine learning. AI is a broad field.";
       const userMessage = "what about machine learning?";
       const enhancements: string[] = [];
-      
+
       const result = mockSmartEnhanceQueries({
         queries,
         context,
@@ -386,7 +459,7 @@ describe("Smart Query Enhancement System", () => {
         enhancements,
         maxQueries: 3,
       });
-      
+
       expect(result).toHaveLength(1);
       expect(result[0].enhanced).toContain("what about machine learning?");
       // Should detect this as a follow-up question
@@ -396,10 +469,11 @@ describe("Smart Query Enhancement System", () => {
 
     it("should enhance short queries that need context", () => {
       const queries = ["tell me more"];
-      const context = "We discussed artificial intelligence and machine learning at Google";
+      const context =
+        "We discussed artificial intelligence and machine learning at Google";
       const userMessage = "tell me more";
       const enhancements: string[] = [];
-      
+
       const result = mockSmartEnhanceQueries({
         queries,
         context,
@@ -407,7 +481,7 @@ describe("Smart Query Enhancement System", () => {
         enhancements,
         maxQueries: 3,
       });
-      
+
       expect(result).toHaveLength(1);
       expect(result[0].enhanced).toContain("tell me more");
       // Should detect this as context-dependent
@@ -434,8 +508,12 @@ describe("Smart Query Enhancement System", () => {
     });
 
     it("should not detect standalone questions", () => {
-      expect(mockIsFollowUpQuestion("what is artificial intelligence?")).toBe(false);
-      expect(mockIsFollowUpQuestion("how do neural networks work?")).toBe(false);
+      expect(mockIsFollowUpQuestion("what is artificial intelligence?")).toBe(
+        false,
+      );
+      expect(mockIsFollowUpQuestion("how do neural networks work?")).toBe(
+        false,
+      );
     });
   });
 
@@ -453,21 +531,32 @@ describe("Smart Query Enhancement System", () => {
     });
 
     it("should detect reference queries", () => {
-      expect(mockIsContextDependentQuery("what was mentioned above?")).toBe(true);
-      expect(mockIsContextDependentQuery("explain the previous point")).toBe(true);
+      expect(mockIsContextDependentQuery("what was mentioned above?")).toBe(
+        true,
+      );
+      expect(mockIsContextDependentQuery("explain the previous point")).toBe(
+        true,
+      );
     });
 
     it("should not detect complete queries", () => {
-      expect(mockIsContextDependentQuery("what is artificial intelligence?")).toBe(false);
-      expect(mockIsContextDependentQuery("how do neural networks work in machine learning?")).toBe(false);
+      expect(
+        mockIsContextDependentQuery("what is artificial intelligence?"),
+      ).toBe(false);
+      expect(
+        mockIsContextDependentQuery(
+          "how do neural networks work in machine learning?",
+        ),
+      ).toBe(false);
     });
   });
 
   describe("Entity Extraction and Relevance", () => {
     it("should extract company names from context", () => {
-      const context = "Google and Microsoft are leading AI companies. Apple is also involved.";
+      const context =
+        "Google and Microsoft are leading AI companies. Apple is also involved.";
       const entities = mockExtractNamedEntities(context);
-      
+
       expect(entities).toContain("google");
       expect(entities).toContain("microsoft");
       expect(entities).toContain("apple");
@@ -477,15 +566,16 @@ describe("Smart Query Enhancement System", () => {
       const entity = "google";
       const query = "what is Google's AI strategy?";
       const context = "Google is a technology company focused on AI";
-      
+
       const relevance = mockCalculateEntityRelevance(entity, query, context);
       expect(relevance).toBeGreaterThan(0.8);
     });
 
     it("should return null for irrelevant entities", () => {
-      const context = "We discussed artificial intelligence and machine learning";
+      const context =
+        "We discussed artificial intelligence and machine learning";
       const query = "what is ai?";
-      
+
       const entity = mockExtractMostRelevantEntity(context, query);
       // Should not extract irrelevant entities
       expect(entity).toBeNull();
@@ -494,12 +584,20 @@ describe("Smart Query Enhancement System", () => {
 
   describe("Enhancement Filtering", () => {
     it("should filter out enhancements already in query", () => {
-      const enhancements = ["artificial intelligence", "machine learning", "neural networks"];
+      const enhancements = [
+        "artificial intelligence",
+        "machine learning",
+        "neural networks",
+      ];
       const query = "what is artificial intelligence?";
       const context = "We discussed AI and ML";
-      
-      const relevant = mockFilterRelevantEnhancements(enhancements, query, context);
-      
+
+      const relevant = mockFilterRelevantEnhancements(
+        enhancements,
+        query,
+        context,
+      );
+
       expect(relevant).not.toContain("artificial intelligence");
       // Only include if truly relevant to context
       if (context.toLowerCase().includes("machine learning")) {
@@ -511,9 +609,13 @@ describe("Smart Query Enhancement System", () => {
       const enhancements = ["ai", "ml", "neural networks"];
       const query = "what is machine learning?";
       const context = "We discussed AI and ML";
-      
-      const relevant = mockFilterRelevantEnhancements(enhancements, query, context);
-      
+
+      const relevant = mockFilterRelevantEnhancements(
+        enhancements,
+        query,
+        context,
+      );
+
       expect(relevant).not.toContain("ai");
       expect(relevant).not.toContain("ml");
       // Only include if truly relevant to context
@@ -525,11 +627,15 @@ describe("Smart Query Enhancement System", () => {
 
   describe("Integration Tests", () => {
     it("should handle complex conversation context", () => {
-      const queries = ["what about their headquarters?", "tell me more about AI"];
-      const context = "Google and Microsoft are leading AI companies. Google is based in Mountain View, California. Microsoft has headquarters in Redmond, Washington.";
+      const queries = [
+        "what about their headquarters?",
+        "tell me more about AI",
+      ];
+      const context =
+        "Google and Microsoft are leading AI companies. Google is based in Mountain View, California. Microsoft has headquarters in Redmond, Washington.";
       const userMessage = "what about their headquarters?";
       const enhancements = ["location", "office", "campus"];
-      
+
       const result = mockSmartEnhanceQueries({
         queries,
         context,
@@ -537,13 +643,13 @@ describe("Smart Query Enhancement System", () => {
         enhancements,
         maxQueries: 3,
       });
-      
+
       expect(result).toHaveLength(2);
-      
+
       // First query should be enhanced with location context
       expect(result[0].enhanced).toContain("what about their headquarters?");
       expect(result[0].enhancementType).toBe("followup");
-      
+
       // Second query should remain clean
       expect(result[1].enhanced).toBe("tell me more about AI");
       expect(result[1].enhancementType).toBe("none");
@@ -554,7 +660,7 @@ describe("Smart Query Enhancement System", () => {
       const context = "";
       const userMessage = "";
       const enhancements: string[] = [];
-      
+
       const result = mockSmartEnhanceQueries({
         queries,
         context,
@@ -562,7 +668,7 @@ describe("Smart Query Enhancement System", () => {
         enhancements,
         maxQueries: 3,
       });
-      
+
       // Empty queries should be filtered out
       expect(result).toHaveLength(0);
     });
@@ -572,7 +678,7 @@ describe("Smart Query Enhancement System", () => {
       const context = "Some context";
       const userMessage = "test";
       const enhancements: string[] = [];
-      
+
       const result = mockSmartEnhanceQueries({
         queries,
         context,
@@ -580,7 +686,7 @@ describe("Smart Query Enhancement System", () => {
         enhancements,
         maxQueries: 3,
       });
-      
+
       expect(result).toHaveLength(3);
     });
   });
@@ -588,10 +694,11 @@ describe("Smart Query Enhancement System", () => {
   describe("Quality Assurance", () => {
     it("should not produce malformed queries like the regression", () => {
       const queries = ["what is ai?"];
-      const context = "We discussed artificial intelligence and machine learning. The user asked about AI.";
+      const context =
+        "We discussed artificial intelligence and machine learning. The user asked about AI.";
       const userMessage = "what is ai?";
       const enhancements: string[] = [];
-      
+
       const result = mockSmartEnhanceQueries({
         queries,
         context,
@@ -599,14 +706,14 @@ describe("Smart Query Enhancement System", () => {
         enhancements,
         maxQueries: 3,
       });
-      
+
       const enhancedQuery = result[0].enhanced;
-      
+
       // Should not contain repetitive phrases
       expect(enhancedQuery).not.toMatch(/user.*user/);
       expect(enhancedQuery).not.toMatch(/ai.*ai/);
       expect(enhancedQuery).not.toMatch(/what.*what/);
-      
+
       // Should be clean and readable
       expect(enhancedQuery.split(/\s+/).length).toBeLessThan(10);
       expect(enhancedQuery).toMatch(/^[a-zA-Z0-9\s?.]+$/);
@@ -614,10 +721,11 @@ describe("Smart Query Enhancement System", () => {
 
     it("should maintain query clarity and relevance", () => {
       const queries = ["explain machine learning"];
-      const context = "We discussed artificial intelligence, machine learning, and neural networks. The user is interested in AI applications.";
+      const context =
+        "We discussed artificial intelligence, machine learning, and neural networks. The user is interested in AI applications.";
       const userMessage = "explain machine learning";
       const enhancements = ["applications", "examples", "use cases"];
-      
+
       const result = mockSmartEnhanceQueries({
         queries,
         context,
@@ -625,15 +733,15 @@ describe("Smart Query Enhancement System", () => {
         enhancements,
         maxQueries: 3,
       });
-      
+
       const enhancedQuery = result[0].enhanced;
-      
+
       // Should still be about machine learning
       expect(enhancedQuery).toContain("machine learning");
-      
+
       // Should not be overly long
       expect(enhancedQuery.split(/\s+/).length).toBeLessThan(8);
-      
+
       // Should make sense semantically
       expect(enhancedQuery).toMatch(/explain machine learning/);
     });
