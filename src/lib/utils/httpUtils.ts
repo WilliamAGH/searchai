@@ -22,17 +22,18 @@ export async function fetchJsonWithRetry(
   for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await fetch(url, options);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (response.ok) {
+        return await response.json();
       }
-      return await response.json();
+      // Do not throw inside the loop; record and retry to avoid unhandled rejections
+      lastError = new Error(`HTTP ${response.status}`);
     } catch (error) {
       lastError = error as Error;
-      if (i < maxRetries - 1) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, 1000 * Math.pow(2, i)),
-        );
-      }
+    }
+    if (i < maxRetries - 1) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 * Math.pow(2, i)),
+      );
     }
   }
 
