@@ -67,12 +67,14 @@ export function registerAIRoutes(http: HttpRouter) {
       }
       // Remove control characters and null bytes, then limit length
       const message = String(payload.message)
+        // eslint-disable-next-line no-control-regex
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
         .slice(0, 10000);
 
       // Sanitize optional systemPrompt
       const systemPrompt = payload.systemPrompt
         ? String(payload.systemPrompt)
+            // eslint-disable-next-line no-control-regex
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
             .slice(0, 2000)
         : undefined;
@@ -84,6 +86,7 @@ export function registerAIRoutes(http: HttpRouter) {
             .filter((s: unknown) => typeof s === "string")
             .map((s: unknown) =>
               String(s)
+                // eslint-disable-next-line no-control-regex
                 .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
                 .slice(0, 2048),
             )
