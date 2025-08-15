@@ -16,9 +16,17 @@ export function useChatNavigation({
 }: UseChatNavigationProps) {
   const navigate = useNavigate();
 
-  const buildChatPath = useCallback((chatId: string) => {
-    return `/chat/${chatId}`;
-  }, []);
+  const buildChatPath = useCallback(
+    (
+      chatId: string,
+      opts?: { privacy?: "private" | "shared" | "public"; shareId?: string; publicId?: string },
+    ) => {
+      if (opts?.privacy === "shared" && opts.shareId) return `/s/${opts.shareId}`;
+      if (opts?.privacy === "public" && opts.publicId) return `/p/${opts.publicId}`;
+      return `/chat/${chatId}`;
+    },
+    [],
+  );
 
   const navigateWithVerification = useCallback(
     async (chatId: string) => {
