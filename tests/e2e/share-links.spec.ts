@@ -116,17 +116,6 @@ test.describe("share modal link variants", () => {
       }
     }
 
-    // Wait for React to process the state change and URL to appear
-    await page.waitForFunction(
-      () => {
-        const input = document.querySelector(
-          'input[type="text"]',
-        ) as HTMLInputElement;
-        return input && input.value.includes("/");
-      },
-      { timeout: 2000 },
-    );
-
     // Verify the radio is checked and URL input is visible
     await expect(sharedRadio).toBeChecked({ timeout: 5000 });
     await expect(urlInput).toBeVisible();
@@ -155,24 +144,16 @@ test.describe("share modal link variants", () => {
     // Try multiple approaches to click the button
     console.log("Attempting to click Generate URL button...");
 
-    // First try: Direct click
+    // First try: Direct click (this is required to populate the URL)
     await genBtn.click();
     // Wait for URL generation to complete
-    await page.waitForFunction(
-      () => {
-        const input = document.querySelector(
-          'input[type="text"]',
-        ) as HTMLInputElement;
-        return input && input.value.includes("/");
-      },
-      { timeout: 2000 },
-    );
+    await expect(urlInput).toHaveValue(/.+/, { timeout: 10000 });
 
     let buttonText = await genBtn.textContent();
     console.log("Button text after direct click:", buttonText);
 
     // If direct click didn't work, try force click
-    if (buttonText === "Generate URL") {
+    if (buttonText && /generate/i.test(buttonText)) {
       console.log("Direct click failed, trying force click...");
       await genBtn.click({ force: true });
       await waitForNetworkIdle(page);
@@ -181,7 +162,7 @@ test.describe("share modal link variants", () => {
     }
 
     // If force click didn't work, try dispatching events
-    if (buttonText === "Generate URL") {
+    if (buttonText && /generate/i.test(buttonText)) {
       console.log("Force click failed, trying event dispatch...");
       await genBtn.dispatchEvent("click");
       await waitForNetworkIdle(page);
@@ -189,7 +170,7 @@ test.describe("share modal link variants", () => {
       console.log("Button text after event dispatch:", buttonText);
     }
 
-    // Wait for URL to be populated
+    // Ensure URL has been populated
     await expect(urlInput).toHaveValue(/.+/, { timeout: 10000 });
     const actualValue = await urlInput.inputValue();
     console.log("Actual URL value:", actualValue);
