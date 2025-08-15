@@ -64,6 +64,23 @@ export default defineConfig({
         },
       },
       enabled: true,
+      // Add cleanup and error handling
+      clean: true,
+      cleanOnRerun: true,
+      // Prevent coverage file errors
+      all: false,
+      // Add proper temp directory handling
+      tempDirectory: "./coverage/.tmp",
+    },
+    // Add test timeout and cleanup
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    // Ensure proper cleanup
+    poolOptions: {
+      forks: {
+        singleFork: false,
+        isolate: true,
+      },
     },
   },
 });
