@@ -8,14 +8,24 @@ export default defineConfig({
   retries: 0,
   reporter: "list",
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5180",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5173",
     headless: true,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  // Don't start a web server since we're using the existing dev server
-  webServer: undefined,
-  
+  webServer: [
+    {
+      command: process.env.CI
+        ? "vite preview --strictPort --port 5173"
+        : "npm run dev:frontend",
+      url: "http://localhost:5173",
+      timeout: 180_000,
+      reuseExistingServer: !process.env.CI,
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  ],
+
   // Projects for different test types
   projects: [
     {

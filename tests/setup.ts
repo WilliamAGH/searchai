@@ -9,38 +9,19 @@ global.IS_REACT_ACT_ENVIRONMENT = true;
 import * as React from "react";
 
 // React 19 has act in the main React export
-// We need to ensure compatibility with React Testing Library
-const act =
-  React.act ||
-  function (callback) {
-    // Fallback for environments where React.act is not available
-    const result = callback();
-    if (result && typeof result.then === "function") {
-      return result;
-    }
-    return Promise.resolve(result);
-  };
+// We use it directly without trying to redefine it
+const act = React.act;
 
-// Ensure React.act exists for Testing Library compatibility
-if (!React.act) {
-  (React as any).act = act;
-}
-
-// Also ensure global React has act
-if (typeof globalThis !== "undefined") {
-  if (!globalThis.React) {
-    (globalThis as any).React = React;
-  }
-  if (globalThis.React && !globalThis.React.act) {
-    (globalThis.React as any).act = act;
-  }
+// Ensure global React is available for Testing Library
+if (typeof globalThis !== "undefined" && !globalThis.React) {
+  (globalThis as any).React = React;
 }
 
 // Export act for use in tests
 export { act };
 
 // Mock react-dom/test-utils to provide act for backward compatibility
-import { vi, expect, beforeAll } from "vitest";
+import { vi, expect } from "vitest";
 // Best practice: use Testing Library's jest-dom matchers
 // (toBeInTheDocument, toBeDisabled, etc.)
 // This static import works after installing the package.
@@ -56,17 +37,8 @@ vi.mock("react-dom/test-utils", () => ({
   unstable_act: act,
 }));
 
-// Patch React Testing Library's act detection
-beforeAll(() => {
-  // React Testing Library looks for React.act
-  // We can't modify the imported React directly, but we can ensure
-  // the global has it for compatibility
-  if (typeof globalThis !== "undefined" && globalThis.React) {
-    if (!globalThis.React.act) {
-      (globalThis.React as any).act = act;
-    }
-  }
-});
+// React Testing Library will automatically detect React.act in React 19
+// No patching needed since act is already available
 
 // Custom matchers for tests
 expect.extend({
