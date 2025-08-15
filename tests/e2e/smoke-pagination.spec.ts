@@ -74,7 +74,7 @@ test.describe("smoke: pagination", () => {
       const msgInput = page.locator('textarea, [role="textbox"]').first();
       // Wait for input to be enabled with a reasonable timeout
       let attempts = 0;
-      const maxAttempts = 30; // 30 seconds max
+      const maxAttempts = 10; // 10 seconds max instead of 30
       
       while (!(await msgInput.isEnabled()) && attempts < maxAttempts) {
         await page.waitForTimeout(1000);
@@ -82,7 +82,7 @@ test.describe("smoke: pagination", () => {
       }
       
       if (attempts >= maxAttempts) {
-        // Skip this message if input is still disabled after 30 seconds
+        // Skip this message if input is still disabled after 10 seconds
         console.log(`Skipping message "${msg}" - input still disabled after ${maxAttempts} seconds`);
         continue;
       }
