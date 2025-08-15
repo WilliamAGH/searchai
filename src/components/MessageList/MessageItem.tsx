@@ -43,8 +43,11 @@ export const MessageItem = React.memo(
     onSourceHover,
     onCitationHover,
   }: MessageItemProps) {
+    const mountTimeRef = React.useRef<number>(Date.now());
     const safeTimestamp =
-      typeof message.timestamp === "number" ? message.timestamp : Date.now();
+      typeof message.timestamp === "number"
+        ? message.timestamp
+        : mountTimeRef.current;
     const safeResults = Array.isArray(message.searchResults)
       ? message.searchResults.filter(
           (r) => r && typeof r.url === "string" && typeof r.title === "string",
@@ -59,9 +62,7 @@ export const MessageItem = React.memo(
 
     return (
       <div
-        key={
-          message._id || `message-${index}-${message.timestamp || Date.now()}`
-        }
+        key={message._id || `message-${index}-${safeTimestamp}`}
         className="flex gap-2 sm:gap-4 max-w-full overflow-hidden"
         data-role={message.role}
       >
@@ -187,7 +188,7 @@ export const MessageItem = React.memo(
                         {
                           role: message.role,
                           content: message.content || "",
-                          searchResults: message.searchResults,
+                          searchResults: safeResults,
                           sources: message.sources,
                         },
                       ])
@@ -243,35 +244,44 @@ export const MessageItem = React.memo(
     if (prevProps.message.reasoning !== nextProps.message.reasoning)
       return false;
 
-    // Re-render if search results change
+    // Re-render if search results change (lightweight signature compare)
+    const sig = (arr?: typeof prevProps.message.searchResults) =>
+      (arr ?? []).map((r) => `${r?.url || ""}|${r?.title || ""}`).join(";");
     if (
-      prevProps.message.searchResults?.length !==
-      nextProps.message.searchResults?.length
+      sig(prevProps.message.searchResults) !==
+      sig(nextProps.message.searchResults)
     )
       return false;
 
-    // Re-render if collapsed state for this message changes
-    const messageId = prevProps.message._id || String(prevProps.index);
-    if (
-      prevProps.collapsedById[messageId] !== nextProps.collapsedById[messageId]
-    )
+    // Re-render if search method changes (affects Sources header)
+    if (prevProps.message.searchMethod !== nextProps.message.searchMethod)
+      return false;
+
+    // Re-render if sources array length changes (affects copy text)
+    const srcLen = (s?: string[]) => (s ? s.length : 0);
+    if (srcLen(prevProps.message.sources) !== srcLen(nextProps.message.sources))
+      return false;
+
+    // Re-render if collapsed state for this message changes (handle ID transitions)
+    const prevId = prevProps.message._id || String(prevProps.index);
+    const nextId = nextProps.message._id || String(nextProps.index);
+    if (prevProps.collapsedById[prevId] !== nextProps.collapsedById[nextId])
       return false;
     if (
-      prevProps.collapsedById[`reasoning-${messageId}`] !==
-      nextProps.collapsedById[`reasoning-${messageId}`]
+      prevProps.collapsedById[`reasoning-${prevId}`] !==
+      nextProps.collapsedById[`reasoning-${nextId}`]
     )
       return false;
 
     // Re-render if hover state changes for this message's sources
+    const hasHover = (m: typeof prevProps.message, url: string | null) =>
+      !!url && !!m.searchResults?.some((r) => r.url === url);
     if (
-      prevProps.message.searchResults?.some(
-        (r) => r.url === prevProps.hoveredSourceUrl,
-      ) !==
-      nextProps.message.searchResults?.some(
-        (r) => r.url === nextProps.hoveredSourceUrl,
-      )
-    )
+      hasHover(prevProps.message, prevProps.hoveredSourceUrl) !==
+      hasHover(nextProps.message, nextProps.hoveredSourceUrl)
+    ) {
       return false;
+    }
 
     // Skip re-render for all other prop changes
     return true;
