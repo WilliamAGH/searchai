@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 let idCounter = 0;
 
@@ -41,6 +42,14 @@ export function getSafeTimestamp(): number {
     return 0; // Will be updated on client hydration
   }
   return Date.now();
+}
+
+/**
+ * Runtime type guard for Convex chat ID validation
+ * Convex IDs are 32-character base32 strings (lowercase alphanumeric)
+ */
+export function isConvexChatId(id: string): id is Id<"chats"> {
+  return /^[0-9a-z]{32}$/.test(id);
 }
 
 /**
