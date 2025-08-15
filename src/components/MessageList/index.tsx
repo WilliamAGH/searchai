@@ -19,7 +19,6 @@ import {
   LoadErrorState,
 } from "./MessageSkeleton";
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
-import { StreamingIndicator } from "../ui/StreamingIndicator";
 import { shouldFilterMessage } from "./DeprecatedDotMessage";
 import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
