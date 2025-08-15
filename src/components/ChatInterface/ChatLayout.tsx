@@ -124,7 +124,11 @@ export function ChatLayout({
         <div className="flex-1 flex flex-col min-h-0">
           <MessageList key={String(currentChatId)} {...messageListProps} />
         </div>
-        <div className="flex-shrink-0 relative pb-16">
+        <div
+          className={`flex-shrink-0 relative ${
+            showFollowUpPrompt ? "pb-16" : ""
+          }`}
+        >
           <FollowUpPrompt
             isOpen={showFollowUpPrompt}
             onContinue={handleContinueChat}
