@@ -41,6 +41,12 @@ export { act };
 
 // Mock react-dom/test-utils to provide act for backward compatibility
 import { vi, expect, beforeAll } from "vitest";
+// Try to dynamically load @testing-library/jest-dom matchers if available.
+try {
+  const spec = "@testing-library/jest" + "-dom/vitest";
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  import(spec).catch(() => {});
+} catch {}
 
 // Mock the react-dom/test-utils module
 vi.mock("react-dom/test-utils", () => ({
