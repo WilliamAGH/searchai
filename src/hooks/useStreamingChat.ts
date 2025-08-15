@@ -16,6 +16,8 @@ export type StreamingState = {
   thinking?: string;
   hasStreamingState: boolean;
   lastUpdated?: number;
+  // NEW: Include messages from real-time subscription
+  messages?: Array<unknown>;
 };
 
 const defaultStreamingState: StreamingState = {
@@ -25,6 +27,7 @@ const defaultStreamingState: StreamingState = {
   thinking: undefined,
   hasStreamingState: false,
   lastUpdated: undefined,
+  messages: undefined,
 };
 
 export function useStreamingChat(
@@ -58,10 +61,16 @@ export function useStreamingChat(
         thinking: streamingData.streamingState.thinking,
         hasStreamingState: true,
         lastUpdated: streamingData.lastUpdated,
+        // NEW: Include messages from the subscription for real-time updates
+        messages: streamingData.messages,
       });
     } else if (streamingData && !streamingData.streamingState) {
       // Chat data exists but no streaming state
-      setLocalState(defaultStreamingState);
+      setLocalState({
+        ...defaultStreamingState,
+        // Still include messages even when not streaming
+        messages: streamingData?.messages,
+      });
     }
   }, [streamingData]);
 
