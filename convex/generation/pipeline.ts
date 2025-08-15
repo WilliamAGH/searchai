@@ -304,7 +304,7 @@ export const generationStep = internalAction({
         systemPrompt,
         userMessage: enhancedUserMessage,
         searchResults: aggregated,
-        model: "anthropic/claude-3.5-sonnet",
+        model: "google/gemini-2.5-flash-lite",
         existingReasoning: accumulatedReasoning,
       });
     } catch (error) {
@@ -422,6 +422,7 @@ async function streamResponseToMessage(args: {
   };
 
   let accumulatedContent = "";
+  let accumulatedReasoning = existingReasoning || "";
   let lastUpdateTime = Date.now();
   // Optimized update interval: Balance between responsiveness and database load
   // 50ms provides smooth streaming while reducing database writes by 50%
@@ -435,6 +436,12 @@ async function streamResponseToMessage(args: {
     // Stream from OpenRouter
     for await (const chunk of streamOpenRouter(body)) {
       chunkCount++;
+
+      // Handle reasoning/thinking content from models that support it
+      if (chunk.choices?.[0]?.delta?.reasoning) {
+        const newReasoning = chunk.choices[0].delta.reasoning;
+        accumulatedReasoning += newReasoning;
+      }
 
       if (chunk.choices?.[0]?.delta?.content) {
         const newContent = chunk.choices[0].delta.content;
@@ -461,8 +468,8 @@ async function streamResponseToMessage(args: {
               streamedContent: newContent, // Send just the new chunk for streaming
               isStreaming: true,
               thinking: "",
-              // Preserve reasoning during streaming
-              reasoning: existingReasoning,
+              // Stream the accumulated reasoning
+              reasoning: accumulatedReasoning,
             },
           );
           lastUpdateTime = now;
@@ -489,8 +496,8 @@ async function streamResponseToMessage(args: {
       thinking: "",
       sources,
       searchResults: searchResults.slice(0, TOP_RESULTS), // Align with top sources
-      // Preserve reasoning in final update
-      reasoning: existingReasoning,
+      // Final reasoning content
+      reasoning: accumulatedReasoning,
     });
   } catch (error) {
     console.error("Streaming failed:", error);
