@@ -1,7 +1,16 @@
 import { test, expect } from "@playwright/test";
 import { clickReactElement } from "./utils/react-click";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test.describe("share modal link variants", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupMSWForTest(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupMSWForTest(page);
+  });
+
   test("smoke: shared/public/llm show correct URL shapes", async ({ page }) => {
     // Go home
     await page.goto("/");

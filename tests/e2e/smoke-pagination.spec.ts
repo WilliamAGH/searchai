@@ -6,8 +6,17 @@
 
 import { test, expect } from "@playwright/test";
 import { setupConsoleErrorCollection } from "../helpers/console-helpers";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test.describe("smoke: pagination", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupMSWForTest(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupMSWForTest(page);
+  });
+
   test("basic pagination elements render without errors", async ({
     page,
     baseURL,

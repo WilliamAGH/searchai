@@ -11,12 +11,18 @@ import {
   getNewChatButton,
   createNewChat,
 } from "../helpers/sidebar-helpers";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test.describe("New Chat Functionality E2E", () => {
   test.beforeEach(async ({ page }) => {
+    await setupMSWForTest(page);
     await page.goto("/");
     // Wait for app to load
     await page.waitForLoadState("networkidle");
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupMSWForTest(page);
   });
 
   test("should create new chat when clicking New Chat button", async ({

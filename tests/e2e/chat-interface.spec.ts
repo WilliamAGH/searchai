@@ -1,9 +1,15 @@
 import { test, expect } from "@playwright/test";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test.describe("ChatInterface Integration Test", () => {
   test.beforeEach(async ({ page }) => {
+    await setupMSWForTest(page);
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupMSWForTest(page);
   });
 
   test("should render all main chat interface components", async ({ page }) => {
