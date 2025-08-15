@@ -207,6 +207,11 @@ export class LocalChatRepository extends BaseRepository {
     this.aiService.abort();
 
     try {
+      // Persist the user's message immediately so UI reflects it and toolbar is available
+      await this.addMessage(chatId, {
+        role: "user",
+        content: message,
+      });
       // Get messages for context
       const localMessages = await this.getAllMessages();
       const context = {
@@ -242,27 +247,23 @@ export class LocalChatRepository extends BaseRepository {
             // Progress will be handled via message updates
           }
         },
-        onMessageCreate: async (message) => {
-          assistantMessageId = message._id;
-          // Save initial assistant message
-          await this.addMessage(chatId, {
+        onMessageCreate: async (_message) => {
+          // Save initial assistant message placeholder and capture its ID
+          const created = await this.addMessage(chatId, {
             role: "assistant",
             content: "",
-            searchResults: message.searchResults,
-            sources: message.sources,
-            reasoning: message.reasoning,
-            searchMethod: message.searchMethod,
-            hasRealResults: message.hasRealResults,
+            // Metadata fields will be updated as chunks arrive
             isStreaming: true,
           });
+          assistantMessageId = created.id;
 
           // Yield initial metadata
-          if (message.searchResults || message.sources) {
+          if (_message.searchResults || _message.sources) {
             metadata = {
-              searchResults: message.searchResults,
-              sources: message.sources,
-              searchMethod: message.searchMethod,
-              hasRealResults: message.hasRealResults,
+              searchResults: _message.searchResults,
+              sources: _message.sources,
+              searchMethod: _message.searchMethod,
+              hasRealResults: _message.hasRealResults,
             };
           }
         },
