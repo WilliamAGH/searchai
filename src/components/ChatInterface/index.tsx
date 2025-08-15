@@ -14,6 +14,7 @@ import React, {
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useUnifiedChat } from "../../hooks/useUnifiedChat";
+import { useNavigate } from "react-router-dom";
 import { useChatNavigation } from "../../hooks/useChatNavigation";
 import { useDraftAnalyzer } from "../../hooks/useDraftAnalyzer";
 import { useMessageHandler } from "../../hooks/useMessageHandler";
@@ -62,6 +63,7 @@ function ChatInterfaceComponent({
   onRequestSignUp?: () => void;
   onRequestSignIn?: () => void;
 }) {
+  const navigate = useNavigate();
   const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
   const apiBase = buildApiBase(convexUrl);
   const resolveApi = useCallback(
@@ -244,6 +246,10 @@ function ChatInterfaceComponent({
 
   const handleNewChat = useCallback(
     async (_opts?: { userInitiated?: boolean }): Promise<string | null> => {
+      if (!isServiceAvailable) {
+        toast.error("Service unavailable: Cannot create new chats right now.");
+        return null;
+      }
       setIsCreatingChat(true);
       try {
         // Simply use the createChat action from useUnifiedChat
@@ -260,7 +266,7 @@ function ChatInterfaceComponent({
       setIsCreatingChat(false);
       return null;
     },
-    [chatActions, navigateWithVerification],
+    [isServiceAvailable, chatActions, navigateWithVerification],
   );
 
   useEffect(() => {
@@ -403,9 +409,9 @@ function ChatInterfaceComponent({
       const newChatId = await handleNewChat();
 
       if (!newChatId) {
-        // Navigate to home as fallback
-        window.location.href = "/";
-        }
+        // Navigate to home as fallback (SPA)
+        navigate("/");
+      }
     },
     onShare: openShareModal,
   });
