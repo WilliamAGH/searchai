@@ -21,13 +21,23 @@ describe.skip("usePaginatedMessages (minimal)", () => {
           hasMore: true,
         };
       },
-      actionImpl: async () => ({ messages: [], nextCursor: undefined, hasMore: false }),
+      actionImpl: async () => ({
+        messages: [],
+        nextCursor: undefined,
+        hasMore: false,
+      }),
     });
 
-    const { usePaginatedMessages } = await import("../../src/hooks/usePaginatedMessages");
+    const { usePaginatedMessages } = await import(
+      "../../src/hooks/usePaginatedMessages"
+    );
 
     const { result } = renderHook(() =>
-      usePaginatedMessages({ chatId: "chat-1", initialLimit: 10, enabled: true }),
+      usePaginatedMessages({
+        chatId: "chat-1",
+        initialLimit: 10,
+        enabled: true,
+      }),
     );
 
     // initial state uses mapped messages from the query
@@ -39,10 +49,13 @@ describe.skip("usePaginatedMessages (minimal)", () => {
 
   it("skips when disabled or chatId is null", async () => {
     setupConvexReactMock({
-      queryImpl: (_name, args) => (args === "skip" ? undefined : { messages: [], hasMore: false }),
+      queryImpl: (_name, args) =>
+        args === "skip" ? undefined : { messages: [], hasMore: false },
     });
 
-    const { usePaginatedMessages } = await import("../../src/hooks/usePaginatedMessages");
+    const { usePaginatedMessages } = await import(
+      "../../src/hooks/usePaginatedMessages"
+    );
 
     const { result } = renderHook(() =>
       usePaginatedMessages({ chatId: null, initialLimit: 5, enabled: false }),
