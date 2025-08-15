@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 import type { Message } from "../lib/types/message";
-import { LoadingMessages } from "../components/ui/LoadingText";
 
 interface UseComponentPropsArgs {
   allChats: Chat[];
@@ -189,9 +188,10 @@ export function useComponentProps(args: UseComponentPropsArgs) {
 
   const messageInputProps = useMemo(
     () => ({
-      disabled: isGenerating,
+      disabled: isGenerating, // Disable input while generating to match expected behavior
+      isGenerating, // Pass generation state separately for submit button
       placeholder: isGenerating
-        ? LoadingMessages.GENERATING
+        ? "AI is generating..." // Show generation state
         : !currentChatId
           ? "Start a new chat..."
           : "Type your message...",
