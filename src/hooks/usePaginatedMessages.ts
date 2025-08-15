@@ -290,11 +290,13 @@ export function usePaginatedMessages({
     };
   }, []);
 
+  const effectiveHasMore = initialMessages ? initialMessages.hasMore : hasMore;
+
   return {
     messages: messages.length > 0 ? messages : initialUnifiedMessages,
     isLoading: !initialMessages && enabled && !!chatId,
     isLoadingMore,
-    hasMore,
+    hasMore: effectiveHasMore,
     error,
     retryCount,
     loadMore,
