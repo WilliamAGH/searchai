@@ -35,7 +35,12 @@ export function useUnifiedChat() {
   useChatMigration(repository, isAuthenticated, state, actions.refreshChats);
 
   // NEW: Add streaming hook for real-time updates
-  const streamingState = useStreamingChat(state.currentChatId);
+  // Pass sessionId for anonymous users to access their chats
+  const sessionId =
+    !isAuthenticated && repository && "sessionId" in repository
+      ? (repository as unknown as { sessionId?: string }).sessionId
+      : undefined;
+  const streamingState = useStreamingChat(state.currentChatId, sessionId);
 
   return {
     // State
