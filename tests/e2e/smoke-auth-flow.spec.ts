@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { VITE_CONVEX_URL } from "../helpers/env";
-import { MOCK_USER_A, MOCK_USER_B } from "../helpers/users";
+import { MOCK_USER_A } from "../helpers/users";
 
 test.describe("Authentication Flow", () => {
   test("smoke: sign-in modal opens and accepts input", async ({ page }) => {
