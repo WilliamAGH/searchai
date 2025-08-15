@@ -9,7 +9,6 @@ import { useMemo } from "react";
 import { useConvex } from "convex/react";
 import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import { ConvexChatRepository } from "../lib/repositories/ConvexChatRepository";
-import { LocalChatRepository } from "../lib/repositories/LocalChatRepository";
 import { useAnonymousSession } from "./useAnonymousSession";
 
 export function useChatRepository(): IChatRepository | null {
@@ -17,36 +16,18 @@ export function useChatRepository(): IChatRepository | null {
   const sessionId = useAnonymousSession();
 
   const repository = useMemo<IChatRepository | null>(() => {
-    // FIX: Restore fallback logic for reliability
-    const getLocal = () => {
-      // Avoid SSR and locked-down environments
-      if (typeof window === "undefined") {
-        console.warn(
-          "Local repository unavailable server-side; returning null",
-        );
-        return null;
-      }
-      try {
-        return new LocalChatRepository();
-      } catch (e) {
-        console.warn(
-          "Local repository failed to initialize; returning null:",
-          e,
-        );
-        return null;
-      }
-    };
-
-    if (convexClient) {
-      try {
-        return new ConvexChatRepository(convexClient, sessionId || undefined);
-      } catch (error) {
-        console.warn("Convex repository failed, falling back to local:", error);
-        return getLocal();
-      }
+    if (!convexClient) {
+      console.error(
+        "Convex client unavailable — repository not initialized (Convex-only mode)",
+      );
+      return null;
     }
-
-    return getLocal();
+    try {
+      return new ConvexChatRepository(convexClient, sessionId || undefined);
+    } catch (error) {
+      console.error("Convex repository initialization failed:", error);
+      return null;
+    }
   }, [convexClient, sessionId]);
 
   return repository;
