@@ -32,8 +32,10 @@ test.describe("Authentication Flow", () => {
     await email.fill(MOCK_USER_A.email);
     await password.fill(MOCK_USER_A.password);
 
-    // Submit
-    await page.getByRole("button", { name: /^sign in$/i }).click();
+    // Submit - use the submit button specifically
+    const submitBtn = page.locator('form').getByRole("button", { name: /^sign in$/i });
+    await expect(submitBtn).toBeVisible();
+    await submitBtn.click();
 
     // Either modal closes or remains (auth depends on environment). Close if still open.
     const closeBtn = page.getByLabel("Close sign in modal");
