@@ -53,7 +53,7 @@ interface MessageListProps {
   streamingState?: {
     isStreaming: boolean;
     streamingContent: string;
-    streamingMessageId?: any; // Convex ID type - will be Id<"messages">
+    streamingMessageId?: Id<"messages"> | string;
     thinking?: string;
   };
 }
@@ -88,6 +88,7 @@ export function MessageList({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingMoreRef = useRef(false);
+  const previousMessagesLengthRef = useRef(0);
   const [collapsedById, setCollapsedById] = React.useState<
     Record<string, boolean>
   >({});
@@ -124,8 +125,10 @@ export function MessageList({
   const currentMessages = enhancedMessages;
   const messagesLength = currentMessages.length;
 
-  // Initialize ref after currentMessages is available
-  const previousMessagesLengthRef = useRef(currentMessages.length);
+  // Initialize ref with correct length on first render
+  if (previousMessagesLengthRef.current === 0 && messagesLength > 0) {
+    previousMessagesLengthRef.current = messagesLength;
+  }
 
   /**
    * Scroll to bottom of messages
