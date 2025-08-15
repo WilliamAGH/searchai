@@ -22,7 +22,7 @@ window.addEventListener('message', async (message) => {
   if (message.source !== window.parent) return;
   if (message.data.type !== 'chefPreviewRequest') return;
 
-  const worker = await import('https://chef.convex.dev/scripts/worker.bundled.mjs');
+  const worker = await import('https://chef.convex.dev/scripts/scripts/worker.bundled.mjs');
   await worker.respondToMessage(message);
 });
             `,
