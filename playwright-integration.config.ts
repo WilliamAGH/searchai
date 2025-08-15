@@ -19,6 +19,12 @@ export default defineConfig({
   ],
   use: {
     baseURL: "http://localhost:5173",
+    // Ensure tests run in headless mode (no browser windows)
+    headless: true,
+    launchOptions: {
+      headless: true,
+      devtools: false,
+    },
     trace: "on",
     screenshot: "on",
     video: "retain-on-failure",

@@ -10,7 +10,15 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5173",
+    // Explicitly force headless mode - runs tests in background without browser windows
     headless: true,
+    // Additional launch options to ensure browser stays in background
+    launchOptions: {
+      // Double-ensure headless mode at the browser launch level
+      headless: true,
+      // Prevent devtools from overriding headless setting
+      devtools: false,
+    },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
