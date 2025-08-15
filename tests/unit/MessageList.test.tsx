@@ -1,12 +1,6 @@
 import { test, expect, describe, beforeEach, afterEach, vi } from "vitest";
 import React from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  cleanup,
-} from "@testing-library/react";
+import { render, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { MessageList } from "../../src/components/MessageList";
 import type { Message } from "../../src/lib/types/message";
 import type { Chat } from "../../src/lib/types/chat";
@@ -92,7 +86,7 @@ describe("MessageList", () => {
   const mockOnToggleSidebar = vi.fn();
   const mockOnShare = vi.fn();
   const mockOnDeleteLocalMessage = vi.fn();
-  const mockOnRequestDeleteMessage = vi.fn();
+  const _mockOnRequestDeleteMessage = vi.fn();
   const mockOnLoadMore = vi.fn();
   const mockOnClearError = vi.fn();
 

@@ -174,7 +174,7 @@ describe("AI Route Handler", () => {
     });
 
     test("should sanitize and limit sources array", async () => {
-      const sources = new Array(30).fill("source-url");
+      const sources = Array.from({ length: 30 }, () => "source-url");
       const request = new Request("http://localhost/api/ai", {
         method: "POST",
         body: JSON.stringify({
@@ -327,7 +327,7 @@ describe("AI Route Handler", () => {
     });
 
     test("should limit chat history to 50 messages", async () => {
-      const chatHistory = new Array(100).fill(null).map((_, i) => ({
+      const chatHistory = Array.from({ length: 100 }, (_, i) => ({
         role: i % 2 === 0 ? "user" : "assistant",
         content: `Message ${i}`,
       }));
