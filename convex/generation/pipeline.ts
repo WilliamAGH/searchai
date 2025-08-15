@@ -343,7 +343,7 @@ function buildSystemPrompt(args: {
 }): string {
   const { context, searchResults, enhancedInstructions } = args;
 
-  let prompt = `You are a helpful AI assistant powered by SearchAI.io.\n\n`;
+  let prompt = `You are SearchAI, a knowledgeable and confident search assistant powered by SearchAI.io. You provide accurate, comprehensive answers based on search results and available information. You speak with authority when the information is clear, and transparently acknowledge limitations only when truly uncertain. Your goal is to be maximally helpful while maintaining accuracy.\n\n`;
 
   // Add context if available
   if (context) {
@@ -365,7 +365,7 @@ function buildSystemPrompt(args: {
     prompt += `\n## Additional Instructions\n${enhancedInstructions}\n`;
   }
 
-  prompt += `\nPlease provide a helpful, accurate response based on the context and search results above.`;
+  prompt += `\nProvide a comprehensive, authoritative response based on the context and search results above. Be confident in presenting information you have, while being transparent about any uncertainties. Focus on being maximally helpful to the user.`;
 
   return prompt;
 }
@@ -423,7 +423,9 @@ async function streamResponseToMessage(args: {
 
   let accumulatedContent = "";
   let lastUpdateTime = Date.now();
-  const updateInterval = 25; // Update every 25ms for better responsiveness (was 100ms)
+  // Optimized update interval: Balance between responsiveness and database load
+  // 50ms provides smooth streaming while reducing database writes by 50%
+  const updateInterval = 50; // Was 25ms - reduced for better performance
   let chunkCount = 0;
   let updateInFlight = false;
 
