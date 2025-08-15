@@ -140,11 +140,17 @@ export const MessageList = React.memo(function MessageList({
         // Compare IDs properly - handle both string and Convex ID types
         const msgId = typeof msg.id === "string" ? msg.id : msg._id;
         if (msgId === streamingState.streamingMessageId) {
+          // FIXED: Use the accumulated streaming content from the hook
+          // This ensures content appears as it streams in, not all at once
+          const finalContent = streamingState.streamingContent || msg.content || "";
+          
           return {
             ...msg,
-            content: streamingState.streamingContent || msg.content || "",
+            content: finalContent,
             isStreaming: true,
             thinking: streamingState.thinking,
+            // Preserve the streamedContent for incremental updates
+            streamedContent: (msg as any).streamedContent || "",
           };
         }
         return msg;
