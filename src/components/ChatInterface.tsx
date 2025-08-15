@@ -86,7 +86,7 @@ export function ChatInterface({
     showShareModal: unified.showShareModal,
     userHistory: unified.userHistory,
     isMobile: unified.isMobile,
-    isSidebarOpen: unified.isSidebarOpen,
+    isSidebarOpen: isSidebarOpen,
   } as const;
   const chatActions = useMemo(
     () => ({
@@ -559,7 +559,7 @@ export function ChatInterface({
               }}
             />
           )}
-          {currentChatId && messages.length > 0 && (
+          {currentChatId && (
             <ChatToolbar
               onShare={openShareModal}
               messages={messages}

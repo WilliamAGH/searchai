@@ -8,11 +8,12 @@ import { api } from "../../convex/_generated/api";
    “excessively deep” error and guarantees that the ID we pass to
    Convex is a proper `Id<"chats">`.
    -------------------------------------------------------------- */
-import type { Doc, Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 
-// Alias the generated document type for readability.
-type Chat = Doc<"chats">;
+// Use the app-wide Chat union to support both local and server chats.
+import type { Chat } from "../lib/types/chat";
 import { logger } from "../lib/logger";
+import { isConvexChatId } from "../lib/utils/id";
 
 /**
  * Props for the ChatSidebar component
@@ -80,10 +81,12 @@ export function ChatSidebar({
       if (!attr) return;
       // Find the chat object whose typed Id matches the attribute
       const match = chats.find((c) => String(c._id) === attr);
-      // Ensure we always pass a proper Convex Id type to the parent callback
-      const selectedId: Id<"chats"> = match
+      // Ensure we pass a correctly-typed value (Id or string) to the parent callback
+      const selectedId: Id<"chats"> | string = match
         ? match._id
-        : (attr as unknown as Id<"chats">);
+        : isConvexChatId(attr)
+          ? (attr as Id<"chats">)
+          : attr;
       handleSelectChat(selectedId);
     },
     [chats, handleSelectChat],
@@ -99,10 +102,10 @@ export function ChatSidebar({
         if (onRequestDeleteChat) {
           onRequestDeleteChat(match ? match._id : attr);
         } else if (match) {
-          if (typeof match._id === "string") {
-            onDeleteLocalChat?.(match._id);
-          } else {
+          if (isConvexChatId(match._id)) {
             await deleteChat({ chatId: match._id });
+          } else {
+            onDeleteLocalChat?.(match._id);
           }
         }
         if (match && currentChatId === match._id) {
