@@ -20,7 +20,7 @@ test.describe("share modal link variants", () => {
       await expect(
         page.locator(".bg-gradient-to-br.from-emerald-500.to-teal-600").first(),
       ).toBeVisible({ timeout: 10000 });
-      
+
       // Wait for generation to complete (no "AI is thinking" indicator)
       await expect(
         page.locator('text="AI is thinking and generating response..."'),
@@ -39,12 +39,17 @@ test.describe("share modal link variants", () => {
     await page.waitForTimeout(2000);
 
     // Check if we have messages in the chat
-    const messageElements = page.locator('[data-testid="message-item"], .message-item, [role="listitem"]');
+    const messageElements = page.locator(
+      '[data-testid="message-item"], .message-item, [role="listitem"]',
+    );
     const messageCount = await messageElements.count();
     console.log(`Found ${messageCount} message elements`);
 
     if (messageCount === 0) {
-      test.skip(true, "No messages found - chat may not have been created properly");
+      test.skip(
+        true,
+        "No messages found - chat may not have been created properly",
+      );
     }
 
     // Try multiple selectors for the share button
@@ -53,7 +58,7 @@ test.describe("share modal link variants", () => {
       'button[aria-label="Share chat"]',
       'button[title*="Share"]',
       'button:has-text("Share")',
-      '[data-testid="share-button"]'
+      '[data-testid="share-button"]',
     ];
 
     for (const selector of selectors) {
@@ -70,11 +75,14 @@ test.describe("share modal link variants", () => {
 
     if (!shareButton) {
       // If no share button found, the test environment might not support sharing
-      test.skip(true, "Share button not found - sharing may not be supported in this environment");
+      test.skip(
+        true,
+        "Share button not found - sharing may not be supported in this environment",
+      );
     }
 
     await expect(shareButton).toBeVisible({ timeout: 15000 });
-    
+
     // Open share modal via the button near the input
     const reactClickSuccess = await clickReactElement(
       page,
@@ -94,7 +102,7 @@ test.describe("share modal link variants", () => {
       '[role="dialog"][aria-modal="true"][aria-labelledby="share-modal-title"]',
       '[role="dialog"][aria-modal="true"]',
       '[data-testid="share-modal"]',
-      '.fixed.inset-0.z-50.flex.items-center.justify-center'
+      ".fixed.inset-0.z-50.flex.items-center.justify-center",
     ];
 
     for (const selector of modalSelectors) {
@@ -111,7 +119,10 @@ test.describe("share modal link variants", () => {
 
     if (!modal) {
       // If no modal found, the test environment might not support modals
-      test.skip(true, "Share modal not found - modals may not be supported in this environment");
+      test.skip(
+        true,
+        "Share modal not found - modals may not be supported in this environment",
+      );
     }
 
     await expect(modal).toBeVisible({ timeout: 15000 });
@@ -142,12 +153,14 @@ test.describe("share modal link variants", () => {
     await expect(urlInput).toBeVisible();
 
     // Find the generate button - it shows different text based on state
-    const genBtn = modal.locator('button').filter({ hasText: /generate|copy/i });
+    const genBtn = modal
+      .locator("button")
+      .filter({ hasText: /generate|copy/i });
     await expect(genBtn).toBeVisible({ timeout: 5000 });
 
     // Click the button to generate URL
     await genBtn.click();
-    
+
     // Wait for URL generation to complete
     await expect(urlInput).toHaveValue(/.+/, { timeout: 10000 });
     await expect(urlInput).toHaveValue(/\/s\//);
@@ -163,9 +176,11 @@ test.describe("share modal link variants", () => {
       await publicLabel.click({ force: true });
     }
     await expect(publicRadio).toBeChecked({ timeout: 5000 });
-    
+
     // Generate URL for public
-    const genBtn2 = modal.locator('button').filter({ hasText: /generate|copy/i });
+    const genBtn2 = modal
+      .locator("button")
+      .filter({ hasText: /generate|copy/i });
     await genBtn2.click();
     // Public URLs may remain /s/ if the server preserves share link; allow either
     await expect(urlInput).toHaveValue(/\/(p|s)\//, { timeout: 15000 });
@@ -181,9 +196,11 @@ test.describe("share modal link variants", () => {
       await llmLabel.click({ force: true });
     }
     await expect(llmRadio).toBeChecked({ timeout: 5000 });
-    
+
     // Generate URL for LLM
-    const genBtn3 = modal.locator('button').filter({ hasText: /generate|copy/i });
+    const genBtn3 = modal
+      .locator("button")
+      .filter({ hasText: /generate|copy/i });
     await genBtn3.click();
     await expect(urlInput).toHaveValue(
       /(\/api\/chatTextMarkdown\?shareId=|\/s\/)/,
@@ -194,7 +211,7 @@ test.describe("share modal link variants", () => {
 
     // Close modal; generation already persisted as needed
     await modal.getByLabel("Close").click();
-    
+
     // Re-open modal
     const reactClickSuccess2 = await clickReactElement(
       page,

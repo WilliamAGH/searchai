@@ -76,23 +76,10 @@ test.describe("ChatInterface Integration Test", () => {
     // Focus input
     await messageInput.click({ force: true });
 
-    // Type and send with Enter
-    await messageInput.type("Test with Enter");
-
-    // Store initial state
-    const initialValue = await messageInput.inputValue();
-    expect(initialValue).toBe("Test with Enter");
-
-    // Press Enter to send
-    await page.keyboard.press("Enter");
-
-    // Input should be cleared after sending
-    await expect(messageInput).toHaveValue("");
-
-    // Type multi-line with Shift+Enter
+    // Type multi-line with Shift+Enter (without sending)
     await messageInput.type("Line 1");
     await page.keyboard.down("Shift");
-    await page.keyboard.press("Enter");
+    await messageInput.press("Enter");
     await page.keyboard.up("Shift");
     await messageInput.type("Line 2");
 
@@ -100,6 +87,12 @@ test.describe("ChatInterface Integration Test", () => {
     const multilineValue = await messageInput.inputValue();
     expect(multilineValue).toContain("Line 1");
     expect(multilineValue).toContain("Line 2");
+
+    // Now test Enter to send
+    await page.keyboard.press("Enter");
+
+    // Input should be cleared after sending
+    await expect(messageInput).toHaveValue("");
   });
 
   test.skip("should auto-resize textarea as content grows", async ({
@@ -243,7 +236,7 @@ test.describe("ChatInterface Integration Test", () => {
     await page.waitForTimeout(2000);
 
     // If error shows, it should be visible
-    const hasError = await errorElement.isVisible().catch(() => false);
+    await errorElement.isVisible().catch(() => false);
 
     // Go back online
     await context.setOffline(false);
