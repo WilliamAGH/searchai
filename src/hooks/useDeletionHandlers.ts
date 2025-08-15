@@ -87,9 +87,11 @@ export function useDeletionHandlers({
   );
 
   const handleRequestDeleteChat = useCallback(
-    async (chatId: Id<"chats">) => {
+    async (chatId: Id<"chats"> | string) => {
       try {
-        await deleteChat({ chatId });
+        // Convert string to Id<"chats"> if needed
+        const convexChatId = chatId as Id<"chats">;
+        await deleteChat({ chatId: convexChatId });
 
         // Show success banner
         setUndoBanner({
@@ -150,9 +152,11 @@ export function useDeletionHandlers({
   );
 
   const handleRequestDeleteMessage = useCallback(
-    async (messageId: Id<"messages">) => {
+    async (messageId: Id<"messages"> | string) => {
       try {
-        await deleteMessage({ messageId });
+        // Convert string to Id<"messages"> if needed
+        const convexMessageId = messageId as Id<"messages">;
+        await deleteMessage({ messageId: convexMessageId });
 
         // Show success banner
         setUndoBanner({

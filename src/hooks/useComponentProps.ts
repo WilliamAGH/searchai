@@ -24,9 +24,9 @@ interface UseComponentPropsArgs {
   handleNewChatButton: () => Promise<void>;
   startNewChatSession: () => Promise<void>;
   handleDeleteLocalChat: (chatId: string) => void;
-  handleRequestDeleteChat: (chatId: Id<"chats">) => void;
+  handleRequestDeleteChat: (chatId: Id<"chats"> | string) => void;
   handleDeleteLocalMessage: (messageId: string) => void;
-  handleRequestDeleteMessage: (messageId: Id<"messages">) => void;
+  handleRequestDeleteMessage: (messageId: Id<"messages"> | string) => void;
   handleMobileSidebarClose: () => void;
   handleSendMessage: (message: string) => Promise<void>;
   handleDraftChange: (draft: string) => void;
@@ -93,21 +93,23 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       chats: allChats,
       currentChatId,
       onSelectChat: handleSelectChat,
-      onDeleteChat: currentChat?.isLocal
-        ? handleDeleteLocalChat
-        : handleRequestDeleteChat,
+      onDeleteLocalChat: handleDeleteLocalChat,
+      onRequestDeleteChat: handleRequestDeleteChat,
       onNewChat: handleNewChatButton,
+      isOpen: sidebarOpen,
+      onToggle: handleToggleSidebar,
       isCreatingChat,
     }),
     [
       allChats,
       currentChatId,
-      currentChat?.isLocal,
       isCreatingChat,
       handleSelectChat,
       handleDeleteLocalChat,
       handleRequestDeleteChat,
       handleNewChatButton,
+      sidebarOpen,
+      handleToggleSidebar,
     ],
   );
 
@@ -117,9 +119,8 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       chats: allChats,
       currentChatId,
       onSelectChat: handleSelectChat,
-      onDeleteChat: currentChat?.isLocal
-        ? handleDeleteLocalChat
-        : handleRequestDeleteChat,
+      onDeleteLocalChat: handleDeleteLocalChat,
+      onRequestDeleteChat: handleRequestDeleteChat,
       onNewChat: handleNewChatButton,
       onClose: handleMobileSidebarClose,
       isCreatingChat,
@@ -129,7 +130,6 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       isMobile,
       allChats,
       currentChatId,
-      currentChat?.isLocal,
       isCreatingChat,
       handleSelectChat,
       handleDeleteLocalChat,
@@ -191,10 +191,10 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       disabled: isGenerating, // Disable input while generating to match expected behavior
       isGenerating, // Pass generation state separately for submit button
       placeholder: isGenerating
-        ? "AI is generating..." // Show generation state
+        ? "AI is generating" // Show generation state
         : !currentChatId
-          ? "Start a new chat..."
-          : "Type your message...",
+          ? "Start a new chat"
+          : "Type your message",
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,

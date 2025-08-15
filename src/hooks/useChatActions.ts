@@ -295,7 +295,7 @@ export function createChatActions(
         content: "", // Empty content initially
         timestamp: Date.now(),
         isStreaming: true,
-        thinking: "Processing your request...", // Show thinking state immediately
+        thinking: "Processing your request", // Show thinking state immediately
       };
 
       // Update state to show generation is starting with both messages
@@ -309,7 +309,7 @@ export function createChatActions(
         messages: [...prev.messages, userMessage, placeholderAIMessage],
         searchProgress: {
           stage: "searching",
-          message: "Searching for information...",
+          message: "Searching for information",
         },
       }));
 
@@ -331,7 +331,7 @@ export function createChatActions(
                   ? {
                       ...msg,
                       content: fullContent,
-                      thinking: fullContent ? "" : "Processing...", // Clear thinking when content starts
+                      thinking: fullContent ? "" : "Processing", // Clear thinking when content starts
                       isStreaming: true,
                     }
                   : msg,

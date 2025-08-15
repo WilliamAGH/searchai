@@ -83,7 +83,8 @@ export function useUrlStateSync({
     // Only sync if we have a chat ID and the URL doesn't already match
     // Do not override when on share/public routes
     const onShareOrPublic =
-      location.pathname.startsWith("/s/") || location.pathname.startsWith("/p/") ||
+      location.pathname.startsWith("/s/") ||
+      location.pathname.startsWith("/p/") ||
       !!propShareId ||
       !!propPublicId;
 
@@ -92,7 +93,11 @@ export function useUrlStateSync({
       if (location.pathname !== expectedPath) {
         navigate(expectedPath, { replace: true });
       }
-    } else if (!onShareOrPublic && location.pathname !== "/" && location.pathname !== "/chat") {
+    } else if (
+      !onShareOrPublic &&
+      location.pathname !== "/" &&
+      location.pathname !== "/chat"
+    ) {
       // If no chat ID but we're on a chat route, go home
       navigate("/", { replace: true });
     }

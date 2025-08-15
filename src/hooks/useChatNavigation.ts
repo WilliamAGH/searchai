@@ -19,10 +19,16 @@ export function useChatNavigation({
   const buildChatPath = useCallback(
     (
       chatId: string,
-      opts?: { privacy?: "private" | "shared" | "public"; shareId?: string; publicId?: string },
+      opts?: {
+        privacy?: "private" | "shared" | "public";
+        shareId?: string;
+        publicId?: string;
+      },
     ) => {
-      if (opts?.privacy === "shared" && opts.shareId) return `/s/${opts.shareId}`;
-      if (opts?.privacy === "public" && opts.publicId) return `/p/${opts.publicId}`;
+      if (opts?.privacy === "shared" && opts.shareId)
+        return `/s/${opts.shareId}`;
+      if (opts?.privacy === "public" && opts.publicId)
+        return `/p/${opts.publicId}`;
       return `/chat/${chatId}`;
     },
     [],
