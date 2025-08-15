@@ -416,16 +416,16 @@ async function streamResponseToMessage(args: {
   const body = {
     model,
     messages,
-    temperature: 0.8,  // Increased from 0.7 for more creative/verbose responses
-    max_tokens: 4000,  // Increased from 2000 to allow longer responses
+    temperature: 0.8, // Increased from 0.7 for more creative/verbose responses
+    max_tokens: 4000, // Increased from 2000 to allow longer responses
     stream: true,
-    top_p: 0.95,  // Slightly wider nucleus sampling for more variety
-    frequency_penalty: -0.2,  // Negative value encourages some repetition (more verbose)
-    presence_penalty: 0.1,  // Slight penalty for new topics to stay focused
+    top_p: 0.95, // Slightly wider nucleus sampling for more variety
+    frequency_penalty: -0.2, // Negative value encourages some repetition (more verbose)
+    presence_penalty: 0.1, // Slight penalty for new topics to stay focused
     // For thinking models, control reasoning verbosity
+    // NOTE: OpenRouter only accepts ONE of effort or max_tokens, not both
     reasoning: {
-      max_tokens: 8000,  // Allow up to 8k tokens for reasoning
-      effort: "high" as const  // Use high effort for detailed thinking
+      effort: "high" as const, // Use high effort for detailed thinking
     },
   };
 
@@ -453,7 +453,7 @@ async function streamResponseToMessage(args: {
 
       if (chunk.choices?.[0]?.delta?.content) {
         const newContent = chunk.choices[0].delta.content;
-        
+
         // Add to reasoning to show we're processing the response
         if (chunkCount === 1 && !chunk.choices?.[0]?.delta?.reasoning) {
           accumulatedReasoning += "\n\n[Composing response...]\n";
