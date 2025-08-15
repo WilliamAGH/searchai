@@ -44,7 +44,7 @@ interface UseComponentPropsArgs {
   streamingState?: {
     isStreaming: boolean;
     streamingContent: string;
-    streamingMessageId?: string;
+    streamingMessageId?: any; // Convex ID type - will be Id<"messages">
     thinking?: string;
     searchProgress?: any;
   };
@@ -53,39 +53,41 @@ interface UseComponentPropsArgs {
 /**
  * Hook to prepare component props for all child components
  */
-export function useComponentProps({
-  allChats,
-  currentChatId,
-  currentChat,
-  currentMessages,
-  sidebarOpen,
-  isMobile,
-  isGenerating,
-  searchProgress,
-  isCreatingChat,
-  isAuthenticated,
-  handleSelectChat,
-  handleNewChatButton,
-  handleDeleteLocalChat,
-  handleRequestDeleteChat,
-  handleDeleteLocalMessage,
-  handleRequestDeleteMessage,
-  handleMobileSidebarClose,
-  handleSendMessage,
-  handleDraftChange,
-  setShowShareModal,
-  userHistory,
-  // Pagination props
-  isLoadingMore,
-  hasMore,
-  onLoadMore,
-  isLoadingMessages,
-  loadError,
-  retryCount,
-  onClearError,
-  // NEW: Add streaming state for real-time updates
-  streamingState,
-}: UseComponentPropsArgs) {
+export function useComponentProps(args: UseComponentPropsArgs) {
+  const {
+    allChats,
+    currentChatId,
+    currentChat,
+    currentMessages,
+    sidebarOpen,
+    isMobile,
+    isGenerating,
+    searchProgress,
+    isCreatingChat,
+    isAuthenticated,
+    handleSelectChat,
+    handleNewChatButton,
+    handleDeleteLocalChat,
+    handleRequestDeleteChat,
+    handleDeleteLocalMessage,
+    handleRequestDeleteMessage,
+    handleMobileSidebarClose,
+    handleSendMessage,
+    handleDraftChange,
+    setShowShareModal,
+    userHistory,
+    // Pagination props
+    isLoadingMore,
+    hasMore,
+    onLoadMore,
+    isLoadingMessages,
+    loadError,
+    retryCount,
+    onClearError,
+    // NEW: Add streaming state for real-time updates
+    streamingState,
+  } = args;
+
   const chatSidebarProps = useMemo(
     () => ({
       chats: allChats,

@@ -52,6 +52,14 @@ export interface ChatState {
   isMobile: boolean;
   /** Sidebar visibility state */
   isSidebarOpen: boolean;
+  // NEW: Add streaming state for real-time updates
+  streamingState?: {
+    isStreaming: boolean;
+    streamingContent: string;
+    streamingMessageId?: any; // Convex ID type - will be Id<"messages">
+    thinking?: string;
+    searchProgress?: any;
+  };
 }
 
 /**

@@ -53,7 +53,7 @@ interface MessageListProps {
   streamingState?: {
     isStreaming: boolean;
     streamingContent: string;
-    streamingMessageId?: string;
+    streamingMessageId?: any; // Convex ID type - will be Id<"messages">
     thinking?: string;
     searchProgress?: any;
   };
@@ -108,7 +108,9 @@ export function MessageList({
     }
     
     return messages.map(msg => {
-      if (msg.id === streamingState.streamingMessageId) {
+      // Compare IDs properly - handle both string and Convex ID types
+      const msgId = typeof msg.id === 'string' ? msg.id : msg._id;
+      if (msgId === streamingState.streamingMessageId) {
         return {
           ...msg,
           content: msg.content + (streamingState.streamingContent || ""),
