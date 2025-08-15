@@ -121,6 +121,7 @@ export interface MessageStreamChunk {
   type: "content" | "metadata" | "error" | "done" | "chunk";
   content?: string;
   thinking?: string;
+  reasoning?: string;
   metadata?: Partial<Message>;
   error?: string;
 }
