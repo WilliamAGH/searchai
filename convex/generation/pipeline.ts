@@ -13,6 +13,9 @@ import { streamOpenRouter } from "./streaming";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
+// Configuration constant for the number of top search results to use
+const TOP_RESULTS = 3 as const;
+
 /**
  * Generate streaming AI response
  * - Adds user message to chat
@@ -85,7 +88,7 @@ export const generateStreamingResponse = action({
  * - Plans context-aware search
  * - Scrapes top 3 results
  * - Builds system prompt with sources
- * - Streams response with 100ms batching
+ * - Streams response with 25ms batching
  * - Updates rolling summary
  * - Handles errors gracefully
  * @param chatId - Chat context
@@ -238,9 +241,10 @@ export const generationStep = internalAction({
           return parts.join(" ");
         });
 
-        // Execute all search queries and aggregate results
+        // Execute only the top enhanced queries and aggregate results
+        const queriesToRun = enhancedQueries.slice(0, TOP_RESULTS);
         const allResults = await Promise.all(
-          enhancedQueries.map((query: string) =>
+          queriesToRun.map((query: string) =>
             ctx.runAction(api.search.searchWeb, { query, maxResults: 5 }),
           ),
         );
@@ -249,19 +253,39 @@ export const generationStep = internalAction({
             aggregated.push(...r.results);
           }
         }
+
+        // Deduplicate by normalized URL and sort by relevance
+        const deduped: typeof aggregated = [];
+        const seen = new Set<string>();
+        for (const item of aggregated) {
+          try {
+            const u = new URL(item.url);
+            const key = (u.origin + u.pathname)
+              .toLowerCase()
+              .replace(/\/+$/, "");
+            if (seen.has(key)) continue;
+            seen.add(key);
+            deduped.push(item);
+          } catch {
+            deduped.push(item);
+          }
+        }
+        aggregated = deduped.sort(
+          (a, b) => b.relevanceScore - a.relevanceScore,
+        );
       }
 
       // 5. Build system prompt with context and search results
       // CRITICAL FIX: Use the sophisticated context from planSearch instead of rebuilding
       const systemPrompt = buildSystemPrompt({
         context: plan.contextSummary, // Use the good context from planSearch!
-        searchResults: aggregated.slice(0, 5), // Top 5 results
+        searchResults: aggregated.slice(0, TOP_RESULTS), // Top results
         enhancedInstructions: enhancements.enhancedSystemPrompt || "",
       });
 
       // Add search results info to reasoning
       if (aggregated.length > 0) {
-        accumulatedReasoning += `\nFound ${aggregated.length} search results. Using top ${Math.min(5, aggregated.length)} for context.\n`;
+        accumulatedReasoning += `\nFound ${aggregated.length} search results. Using top ${Math.min(TOP_RESULTS, aggregated.length)} for context.\n`;
       }
 
       // 6. Start streaming generation
@@ -401,6 +425,7 @@ async function streamResponseToMessage(args: {
   let lastUpdateTime = Date.now();
   const updateInterval = 25; // Update every 25ms for better responsiveness (was 100ms)
   let chunkCount = 0;
+  let updateInFlight = false;
 
   try {
     console.info("📡 Starting OpenRouter stream...");
@@ -423,14 +448,12 @@ async function streamResponseToMessage(args: {
 
         // Batch updates to reduce database writes
         const now = Date.now();
-        if (now - lastUpdateTime >= updateInterval) {
-          // Work around TS2589: Known Convex limitation with complex type inference
-          // @ts-ignore - Deep type instantiation error
-          const now = Date.now();
-          if (now - lastUpdateTime >= updateInterval) {
-            // Work around TS2589: Known Convex limitation with complex type inference
-            // @ts-ignore - Deep type instantiation error
-            await ctx.runMutation(internal.messages.updateMessage, {
+        if (!updateInFlight && now - lastUpdateTime >= updateInterval) {
+          updateInFlight = true;
+          // Explicitly type the awaited return to avoid deep instantiation issues
+          const _ret: null = await ctx.runMutation(
+            internal.messages.updateMessage,
+            {
               messageId,
               content: accumulatedContent,
               streamedContent: newContent, // Send just the new chunk for streaming
@@ -438,10 +461,10 @@ async function streamResponseToMessage(args: {
               thinking: "",
               // Preserve reasoning during streaming
               reasoning: existingReasoning,
-            });
-            lastUpdateTime = now;
-          }
+            },
+          );
           lastUpdateTime = now;
+          updateInFlight = false;
         }
       }
     }
@@ -455,7 +478,7 @@ async function streamResponseToMessage(args: {
     const sources = searchResults
       .map((r) => r.url)
       .filter(Boolean)
-      .slice(0, 5);
+      .slice(0, TOP_RESULTS);
 
     await ctx.runMutation(internal.messages.updateMessage, {
       messageId,
@@ -463,7 +486,7 @@ async function streamResponseToMessage(args: {
       isStreaming: false,
       thinking: "",
       sources,
-      searchResults: searchResults.slice(0, 10), // Include the full search results for display
+      searchResults: searchResults.slice(0, TOP_RESULTS), // Align with top sources
       // Preserve reasoning in final update
       reasoning: existingReasoning,
     });
