@@ -8,10 +8,15 @@ import { searchWithDuckDuckGo } from "../convex/search/providers/duckduckgo.ts";
 // MSW handles all fetch mocking - no need for vi.stubGlobal
 
 describe("convex/search helpers", () => {
-  it.skip("searchWithDuckDuckGo returns a Promise", async () => {
-    // Skip this test as it makes real HTTP calls
+  it("searchWithDuckDuckGo returns a Promise", async () => {
+    // MSW now handles the HTTP calls - no real network requests
     const p = searchWithDuckDuckGo("test", 1);
     expect(p instanceof Promise).toBe(true);
+
+    // Let's also verify it resolves with mocked data
+    const results = await p;
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.length).toBeGreaterThan(0);
   });
 
   it("Keyword extraction and augmentation heuristics work", () => {
