@@ -63,8 +63,9 @@ interface MessageListProps {
  */
 /**
  * Render the message list for a chat conversation with pagination support.
+ * Memoized to prevent unnecessary re-renders during streaming.
  */
-export function MessageList({
+export const MessageList = React.memo(function MessageList({
   messages,
   isGenerating,
   onToggleSidebar,
@@ -100,25 +101,45 @@ export function MessageList({
     string | null
   >(null);
 
-  // NEW: Enhance messages with streaming content for real-time updates
+  // NEW: Use real-time messages from subscription when available
   const enhancedMessages = React.useMemo(() => {
-    if (!streamingState?.isStreaming || !streamingState?.streamingMessageId) {
-      return messages;
+    // If we have real-time messages from the subscription, use those
+    if (streamingState?.messages && streamingState.messages.length > 0) {
+      // Map subscription messages to the expected format
+      const realtimeMessages = streamingState.messages.map((msg: unknown) => ({
+        ...msg,
+        id: msg._id || msg.id,
+        // Mark the streaming message
+        isStreaming: msg._id === streamingState.streamingMessageId || msg.isStreaming,
+        // Use the full content from the streaming message
+        content: msg._id === streamingState.streamingMessageId && streamingState.streamingContent
+          ? streamingState.streamingContent
+          : msg.content || "",
+        thinking: msg._id === streamingState.streamingMessageId 
+          ? streamingState.thinking 
+          : msg.thinking,
+      }));
+      return realtimeMessages;
     }
 
-    return messages.map((msg) => {
-      // Compare IDs properly - handle both string and Convex ID types
-      const msgId = typeof msg.id === "string" ? msg.id : msg._id;
-      if (msgId === streamingState.streamingMessageId) {
-        return {
-          ...msg,
-          content: msg.content + (streamingState.streamingContent || ""),
-          isStreaming: true,
-          thinking: streamingState.thinking,
-        };
-      }
-      return msg;
-    });
+    // Fallback: enhance existing messages with streaming content
+    if (streamingState?.isStreaming && streamingState?.streamingMessageId) {
+      return messages.map((msg) => {
+        // Compare IDs properly - handle both string and Convex ID types
+        const msgId = typeof msg.id === "string" ? msg.id : msg._id;
+        if (msgId === streamingState.streamingMessageId) {
+          return {
+            ...msg,
+            content: streamingState.streamingContent || msg.content || "",
+            isStreaming: true,
+            thinking: streamingState.thinking,
+          };
+        }
+        return msg;
+      });
+    }
+
+    return messages;
   }, [messages, streamingState]);
 
   // Use enhanced messages for all operations
@@ -438,4 +459,4 @@ export function MessageList({
       <div ref={messagesEndRef} />
     </div>
   );
-}
+});
