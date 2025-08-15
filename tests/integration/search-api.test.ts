@@ -423,6 +423,10 @@ describe.skip("Search API with 100% Synthetic Behavior", () => {
 });
 
 describe("Search Test Helper Utilities", () => {
+  beforeEach(() => {
+    searchTestHelper.reset();
+  });
+
   it("should track provider call history", () => {
     searchTestHelper.recordCall("serp", "test query", { results: [] });
     searchTestHelper.recordCall("openrouter", "test query", { results: [] });
