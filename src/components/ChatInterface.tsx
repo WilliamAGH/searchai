@@ -38,6 +38,7 @@ import { MessageList } from "./MessageList";
 import { MobileSidebar } from "./MobileSidebar";
 import { ShareModalContainer } from "./ShareModalContainer";
 import { UndoBanner } from "./UndoBanner";
+import { toast } from "sonner";
 
 export function ChatInterface({
   isAuthenticated,
@@ -69,6 +70,7 @@ export function ChatInterface({
   const { aiService } = useServices(convexUrl);
 
   const unified = useUnifiedChat();
+  const isServiceAvailable = !!(unified as any).repository;
   const chatState = {
     chats: unified.chats,
     currentChatId: unified.currentChatId,
@@ -253,8 +255,8 @@ export function ChatInterface({
         // Simply use the createChat action from useUnifiedChat
         const chat = await chatActions.createChat("New Chat");
         if (chat?.id) {
-          // Navigate to the new chat
-          await navigateWithVerification(`/chat/${chat.id}`);
+          // Navigate to the new chat (pass chatId, not a path)
+          await navigateWithVerification(chat.id);
           setIsCreatingChat(false);
           return chat.id;
         }
@@ -417,6 +419,18 @@ export function ChatInterface({
     chatActions,
   });
 
+  // Wrap send with service-availability guard
+  const guardedHandleSendMessage = useCallback(
+    async (message: string) => {
+      if (!isServiceAvailable) {
+        toast.error("Service unavailable: Cannot send messages right now.");
+        return;
+      }
+      await handleSendMessage(message);
+    },
+    [isServiceAvailable, handleSendMessage],
+  );
+
   useEffect(() => {
     sendRefTemp.current = sendRef.current;
   }, [sendRef]);
@@ -461,6 +475,12 @@ export function ChatInterface({
     sidebarOpen,
     onToggleSidebar,
     onNewChat: async () => {
+      if (!isServiceAvailable) {
+        toast.error(
+          "Service unavailable: Cannot create new chats right now.",
+        );
+        return;
+      }
       // Reset state first
       userSelectedChatAtRef.current = Date.now();
       setMessageCount(0);
@@ -472,9 +492,7 @@ export function ChatInterface({
 
       if (!newChatId) {
         // Navigate to home as fallback
-        await navigateWithVerification("/").catch(() => {
-          window.location.href = "/";
-        });
+        window.location.href = "/";
       }
     },
     onShare: openShareModal,
@@ -507,7 +525,7 @@ export function ChatInterface({
     handleDeleteLocalMessage,
     handleRequestDeleteMessage,
     handleMobileSidebarClose,
-    handleSendMessage,
+    handleSendMessage: guardedHandleSendMessage,
     handleDraftChange,
     setShowShareModal,
     userHistory,

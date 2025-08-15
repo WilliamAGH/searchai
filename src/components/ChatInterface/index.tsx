@@ -30,6 +30,7 @@ import { useSidebarTiming } from "../../hooks/useSidebarTiming";
 import { usePaginatedMessages } from "../../hooks/usePaginatedMessages";
 import { logger } from "../../lib/logger";
 import { ChatLayout } from "./ChatLayout";
+import { toast } from "sonner";
 import type { Chat } from "../../lib/types/chat";
 import { createChatFromData } from "../../lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "../../lib/constants/topicDetection";
@@ -74,6 +75,7 @@ function ChatInterfaceComponent({
   const unified = useUnifiedChat();
   const chatState = unified;
   const chatActions = unified;
+  const isServiceAvailable = !!unified.repository;
   const currentChatId = chatState.currentChatId;
   const isGenerating = chatState.isGenerating || localIsGenerating;
   const searchProgress = chatState.searchProgress;
@@ -247,8 +249,8 @@ function ChatInterfaceComponent({
         // Simply use the createChat action from useUnifiedChat
         const chat = await chatActions.createChat("New Chat");
         if (chat?.id) {
-          // Navigate to the new chat
-          await navigateWithVerification(`/chat/${chat.id}`);
+          // Navigate to the new chat (pass chatId, not a path)
+          await navigateWithVerification(chat.id);
           setIsCreatingChat(false);
           return chat.id;
         }
@@ -330,6 +332,18 @@ function ChatInterfaceComponent({
     chatActions,
   });
 
+  // Wrap send with service-availability guard
+  const guardedHandleSendMessage = useCallback(
+    async (message: string) => {
+      if (!isServiceAvailable) {
+        toast.error("Service unavailable: Cannot send messages right now.");
+        return;
+      }
+      await handleSendMessage(message);
+    },
+    [isServiceAvailable, handleSendMessage],
+  );
+
   useEffect(() => {
     sendRefTemp.current = sendRef.current;
   }, [sendRef]);
@@ -373,6 +387,12 @@ function ChatInterfaceComponent({
     sidebarOpen,
     onToggleSidebar,
     onNewChat: async () => {
+      if (!isServiceAvailable) {
+        toast.error(
+          "Service unavailable: Cannot create new chats right now.",
+        );
+        return;
+      }
       // Reset state first
       userSelectedChatAtRef.current = Date.now();
       setMessageCount(0);
@@ -384,10 +404,8 @@ function ChatInterfaceComponent({
 
       if (!newChatId) {
         // Navigate to home as fallback
-        await navigateWithVerification("/").catch(() => {
-          window.location.href = "/";
-        });
-      }
+        window.location.href = "/";
+        }
     },
     onShare: openShareModal,
   });
@@ -419,7 +437,7 @@ function ChatInterfaceComponent({
     handleDeleteLocalMessage,
     handleRequestDeleteMessage,
     handleMobileSidebarClose,
-    handleSendMessage,
+    handleSendMessage: guardedHandleSendMessage,
     handleDraftChange,
     setShowShareModal,
     userHistory,
