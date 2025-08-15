@@ -368,13 +368,18 @@ async function handleOpenRouterStreaming(
   const openRouterBody = {
     model: "google/gemini-2.5-flash",
     messages,
-    temperature: 0.7,
-    max_tokens: 4000,
+    temperature: 0.8,  // Increased for more creative/verbose responses
+    max_tokens: 6000,  // Increased from 4000 for longer responses
     stream: true,
     // Enable caching for repeated context
-    top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0,
+    top_p: 0.95,  // Slightly wider nucleus sampling
+    frequency_penalty: -0.2,  // Negative value encourages elaboration
+    presence_penalty: 0.1,  // Keep focused on topic
+    // For thinking models, control reasoning verbosity
+    reasoning: {
+      max_tokens: 8000,  // Allow up to 8k tokens for reasoning
+      effort: "high" as const  // Use high effort for detailed thinking
+    },
   };
 
   dlog("🤖 OPENROUTER REQUEST:");

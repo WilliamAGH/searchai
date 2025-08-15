@@ -19,6 +19,10 @@ interface OpenRouterBody {
   frequency_penalty?: number;
   presence_penalty?: number;
   stream?: boolean;
+  reasoning?: {
+    max_tokens: number;
+    effort: "low" | "medium" | "high";
+  };
 }
 
 // Re-export from shared utility

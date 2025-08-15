@@ -365,7 +365,7 @@ function buildSystemPrompt(args: {
     prompt += `\n## Additional Instructions\n${enhancedInstructions}\n`;
   }
 
-  prompt += `\nProvide a comprehensive, authoritative response based on the context and search results above. Be confident in presenting information you have, while being transparent about any uncertainties. Focus on being maximally helpful to the user.`;
+  prompt += `\nProvide a comprehensive, detailed, and authoritative response based on the context and search results above. Be thorough in your explanations, offering multiple perspectives and examples where relevant. Include specific details, steps, and context that would be helpful. Be confident in presenting information you have, while being transparent about any uncertainties. Aim for depth and completeness in your response to maximize helpfulness to the user.`;
 
   return prompt;
 }
@@ -416,9 +416,17 @@ async function streamResponseToMessage(args: {
   const body = {
     model,
     messages,
-    temperature: 0.7,
-    max_tokens: 2000,
+    temperature: 0.8,  // Increased from 0.7 for more creative/verbose responses
+    max_tokens: 4000,  // Increased from 2000 to allow longer responses
     stream: true,
+    top_p: 0.95,  // Slightly wider nucleus sampling for more variety
+    frequency_penalty: -0.2,  // Negative value encourages some repetition (more verbose)
+    presence_penalty: 0.1,  // Slight penalty for new topics to stay focused
+    // For thinking models, control reasoning verbosity
+    reasoning: {
+      max_tokens: 8000,  // Allow up to 8k tokens for reasoning
+      effort: "high" as const  // Use high effort for detailed thinking
+    },
   };
 
   let accumulatedContent = "";
