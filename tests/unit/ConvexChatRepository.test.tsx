@@ -1,6 +1,5 @@
 import { test, expect, describe, beforeEach, vi } from "vitest";
 import { ConvexChatRepository } from "../../src/lib/repositories/ConvexChatRepository";
-import { ConvexClient } from "convex/browser";
 
 // Mock the Convex client
 vi.mock("convex/browser", () => ({

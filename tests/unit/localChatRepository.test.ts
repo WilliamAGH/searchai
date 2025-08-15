@@ -38,9 +38,10 @@ describe("LocalChatRepository (basic operations)", () => {
 
     const raw = readJSON<any[]>(KEYS.CHATS);
     expect(raw).toBeTruthy();
-    expect(raw!.length).toBeGreaterThan(0);
+    expect(raw?.length).toBeGreaterThan(0);
 
-    const saved = raw![0];
+    const saved = raw?.[0];
+    expect(saved).toBeDefined();
     expect(saved._id).toBe(chat.id);
     expect(saved.title).toBe("b> Hello World /b>");
     expect(saved.isLocal).toBe(true);
@@ -56,7 +57,8 @@ describe("LocalChatRepository (basic operations)", () => {
     });
     expect(m1.id).toBeTruthy();
 
-    const rawMessages = readJSON<any[]>(KEYS.MESSAGES)!;
+    const rawMessages = readJSON<any[]>(KEYS.MESSAGES);
+    expect(rawMessages).toBeDefined();
     expect(rawMessages?.length).toBe(1);
     const saved = rawMessages[0];
     expect(saved._id).toBe(m1.id);
@@ -89,8 +91,10 @@ describe("LocalChatRepository (basic operations)", () => {
 
     // Update title using repository API (relies on getChats())
     await repo.updateChatTitle(chatId, "  New   Name  ");
-    const raw = readJSON<any[]>(KEYS.CHATS)!;
-    const saved = raw.find((c) => c._id === chatId)!;
+    const raw = readJSON<any[]>(KEYS.CHATS);
+    expect(raw).toBeDefined();
+    const saved = raw?.find((c) => c._id === chatId);
+    expect(saved).toBeDefined();
     expect(saved.title).toBe("New Name");
   });
 
@@ -137,10 +141,12 @@ describe("LocalChatRepository (basic operations)", () => {
     vi.spyOn(global, "fetch").mockRejectedValue(new Error("Network down"));
     const res = await repo.shareChat(chatId, "shared");
     expect(res.shareId).toBeTruthy();
-    expect(res.shareId!.startsWith("s_")).toBe(true);
+    expect(res.shareId?.startsWith("s_")).toBe(true);
 
-    const raw = readJSON<any[]>(KEYS.CHATS)!;
-    const saved = raw.find((c) => c._id === chatId)!;
+    const raw = readJSON<any[]>(KEYS.CHATS);
+    expect(raw).toBeDefined();
+    const saved = raw?.find((c) => c._id === chatId);
+    expect(saved).toBeDefined();
     expect(saved.privacy).toBe("shared");
     expect(saved.shareId).toBe(res.shareId);
   });
@@ -202,8 +208,10 @@ describe("LocalChatRepository (basic operations)", () => {
 
     await repo.deleteChat(chatIdA);
 
-    const chatsAfter = readJSON<any[]>(KEYS.CHATS)!;
-    const msgsAfter = readJSON<any[]>(KEYS.MESSAGES)!;
+    const chatsAfter = readJSON<any[]>(KEYS.CHATS);
+    const msgsAfter = readJSON<any[]>(KEYS.MESSAGES);
+    expect(chatsAfter).toBeDefined();
+    expect(msgsAfter).toBeDefined();
 
     expect(chatsAfter.find((c) => c._id === chatIdA)).toBeUndefined();
     expect(chatsAfter.find((c) => c._id === chatIdB)).toBeDefined();
