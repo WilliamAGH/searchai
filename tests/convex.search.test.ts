@@ -1,31 +1,15 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   __extractKeywordsForTest as extractKW,
   __augmentQueryForTest as augmentQ,
 } from "../convex/search.ts";
 import { searchWithDuckDuckGo } from "../convex/search/providers/duckduckgo.ts";
+import {
+  setSearchTestScenario,
+  SEARCH_TEST_SCENARIOS,
+} from "./mocks/search-api-mocks";
 
-// Prevent live network calls in restricted environments by stubbing fetch
-beforeAll(() => {
-  if (typeof globalThis.fetch !== "function") {
-    // @ts-expect-error - adding fetch to global for tests
-    globalThis.fetch = (async () => ({
-      ok: true,
-      json: async () => ({}),
-    })) as any;
-  }
-  vi.stubGlobal(
-    "fetch",
-    // Minimal Response-like stub used by providers
-    vi.fn(
-      async () => ({ ok: true, json: async () => ({ results: [] }) }) as any,
-    ),
-  );
-});
-
-afterAll(() => {
-  vi.unstubAllGlobals();
-});
+// MSW handles all fetch mocking - no need for vi.stubGlobal
 
 describe("convex/search helpers", () => {
   it("searchWithDuckDuckGo returns a Promise", async () => {

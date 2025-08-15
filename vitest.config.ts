@@ -12,7 +12,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   test: {
-    setupFiles: ["./tests/setup.ts"],
+    setupFiles: ["./tests/setup.ts", "./tests/mocks/setup-msw.ts"],
     environment: "node",
     // Use jsdom automatically for DOM-focused tests
     environmentMatchGlobs: [

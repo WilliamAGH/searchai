@@ -8,6 +8,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { logger } from "../lib/logger";
+import { Spinner } from "./ui/Spinner";
 import { copyToClipboard } from "../lib/clipboard";
 import { formatConversationMarkdown } from "../lib/utils";
 
@@ -455,25 +456,7 @@ export function ShareModal({
                     )
                   ) : busy ? (
                     <span className="inline-flex items-center gap-2">
-                      <svg
-                        className="w-4 h-4 animate-spin"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                      >
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          strokeWidth="4"
-                          className="opacity-25"
-                        />
-                        <path
-                          d="M4 12a8 8 0 018-8"
-                          strokeWidth="4"
-                          className="opacity-75"
-                        />
-                      </svg>
+                      <Spinner size="sm" />
                       Generating…
                     </span>
                   ) : (

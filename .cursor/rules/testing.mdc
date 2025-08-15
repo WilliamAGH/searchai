@@ -228,6 +228,32 @@ global.ResizeObserver = class ResizeObserver {
 
 ## 🧪 React Testing Patterns (React 19)
 
+### React 19 Specific Setup
+
+```typescript
+// React 19 Test Setup - CRITICAL for compatibility
+// tests/setup.ts
+import * as React from 'react'
+
+// React 19 exports act directly - DO NOT redefine
+// React Testing Library v16+ automatically handles act
+const act = React.act // Use directly, don't wrap or redefine
+
+// Set global environment flag
+global.IS_REACT_ACT_ENVIRONMENT = true
+
+// Ensure global React is available for Testing Library
+if (typeof globalThis !== 'undefined' && !globalThis.React) {
+  (globalThis as any).React = React
+}
+
+// Mock react-dom/test-utils for backward compatibility
+vi.mock('react-dom/test-utils', () => ({
+  act: React.act,
+  unstable_act: React.act,
+}))
+```
+
 ### Component Testing Best Practices
 
 ```typescript
@@ -324,6 +350,125 @@ describe('Async Operations', () => {
 ```
 
 ## 🎭 Playwright E2E Testing
+
+### Common Playwright Issues & Solutions
+
+#### WebSocket Connection Errors
+```typescript
+// Problem: "WebSocket connection to 'ws://localhost:5173/' failed"
+// Solution 1: Ignore WebSocket errors in tests that don't need them
+test('my test', async ({ page }) => {
+  // Filter out WebSocket errors
+  page.on('console', msg => {
+    if (msg.text().includes('WebSocket connection')) return
+    console.log(msg.text())
+  })
+  
+  // Alternative: Set up console error collection with filtering
+  const consoleErrors: string[] = []
+  page.on('console', msg => {
+    if (msg.type() === 'error' && !msg.text().includes('WebSocket')) {
+      consoleErrors.push(msg.text())
+    }
+  })
+})
+
+// Solution 2: Ensure dev server is properly started
+webServer: {
+  command: 'npm run dev',
+  url: 'http://localhost:5173',
+  reuseExistingServer: !process.env.CI,
+  timeout: 120 * 1000,
+  stdout: 'pipe', // Show server output for debugging
+  stderr: 'pipe',
+}
+```
+
+#### Duplicate React Key Warnings
+```typescript
+// Problem: "Encountered two children with the same key"
+// This is a CODE issue, not a test issue!
+// Fix in component:
+export function MessageList({ messages }) {
+  return (
+    <div>
+      {messages.map((msg) => (
+        // Ensure unique keys - use ID, not index
+        <Message key={msg.id || `${msg.timestamp}-${msg.content}`} {...msg} />
+      ))}
+    </div>
+  )
+}
+
+// In test: Assert no duplicate key warnings
+test('no duplicate keys', async ({ page }) => {
+  const consoleWarnings: string[] = []
+  page.on('console', msg => {
+    if (msg.type() === 'warning' && msg.text().includes('same key')) {
+      consoleWarnings.push(msg.text())
+    }
+  })
+  
+  // ... your test
+  
+  expect(consoleWarnings).toHaveLength(0)
+})
+```
+
+#### Mobile Sidebar Visibility Issues
+```typescript
+// Problem: Mobile sidebar not visible in tests
+// Solution: Properly set viewport and wait for animations
+
+test.describe('Mobile Tests', () => {
+  test.use({ 
+    viewport: { width: 375, height: 667 }, // iPhone size
+    isMobile: true, // Enable mobile behavior
+  })
+  
+  test('mobile sidebar opens', async ({ page }) => {
+    await page.goto('/')
+    
+    // Click hamburger menu
+    await page.getByRole('button', { name: /menu/i }).click()
+    
+    // Wait for animation to complete
+    await page.waitForSelector('[role="dialog"]', { 
+      state: 'visible',
+      timeout: 5000 
+    })
+    
+    // Alternative: Wait for specific animation class
+    await page.waitForFunction(() => {
+      const dialog = document.querySelector('[role="dialog"]')
+      return dialog && !dialog.classList.contains('animate-out')
+    })
+  })
+})
+```
+
+#### Share Button Not Visible
+```typescript
+// Problem: Share button not appearing in tests
+// Solution: Ensure chat is created and messages exist first
+
+test('share functionality', async ({ page }) => {
+  // First create a chat with a message
+  await page.goto('/')
+  
+  const input = page.getByRole('textbox', { name: /message/i })
+  await input.fill('Test message')
+  await input.press('Enter')
+  
+  // Wait for chat to be created and message to appear
+  await page.waitForSelector('[data-testid="message-user"]')
+  
+  // Share button may only appear after chat has messages
+  await expect(
+    page.getByRole('button', { name: /share/i })
+  ).toBeVisible({ timeout: 10000 })
+})
+```
 
 ### Configuration for Vite/React
 
@@ -462,73 +607,296 @@ test.describe('Chat Functionality', () => {
 })
 ```
 
-## 🔌 API Mocking with MSW
+## 🔌 API Mocking with MSW (IMPLEMENTED ✅)
 
 ### Setup Mock Service Worker
 
 ```typescript
-// src/test/mocks/handlers.ts
+// tests/mocks/search-api-mocks.ts - COMPREHENSIVE SEARCH MOCKING
 import { http, HttpResponse } from 'msw'
+import type { SearchResult } from '../../convex/search/providers/serpapi'
 
-export const handlers = [
-  http.post('/api/chat/send', async ({ request }) => {
-    const body = await request.json()
-    
-    return HttpResponse.json({
-      id: 'msg_123',
-      content: body.content,
-      role: 'user',
-      timestamp: new Date().toISOString(),
-    })
+// Test scenarios for deterministic testing
+export const SEARCH_TEST_SCENARIOS = {
+  STANDARD: 'standard',
+  NO_RESULTS: 'no_results',
+  ERROR: 'error',
+  TIMEOUT: 'timeout',
+  RATE_LIMITED: 'rate_limited',
+  PARTIAL_RESULTS: 'partial_results',
+  CREATOR_QUERY: 'creator_query',
+  TECHNICAL_QUERY: 'technical_query',
+  CURRENT_EVENTS: 'current_events',
+} as const
+
+// Control test behavior
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.ERROR)
+setResponseDelay(500) // Simulate network latency
+setErrorRate(0.3)     // 30% random errors
+
+// Mock handlers for all search providers
+export const searchHandlers = [
+  // SERP API DuckDuckGo
+  http.get('https://serpapi.com/search', async ({ request }) => {
+    // Returns deterministic results based on scenario
   }),
   
-  http.get('/api/chats', () => {
-    return HttpResponse.json([
-      { id: 'chat_1', title: 'Test Chat 1' },
-      { id: 'chat_2', title: 'Test Chat 2' },
-    ])
+  // OpenRouter search & planner
+  http.post('https://openrouter.ai/api/v1/chat/completions', async ({ request }) => {
+    // Handles both search requests and planner requests
   }),
   
-  // Error simulation
-  http.get('/api/error', () => {
-    return HttpResponse.error()
+  // Direct DuckDuckGo API
+  http.get('https://api.duckduckgo.com/*', async ({ request }) => {
+    // Returns HTML formatted results
   }),
 ]
 
-// src/test/mocks/server.ts
+// tests/mocks/server.ts
 import { setupServer } from 'msw/node'
-import { handlers } from './handlers'
+import { searchHandlers } from './search-api-mocks'
 
-export const server = setupServer(...handlers)
+export const server = setupServer(...searchHandlers)
 ```
 
-### Integration in Tests
+### Integration in Tests (ACTIVE)
 
 ```typescript
-// src/test/setup.ts
-import { server } from './mocks/server'
+// tests/mocks/setup-msw.ts - AUTO-LOADED BY VITEST
+import { beforeAll, afterEach, afterAll } from 'vitest'
+import { server } from './server'
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-// In specific tests
-import { http, HttpResponse } from 'msw'
-import { server } from '../test/mocks/server'
+// vitest.config.ts - CONFIGURED
+setupFiles: ["./tests/setup.ts", "./tests/mocks/setup-msw.ts"]
+```
 
-test('handles API errors', async () => {
-  // Override handler for this test
-  server.use(
-    http.post('/api/chat/send', () => {
-      return HttpResponse.json(
-        { error: 'Service unavailable' },
-        { status: 503 }
-      )
-    })
-  )
+### Search API Testing Examples
+
+```typescript
+// Test provider fallback chain
+it('should fallback through providers', async () => {
+  mockSearchResponse('serp', null, 500) // Make SERP fail
   
-  // Test error handling...
+  const results = await searchWeb({ query: 'test' })
+  expect(results.searchMethod).toBe('openrouter') // Falls back
 })
+
+// Test search planner intelligence
+it('should plan searches based on context', async () => {
+  const plan = await planSearch({
+    chatId: 'test-id',
+    newMessage: 'What is React?',
+    maxContextMessages: 10
+  })
+  
+  expect(plan.shouldSearch).toBe(true)
+  expect(plan.queries.length).toBeGreaterThan(0)
+})
+
+// Test error resilience
+it('should handle errors gracefully', async () => {
+  setSearchTestScenario(SEARCH_TEST_SCENARIOS.ERROR)
+  
+  const results = await searchWeb({ query: 'test' })
+  expect(results.searchMethod).toBe('fallback')
+  expect(results.hasRealResults).toBe(false)
+})
+```
+
+### Test Helper Utilities
+
+```typescript
+import { searchTestHelper } from '../mocks/search-api-mocks'
+
+// Track API calls
+searchTestHelper.getCallCount('serp')
+searchTestHelper.verifyFallbackChain()
+searchTestHelper.verifyCaching('query')
+
+// Reset between tests
+searchTestHelper.reset()
+```
+
+## 🔍 Search API Testing Best Practices (NEW)
+
+### Available Test Scenarios
+
+Use these predefined scenarios for comprehensive testing:
+
+```typescript
+import { SEARCH_TEST_SCENARIOS, setSearchTestScenario } from './mocks/search-api-mocks'
+
+// Standard operation with good results
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.STANDARD)
+
+// Empty results testing
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.NO_RESULTS)
+
+// Network and provider errors
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.ERROR)
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.TIMEOUT)
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.RATE_LIMITED)
+
+// Partial/incomplete data
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.PARTIAL_RESULTS)
+
+// Domain-specific scenarios
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.CREATOR_QUERY)   // William Callahan detection
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.TECHNICAL_QUERY) // Documentation results
+setSearchTestScenario(SEARCH_TEST_SCENARIOS.CURRENT_EVENTS)  // News/recent content
+```
+
+### Testing Provider Fallback Chain
+
+```typescript
+describe('Search Provider Fallback', () => {
+  it('follows correct fallback order', async () => {
+    // SERP API → OpenRouter → DuckDuckGo → Fallback Links
+    process.env.SERP_API_KEY = 'test'
+    process.env.OPENROUTER_API_KEY = 'test'
+    
+    // Make first two providers fail
+    mockSearchResponse('serp', null, 500)
+    mockSearchResponse('openrouter', null, 503)
+    
+    const results = await searchWeb({ query: 'test' })
+    
+    // Should fall back to DuckDuckGo
+    expect(results.searchMethod).toBe('duckduckgo')
+    
+    // Verify fallback chain was followed
+    expect(searchTestHelper.verifyFallbackChain()).toBe(true)
+  })
+})
+```
+
+### Testing Search Planner Intelligence
+
+```typescript
+describe('Search Planner', () => {
+  it('detects when search is needed', async () => {
+    const informationQuery = await planSearch({
+      chatId: 'test',
+      newMessage: 'What is the latest AI news?',
+      maxContextMessages: 10
+    })
+    expect(informationQuery.shouldSearch).toBe(true)
+    
+    const greeting = await planSearch({
+      chatId: 'test',
+      newMessage: 'Hello there!',
+      maxContextMessages: 10
+    })
+    expect(greeting.shouldSearch).toBe(false)
+  })
+  
+  it('suggests new chat for topic changes', async () => {
+    const plan = await planSearch({
+      chatId: 'test',
+      newMessage: 'Let\'s talk about something completely different',
+      maxContextMessages: 10
+    })
+    expect(plan.suggestNewChat).toBe(true)
+  })
+})
+```
+
+### Testing Error Resilience
+
+```typescript
+describe('Error Handling', () => {
+  it('handles intermittent failures', async () => {
+    setErrorRate(0.3) // 30% failure rate
+    
+    const attempts = 10
+    const results = await Promise.allSettled(
+      Array(attempts).fill(null).map(() => 
+        searchWeb({ query: 'test', maxResults: 5 })
+      )
+    )
+    
+    const successful = results.filter(r => r.status === 'fulfilled')
+    expect(successful.length).toBeGreaterThan(attempts * 0.5)
+  })
+  
+  it('handles slow networks', async () => {
+    setResponseDelay(2000) // 2 second delay
+    
+    const start = Date.now()
+    await searchWeb({ query: 'test' })
+    const duration = Date.now() - start
+    
+    expect(duration).toBeGreaterThanOrEqual(2000)
+  })
+})
+```
+
+### Testing Cache Behavior
+
+```typescript
+describe('Search Caching', () => {
+  it('caches identical queries', async () => {
+    const query = 'test caching'
+    
+    // First call - hits API
+    const result1 = await searchWeb({ query, maxResults: 5 })
+    const callCount1 = searchTestHelper.getCallCount()
+    
+    // Second call - should use cache
+    const result2 = await searchWeb({ query, maxResults: 5 })
+    const callCount2 = searchTestHelper.getCallCount()
+    
+    expect(result1).toEqual(result2)
+    expect(callCount2).toBe(callCount1) // No new API calls
+    expect(searchTestHelper.verifyCaching(query)).toBe(true)
+  })
+})
+```
+
+### E2E Search Testing with Playwright
+
+```typescript
+// tests/e2e/search-with-mocks.spec.ts
+import { test, expect } from '@playwright/test'
+import { setSearchTestScenario, SEARCH_TEST_SCENARIOS } from '../mocks/search-api-mocks'
+
+test('handles search results in UI', async ({ page }) => {
+  setSearchTestScenario(SEARCH_TEST_SCENARIOS.TECHNICAL_QUERY)
+  
+  await page.goto('/')
+  const input = page.locator('[role="textbox"]').first()
+  
+  await input.type('How do React hooks work?')
+  await page.keyboard.press('Enter')
+  
+  // Wait for response with search results
+  await expect(input).toBeEnabled({ timeout: 30000 })
+  
+  // Verify search results are integrated
+  const response = page.locator('[data-testid="message-assistant"]').last()
+  await expect(response).toContainText(/React/)
+})
+```
+
+### Debugging Search Tests
+
+```typescript
+// Enable detailed logging
+import { searchTestHelper } from './mocks/search-api-mocks'
+
+// After test execution
+console.log('API Calls:', searchTestHelper.getCallCount())
+console.log('Last Call:', searchTestHelper.getLastCall())
+console.log('Fallback Chain Valid:', searchTestHelper.verifyFallbackChain())
+
+// Check specific provider calls
+console.log('SERP calls:', searchTestHelper.getCallCount('serp'))
+console.log('OpenRouter calls:', searchTestHelper.getCallCount('openrouter'))
+console.log('DuckDuckGo calls:', searchTestHelper.getCallCount('duckduckgo'))
 ```
 
 ## 📊 Coverage Requirements
@@ -762,6 +1130,28 @@ describe('ChatInterface', () => {
 
 ## 🚨 Common Pitfalls to Avoid
 
+### React 19 Specific Pitfalls
+
+#### 1. Trying to Redefine React.act
+```typescript
+// ❌ BAD: Will throw "Cannot redefine property: act"
+if (!React.act) {
+  (React as any).act = customAct
+}
+
+// ✅ GOOD: Use React.act directly
+const act = React.act // React 19 exports it
+```
+
+#### 2. Using Outdated Testing Library Versions
+```json
+// ❌ BAD: Old versions don't support React 19
+"@testing-library/react": "^14.0.0"
+
+// ✅ GOOD: Use v16+ for React 19
+"@testing-library/react": "^16.0.0"
+```
+
 ### 1. Testing Implementation Details
 
 ```typescript
@@ -855,6 +1245,107 @@ expect(window.location.pathname).toBe('/home')
 - VS Code: Playwright Test for VS Code
 - Chrome: React Developer Tools
 - Chrome: Testing Playground
+
+## 🔧 Troubleshooting Guide
+
+### Vitest Issues
+
+#### Worker Pool Errors
+```bash
+# Error: "Cannot find module" or worker termination
+# Solution: Switch to forks pool
+vitest run --pool=forks
+
+# For CI environments
+vitest run --pool=vmForks --poolOptions.vmForks.singleFork
+```
+
+#### Memory Issues in CI
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true, // Run tests sequentially in one process
+      }
+    },
+    maxConcurrency: 1, // Limit concurrent tests
+  }
+})
+```
+
+### Playwright Issues
+
+#### Tests Failing Only in CI
+```typescript
+// playwright.config.ts
+export default defineConfig({
+  // Increase timeouts for CI
+  use: {
+    actionTimeout: process.env.CI ? 30000 : 10000,
+    navigationTimeout: process.env.CI ? 60000 : 30000,
+  },
+  
+  // More retries in CI
+  retries: process.env.CI ? 3 : 1,
+  
+  // Disable parallelism if flaky
+  workers: process.env.CI ? 1 : undefined,
+})
+```
+
+#### Network Errors (ERR_CONNECTION_REFUSED)
+```typescript
+// Ensure server is ready before tests
+webServer: {
+  command: 'npm run dev',
+  url: 'http://localhost:5173',
+  reuseExistingServer: !process.env.CI,
+  // Add health check
+  timeout: 120 * 1000,
+  stdout: 'pipe',
+  stderr: 'pipe',
+}
+
+// Or use custom wait logic
+test.beforeAll(async () => {
+  // Wait for server to be ready
+  await waitForServer('http://localhost:5173', { timeout: 30000 })
+})
+```
+
+### React Testing Library Issues
+
+#### Act Warnings
+```typescript
+// Warning: "An update was not wrapped in act(...)"
+// Solution 1: Use async utilities
+await waitFor(() => {
+  expect(screen.getByText('Done')).toBeInTheDocument()
+})
+
+// Solution 2: Ensure all updates complete
+await act(async () => {
+  await userEvent.click(button)
+})
+
+// Solution 3: For React 19, act is automatic with RTL v16+
+// Just ensure you're using the latest version
+```
+
+#### Timeout Issues
+```typescript
+// Increase timeout for slow operations
+await waitFor(
+  () => expect(screen.getByText('Loaded')).toBeInTheDocument(),
+  { timeout: 5000 } // Default is 1000ms
+)
+
+// For findBy queries
+const element = await screen.findByText('Loaded', {}, { timeout: 5000 })
+```
 
 ---
 

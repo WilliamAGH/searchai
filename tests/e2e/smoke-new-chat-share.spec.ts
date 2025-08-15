@@ -14,6 +14,10 @@ test.describe("smoke: new chat share flow has no console errors", () => {
       const t = msg.text() || "";
       // Ignore known benign navigation-soft-fail logs from optimistic nav
       if (/Failed to navigate to new (local )?chat:/i.test(t)) return;
+      // Ignore WebSocket errors from Vite HMR
+      if (/WebSocket connection to 'ws:\/\/localhost:\d+\/' failed/.test(t))
+        return;
+      if (/ERR_CONNECTION_REFUSED.*@vite\/client/.test(t)) return;
       consoleErrors.push(t);
     });
     page.on("pageerror", (err) => consoleErrors.push(err.message));
@@ -46,7 +50,23 @@ test.describe("smoke: new chat share flow has no console errors", () => {
     await input.type("E2E smoke hello");
     await page.keyboard.press("Enter");
 
-    // Wait for the share button to be visible and click it
+    // Wait for the message to be sent and chat to be created
+    // The share button should only appear after both conditions are met:
+    // 1. Chat has been created (currentChatId exists)
+    // 2. At least one message exists in the chat
+    await page.waitForFunction(
+      () => {
+        // Check if there's at least one message element in the DOM
+        // Messages use data-role="user" or data-role="assistant" attributes
+        const messages = document.querySelectorAll(
+          '[data-role="user"], [data-role="assistant"]',
+        );
+        return messages.length > 0;
+      },
+      { timeout: 10000 },
+    );
+
+    // Now wait for the share button to be visible
     const shareButton = page.locator('button[aria-label="Share chat"]');
     await expect(shareButton).toBeVisible({ timeout: 10000 });
 

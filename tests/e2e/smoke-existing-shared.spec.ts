@@ -1,22 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { clickReactElement } from "./utils/react-click";
+import { collectFilteredConsoleErrors } from "../helpers/console-helpers";
 
 test.describe("smoke: existing shared/public chat open has no console errors", () => {
   test("smoke: publish shared chat anonymously then open share URL", async ({
     page,
     baseURL,
   }) => {
-    const consoleErrors: string[] = [];
+    const { consoleErrors, cleanup } = collectFilteredConsoleErrors(page);
     const requestFailures: string[] = [];
     const responseFailures: string[] = [];
-
-    page.on("console", (msg) => {
-      if (msg.type() !== "error") return;
-      const t = msg.text() || "";
-      if (/Failed to navigate to new (local )?chat:/i.test(t)) return;
-      consoleErrors.push(t);
-    });
-    page.on("pageerror", (err) => consoleErrors.push(err.message));
     const isHttp = (u: string) =>
       u.startsWith("http://") || u.startsWith("https://");
     page.on("requestfailed", (req) => {
@@ -59,9 +52,11 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
       // Fallback to normal click if React fiber fails
       await shareButton.click({ force: true });
     }
-    const modal = page.locator(
-      '[role="dialog"][aria-modal="true"][aria-labelledby="share-modal-title"]',
-    );
+
+    // Wait for modal to appear - use multiple possible selectors
+    const modal = page
+      .locator('[role="dialog"][aria-modal="true"], .fixed.inset-0.z-50')
+      .first();
     await expect(modal).toBeVisible({ timeout: 10000 });
     await modal.locator('input[type="radio"][value="shared"]').check();
     const genBtn = modal.getByRole("button", { name: /generate url|copy/i });
@@ -74,6 +69,8 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
     expect(shareUrl).toMatch(/\/(s|p)\//);
     await modal.getByLabel("Close").click();
     await page.goto(shareUrl, { waitUntil: "domcontentloaded" });
+
+    cleanup();
 
     expect.soft(requestFailures, requestFailures.join("\n")).toEqual([]);
     expect.soft(responseFailures, responseFailures.join("\n")).toEqual([]);

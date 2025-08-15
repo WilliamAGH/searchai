@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 import type { Message } from "../lib/types/message";
+import { LoadingMessages } from "../components/ui/LoadingText";
 
 interface UseComponentPropsArgs {
   allChats: Chat[];

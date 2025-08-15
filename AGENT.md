@@ -48,26 +48,20 @@ BUILD_TOOL: Vite
 BUILD_TOOL_VERSION: 6.x
 BACKEND: Convex
 
-# Testing Configuration
-# This section defines the testing framework and tools used by this project.
-# The test.md command uses these variables to adapt its guidance.
-TEST_RUNNER: Playwright              # The test runner executable (Jest, Vitest, Playwright, Mocha, etc.)
-TEST_FRAMEWORK: Playwright Test       # The testing framework/library (Jest, Vitest, Playwright Test, Mocha+Chai, etc.)
-TEST_CONFIG_PATH: playwright.config.ts # Path to the test configuration file
-TEST_FILE_PATTERN: **/*.{test,spec}.{ts,tsx,js,jsx}  # Pattern for test files
-TEST_COVERAGE_COMMAND: npm run test:coverage  # Command to run tests with coverage
-TEST_WATCH_COMMAND: npm run test:watch        # Command to run tests in watch mode
-TEST_SMOKE_COMMAND: npm run test:smoke        # Command to run smoke tests
-TEST_UNIT_COMMAND: npm run test:unit          # Command to run unit tests (if applicable)
-TEST_E2E_COMMAND: npm run test:e2e            # Command to run E2E tests (if applicable)
-
-# Test Environment
-TEST_ENV: node                        # Environment tests run in (node, jsdom, happy-dom, etc.)
-TEST_TIMEOUT: 30000                   # Default test timeout in milliseconds
-
-# Mocking Libraries (if used)
-MOCK_LIBRARY: built-in                # Mocking library (jest.fn, vi.fn, sinon, etc.)
-ASSERTION_LIBRARY: expect             # Assertion library (expect, chai, assert, etc.)
+# Testing
+TEST_RUNNER: Playwright
+TEST_FRAMEWORK: Playwright Test
+TEST_CONFIG_PATH: playwright.config.ts
+TEST_FILE_PATTERN: **/*.{test,spec}.{ts,tsx,js,jsx}
+TEST_COVERAGE_COMMAND: npm run test:coverage
+TEST_WATCH_COMMAND: npm run test:watch
+TEST_SMOKE_COMMAND: npm run test:smoke
+TEST_UNIT_COMMAND: npm run test:unit
+TEST_E2E_COMMAND: npm run test:e2e
+TEST_ENV: node
+TEST_TIMEOUT: 30000
+MOCK_LIBRARY: built-in
+ASSERTION_LIBRARY: expect
 
 # Code Quality
 LINTER: Oxlint v1.x
@@ -86,7 +80,7 @@ TYPE_CHECKER: TypeScript (tsc)
 #   * Custom transform/refine logic
 
 # Directories
-TYPES_DIR: src/types/
+TYPES_DIR: src/types/          # UI-only types, NEVER database entities
 SCHEMAS_DIR: src/schemas/
 DOCS_DIR: docs/
 COMPONENTS_DIR: src/components/
@@ -232,687 +226,206 @@ export function validateChatMessage(message: string) {
 
 **THE RULE:** Use existing code. Find it in the repo, don't start from scratch. Zero temperature means zero tolerance for redundancy.
 
-## 📚 Documentation Source of Truth
+## 📚 DOCUMENTATION HIERARCHY
 
-- Single Source: `.cursor/rules/*.mdc` is the authoritative location for our engineering guidelines and non-task documentation.
-- Docs Folder: `docs/` may contain transient or historical materials only; do not duplicate content between `docs/` and `.cursor/rules/`.
-- Consolidation Rule: For each broad topic (e.g., Testing, Convex, Pagination, Chat domain, Migrations), maintain exactly one `.mdc` rule file in `.cursor/rules/`.
-- Migration Policy: When adding or updating guidance, place it under `.cursor/rules/*.mdc`. If related markdown exists in `docs/`, migrate or merge it into the appropriate `.mdc` and remove the duplicate.
+**Authoritative Sources:**
 
-## 📐 Project Rules (Canonical)
+- `.cursor/rules/*.mdc` - Engineering guidelines (single source of truth)
+  - `testing.mdc` - Vitest/Playwright setup
+  - `convex_rules.mdc` - Validated Convex patterns
+  - `pagination.mdc` - Pagination architecture
+  - `chat.mdc` - Chat domain architecture
+- `README.md` - Setup, deployment, environment configuration
+- `docs/` - Historical/transient materials only (migrate to .mdc if canonical)
 
-The following rule files contain the canonical guidance for each topic:
+## 🚨 VERIFICATION PROTOCOL
 
-- Testing: `.cursor/rules/testing.mdc` — Vitest/Playwright setup, CI strategy, coverage, and best practices
-- Convex: `.cursor/rules/convex_rules.mdc` — Verified patterns for validators, generated types, function refs, and HTTP validation
-- Pagination: `.cursor/rules/pagination.mdc` — Architecture, usage, retries, guards, and migration guidance
-- Chat Domain: `.cursor/rules/chat.mdc` — Architecture overview and phased refactoring plan (types, performance, validation)
-- Migrations (UUID v7): `.cursor/rules/migrations-uuid.mdc` — Rationale, implementation checklist, and rollback considerations
+### Documentation Verification
 
-Always consult these files for up-to-date patterns and verified references.
+**NEVER** use training data or assumptions. **ALWAYS** verify against live documentation.
 
-## 🚨 ZERO TOLERANCE - MANDATORY VERIFICATION PROTOCOL
+**Required for EVERY code change:**
 
-### CRITICAL: Never Use Training Data - Always Use Live Documentation
+1. Web search for "[library] [version] documentation"
+2. Verify exact API in official docs
+3. Check package.json for actual versions
+4. Validate with `npm run validate` before committing
 
-**ABSOLUTELY FORBIDDEN:**
+**Forbidden:**
 
-- Using remembered API patterns from training data
-- Assuming library behavior without checking current docs
-- Writing code based on "common patterns" without verification
-- Guessing at configuration options
-- Using deprecated or outdated syntax
-
-**MANDATORY FOR EVERY CODE CHANGE:**
-
-1. **Documentation Lookup** (REQUIRED):
-
-   - Use built-in web search for library documentation
-   - Search for "[library] [version] documentation"
-   - Verify API patterns in official docs
-
-2. **Web Search for Current Patterns** (REQUIRED):
-
-   - Use built-in google_web_search for:
-     - "React 19.1 [specific feature] documentation"
-     - "Vite 6 [configuration] 2024"
-     - "Convex [API method] typescript"
-     - Current best practices and migration guides
-
-3. **Direct Documentation Fetch** (WHEN NEEDED):
-   - Fetch official docs directly from source
-   - Read package.json for exact versions
-   - Check CHANGELOG.md for breaking changes
-
-### Type Safety Violations - IMMEDIATE HALT
-
-**NEVER ALLOWED:**
-
-- Any `@ts-ignore` or `@ts-expect-error` EXCEPT for documented Convex TS2589 issues
+- Any `@ts-ignore` except documented Convex TS2589 issues
 - Any `eslint-disable` comments
-- Any `any` type without explicit justification
-- Any unvalidated external data
-- Any type assertions without runtime checks
+- Any `any` type without justification
+- Assumptions about API behavior
 
-### 🚨 CONVEX TS2589 ERROR PREVENTION
-
-**CRITICAL RULE: Avoid TypeScript TS2589 "Type instantiation is excessively deep" errors:**
-
-- **NEVER** use `ctx.runMutation` or `ctx.runQuery` in httpAction handlers with complex nested arguments
-- **NEVER** pass arrays of objects with multiple optional fields through `ctx.runMutation`
-- **INSTEAD** simplify argument types or use `@ts-ignore` with clear documentation when unavoidable
-
-**Known Problematic Patterns:**
+### TypeScript TS2589 Prevention
 
 ```typescript
-// ❌ CAUSES TS2589: Complex nested types in httpAction
-await ctx.runMutation(api.chats.publishAnonymousChat, {
-  messages: Array<{ role: string; content?: string; searchResults?: Array<...> }>
+// ❌ Complex nested types in httpAction cause TS2589
+await ctx.runMutation(api.chats.publish, {
+  messages: Array<{ role: string; content?: string; ... }>
 });
 
-// ✅ ACCEPTABLE WORKAROUND: Document and use @ts-ignore
+// ✅ Workaround with documentation
 // @ts-ignore - Known Convex limitation with complex type inference
-await ctx.runMutation(api.chats.publishAnonymousChat, { ... });
+await ctx.runMutation(api.chats.publish, { ... });
 ```
 
-### Assumptions = VIOLATIONS
+## 🏗️ PROJECT STRUCTURE & BOUNDARIES
 
-**BEFORE WRITING ANY CODE:**
+```
+searchai-io/
+├── src/                       # FRONTEND ONLY - React application
+│   ├── components/           # React components
+│   ├── hooks/               # Custom React hooks
+│   ├── lib/
+│   │   ├── validation/      # CLIENT-SIDE validation (UX feedback only)
+│   │   ├── utils/          # Frontend helpers
+│   │   └── adapters/       # Frontend service adapters
+│   └── types/              # UI-only types (NEVER database entities!)
+├── convex/                    # BACKEND ONLY - Convex functions
+│   ├── _generated/          # AUTO-GENERATED types (SOURCE OF TRUTH)
+│   ├── lib/
+│   │   └── security/       # SERVER-SIDE validation & sanitization
+│   │       ├── sanitization.ts  # Input sanitization, SearchResult normalization
+│   │       ├── patterns.ts      # Security patterns
+│   │       └── webContent.ts    # Web content security
+│   ├── http/               # HTTP route handlers
+│   │   └── routes/         # Individual route modules
+│   └── *.ts               # Backend functions
+└── tests/                     # Test files
+```
 
-1. Verify the exact API in current documentation
-2. Check the specific version we're using
-3. Confirm the feature exists in that version
-4. Test the pattern with type checking
+**Critical Import Rules:**
 
-**NEVER ASSUME:**
+| Directory              | Can Import From                    | CANNOT Import From                 |
+| ---------------------- | ---------------------------------- | ---------------------------------- |
+| `src/`                 | `convex/_generated/`, other `src/` | `convex/*.ts` (except \_generated) |
+| `convex/`              | Other `convex/`, Node modules      | ANY `src/` files                   |
+| `src/lib/validation/`  | `src/` only                        | `convex/` files                    |
+| `convex/lib/security/` | `convex/` only                     | `src/` files                       |
 
-- That a React hook works the same in v19 as v18
-- That Vite config hasn't changed
-- That Convex APIs are stable
-- That TypeScript behavior is consistent
-- That any pattern from memory is correct
+## 🎯 CONVEX TYPE SYSTEM
 
-## 🎯 PROJECT PRINCIPLES
+**ONE RULE:** Import ALL database types from `convex/_generated/` - NO EXCEPTIONS.
 
-### Type Safety First
-
-- Full TypeScript coverage with strict mode enabled
-- No `any` types without explicit justification
-- Runtime validation for all external data
-- Convex schema validation for backend
-
-### 🚨 CRITICAL: Convex Type Generation & Import Strategy
-
-**IMPORTANT UPDATE (August 2025):** After thorough analysis, we've determined that creating abstraction layers over Convex's `_generated` directory is an anti-pattern that should be avoided.
-
-**CONVEX TYPE IMPORT RULES:**
-
-1. **ALWAYS** import directly from `convex/_generated/` directories - this is Convex's intended pattern
-2. **NEVER** create "wrapper" or "re-export" files like `convexTypes.ts`
-3. **NEVER** manually duplicate types that Convex generates
-4. **FOLLOW** Convex's official documentation patterns exactly
-
-**WHY NO ABSTRACTION LAYER:**
-
-- Convex's `_generated` directory IS the abstraction layer
-- Re-export files can cause circular dependencies and compilation errors
-- They add maintenance burden without benefit
-- They break IDE auto-import and discovery
-- They go against Convex framework conventions
-
-**CORRECT IMPORT PATTERNS:**
+### Correct Patterns
 
 ```typescript
-// ✅ BACKEND FILES (in convex/ directory)
+// ✅ BACKEND (convex/ directory)
 import { query, mutation, action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 
-// ✅ FRONTEND FILES (in src/ directory)
+// ✅ FRONTEND (src/ directory)
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 
-// Use the generated types directly
+// Using types
 const userId: Id<"users"> = "...";
 const user: Doc<"users"> = await ctx.db.get(userId);
 ```
 
-**INCORRECT PATTERNS TO AVOID:**
+### Forbidden Patterns
 
 ```typescript
-// ❌ WRONG - Creating re-export abstraction files
-// convex/lib/convexTypes.ts
+// ❌ Re-export files
 export { Doc, Id } from "../_generated/dataModel";
 
-// ❌ WRONG - Importing from abstraction instead of source
-import { Doc, Id } from "./lib/convexTypes";
+// ❌ Manual type definitions for DB entities
+interface User { _id: string; name: string; }
 
-// ❌ WRONG - Creating duplicate type definitions
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-}
+// ❌ Duplicate schema types
+type ChatMessage = { ... }  // Use Doc<"messages"> instead
 ```
 
-**AUTO-GENERATED TYPES (USE DIRECTLY):**
+**Why:** Convex's `_generated/` directory IS the abstraction layer. Re-exports cause circular dependencies, break IDE discovery, and add maintenance burden.
 
-- `Doc<TableName>` - Document types for each table with all fields
-- `Id<TableName>` - Type-safe document ID types for each table
-- `DataModel` - Complete database schema representation
-- `QueryCtx`, `MutationCtx`, `ActionCtx` - Typed context objects
-- `api` and `internal` - Type-safe function references
-- All argument and return types for Convex functions
+### Validation Strategy
 
-**TYPE SAFETY GUARANTEE:**
+- **Client-side (`src/lib/validation/`):** UX feedback only (can be bypassed)
+- **Server-side (`convex/lib/security/`):** MANDATORY security & normalization
+- **Convex validators:** Use `v` validators for all function arguments
 
-Convex's type generation ensures perfect synchronization between your schema and TypeScript types. The `_generated` files update instantly when schema changes, providing complete type safety without any abstraction layers.
+## 📏 CODE ORGANIZATION
 
-### ✅ LITMUS TEST: Full Convex Type Optimization
+### File Size Limit: 500 Lines Maximum
 
-**VERIFICATION CHECKLIST - Our codebase MUST:**
+Split files approaching 400 lines:
 
-1. Use ONLY Convex-generated `Doc<T>` types for all database documents
-2. Use ONLY Convex-generated `Id<T>` types for all document references
-3. Import ALL database types from `convex/_generated/dataModel`
-4. Leverage Convex's automatic type inference for all function arguments
-5. Have ZERO manual interface/type definitions that duplicate schema
-6. Achieve 100% type safety through Convex's embedded type system
-
-**CONVEX TYPE & VALIDATION BENEFITS WE MUST LEVERAGE:**
-
-- **Automatic Schema Synchronization**: Types update instantly with schema changes
-- **Compile-Time Safety**: Invalid table names or fields caught at build time
-- **Runtime Validation**: Function args validated automatically at runtime
-- **Perfect Type Inference**: Function arguments and returns typed automatically
-- **System Fields Included**: `_id`, `_creationTime` automatically in `Doc<T>`
-- **Cross-Table References**: Type-safe with `Id<TableName>` preventing mismatches
-- **Serialization Handled**: Automatic JSON serialization/deserialization
-- **Zero Maintenance**: No manual type updates ever needed
-
-**UNIFIED TYPE STRATEGY:**
-
-```typescript
-// Our entire type system flows from Convex:
-// schema.ts → npx convex dev → _generated/* → Full app type safety
-
-// Frontend components
-import type { Doc, Id } from "../convex/_generated/dataModel";
-type ChatProps = { chat: Doc<"chats"> };
-
-// API calls
-import { api } from "../convex/_generated/api";
-const result = await convex.query(api.chats.getChat, { chatId });
-// ^ Fully typed arguments and return value
-
-// No separate types folder needed for DB entities!
-```
-
-### Modern Stack
-
-- React 19 with latest features
-- Vite for blazing fast development
-  - **CRITICAL: Use `import.meta.env.VITE_*` for environment variables, NOT `process.env`**
-  - Example: `import.meta.env.VITE_CONVEX_URL` instead of `process.env.NEXT_PUBLIC_CONVEX_URL`
-- Convex for real-time backend
-- Tailwind CSS for styling
-- AI SDK for LLM integration
-
-### Quality Standards
-
-- Zero warnings/errors in validation
-- Comprehensive test coverage
-- Consistent code formatting
-- Accessibility compliance
-- **File Size Limits**: Maximum 500 lines per file
-
-## 🛠️ DEVELOPMENT WORKFLOW
-
-### Pre-commit Validation
-
-All code changes must pass:
-
-1. `npm run lint` - Oxlint validation
-2. `npm run typecheck` - TypeScript checks (both frontend and Convex)
-3. `npm run format:check` - Prettier formatting
-4. `npm run test` - Test suite execution
-
-### Convex Backend
-
-- Schema-driven development with AUTO-GENERATED types
-- Type-safe API functions with ZERO manual type definitions
-- Built-in runtime validation via `v` validators
-- Real-time subscriptions with full type inference
-- Automatic client-server type synchronization
-- Separate TypeScript config for backend
-- **CRITICAL**: ALL types come from `convex/_generated/*` - NO DUPLICATES
-- **VALIDATION**: Use Convex `v` validators for all function arguments
-
-**IMPORTANT**: For detailed Convex setup, deployment, and environment configuration, see [README.md](./README.md#initial-setup). This includes:
-
-- Environment variable configuration
-- Deployment commands for dev/prod
-- API endpoint documentation
-- Troubleshooting common issues
-
-### AI Integration
-
-- OpenAI SDK for completions
-- Vercel AI SDK for streaming
-- Proper error handling for AI failures
-- Rate limiting and cost management
-
-## 📁 PROJECT STRUCTURE & DIRECTORY BOUNDARIES
-
-```
-searchai-io/
-├── src/                # React application (FRONTEND ONLY)
-│   ├── components/     # React components
-│   ├── hooks/         # Custom React hooks
-│   ├── lib/           # Frontend utilities
-│   │   ├── validation/ # CLIENT-SIDE validation (UX only)
-│   │   ├── utils/     # Frontend helpers
-│   │   └── adapters/  # Frontend service adapters
-│   ├── types/         # UI-only types (NEVER database entities!)
-│   └── styles/        # CSS and styling
-├── convex/            # Convex backend (BACKEND ONLY)
-│   ├── _generated/    # Auto-generated Convex types (SOURCE OF TRUTH)
-│   ├── lib/           # Backend utilities (CANNOT import from src/)
-│   │   └── security/  # SERVER-SIDE validation & sanitization
-│   │       ├── sanitization.ts  # Input sanitization, SearchResult normalization
-│   │       ├── patterns.ts      # Security patterns
-│   │       └── webContent.ts    # Web content security
-│   ├── http/          # HTTP route handlers
-│   │   └── routes/    # Individual route modules
-│   └── *.ts          # Backend functions
-├── tests/             # Test files
-└── public/            # Static assets
-```
-
-### 🚨 CRITICAL DIRECTORY BOUNDARIES
-
-**FRONTEND (`src/`) vs BACKEND (`convex/`) Separation:**
-
-| Directory              | Purpose                               | Can Import From                          | CANNOT Import From                 |
-| ---------------------- | ------------------------------------- | ---------------------------------------- | ---------------------------------- |
-| `src/`                 | Frontend React app                    | `convex/_generated/`, other `src/` files | `convex/*.ts` (except \_generated) |
-| `convex/`              | Backend functions                     | Other `convex/` files, Node modules      | ANY `src/` files                   |
-| `src/lib/validation/`  | Client-side validation for UX         | `src/` files only                        | `convex/` files                    |
-| `convex/lib/security/` | Server-side validation & sanitization | `convex/` files only                     | `src/` files                       |
-
-**Why This Separation Exists:**
-
-- Convex backend runs in a separate environment from the frontend
-- Backend cannot access frontend code (different build processes)
-- Frontend can only access backend through generated API types
-
-### ⚠️ VALIDATION STRATEGY - WHERE TO PUT WHAT
-
-**Client-Side (`src/lib/validation/`):**
-
-- ✅ Form validation for immediate UX feedback
-- ✅ Input length checks for user guidance
-- ✅ Format validation (email, phone) for user hints
-- ❌ NOT for security (can be bypassed)
-- ❌ NOT for data normalization
-
-**Server-Side (`convex/lib/security/`):**
-
-- ✅ **MANDATORY** security sanitization
-- ✅ Data normalization (e.g., normalizeSearchResult)
-- ✅ HTML/XSS prevention
-- ✅ Type coercion for external data
-- ✅ Default value assignment
-
-**Example - SearchResult Normalization:**
-
-```typescript
-// ❌ WRONG: In src/lib/validation/
-export function normalizeSearchResult() { ... }
-
-// ✅ CORRECT: In convex/lib/security/sanitization.ts
-export function normalizeSearchResult(result: any): SearchResult {
-  // Ensures relevanceScore is always present
-  // Sanitizes title and snippet
-  // Used by HTTP endpoints receiving external data
-}
-```
-
-### 📋 TYPE DEFINITIONS - WHERE THEY BELONG
-
-**Database Types:**
-
-- ✅ **ONLY** from `convex/_generated/dataModel`
-- ❌ NEVER manually define database types
-
-**Business Logic Types (non-database):**
-
-- If used only in backend → Define in relevant `convex/` file
-- If used only in frontend → Define in `src/types/`
-- If shared → Define in backend, import via API response types
-
-**❌ NEVER Re-export Types:**
-
-- Don't create "convenience" re-exports (e.g., `export type { SearchResult }`)
-- Each file should import directly from the source of truth
-- Re-exports create confusion about where types are defined
-- Re-exports can mask circular dependencies
-- Direct imports make code navigation clearer
-
-**⚠️ CRITICAL DISTINCTION - src/types/ Directory:**
-
-- ✅ **ALLOWED**: UI-specific types (component props, form states, client-only interfaces)
-- ❌ **FORBIDDEN**: Any type that duplicates Convex schema (User, Chat, Message, etc.)
-- ❌ **FORBIDDEN**: Any ID types (use `Id<TableName>` from \_generated)
-- ❌ **FORBIDDEN**: Any database document types (use `Doc<TableName>` from \_generated)
-
-## 📏 FILE SIZE & ORGANIZATION STANDARDS
-
-### Maximum File Size: 500 Lines
-
-**MANDATORY**: No single file should exceed 500 lines of code. This ensures:
-
-- Better maintainability and readability
-- Faster IDE performance and code navigation
-- Easier code reviews and debugging
-- Clear separation of concerns
-
-### When to Split Files
-
-**Split files when approaching 400 lines by:**
-
-1. **Component Splitting** (React):
-
-   ```typescript
-   // Instead of one large ChatInterface.tsx (500+ lines)
-   // Split into:
-   components/
-   ├── ChatInterface.tsx         // Main container (< 200 lines)
-   ├── ChatHeader.tsx            // Header component (< 100 lines)
-   ├── ChatMessageList.tsx       // Message display (< 150 lines)
-   └── ChatInput.tsx             // Input controls (< 100 lines)
-   ```
-
-2. **Hook Extraction**:
-
-   ```typescript
-   // Extract complex logic into custom hooks
-   hooks/
-   ├── useChat.ts               // Chat state management
-   ├── useChatSubscription.ts   // Real-time subscriptions
-   └── useChatActions.ts        // Chat mutations
-   ```
-
-3. **Utility Function Separation**:
-
-   ```typescript
-   // Group related utilities
-   lib/
-   ├── validation/
-   │   ├── input.ts            // Input validation
-   │   └── email.ts            // Email-specific validation
-   ├── formatting/
-   │   ├── date.ts             // Date formatting
-   │   └── message.ts          // Message formatting
-   └── constants/
-       └── limits.ts           // App-wide constants
-   ```
-
-4. **Convex Function Organization**:
-   ```typescript
-   // Split large Convex files by domain
-   convex/
-   ├── chats/
-   │   ├── queries.ts          // Chat queries
-   │   ├── mutations.ts        // Chat mutations
-   │   └── subscriptions.ts    // Real-time subscriptions
-   ├── messages/
-   │   ├── queries.ts          // Message queries
-   │   └── mutations.ts        // Message mutations
-   └── users/
-       └── queries.ts          // User queries
-   ```
+- Components → Separate header/body/footer
+- Logic → Extract hooks
+- Utilities → Group by domain
+- Convex → Split by queries/mutations
 
 ### Circular Dependency Prevention
 
-**CRITICAL: Prevent circular dependencies through:**
+1. **Import Direction:** UI → Hooks → Services → Types (never reverse)
+2. **Type Imports:** Only from `_generated/dataModel`
+3. **No Re-exports:** Import directly from source
+4. **Validation:** Run `npm run typecheck` frequently
 
-1. **Dependency Direction**:
+## 🚀 DEVELOPMENT WORKFLOW
 
-   ```
-   UI Components → Hooks → Services → Types
-   Never: Services → Components or Hooks → Components
-   ```
+### Pre-commit Validation (ALL REQUIRED)
 
-2. **Type Import Strategy**:
+```bash
+npm run lint          # Oxlint validation
+npm run typecheck     # TypeScript checks
+npm run format:check  # Prettier formatting
+npm run test          # Test suite
+```
 
-   - Import Convex types ONLY from `_generated/dataModel`
-   - Never create intermediate type files that re-export
-   - UI types stay in `src/types/` and never import from components
+### Environment Variables
 
-3. **Common Anti-Patterns to Avoid**:
+- Frontend: `import.meta.env.VITE_*` (NOT `process.env`)
+- Backend: Set via `npx convex env set KEY "value"`
+- Never commit `.env` files
 
-   ```typescript
-   // ❌ WRONG: Circular dependency
-   // fileA.ts
-   import { something } from "./fileB";
-   export const utilA = () => something();
-
-   // fileB.ts
-   import { utilA } from "./fileA"; // CIRCULAR!
-
-   // ✅ CORRECT: Extract shared logic
-   // shared.ts
-   export const sharedUtil = () => {};
-
-   // fileA.ts & fileB.ts
-   import { sharedUtil } from "./shared";
-   ```
-
-4. **Barrel Exports Pattern**:
-
-   ```typescript
-   // ✅ Use index.ts for clean imports but avoid deep nesting
-   components/Chat/
-   ├── ChatHeader.tsx
-   ├── ChatBody.tsx
-   ├── ChatFooter.tsx
-   └── index.ts         // Export all chat components
-
-   // index.ts
-   export { ChatHeader } from './ChatHeader';
-   export { ChatBody } from './ChatBody';
-   export { ChatFooter } from './ChatFooter';
-   ```
-
-5. **Dependency Validation**:
-   - Run `npm run typecheck` frequently to catch circular dependencies
-   - TypeScript will error on circular imports
-   - Keep import chains shallow (max 3-4 levels deep)
-
-## 🚀 KEY COMMANDS
+### Key Commands
 
 ```bash
 # Development
-npm run dev              # Start both frontend and backend
-npm run dev:frontend     # Frontend only (Vite)
-npm run dev:backend      # Backend only (Convex)
+npm run dev              # Start frontend + backend
+npx convex dev          # Convex hot reload
+npx convex dev --once   # Deploy without watching
 
-# Convex Operations (see README.md for complete guide)
-npx convex dev          # Start dev deployment with hot reload
-npx convex dev --once   # Deploy to dev without watching
-npx convex deploy       # Deploy to production
-npx convex logs         # View dev logs
-npx convex logs --prod  # View production logs
-npx convex dashboard    # Open Convex dashboard
+# Deployment
+npx convex deploy       # Production deploy
+npx convex dashboard    # Open dashboard
 
-# Environment Management
-npx convex env set KEY "value"       # Set dev env variable
-npx convex env set KEY "value" --prod # Set prod env variable
-npx convex env list                   # List dev env variables
-npx convex env list --prod            # List prod env variables
-
-# Quality Checks
-npm run validate         # Run all validations
-npm run lint            # Run Oxlint
-npm run lint:fix        # Fix linting issues
-npm run typecheck       # TypeScript validation
-npm run format          # Format code with Prettier
-
-# Testing
-npm run test            # Run all tests
-npm run test:smoke      # Smoke tests only
-
-# Build & Deploy
-npm run build           # Production build
-npm run preview         # Preview production build
-
-# Maintenance
-npm run clean           # Clear caches
+# Quality
+npm run validate        # All checks
 npm run clean:all       # Full reset
 ```
 
-## 🔒 SECURITY & ENVIRONMENT
+## ⚠️ CRITICAL RULES
 
-### Required Environment Variables
+### Modern Stack Requirements
 
-**See [README.md](./README.md#environment-variables-reference) for complete list.**
+- React 19 patterns only (no class components)
+- Convex subscriptions for data (no useEffect fetching)
+- Tailwind CSS for styling
+- Vite environment variables (`import.meta.env.VITE_*`)
+- AI SDK for LLM integration
 
-Key variables:
+### Commit Conventions
 
-- `VITE_CONVEX_URL` - Frontend build-time Convex URL
-- `CONVEX_DEPLOYMENT` - CLI deployment target
-- `CONVEX_RESEND_API_KEY` - Email service API key
-- `OPENROUTER_API_KEY` - AI provider key
-- `SERP_API_KEY` - Search API key
-- Never commit `.env` files
+`feat:` | `fix:` | `docs:` | `style:` | `refactor:` | `test:` | `chore:` | `perf:`
 
-### API Security
+## 📋 VERIFICATION CHECKLIST
 
-- Rate limiting on all endpoints
-- Input sanitization
-- CORS configuration
-- Authentication required for mutations
+Before ANY commit:
 
-## 📋 COMMIT CONVENTIONS
-
-Follow conventional commits:
-
-- `feat:` New features
-- `fix:` Bug fixes
-- `docs:` Documentation
-- `style:` Formatting changes
-- `refactor:` Code restructuring
-- `test:` Test updates
-- `chore:` Maintenance tasks
-- `perf:` Performance improvements
-
-## 🎨 STYLING GUIDELINES
-
-- Tailwind CSS for all styling
-- Component-specific styles in same file
-- Responsive design with container queries
-- Dark mode support
-- Accessibility-first approach
-
-## 🔍 MANDATORY PRE-TASK WORKFLOW
-
-### Before ANY Code Changes:
-
-1. **Check Current Versions**:
-
-   ```bash
-   cat package.json | grep -E '"(react|convex|vite|typescript)"'
-   ```
-
-2. **Fetch Live Documentation**:
-
-   - Use web search for official documentation
-   - React 19: Search for "React 19 documentation"
-   - Convex: Search for "Convex documentation"
-   - Vite: Search for "Vite documentation"
-   - AI SDK: Search for "Vercel AI SDK documentation"
-
-3. **Search for Current Patterns**:
-
-   - Use web search for "[library] [version] [feature] site:official-docs"
-   - Check Stack Overflow for recent answers (2024 only)
-   - Verify against GitHub issues for known problems
-
-4. **Validate Before Committing**:
-   ```bash
-   npm run validate  # MUST pass with 0 errors
-   ```
-
-## ⛔ FORBIDDEN PRACTICES
-
-### NEVER Use Outdated Patterns:
-
-- React class components (use function components)
-- useEffect for data fetching (use Convex subscriptions)
-- Deprecated React 18 patterns in React 19
-- Old Vite config syntax
-- Any polyfills for modern browsers
-
-### NEVER Trust Memory:
-
-- Every import must be verified
-- Every API call must be checked
-- Every config option must be confirmed
-- Every type must be validated
-
-### ALWAYS Verify Against:
-
-- Current official documentation
-- Actual installed package versions
-- TypeScript compiler output
-- Runtime behavior in development
+- [ ] Searched for existing code before writing new
+- [ ] No redundant implementations
+- [ ] Verified against live documentation
+- [ ] All imports from correct sources
+- [ ] Types from `_generated/` only
+- [ ] `npm run validate` passes with 0 errors
+- [ ] Files under 500 lines
+- [ ] No circular dependencies
 
 ---
 
-## 🔧 CONVEX-SPECIFIC WORKFLOWS
-
-### Switching Between Environments
-
-```bash
-# Work with dev deployment
-export CONVEX_DEPLOYMENT=diligent-greyhound-240
-npx convex dev
-
-# Deploy to production
-export CONVEX_DEPLOYMENT=vivid-boar-858
-npx convex deploy -y
-```
-
-### Adding New Convex Functions
-
-1. Create function in `convex/` directory
-2. Ensure proper TypeScript types
-3. Deploy to dev: `npx convex dev --once`
-4. Test thoroughly
-5. Deploy to prod: `npx convex deploy -y`
-
-### Email Configuration (Resend)
-
-- Dev/Prod use `CONVEX_RESEND_API_KEY`
-- Email functions in `convex/email.ts`
-- Templates use inline HTML for better compatibility
-
-### Debugging Convex Issues
-
-```bash
-# Check function logs
-npx convex logs --filter "functionName"
-
-# View real-time logs
-npx convex logs --follow
-
-# Check deployment status
-npx convex dashboard
-```
-
-**For complete Convex documentation, troubleshooting, and deployment guides, refer to [README.md](./README.md).**
-
----
-
-**REMEMBER**: This is a ZERO TEMPERATURE environment. Every line of code must be verified against current documentation. Training data is outdated. Memory is unreliable. Only live documentation is truth. No assumptions - verify EVERYTHING through MCP tools, web search, and direct documentation fetch.
+**REMEMBER:** Zero temperature = Zero assumptions. Verify EVERYTHING through documentation, no redundancy tolerated, type safety absolute.

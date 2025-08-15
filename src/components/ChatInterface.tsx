@@ -559,7 +559,7 @@ export function ChatInterface({
               }}
             />
           )}
-          {currentChatId && (
+          {currentChatId && messages.length > 0 && (
             <ChatToolbar
               onShare={openShareModal}
               messages={messages}

@@ -9,6 +9,9 @@ import { ContentWithCitations } from "../ContentWithCitations";
 import { ReasoningDisplay } from "../ReasoningDisplay";
 import { CopyButton } from "../CopyButton";
 import { MessageSources } from "./MessageSources";
+import { Spinner } from "../ui/Spinner";
+import { LoadingText, LoadingMessages } from "../ui/LoadingText";
+import { ThreeDots } from "../ui/ThreeDots";
 import {
   extractPlainText,
   formatConversationWithSources,
@@ -59,6 +62,7 @@ export const MessageItem = React.memo(
           message._id || `message-${index}-${message.timestamp || Date.now()}`
         }
         className="flex gap-2 sm:gap-4 max-w-full overflow-hidden"
+        data-role={message.role}
       >
         <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center">
           {message.role === "user" ? (
@@ -118,26 +122,12 @@ export const MessageItem = React.memo(
             message.thinking &&
             message.thinking.trim() && (
               <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                <span>{message.thinking}</span>
+                <Spinner size="sm" aria-label="AI is thinking" />
+                <LoadingText message={message.thinking} className="flex-1">
+                  {message.isStreaming && (
+                    <ThreeDots size="sm" color="bg-blue-500" />
+                  )}
+                </LoadingText>
               </div>
             )}
 
@@ -160,20 +150,27 @@ export const MessageItem = React.memo(
             )}
 
           {/* 4) AI/user content last – always appears under sources/thinking */}
-          <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden text-[15px] sm:text-base leading-6">
-            {message.role === "assistant" ? (
-              <ContentWithCitations
-                content={message.content || ""}
-                searchResults={safeResults}
-                hoveredSourceUrl={hoveredSourceUrl}
-                onCitationHover={onCitationHover}
-              />
-            ) : (
-              <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed break-words slashed-zero lining-nums tabular-nums">
-                {message.content}
+          {/* Only show content if it's not empty or just dots during streaming */}
+          {message.content &&
+            message.content.trim() &&
+            message.content !== "•••" &&
+            message.content !== "..." &&
+            message.content !== "…" && (
+              <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden text-[15px] sm:text-base leading-6">
+                {message.role === "assistant" ? (
+                  <ContentWithCitations
+                    content={message.content}
+                    searchResults={safeResults}
+                    hoveredSourceUrl={hoveredSourceUrl}
+                    onCitationHover={onCitationHover}
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed break-words slashed-zero lining-nums tabular-nums">
+                    {message.content}
+                  </div>
+                )}
               </div>
             )}
-          </div>
 
           <div className="-mt-1 flex items-start justify-between">
             <div className="text-xs text-gray-500 dark:text-gray-500">

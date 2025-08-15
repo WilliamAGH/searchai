@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
 import { getFaviconUrl, getSafeHostname } from "../lib/utils/favicon";
+import { ThreeDots } from "./ui/ThreeDots";
 
 interface SearchProgressProps {
   progress: {
@@ -160,11 +161,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
           )}
 
           <div className="flex items-center gap-2 mt-3">
-            <div className="flex space-x-1">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0ms]"></div>
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:100ms]"></div>
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:200ms]"></div>
-            </div>
+            <ThreeDots size="md" color="bg-emerald-500" />
           </div>
         </div>
       </div>

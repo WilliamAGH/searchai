@@ -71,7 +71,10 @@ export function VirtualizedMessageList({
             const actualIndex = groupIndex * 10 + index;
             return (
               <div
-                key={message._id || `msg-${actualIndex}`}
+                key={
+                  message._id ||
+                  `msg-${message.role}-${actualIndex}-${message.timestamp || Date.now()}-${message.content?.slice(0, 20) || "empty"}`
+                }
                 className="message-item"
                 data-message-index={actualIndex}
               >
