@@ -46,7 +46,7 @@ test.describe("Authentication Flow", () => {
       if (await closeBtn.isVisible({ timeout: 2000 })) {
         await closeBtn.click();
       }
-    } catch (_error) {
+    } catch {
       // Modal might have already closed, which is fine
       console.log("Modal already closed or close button not found");
     }
