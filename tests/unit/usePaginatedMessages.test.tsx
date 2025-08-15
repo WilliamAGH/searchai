@@ -1,11 +1,16 @@
 import { test, expect, describe, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
+import { act } from 'react';
 import { usePaginatedMessages } from '../../src/hooks/usePaginatedMessages';
+
+// Create mocks outside to be accessible in module mock
+const mockUseQuery = vi.fn();
+const mockUseAction = vi.fn();
 
 // Mock dependencies
 vi.mock('convex/react', () => ({
-  useQuery: vi.fn(),
-  useAction: vi.fn(),
+  useQuery: mockUseQuery,
+  useAction: mockUseAction,
 }));
 
 vi.mock('../../convex/_generated/api', () => ({
@@ -42,10 +47,9 @@ describe('usePaginatedMessages', () => {
     // Create mock load more function
     mockLoadMore = vi.fn();
     
-    // Set up mocks
-    const convexReact = vi.mocked(require('convex/react'));
-    convexReact.useAction = vi.fn(() => mockLoadMore);
-    convexReact.useQuery = vi.fn();
+    // Set up mock implementations
+    mockUseAction.mockReturnValue(mockLoadMore);
+    mockUseQuery.mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -53,9 +57,6 @@ describe('usePaginatedMessages', () => {
   });
 
   test('should initialize with default state', () => {
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(undefined);
-
     const { result } = renderHook(() =>
       usePaginatedMessages({
         chatId: null,
@@ -74,16 +75,13 @@ describe('usePaginatedMessages', () => {
   });
 
   test('should skip query when chatId is null', () => {
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(undefined);
-
     renderHook(() =>
       usePaginatedMessages({
         chatId: null,
       })
     );
 
-    expect(useQuery).toHaveBeenCalledWith(
+    expect(mockUseQuery).toHaveBeenCalledWith(
       'getChatMessagesPaginated',
       'skip'
     );
@@ -91,8 +89,6 @@ describe('usePaginatedMessages', () => {
 
   test('should query messages when chatId is provided', () => {
     const chatId = 'chat-123';
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(undefined);
 
     renderHook(() =>
       usePaginatedMessages({
@@ -101,7 +97,7 @@ describe('usePaginatedMessages', () => {
       })
     );
 
-    expect(useQuery).toHaveBeenCalledWith(
+    expect(mockUseQuery).toHaveBeenCalledWith(
       'getChatMessagesPaginated',
       {
         chatId: 'chat-123',
@@ -130,8 +126,7 @@ describe('usePaginatedMessages', () => {
       hasMore: true,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(mockMessages);
+    mockUseQuery.mockReturnValue(mockMessages);
 
     const { result } = renderHook(() =>
       usePaginatedMessages({
@@ -167,8 +162,7 @@ describe('usePaginatedMessages', () => {
       hasMore: false,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(mockMessages);
+    mockUseQuery.mockReturnValue(mockMessages);
 
     const { result } = renderHook(() =>
       usePaginatedMessages({
@@ -208,8 +202,7 @@ describe('usePaginatedMessages', () => {
       hasMore: false,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(initialMessages);
+    mockUseQuery.mockReturnValue(initialMessages);
     mockLoadMore.mockResolvedValue(moreMessages);
 
     const { result } = renderHook(() =>
@@ -250,8 +243,7 @@ describe('usePaginatedMessages', () => {
       hasMore: true,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(initialMessages);
+    mockUseQuery.mockReturnValue(initialMessages);
     mockLoadMore.mockRejectedValue(new Error('Failed to load'));
 
     const { result } = renderHook(() =>
@@ -279,8 +271,7 @@ describe('usePaginatedMessages', () => {
       hasMore: false,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(initialMessages);
+    mockUseQuery.mockReturnValue(initialMessages);
     mockLoadMore.mockRejectedValue(new Error('Test error'));
 
     const { result } = renderHook(() =>
@@ -318,8 +309,7 @@ describe('usePaginatedMessages', () => {
       hasMore: true,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(initialMessages);
+    mockUseQuery.mockReturnValue(initialMessages);
 
     const { result } = renderHook(() =>
       usePaginatedMessages({
@@ -340,8 +330,7 @@ describe('usePaginatedMessages', () => {
   });
 
   test('should handle disabled state', () => {
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(undefined);
+    mockUseQuery.mockReturnValue(undefined);
 
     const { result } = renderHook(() =>
       usePaginatedMessages({
@@ -350,7 +339,7 @@ describe('usePaginatedMessages', () => {
       })
     );
 
-    expect(useQuery).toHaveBeenCalledWith(
+    expect(mockUseQuery).toHaveBeenCalledWith(
       'getChatMessagesPaginated',
       'skip'
     );
@@ -359,8 +348,7 @@ describe('usePaginatedMessages', () => {
   });
 
   test('should handle chat ID change', () => {
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue({
+    mockUseQuery.mockReturnValue({
       messages: [
         {
           _id: 'msg1',
@@ -387,7 +375,7 @@ describe('usePaginatedMessages', () => {
     expect(result.current.messages[0].content).toBe('Chat 1 message');
 
     // Change chat ID
-    useQuery.mockReturnValue({
+    mockUseQuery.mockReturnValue({
       messages: [
         {
           _id: 'msg2',
@@ -402,7 +390,7 @@ describe('usePaginatedMessages', () => {
 
     rerender({ chatId: 'chat-2' });
 
-    expect(useQuery).toHaveBeenCalledWith(
+    expect(mockUseQuery).toHaveBeenCalledWith(
       'getChatMessagesPaginated',
       {
         chatId: 'chat-2',
@@ -425,8 +413,7 @@ describe('usePaginatedMessages', () => {
       hasMore: true,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(initialMessages);
+    mockUseQuery.mockReturnValue(initialMessages);
     mockLoadMore.mockImplementation(
       () => new Promise((resolve) => setTimeout(resolve, 100))
     );
@@ -471,8 +458,7 @@ describe('usePaginatedMessages', () => {
       hasMore: false,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(mockMessages);
+    mockUseQuery.mockReturnValue(mockMessages);
 
     const { result } = renderHook(() =>
       usePaginatedMessages({
@@ -502,8 +488,7 @@ describe('usePaginatedMessages', () => {
       hasMore: false,
     };
 
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(mockMessages);
+    mockUseQuery.mockReturnValue(mockMessages);
 
     const { result } = renderHook(() =>
       usePaginatedMessages({
@@ -517,8 +502,7 @@ describe('usePaginatedMessages', () => {
   });
 
   test('should handle custom initial limit', () => {
-    const { useQuery } = require('convex/react');
-    useQuery.mockReturnValue(undefined);
+    mockUseQuery.mockReturnValue(undefined);
 
     renderHook(() =>
       usePaginatedMessages({
@@ -527,7 +511,7 @@ describe('usePaginatedMessages', () => {
       })
     );
 
-    expect(useQuery).toHaveBeenCalledWith(
+    expect(mockUseQuery).toHaveBeenCalledWith(
       'getChatMessagesPaginated',
       {
         chatId: 'chat-123',

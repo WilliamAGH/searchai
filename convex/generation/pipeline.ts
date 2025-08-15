@@ -445,6 +445,11 @@ async function streamResponseToMessage(args: {
 
       if (chunk.choices?.[0]?.delta?.content) {
         const newContent = chunk.choices[0].delta.content;
+        
+        // Add to reasoning to show we're processing the response
+        if (chunkCount === 1 && !chunk.choices?.[0]?.delta?.reasoning) {
+          accumulatedReasoning += "\n\n[Composing response...]\n";
+        }
         accumulatedContent += newContent;
 
         // Log first few chunks for debugging
@@ -467,7 +472,7 @@ async function streamResponseToMessage(args: {
               content: accumulatedContent,
               streamedContent: newContent, // Send just the new chunk for streaming
               isStreaming: true,
-              thinking: "",
+              thinking: "Composing response...",
               // Stream the accumulated reasoning
               reasoning: accumulatedReasoning,
             },
