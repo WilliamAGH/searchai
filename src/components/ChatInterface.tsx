@@ -307,16 +307,40 @@ export function ChatInterface({
           chatId,
           (chunk: MessageStreamChunk) => {
             // Handle SSE chunks from the backend
-            if (chunk && chunk.type === "chunk" && chunk.content) {
-              chatActions.updateMessage(assistantMessage.id, {
-                content: (assistantMessage.content || "") + chunk.content,
-                hasStartedContent: true,
-                searchResults: (chunk.metadata?.searchResults ??
-                  []) as SearchResult[],
-                sources: (chunk.metadata?.sources ?? []) as string[],
-              });
-              assistantMessage.content =
-                (assistantMessage.content || "") + chunk.content;
+            if (chunk && chunk.type === "chunk") {
+              const updates: Record<string, unknown> = {};
+              
+              // Update content if present
+              if (chunk.content) {
+                updates.content = (assistantMessage.content || "") + chunk.content;
+                updates.hasStartedContent = true;
+                assistantMessage.content = updates.content;
+              }
+              
+              // Update thinking status if present
+              if (chunk.thinking !== undefined) {
+                updates.thinking = chunk.thinking;
+              }
+              
+              // Update reasoning if present
+              if (chunk.reasoning !== undefined) {
+                updates.reasoning = (assistantMessage.reasoning || "") + chunk.reasoning;
+              }
+              
+              // Update metadata if present
+              if (chunk.metadata) {
+                if (chunk.metadata.searchResults) {
+                  updates.searchResults = chunk.metadata.searchResults as SearchResult[];
+                }
+                if (chunk.metadata.sources) {
+                  updates.sources = chunk.metadata.sources as string[];
+                }
+              }
+              
+              // Apply all updates
+              if (Object.keys(updates).length > 0) {
+                chatActions.updateMessage(assistantMessage.id, updates);
+              }
             }
           },
           [], // searchResults
