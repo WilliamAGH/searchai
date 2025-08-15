@@ -17,6 +17,7 @@ import {
   formatConversationWithSources,
 } from "../../lib/clipboard";
 import type { Message } from "../../lib/types/message";
+import { shouldShowAnimatedDots } from "../../lib/utils/textUtils";
 
 interface MessageItemProps {
   message: Message;
@@ -124,7 +125,8 @@ export const MessageItem = React.memo(
               <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
                 <Spinner size="sm" aria-label="AI is thinking" />
                 <LoadingText message={message.thinking} className="flex-1">
-                  {message.isStreaming && (
+                  {/* Only show animated dots if text doesn't already contain static dots */}
+                  {shouldShowAnimatedDots(message.thinking, message.isStreaming || false) && (
                     <ThreeDots size="sm" color="bg-blue-500" />
                   )}
                 </LoadingText>

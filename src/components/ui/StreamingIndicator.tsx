@@ -6,6 +6,7 @@
 
 import React from "react";
 import { ThreeDots } from "./ThreeDots";
+import { shouldShowAnimatedDots } from "../../lib/utils/textUtils";
 
 interface StreamingIndicatorProps {
   isStreaming: boolean;
@@ -57,7 +58,10 @@ export const StreamingIndicator: React.FC<StreamingIndicatorProps> = ({
             />
           </svg>
           <span>{thinking || message}</span>
-          <ThreeDots size="sm" color="bg-emerald-500" />
+          {/* Only show animated dots if text doesn't already contain static dots */}
+          {shouldShowAnimatedDots(thinking || message, true) && (
+            <ThreeDots size="sm" color="bg-emerald-500" />
+          )}
         </div>
       </div>
     </div>
