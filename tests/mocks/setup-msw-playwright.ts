@@ -8,8 +8,8 @@ import { chromium, type FullConfig } from "@playwright/test";
 async function globalSetup(_config: FullConfig) {
   console.log("🔧 Setting up MSW for Playwright E2E tests...");
 
-  // Launch a browser to set up MSW
-  const browser = await chromium.launch();
+  // Launch a browser to set up MSW (always in headless mode)
+  const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();
 
