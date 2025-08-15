@@ -479,7 +479,7 @@ async function publishMessages(ctx: MutationCtx, messages: Message[]) {
 
 ## 🏗️ PROJECT STRUCTURE & BOUNDARIES
 
-```
+```text
 searchai-io/
 ├── src/                       # FRONTEND ONLY - React application
 │   ├── components/           # React components
