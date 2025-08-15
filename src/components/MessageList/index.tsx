@@ -260,7 +260,7 @@ export const MessageList = React.memo(function MessageList({
           // Auto-expand when streaming starts or reasoning exists without content
           // Auto-collapse when streaming ends AND content exists
           const shouldCollapse = !isStreaming && hasContent;
-          
+
           // Only update if state needs to change
           if (prev[reasoningId] !== shouldCollapse) {
             updates[reasoningId] = shouldCollapse;
