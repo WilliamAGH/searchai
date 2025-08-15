@@ -4,10 +4,8 @@ import {
   __augmentQueryForTest as augmentQ,
 } from "../convex/search.ts";
 import { searchWithDuckDuckGo } from "../convex/search/providers/duckduckgo.ts";
-import {
-  setSearchTestScenario,
-  SEARCH_TEST_SCENARIOS,
-} from "./mocks/search-api-mocks";
+// Mocks are available but not used in this test file
+// import { setSearchTestScenario, SEARCH_TEST_SCENARIOS } from "./mocks/search-api-mocks";
 
 // MSW handles all fetch mocking - no need for vi.stubGlobal
 

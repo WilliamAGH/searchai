@@ -8,7 +8,8 @@ import { collectFilteredConsoleErrors } from "../helpers/console-helpers";
 test.describe("Debug Mobile Sidebar", () => {
   test("check mobile sidebar rendering", async ({ page }) => {
     // Capture errors with WebSocket filtering
-    const { consoleErrors } = collectFilteredConsoleErrors(page);
+    // Note: consoleErrors is collected but not used in this debug test
+    collectFilteredConsoleErrors(page);
     const errors: string[] = [];
     page.on("pageerror", (exception) => {
       errors.push(`Page error: ${exception.message}\n${exception.stack}`);

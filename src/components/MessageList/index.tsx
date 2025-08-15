@@ -194,8 +194,7 @@ export const MessageList = React.memo(function MessageList({
         ) {
           onDeleteLocalMessage?.(String(messageId));
         } else {
-            await deleteMessage({ messageId: messageId as Id<"messages"> });
-          }
+          await deleteMessage({ messageId: messageId as Id<"messages"> });
         }
       } catch (err) {
         logger.error("Failed to delete message", err);
