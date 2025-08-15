@@ -13,7 +13,6 @@ interface UseUrlStateSyncProps {
   chatByPublicId?: unknown;
   localChats?: Array<{ id: string; shareId?: string; publicId?: string }>;
   selectChat?: (id: string) => Promise<void>;
-  userSelectedChatAtRef?: React.MutableRefObject<number | null>;
 }
 
 /**
@@ -33,7 +32,6 @@ export function useUrlStateSync({
   chatByPublicId: _chatByPublicId,
   localChats,
   selectChat,
-  userSelectedChatAtRef,
 }: UseUrlStateSyncProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,7 +42,6 @@ export function useUrlStateSync({
   // Select chat based on deep-link params if present and resolvable from local state
   useEffect(() => {
     if (!localChats || !selectChat) return;
-    const path = location.pathname || "";
 
     // If deep-link via /s/:shareId
     if (propShareId) {
@@ -95,7 +92,7 @@ export function useUrlStateSync({
       if (location.pathname !== expectedPath) {
         navigate(expectedPath, { replace: true });
       }
-    } else if (location.pathname !== "/" && location.pathname !== "/chat") {
+    } else if (!onShareOrPublic && location.pathname !== "/" && location.pathname !== "/chat") {
       // If no chat ID but we're on a chat route, go home
       navigate("/", { replace: true });
     }
