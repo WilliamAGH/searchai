@@ -20,6 +20,7 @@ import {
 } from "./MessageSkeleton";
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
 import { StreamingIndicator } from "../ui/StreamingIndicator";
+import { shouldFilterMessage } from "./DeprecatedDotMessage";
 import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
 
@@ -387,7 +388,9 @@ export const MessageList = React.memo(function MessageList({
           {/* Use virtualization for large message lists (100+ messages) */}
           {messagesLength > 100 ? (
             <VirtualizedMessageList
-              messages={currentMessages}
+              messages={currentMessages.filter(
+                (message) => !shouldFilterMessage(message),
+              )}
               className="space-y-6 sm:space-y-8"
               estimatedItemHeight={150}
               renderItem={(message, index) => (
@@ -408,38 +411,31 @@ export const MessageList = React.memo(function MessageList({
               )}
             />
           ) : (
-            currentMessages.map((message, index) => (
-              <MessageItem
-                key={
-                  message._id ||
-                  `message-${index}-${message.timestamp || Date.now()}`
-                }
-                message={message}
-                index={index}
-                collapsedById={collapsedById}
-                hoveredSourceUrl={hoveredSourceUrl}
-                onToggleCollapsed={toggleCollapsed}
-                onDeleteMessage={handleDeleteMessage}
-                onSourceHover={setHoveredSourceUrl}
-                onCitationHover={setHoveredCitationUrl}
-              />
-            ))
+            currentMessages
+              .filter((message) => !shouldFilterMessage(message))
+              .map((message, index) => (
+                <MessageItem
+                  key={
+                    message._id ||
+                    `message-${index}-${message.timestamp || Date.now()}`
+                  }
+                  message={message}
+                  index={index}
+                  collapsedById={collapsedById}
+                  hoveredSourceUrl={hoveredSourceUrl}
+                  onToggleCollapsed={toggleCollapsed}
+                  onDeleteMessage={handleDeleteMessage}
+                  onSourceHover={setHoveredSourceUrl}
+                  onCitationHover={setHoveredCitationUrl}
+                />
+              ))
           )}
-
-          {/* Show "AI is thinking" when in generating stage */}
-          {isGenerating &&
-            searchProgress &&
-            searchProgress.stage === "generating" && (
-              <StreamingIndicator
-                isStreaming={true}
-                message="AI is thinking and generating response..."
-              />
-            )}
 
           {/* Show search progress for non-generating stages */}
           {isGenerating &&
             searchProgress &&
-            searchProgress.stage !== "generating" && (
+            searchProgress.stage !== "generating" &&
+            searchProgress.stage !== "idle" && (
               <SearchProgress progress={searchProgress} />
             )}
         </div>

@@ -13,6 +13,8 @@ interface MessageInputProps {
   onSendMessage: (message: string) => void;
   /** Disable input during generation */
   disabled?: boolean;
+  /** Whether AI is currently generating (for submit button only) */
+  isGenerating?: boolean;
   /** Placeholder text */
   placeholder?: string;
   /** Optional draft-change callback (debounced in parent) */
@@ -30,6 +32,7 @@ interface MessageInputProps {
 export function MessageInput({
   onSendMessage,
   disabled = false,
+  isGenerating = false,
   placeholder = "Ask me anything...",
   onDraftChange,
   history = [],
@@ -52,14 +55,14 @@ export function MessageInput({
    */
   const sendCurrentMessage = React.useCallback(() => {
     const trimmed = message.trim();
-    if (trimmed && !disabled) {
+    if (trimmed && !disabled && !isGenerating) {
       onSendMessage(trimmed);
       setMessage("");
       onDraftChange?.("");
       setHistoryIndex(null);
       setDraftBeforeHistory(null);
     }
-  }, [message, disabled, onSendMessage, onDraftChange]);
+  }, [message, disabled, isGenerating, onSendMessage, onDraftChange]);
 
   const handleSubmit = React.useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -286,8 +289,10 @@ export function MessageInput({
             <button
               type="submit"
               aria-label="Send message"
-              title="Send message"
-              disabled={!message.trim() || disabled}
+              title={
+                isGenerating ? "Wait for response to finish" : "Send message"
+              }
+              disabled={!message.trim() || disabled || isGenerating}
               className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 sm:w-7 sm:h-7 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-colors"
             >
               <svg
