@@ -63,7 +63,7 @@ export function useStreamingChat(
       // FIXED: Implement proper streaming that shows incremental updates
       const newContent = streamingData.streamingState.content || "";
       const currentContent = localState.streamingContent;
-      
+
       // For streaming, always use the latest content to show incremental updates
       let accumulatedContent = currentContent;
       if (streamingData.streamingState.isStreaming) {

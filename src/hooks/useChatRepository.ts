@@ -1,6 +1,8 @@
 /**
  * Chat Repository Hook
- * Manages repository selection - ALWAYS uses Convex for all users
+ * Chooses chat repository:
+ * - Prefers Convex when available
+ * - Falls back to Local when Convex init fails or is unavailable
  */
 
 import { useMemo } from "react";
@@ -16,17 +18,35 @@ export function useChatRepository(): IChatRepository | null {
 
   const repository = useMemo<IChatRepository | null>(() => {
     // FIX: Restore fallback logic for reliability
+    const getLocal = () => {
+      // Avoid SSR and locked-down environments
+      if (typeof window === "undefined") {
+        console.warn(
+          "Local repository unavailable server-side; returning null",
+        );
+        return null;
+      }
+      try {
+        return new LocalChatRepository();
+      } catch (e) {
+        console.warn(
+          "Local repository failed to initialize; returning null:",
+          e,
+        );
+        return null;
+      }
+    };
+
     if (convexClient) {
       try {
         return new ConvexChatRepository(convexClient, sessionId || undefined);
       } catch (error) {
         console.warn("Convex repository failed, falling back to local:", error);
-        return new LocalChatRepository();
+        return getLocal();
       }
     }
 
-    // FIX: Return local repository when Convex unavailable
-    return new LocalChatRepository();
+    return getLocal();
   }, [convexClient, sessionId]);
 
   return repository;
