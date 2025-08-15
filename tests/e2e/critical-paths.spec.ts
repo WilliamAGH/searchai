@@ -79,9 +79,9 @@ test.describe("Critical User Paths", () => {
     await input.press("Enter");
 
     // Wait for the message to be processed and chat to be created
-    await expect(
-      page.locator('text="Message to share"'),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text="Message to share"')).toBeVisible({
+      timeout: 15000,
+    });
 
     // Wait a bit for the chat to be fully created
     await page.waitForTimeout(2000);

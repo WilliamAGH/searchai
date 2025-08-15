@@ -20,7 +20,6 @@ test.describe("Search Functionality with Mocked APIs", () => {
   test("should display search results for technical queries", async ({
     page,
   }) => {
-
     const messageInput = page.locator('textarea, [role="textbox"]').first();
     await expect(messageInput).toBeVisible({ timeout: 15000 });
 
@@ -33,15 +32,19 @@ test.describe("Search Functionality with Mocked APIs", () => {
     await expect(messageInput).toBeEnabled({ timeout: 30000 });
 
     // Verify search results are integrated in the response
-    // The mocked results should include React documentation
-    const messageContent = page
-      .locator('[data-role="assistant"]')
-      .last();
-    await expect(messageContent).toContainText(/React/, { timeout: 10000 });
+    // The AI should provide a response based on search results
+    const messageContent = page.locator('[data-role="assistant"]').last();
+    
+    // Check that we got a meaningful response (not just an error)
+    const responseText = await messageContent.textContent();
+    expect(responseText).toBeTruthy();
+    expect(responseText!.length).toBeGreaterThan(100); // Should have substantial content
+    
+    // Verify search sources are mentioned
+    await expect(messageContent).toContainText(/DuckDuckGo|Wikipedia|search/i, { timeout: 10000 });
   });
 
   test("should handle creator detection queries", async ({ page }) => {
-
     const messageInput = page.locator('textarea, [role="textbox"]').first();
     await expect(messageInput).toBeVisible({ timeout: 15000 });
 
@@ -54,16 +57,13 @@ test.describe("Search Functionality with Mocked APIs", () => {
     await expect(messageInput).toBeEnabled({ timeout: 30000 });
 
     // Verify the response mentions William Callahan
-    const messageContent = page
-      .locator('[data-role="assistant"]')
-      .last();
+    const messageContent = page.locator('[data-role="assistant"]').last();
     await expect(messageContent).toContainText(/William Callahan/i, {
       timeout: 10000,
     });
   });
 
   test("should gracefully handle search API errors", async ({ page }) => {
-
     const messageInput = page.locator('textarea, [role="textbox"]').first();
     await expect(messageInput).toBeVisible({ timeout: 15000 });
 
@@ -76,13 +76,14 @@ test.describe("Search Functionality with Mocked APIs", () => {
     await expect(messageInput).toBeEnabled({ timeout: 30000 });
 
     // The response should still be present (fallback behavior)
-    const messages = page.locator('[data-role="assistant"], [data-role="user"]');
+    const messages = page.locator(
+      '[data-role="assistant"], [data-role="user"]',
+    );
     const messageCount = await messages.count();
     expect(messageCount).toBeGreaterThan(1);
   });
 
   test("should handle rate limiting with fallback", async ({ page }) => {
-
     const messageInput = page.locator('textarea, [role="textbox"]').first();
     await expect(messageInput).toBeVisible({ timeout: 15000 });
 

@@ -1,29 +1,28 @@
 /**
  * @fileoverview CRITICAL REGRESSION TEST FOR CHAT TOOLBAR VISIBILITY
- * 
+ *
  * ⚠️ DO NOT MODIFY OR DELETE THIS TEST ⚠️
- * 
+ *
  * This test suite prevents a recurring regression where the Copy/Share toolbar
  * appears on empty chats. This has happened multiple times when developers
  * "fix" failing tests by removing the messages.length check.
- * 
+ *
  * REGRESSION HISTORY:
  * - The toolbar keeps appearing on empty chats
  * - Developers remove the messages.length > 0 check to "fix" tests
  * - Users see Copy/Share buttons with nothing to copy/share
  * - This creates a poor UX and confuses users
- * 
+ *
  * THE RULE:
  * ChatToolbar should ONLY render when:
  * 1. currentChatId exists (chat is in database)
  * 2. messages.length > 0 (there's content to share)
- * 
+ *
  * See: docs/CHAT_TOOLBAR_REGRESSION_PREVENTION.md
  */
 
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import "@testing-library/jest-dom";
 import { ChatInterface } from "../../src/components/ChatInterface";
 
 // Mock all the dependencies
@@ -110,12 +109,7 @@ describe("ChatToolbar Regression Prevention", () => {
       messages: [], // But NO messages
     });
 
-    render(
-      <ChatInterface
-        isAuthenticated={false}
-        isSidebarOpen={false}
-      />
-    );
+    render(<ChatInterface isAuthenticated={false} isSidebarOpen={false} />);
 
     // The Share button should NOT exist
     const shareButton = screen.queryByLabelText("Share chat");
@@ -137,12 +131,7 @@ describe("ChatToolbar Regression Prevention", () => {
       messages: [{ id: "1", content: "test", role: "user" }], // Has messages
     });
 
-    render(
-      <ChatInterface
-        isAuthenticated={false}
-        isSidebarOpen={false}
-      />
-    );
+    render(<ChatInterface isAuthenticated={false} isSidebarOpen={false} />);
 
     // The Share button should NOT exist
     const shareButton = screen.queryByLabelText("Share chat");
@@ -164,12 +153,7 @@ describe("ChatToolbar Regression Prevention", () => {
       messages: [{ id: "1", content: "Hello", role: "user" }], // Has messages
     });
 
-    render(
-      <ChatInterface
-        isAuthenticated={false}
-        isSidebarOpen={false}
-      />
-    );
+    render(<ChatInterface isAuthenticated={false} isSidebarOpen={false} />);
 
     // Now the buttons SHOULD exist
     const shareButton = screen.queryByLabelText("Share chat");
@@ -185,7 +169,10 @@ describe("ChatToolbar Regression Prevention", () => {
    */
   it("validates the exact conditional rendering logic", () => {
     // This is more of a documentation test to show the required logic
-    const shouldShowToolbar = (currentChatId: string | null, messages: any[]) => {
+    const shouldShowToolbar = (
+      currentChatId: string | null,
+      messages: any[],
+    ) => {
       // THIS IS THE REQUIRED LOGIC - DO NOT CHANGE
       return currentChatId && messages.length > 0;
     };
@@ -203,13 +190,13 @@ describe("ChatToolbar Regression Prevention", () => {
 
 /**
  * IF THESE TESTS FAIL:
- * 
+ *
  * 1. DO NOT remove or modify the tests
  * 2. DO NOT change the test expectations
  * 3. DO fix the implementation in ChatInterface.tsx
  * 4. The toolbar condition must be: currentChatId && messages.length > 0
  * 5. Read docs/CHAT_TOOLBAR_REGRESSION_PREVENTION.md
- * 
+ *
  * The UX principle is simple:
  * - No messages = Nothing to share = No share button
  * - Empty chat = Nothing to copy = No copy button

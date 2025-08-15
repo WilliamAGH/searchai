@@ -1,15 +1,15 @@
 /**
  * Chat toolbar with Share and Copy buttons
  * Positioned above the message input area
- * 
+ *
  * ⚠️ IMPORTANT USAGE REQUIREMENTS ⚠️
  * This component should ONLY be rendered when:
  * 1. A chat exists (currentChatId is not null/undefined)
  * 2. There are messages to copy/share (messages.length > 0)
- * 
+ *
  * NEVER render this toolbar on an empty chat!
  * Users should not see Copy/Share buttons when there's nothing to copy/share.
- * 
+ *
  * @example Correct usage:
  * ```tsx
  * {currentChatId && messages.length > 0 && (
@@ -20,15 +20,15 @@
  *   />
  * )}
  * ```
- * 
+ *
  * @example WRONG usage (DO NOT DO THIS):
  * ```tsx
  * // ❌ Missing messages.length check
  * {currentChatId && <ChatToolbar ... />}
- * 
+ *
  * // ❌ Missing currentChatId check
  * {messages.length > 0 && <ChatToolbar ... />}
- * 
+ *
  * // ❌ No checks at all
  * <ChatToolbar ... />
  * ```
@@ -51,10 +51,10 @@ interface ChatToolbarProps {
 
 /**
  * Toolbar with Share and Copy buttons for chat conversations.
- * 
+ *
  * ⚠️ CRITICAL: Parent component MUST ensure messages.length > 0 before rendering!
  * This component does not check if messages array is empty.
- * 
+ *
  * @param onShare - Handler to open share modal
  * @param messages - Messages to copy (must not be empty)
  * @param chatTitle - Title for formatted output

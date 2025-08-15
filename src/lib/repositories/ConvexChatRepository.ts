@@ -11,11 +11,9 @@ import type {
   UnifiedChat,
   UnifiedMessage,
   StreamChunk,
-  ChatResponse} from "../types/unified";
-import {
-  IdUtils,
-  TitleUtils,
+  ChatResponse,
 } from "../types/unified";
+import { IdUtils, TitleUtils } from "../types/unified";
 import { logger } from "../logger";
 // Removed unused imports from errorHandling
 

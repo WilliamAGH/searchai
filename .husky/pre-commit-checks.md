@@ -3,11 +3,13 @@
 ## ChatToolbar Visibility Check
 
 **AUTOMATED CHECK**: The pre-commit hook will warn if you modify:
+
 - `src/components/ChatInterface.tsx` near the ChatToolbar render
 - `src/components/ChatToolbar.tsx`
 - `tests/e2e/smoke-new-chat-share.spec.ts`
 
 ### The Check Pattern
+
 ```bash
 # This runs automatically on commit
 if git diff --cached --name-only | grep -E "(ChatInterface|ChatToolbar|smoke-new-chat-share)"; then

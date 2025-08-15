@@ -5,7 +5,7 @@
 
 import React from "react";
 import { Spinner } from "../ui/Spinner";
-import type { ErrorStateProps} from "../../lib/constants/errorStates";
+import type { ErrorStateProps } from "../../lib/constants/errorStates";
 import { ErrorMessages, RetryConfig } from "../../lib/constants/errorStates";
 
 interface MessageSkeletonProps {
@@ -156,16 +156,14 @@ export function LoadErrorState({
   className = "",
 }: ErrorStateProps) {
   const canRetry = retryCount < maxRetries && onRetry;
-  
+
   return (
     <div
       className={`flex flex-col items-center justify-center py-8 text-sm ${className}`}
       role="alert"
       aria-live="polite"
     >
-      <div className="text-red-500 dark:text-red-400 mb-2">
-        {message}
-      </div>
+      <div className="text-red-500 dark:text-red-400 mb-2">{message}</div>
       {retryCount > 0 && canRetry && (
         <div
           className="text-gray-500 dark:text-gray-400 mb-2"

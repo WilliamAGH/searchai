@@ -7,11 +7,9 @@ import type {
   UnifiedChat,
   UnifiedMessage,
   StreamChunk,
-  ChatResponse} from "../types/unified";
-import {
-  IdUtils,
-  TitleUtils,
+  ChatResponse,
 } from "../types/unified";
+import { IdUtils, TitleUtils } from "../types/unified";
 
 /**
  * Base Chat Repository Interface

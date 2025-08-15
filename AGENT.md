@@ -226,6 +226,187 @@ export function validateChatMessage(message: string) {
 
 **THE RULE:** Use existing code. Find it in the repo, don't start from scratch. Zero temperature means zero tolerance for redundancy.
 
+## 🔄 CRITICAL: Comprehensive Code Update Protocol
+
+### The Update Verification Mandate
+
+**ABSOLUTE REQUIREMENT:** When editing or updating ANY code, you MUST find and update ALL usages throughout the entire codebase. Missing even one usage creates inconsistencies that break features and introduce bugs.
+
+### Three-Phase Update Protocol
+
+#### Phase 1: Pre-Update Planning
+**BEFORE making any code changes:**
+
+1. **Map All Usages**:
+   ```bash
+   # Find all imports of the module/function
+   grep -r "import.*ModuleName" --include="*.ts" --include="*.tsx"
+   
+   # Find all function calls
+   grep -r "functionName(" --include="*.ts" --include="*.tsx"
+   
+   # Find all type references
+   grep -r "TypeName" --include="*.ts" --include="*.tsx"
+   ```
+
+2. **Create Update Checklist**:
+   ```typescript
+   // TODO: Update Plan for [Function/Type/Module Name]
+   // [ ] src/components/Chat/ChatInput.tsx - line 45
+   // [ ] src/hooks/useChat.ts - line 78, 92
+   // [ ] convex/chats.ts - line 234
+   // [ ] convex/http/routes/chat.ts - line 56
+   // [ ] tests/chat.test.ts - line 123, 145
+   ```
+
+3. **Identify Wire Points**:
+   - What files will need to import this?
+   - What files currently use the old pattern?
+   - What new connections need to be established?
+   - What parameter changes ripple through the codebase?
+
+#### Phase 2: During Updates
+**WHILE making changes:**
+
+1. **Track Every Change**:
+   ```typescript
+   // CHANGE LOG:
+   // ✓ Updated function signature in convex/lib/security/validation.ts
+   // ✓ Updated import in src/components/ChatMessage.tsx
+   // ✓ Updated call site in src/hooks/useMessages.ts
+   // ⚠️ PENDING: Update tests in tests/validation.test.ts
+   ```
+
+2. **Verify Parameter Agreement**:
+   - Function signatures match across all calls
+   - Type parameters align everywhere
+   - Import paths are consistent
+   - No orphaned old implementations
+
+3. **Check Adjacent Functionality**:
+   - Related functions that might use similar patterns
+   - Parent components that pass props
+   - Child components that receive data
+   - Middleware or interceptors in the chain
+
+#### Phase 3: Post-Update Audit
+**AFTER completing updates:**
+
+1. **Comprehensive Usage Audit**:
+   ```bash
+   # Verify no old patterns remain
+   grep -r "oldFunctionName" --include="*.ts" --include="*.tsx"
+   
+   # Check for type mismatches
+   npm run typecheck
+   
+   # Verify all imports resolve
+   npm run build
+   ```
+
+2. **Expanded Search for Missed Updates**:
+   - Search for partial matches (might catch variations)
+   - Check test files for mock implementations
+   - Review configuration files
+   - Scan documentation and comments
+
+3. **Adjacent Functionality Verification**:
+   - Functions in the same module
+   - Similar patterns in other domains
+   - Event handlers and callbacks
+   - Error handling paths
+
+### Common Update Failures to Prevent
+
+**❌ CRITICAL FAILURES:**
+
+1. **Parameter Mismatch**:
+   ```typescript
+   // Function updated to take 3 parameters
+   function processChat(id: string, message: string, userId: string) {}
+   
+   // But some calls still use 2 parameters
+   processChat(id, message); // 💥 Runtime error!
+   ```
+
+2. **Type Definition Drift**:
+   ```typescript
+   // Type updated in one place
+   type ChatMessage = { id: string; content: string; timestamp: number }
+   
+   // But old type still used elsewhere
+   type ChatMessage = { id: string; text: string } // 💥 Type mismatch!
+   ```
+
+3. **Import Path Inconsistency**:
+   ```typescript
+   // Some files use new path
+   import { validate } from '@/lib/validation/chat'
+   
+   // Others still use old path
+   import { validate } from '../../../utils/validate' // 💥 Module not found!
+   ```
+
+### The Update Verification Checklist
+
+**FOR EVERY CODE UPDATE:**
+
+- [ ] Created comprehensive list of ALL current usages
+- [ ] Mapped out ALL files that will need updates
+- [ ] Identified ALL parameter changes needed
+- [ ] Updated EVERY import statement
+- [ ] Modified EVERY function call
+- [ ] Adjusted EVERY type reference
+- [ ] Checked ALL test files
+- [ ] Verified NO old patterns remain
+- [ ] Confirmed ALL parameters match
+- [ ] Validated ALL types align
+- [ ] Tested ALL affected functionality
+- [ ] Reviewed ALL adjacent code
+
+### Search Strategies for Finding All Usages
+
+```bash
+# 1. Direct function/type usage
+grep -r "functionName" --include="*.ts" --include="*.tsx"
+
+# 2. Import statements
+grep -r "import.*functionName" --include="*.ts" --include="*.tsx"
+grep -r "from.*moduleName" --include="*.ts" --include="*.tsx"
+
+# 3. Destructured imports
+grep -r "{.*functionName.*}" --include="*.ts" --include="*.tsx"
+
+# 4. Dynamic references
+grep -r "['\"]\.functionName" --include="*.ts" --include="*.tsx"
+
+# 5. Test mocks and stubs
+grep -r "mock.*functionName" --include="*.test.ts" --include="*.spec.ts"
+grep -r "jest\.fn.*functionName" --include="*.test.ts"
+
+# 6. Configuration references
+grep -r "functionName" --include="*.json" --include="*.config.ts"
+
+# 7. Comments and documentation
+grep -r "functionName" --include="*.md" --include="*.ts" --include="*.tsx"
+```
+
+### Zero Tolerance for Incomplete Updates
+
+**THE CONSEQUENCES:**
+- Partial updates = Broken features
+- Missed usages = Runtime errors
+- Inconsistent parameters = Type errors
+- Forgotten imports = Build failures
+
+**THE SOLUTION:**
+- Plan comprehensively
+- Update systematically  
+- Verify exhaustively
+- Never assume completeness
+
+**FINAL RULE:** An update is not complete until EVERY usage has been found, updated, and verified. Zero temperature means zero tolerance for incomplete updates.
+
 ## 📚 DOCUMENTATION HIERARCHY
 
 **Authoritative Sources:**
