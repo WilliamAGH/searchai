@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { clickReactElement } from "./utils/react-click";
-import { waitForNetworkIdle } from "../helpers/wait-conditions";
 
 test.describe("share modal link variants", () => {
   test("smoke: shared/public/llm show correct URL shapes", async ({ page }) => {
@@ -28,10 +27,8 @@ test.describe("share modal link variants", () => {
     // Wait for share controls to be available
     const shareButton = page.locator('button[aria-label="Share chat"]');
     await expect(shareButton).toBeVisible({ timeout: 10000 });
-    // Open share modal via the button near the input (use the last toolbar button)
-    // Toolbar has: toggle sidebar, Copy, Share — select the Share button by its SVG and position
-    // Prefer the explicit share button by title if present; fallback to last toolbar button
-    // Use the already-located share button with React fiber workaround
+    
+    // Open share modal via the button near the input
     const reactClickSuccess = await clickReactElement(
       page,
       'button[aria-label="Share chat"]',
@@ -57,123 +54,30 @@ test.describe("share modal link variants", () => {
     const llmRadio = modal.locator('input[type="radio"][value="llm"]');
     const urlInput = modal.locator("#share-url-input");
 
-    // Custom function to trigger radio button onChange via React fiber
-    const triggerRadioChange = async (value: string) => {
-      return await page.evaluate((radioValue: string) => {
-        const radio = document.querySelector(
-          `input[type="radio"][value="${radioValue}"]`,
-        ) as HTMLInputElement;
-        if (!radio) return false;
-
-        // Find React fiber key
-        const fiberKey = Object.keys(radio).find(
-          (key) =>
-            key.startsWith("__reactFiber") ||
-            key.startsWith("__reactInternalInstance"),
-        );
-
-        if (!fiberKey) return false;
-
-        const fiber = (radio as any)[fiberKey];
-
-        // Look for onChange handler in the fiber
-        let current = fiber;
-        while (current) {
-          if (current.memoizedProps && current.memoizedProps.onChange) {
-            try {
-              // Create a synthetic event
-              const event = {
-                target: { value: radioValue, checked: true },
-                currentTarget: { value: radioValue, checked: true },
-                preventDefault: () => {},
-                stopPropagation: () => {},
-              };
-              current.memoizedProps.onChange(event);
-              return true;
-            } catch (error) {
-              console.error("onChange execution failed:", error);
-              return false;
-            }
-          }
-          current = current.return;
-        }
-
-        return false;
-      }, value);
-    };
-
-    // Try to trigger the shared radio button
-    const sharedSuccess = await triggerRadioChange("shared");
-    if (!sharedSuccess) {
-      // Fallback: try clicking the label with React fiber
-      const labelSuccess = await clickReactElement(
-        page,
-        'label[aria-label="Shared"]',
-      );
-      if (!labelSuccess) {
-        // Final fallback: force click the radio button
-        await sharedRadio.click({ force: true });
-      }
+    // Select Shared using React fiber workaround on label
+    const sharedLabelClickSuccess = await clickReactElement(
+      page,
+      'label[aria-label="Shared"]',
+    );
+    if (!sharedLabelClickSuccess) {
+      // Fallback to clicking the label normally
+      const sharedLabel = modal.locator('label[aria-label="Shared"]');
+      await sharedLabel.click({ force: true });
     }
 
     // Verify the radio is checked and URL input is visible
     await expect(sharedRadio).toBeChecked({ timeout: 5000 });
     await expect(urlInput).toBeVisible();
 
-    // Try multiple selectors for the generate button
-    let genBtn = modal.locator('button:has-text("Generate URL")');
-    if (!(await genBtn.isVisible())) {
-      genBtn = modal.locator('button[aria-label*="Generate"]');
-    }
-    if (!(await genBtn.isVisible())) {
-      genBtn = modal.locator("button").filter({ hasText: /generate/i });
-    }
-
+    // Find the generate button - it shows different text based on state
+    const genBtn = modal.locator('button').filter({ hasText: /generate|copy/i });
     await expect(genBtn).toBeVisible({ timeout: 5000 });
 
-    // Add debugging for the onShare function
-    await page.evaluate(() => {
-      console.log("Adding onShare debugging...");
-      // Intercept console.log calls from the page
-      const originalLog = console.log;
-      window.console.log = (...args) => {
-        originalLog("[PAGE]", ...args);
-      };
-    });
-
-    // Try multiple approaches to click the button
-    console.log("Attempting to click Generate URL button...");
-
-    // First try: Direct click (this is required to populate the URL)
+    // Click the button to generate URL
     await genBtn.click();
+    
     // Wait for URL generation to complete
     await expect(urlInput).toHaveValue(/.+/, { timeout: 10000 });
-
-    let buttonText = await genBtn.textContent();
-    console.log("Button text after direct click:", buttonText);
-
-    // If direct click didn't work, try force click
-    if (buttonText && /generate/i.test(buttonText)) {
-      console.log("Direct click failed, trying force click...");
-      await genBtn.click({ force: true });
-      await waitForNetworkIdle(page);
-      buttonText = await genBtn.textContent();
-      console.log("Button text after force click:", buttonText);
-    }
-
-    // If force click didn't work, try dispatching events
-    if (buttonText && /generate/i.test(buttonText)) {
-      console.log("Force click failed, trying event dispatch...");
-      await genBtn.dispatchEvent("click");
-      await waitForNetworkIdle(page);
-      buttonText = await genBtn.textContent();
-      console.log("Button text after event dispatch:", buttonText);
-    }
-
-    // Ensure URL has been populated
-    await expect(urlInput).toHaveValue(/.+/, { timeout: 10000 });
-    const actualValue = await urlInput.inputValue();
-    console.log("Actual URL value:", actualValue);
     await expect(urlInput).toHaveValue(/\/s\//);
 
     // Select Public using React fiber workaround on label
@@ -187,7 +91,9 @@ test.describe("share modal link variants", () => {
       await publicLabel.click({ force: true });
     }
     await expect(publicRadio).toBeChecked({ timeout: 5000 });
-    const genBtn2 = modal.getByRole("button", { name: /generate url|copy/i });
+    
+    // Generate URL for public
+    const genBtn2 = modal.locator('button').filter({ hasText: /generate|copy/i });
     await genBtn2.click();
     // Public URLs may remain /s/ if the server preserves share link; allow either
     await expect(urlInput).toHaveValue(/\/(p|s)\//, { timeout: 15000 });
@@ -203,7 +109,9 @@ test.describe("share modal link variants", () => {
       await llmLabel.click({ force: true });
     }
     await expect(llmRadio).toBeChecked({ timeout: 5000 });
-    const genBtn3 = modal.getByRole("button", { name: /generate url|copy/i });
+    
+    // Generate URL for LLM
+    const genBtn3 = modal.locator('button').filter({ hasText: /generate|copy/i });
     await genBtn3.click();
     await expect(urlInput).toHaveValue(
       /(\/api\/chatTextMarkdown\?shareId=|\/s\/)/,
@@ -214,6 +122,7 @@ test.describe("share modal link variants", () => {
 
     // Close modal; generation already persisted as needed
     await modal.getByLabel("Close").click();
+    
     // Re-open modal
     const reactClickSuccess2 = await clickReactElement(
       page,

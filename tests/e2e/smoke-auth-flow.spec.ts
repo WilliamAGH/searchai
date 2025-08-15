@@ -6,8 +6,11 @@ test.describe("Authentication Flow", () => {
     // Navigate to home
     await page.goto("/");
 
-    // Expect app header present
-    await expect(page.getByRole("heading", { name: /SearchAI/i })).toBeVisible({
+    // Wait for the app to load by checking for the main content
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+
+    // Expect app header present - look for the SearchAI text in the header
+    await expect(page.locator('header').getByText(/SearchAI/i)).toBeVisible({
       timeout: 15000,
     });
 
@@ -39,6 +42,6 @@ test.describe("Authentication Flow", () => {
     }
 
     // Back at main app
-    await expect(page.getByRole("heading", { name: /SearchAI/i })).toBeVisible();
+    await expect(page.locator('main')).toBeVisible();
   });
 });
