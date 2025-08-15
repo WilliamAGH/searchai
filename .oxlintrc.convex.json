@@ -1,19 +1,14 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "extends": "./.oxlintrc.json",
-  "plugins": [
-    "typescript"
-  ],
+  "extends": ["./.oxlintrc.json"],
+  "plugins": ["typescript"],
   "rules": {
-    // Convex-specific TypeScript rules
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/no-unsafe-assignment": "error",
     "@typescript-eslint/no-unsafe-member-access": "error",
     "@typescript-eslint/no-unsafe-call": "error",
     "@typescript-eslint/no-unsafe-return": "error",
     "@typescript-eslint/no-unsafe-argument": "error",
-    
-    // Enforce strict typing for Convex
     "@typescript-eslint/explicit-function-return-type": [
       "error",
       {
@@ -22,9 +17,7 @@
         "allowHigherOrderFunctions": false
       }
     ],
-    
-    // Prevent string type for IDs
-    "@typescript-eslint/no-restricted-types": [
+    "@typescript-eslint/ban-types": [
       "error",
       {
         "types": {
@@ -32,11 +25,10 @@
             "message": "Use Id<TableName> for document IDs, not string",
             "fixWith": "Id"
           }
-        }
+        },
+        "extendDefaults": true
       }
     ],
-    
-    // Custom import restrictions for Convex
     "no-restricted-imports": [
       "error",
       {
@@ -53,7 +45,6 @@
     {
       "files": ["convex/**/*.ts"],
       "rules": {
-        // Strict validation for Convex functions
         "@typescript-eslint/no-explicit-any": "error",
         "@typescript-eslint/strict-boolean-expressions": "error",
         "@typescript-eslint/no-non-null-assertion": "error",
