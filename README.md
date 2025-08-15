@@ -9,6 +9,11 @@ Built with React + Vite on the frontend and Convex on the backend.
 - **API Endpoints**: HTTP routes in Convex serve unauthenticated users
 - **Real-time**: Convex mutations/actions for authenticated users
 
+### Project Rules & Guidance
+
+- See `.cursor/rules/*.mdc` for canonical engineering rules (Testing, Convex, Pagination, Chat domain, Migrations).
+- See `AGENT.md` for the overall development configuration and links to the rule files.
+
 ### Recent Improvements (Overview)
 
 - Context-aware planner with deterministic query augmentation and anchor queries for higher search relevance (auth + unauth flows).
