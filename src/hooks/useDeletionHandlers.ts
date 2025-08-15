@@ -89,8 +89,20 @@ export function useDeletionHandlers({
   const handleRequestDeleteChat = useCallback(
     async (chatId: Id<"chats"> | string) => {
       try {
-        // Convert string to Id<"chats"> if needed
-        const convexChatId = chatId as Id<"chats">;
+        // Validate the chat ID before casting
+        let convexChatId: Id<"chats">;
+        if (typeof chatId === "string") {
+          // Import isConvexChatId for validation
+          const { isConvexChatId } = await import("../lib/utils/id");
+          if (!isConvexChatId(chatId)) {
+            logger.warn("Invalid chat ID for deletion:", { chatId });
+            setUndoBanner({ show: true, message: "Invalid chat identifier" });
+            return;
+          }
+          convexChatId = chatId;
+        } else {
+          convexChatId = chatId;
+        }
         await deleteChat({ chatId: convexChatId });
 
         // Show success banner
@@ -154,8 +166,23 @@ export function useDeletionHandlers({
   const handleRequestDeleteMessage = useCallback(
     async (messageId: Id<"messages"> | string) => {
       try {
-        // Convert string to Id<"messages"> if needed
-        const convexMessageId = messageId as Id<"messages">;
+        // Validate the message ID before casting
+        let convexMessageId: Id<"messages">;
+        if (typeof messageId === "string") {
+          // Import isConvexMessageId for validation
+          const { isConvexMessageId } = await import("../lib/utils/id");
+          if (!isConvexMessageId(messageId)) {
+            logger.warn("Invalid message ID for deletion:", { messageId });
+            setUndoBanner({
+              show: true,
+              message: "Invalid message identifier",
+            });
+            return;
+          }
+          convexMessageId = messageId;
+        } else {
+          convexMessageId = messageId;
+        }
         await deleteMessage({ messageId: convexMessageId });
 
         // Show success banner
