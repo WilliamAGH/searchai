@@ -22,6 +22,27 @@ export const subscribeToChatUpdates = query({
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
   },
+  returns: v.union(
+    v.null(),
+    v.object({
+      chat: v.any(),
+      messages: v.array(v.any()),
+      isGenerating: v.boolean(),
+      streamedContent: v.optional(v.string()),
+      rollingSummary: v.optional(v.string()),
+      lastUpdated: v.number(),
+      streamingState: v.union(
+        v.null(),
+        v.object({
+          messageId: v.id("messages"),
+          isStreaming: v.boolean(),
+          content: v.optional(v.string()),
+          streamedContent: v.optional(v.string()),
+          thinking: v.optional(v.string()),
+        }),
+      ),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
@@ -51,27 +72,34 @@ export const subscribeToChatUpdates = query({
       .order("asc")
       .collect();
 
-    // Find any streaming message
-    const streamingMessage = messages.find(
-      (m: Doc<"messages">) => m.isStreaming === true,
-    );
+    // Find the most recent streaming message (if any)
+    let streamingMessage: Doc<"messages"> | undefined;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i] as Doc<"messages">;
+      if (m.isStreaming === true) {
+        streamingMessage = m;
+        break;
+      }
+    }
 
     return {
       chat,
       messages,
-      isGenerating: false, // The chat entity doesn't have isStreaming field
+      isGenerating: !!streamingMessage,
       streamedContent: streamingMessage?.streamedContent || undefined,
       rollingSummary: chat.rollingSummary,
       lastUpdated: Date.now(),
       // NEW: Add streaming state for real-time updates
-      streamingState: streamingMessage ? {
-        messageId: streamingMessage._id,
-        isStreaming: true,
-        content: streamingMessage.content,
-        streamedContent: streamingMessage.streamedContent,
-        thinking: streamingMessage.thinking,
-        // Note: searchProgress field doesn't exist in schema
-      } : null,
+      streamingState: streamingMessage
+        ? {
+            messageId: streamingMessage._id,
+            isStreaming: true,
+            content: streamingMessage.content,
+            streamedContent: streamingMessage.streamedContent,
+            thinking: streamingMessage.thinking,
+            // Note: searchProgress field doesn't exist in schema
+          }
+        : null,
     };
   },
 });
@@ -84,6 +112,16 @@ export const subscribeToChatUpdates = query({
  */
 export const subscribeToMessageStream = query({
   args: { messageId: v.id("messages") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      messageId: v.id("messages"),
+      content: v.optional(v.string()),
+      streamedContent: v.optional(v.string()),
+      isStreaming: v.boolean(),
+      completedAt: v.optional(v.number()),
+    }),
+  ),
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     if (!message) return null;
@@ -92,8 +130,8 @@ export const subscribeToMessageStream = query({
       messageId: args.messageId,
       content: message.content,
       streamedContent: message.streamedContent,
-      isStreaming: message.isStreaming || false,
-      completedAt: undefined, // This field doesn't exist in the schema
+      isStreaming: !!message.isStreaming,
+      completedAt: undefined,
     };
   },
 });
