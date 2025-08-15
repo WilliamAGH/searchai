@@ -185,7 +185,7 @@ export function ChatSidebar({
               />
             </svg>
           )}
-          {isCreatingChat ? "Creating..." : "New Chat"}
+          {isCreatingChat ? "Creating" : "New Chat"}
         </button>
       </div>
 
@@ -216,11 +216,6 @@ export function ChatSidebar({
                     {chat.title}
                   </div>
                   <div className="text-sm text-muted-foreground flex items-center gap-1 min-w-0">
-                    {"isLocal" in chat && chat.isLocal && (
-                      <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
-                        Local
-                      </span>
-                    )}
                     <span className="truncate">
                       {new Date(chat.updatedAt).toLocaleDateString()}
                     </span>

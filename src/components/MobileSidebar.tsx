@@ -228,7 +228,7 @@ export function MobileSidebar({
                         />
                       </svg>
                     )}
-                    {isCreatingChat ? "Creating..." : "New Chat"}
+                    {isCreatingChat ? "Creating" : "New Chat"}
                   </button>
 
                   <div className="space-y-1">
@@ -263,11 +263,6 @@ export function MobileSidebar({
                                 {chat.title}
                               </div>
                               <div className="text-xs text-gray-500 flex items-center gap-1 min-w-0">
-                                {"isLocal" in chat && chat.isLocal && (
-                                  <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
-                                    Local
-                                  </span>
-                                )}
                                 <span className="truncate">
                                   {new Date(
                                     chat.updatedAt,

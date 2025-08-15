@@ -194,32 +194,18 @@ function ChatInterfaceComponent({
     refresh: _refreshMessages,
     clearError,
   } = usePaginatedMessages({
-    chatId:
-      isAuthenticated && currentChatId && !currentChat?.isLocal
-        ? currentChatId
-        : null,
+    chatId: isAuthenticated && currentChatId ? currentChatId : null,
     initialLimit: 50,
-    enabled: isAuthenticated && !!currentChatId && !currentChat?.isLocal,
+    enabled: isAuthenticated && !!currentChatId,
   });
 
   // Use paginated messages when available, fallback to regular messages
   const effectiveMessages = useMemo(() => {
-    if (
-      isAuthenticated &&
-      currentChatId &&
-      !currentChat?.isLocal &&
-      paginatedMessages.length > 0
-    ) {
+    if (isAuthenticated && currentChatId && paginatedMessages.length > 0) {
       return paginatedMessages;
     }
     return messages;
-  }, [
-    isAuthenticated,
-    currentChatId,
-    currentChat?.isLocal,
-    paginatedMessages,
-    messages,
-  ]);
+  }, [isAuthenticated, currentChatId, paginatedMessages, messages]);
 
   const currentMessages = useMemo(
     () => mapMessagesToLocal(effectiveMessages, isAuthenticated),
