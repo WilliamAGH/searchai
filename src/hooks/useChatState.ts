@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { UnifiedChat, UnifiedMessage } from "../lib/types/unified";
+import type { Id } from "../../convex/_generated/dataModel";
 
 /**
  * Complete chat application state interface
@@ -56,7 +57,7 @@ export interface ChatState {
   streamingState?: {
     isStreaming: boolean;
     streamingContent: string;
-    streamingMessageId?: any; // Convex ID type - will be Id<"messages">
+    streamingMessageId?: Id<"messages"> | string;
     thinking?: string;
   };
 }

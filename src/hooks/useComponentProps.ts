@@ -44,7 +44,7 @@ interface UseComponentPropsArgs {
   streamingState?: {
     isStreaming: boolean;
     streamingContent: string;
-    streamingMessageId?: any; // Convex ID type - will be Id<"messages">
+    streamingMessageId?: Id<"messages"> | string;
     thinking?: string;
   };
 }
@@ -65,6 +65,7 @@ export function useComponentProps(args: UseComponentPropsArgs) {
     isCreatingChat,
     isAuthenticated,
     handleSelectChat,
+    handleToggleSidebar,
     handleNewChatButton,
     handleDeleteLocalChat,
     handleRequestDeleteChat,
@@ -144,9 +145,13 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       isGenerating,
       searchProgress,
       chatId: currentChatId,
-      onDeleteMessage: isAuthenticated
+      currentChat,
+      onToggleSidebar: handleToggleSidebar,
+      onShare: () => setShowShareModal(true),
+      onDeleteLocalMessage: handleDeleteLocalMessage,
+      onRequestDeleteMessage: isAuthenticated
         ? handleRequestDeleteMessage
-        : handleDeleteLocalMessage,
+        : undefined,
       // Pagination props (optional, passed through)
       isLoadingMore,
       hasMore,
@@ -163,7 +168,10 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       isGenerating,
       searchProgress,
       currentChatId,
+      currentChat,
       isAuthenticated,
+      handleToggleSidebar,
+      setShowShareModal,
       handleRequestDeleteMessage,
       handleDeleteLocalMessage,
       isLoadingMore,
