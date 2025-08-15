@@ -437,9 +437,9 @@ async function streamResponseToMessage(args: {
   let accumulatedContent = "";
   let accumulatedReasoning = existingReasoning || "";
   let lastUpdateTime = Date.now();
-  // Optimized update interval: Balance between responsiveness and database load
-  // 50ms provides smooth streaming while reducing database writes by 50%
-  const updateInterval = 50; // Was 25ms - reduced for better performance
+  // FIXED: Reduce update interval for more responsive streaming
+  // 25ms provides smoother streaming while maintaining reasonable database load
+  const updateInterval = 25; // Was 50ms - reduced for better streaming responsiveness
   let chunkCount = 0;
   let updateInFlight = false;
 
@@ -477,7 +477,10 @@ async function streamResponseToMessage(args: {
         const now = Date.now();
         if (!updateInFlight && now - lastUpdateTime >= updateInterval) {
           updateInFlight = true;
-          // Explicitly type the awaited return to avoid deep instantiation issues
+          // FIXED: Proper streaming implementation
+          // - content: accumulated content (for final display)
+          // - streamedContent: new chunk (for incremental updates)
+          // - isStreaming: true (to indicate streaming state)
           const _ret: null = await ctx.runMutation(
             internal.messages.updateMessage,
             {

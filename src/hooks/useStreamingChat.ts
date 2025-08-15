@@ -60,10 +60,26 @@ export function useStreamingChat(
   // Update local state when streaming data changes
   useEffect(() => {
     if (streamingData?.streamingState) {
+      // FIXED: Implement robust streaming with proper content change detection
+      const newContent = streamingData.streamingState.content || "";
+      const currentContent = localState.streamingContent;
+      
+      // For streaming, detect when new content arrives
+      let accumulatedContent = currentContent;
+      if (streamingData.streamingState.isStreaming) {
+        // During streaming, check if we have new content
+        if (newContent && newContent !== currentContent) {
+          // New content arrived - this creates the streaming effect
+          accumulatedContent = newContent;
+        }
+      } else if (newContent) {
+        // Not streaming, use final content
+        accumulatedContent = newContent;
+      }
+
       setLocalState({
         isStreaming: streamingData.streamingState.isStreaming ?? false,
-        // Use 'content' which has the full accumulated content, not 'streamedContent' which is just the chunk
-        streamingContent: streamingData.streamingState.content ?? "",
+        streamingContent: accumulatedContent,
         streamingMessageId: streamingData.streamingState.messageId,
         thinking: streamingData.streamingState.thinking,
         hasStreamingState: true,
@@ -79,7 +95,7 @@ export function useStreamingChat(
         messages: streamingData?.messages,
       });
     }
-  }, [streamingData]);
+  }, [streamingData, localState.streamingContent]);
 
   return localState;
 }
