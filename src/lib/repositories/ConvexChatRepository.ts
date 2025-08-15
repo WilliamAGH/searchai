@@ -21,12 +21,12 @@ import { logger } from "../logger";
 export class ConvexChatRepository extends BaseRepository {
   protected storageType = "convex" as const;
   private client: ConvexClient;
-  private sessionId?: string;
+  private _sessionId?: string;
 
   constructor(client: ConvexClient, sessionId?: string) {
     super();
     this.client = client;
-    this.sessionId = sessionId;
+    this._sessionId = sessionId;
 
     // Log initialization for debugging
     logger.debug("ConvexChatRepository initialized", {
@@ -37,18 +37,23 @@ export class ConvexChatRepository extends BaseRepository {
 
   // Allow updating sessionId after creation
   setSessionId(sessionId: string | undefined) {
-    this.sessionId = sessionId;
+    this._sessionId = sessionId;
     logger.debug("ConvexChatRepository sessionId updated", {
       hasSessionId: !!sessionId,
       sessionId,
     });
   }
 
+  // Getter for sessionId
+  get sessionId(): string | undefined {
+    return this._sessionId;
+  }
+
   // Chat operations
   async getChats(): Promise<UnifiedChat[]> {
     try {
       const chats = await this.client.query(api.chats.getUserChats, {
-        sessionId: this.sessionId,
+        sessionId: this._sessionId,
       });
       if (!chats) return [];
 
@@ -77,7 +82,7 @@ export class ConvexChatRepository extends BaseRepository {
         // Try to find by opaque ID or share ID
         const byOpaque = await this.client.query(api.chats.getChatByOpaqueId, {
           opaqueId: id,
-          sessionId: this.sessionId,
+          sessionId: this._sessionId,
         });
         if (byOpaque) {
           return this.convexToUnifiedChat(byOpaque);
@@ -87,7 +92,7 @@ export class ConvexChatRepository extends BaseRepository {
 
       const chat = await this.client.query(api.chats.getChatById, {
         chatId: IdUtils.toConvexChatId(id),
-        sessionId: this.sessionId,
+        sessionId: this._sessionId,
       });
 
       return chat ? this.convexToUnifiedChat(chat) : null;
@@ -102,18 +107,18 @@ export class ConvexChatRepository extends BaseRepository {
       const finalTitle = title || "New Chat";
       logger.debug("Creating chat", {
         title: finalTitle,
-        sessionId: this.sessionId,
-        hasSessionId: !!this.sessionId,
+        sessionId: this._sessionId,
+        hasSessionId: !!this._sessionId,
       });
 
       const chatId = await this.client.mutation(api.chats.createChat, {
         title: TitleUtils.sanitize(finalTitle),
-        sessionId: this.sessionId,
+        sessionId: this._sessionId,
       });
 
       logger.debug("Chat created with ID", {
         chatId,
-        sessionId: this.sessionId,
+        sessionId: this._sessionId,
       });
 
       const chat = await this.getChatById(IdUtils.toUnifiedId(chatId));
@@ -123,7 +128,7 @@ export class ConvexChatRepository extends BaseRepository {
     } catch (error) {
       logger.error("Failed to create chat in Convex:", {
         error,
-        sessionId: this.sessionId,
+        sessionId: this._sessionId,
       });
       throw error;
     }
@@ -189,13 +194,13 @@ export class ConvexChatRepository extends BaseRepository {
     try {
       logger.debug("Fetching messages for chat", {
         chatId,
-        sessionId: this.sessionId,
-        hasSessionId: !!this.sessionId,
+        sessionId: this._sessionId,
+        hasSessionId: !!this._sessionId,
       });
 
       const messages = await this.client.query(api.chats.getChatMessages, {
         chatId: IdUtils.toConvexChatId(chatId),
-        sessionId: this.sessionId,
+        sessionId: this._sessionId,
       });
 
       if (!messages) {
@@ -213,7 +218,7 @@ export class ConvexChatRepository extends BaseRepository {
       logger.error("Failed to fetch messages from Convex:", {
         error,
         chatId,
-        sessionId: this.sessionId,
+        sessionId: this._sessionId,
       });
       return [];
     }
@@ -404,7 +409,7 @@ export class ConvexChatRepository extends BaseRepository {
           api.chats.subscribeToChatUpdates,
           {
             chatId: convexChatId,
-            sessionId: this.sessionId,
+            sessionId: this._sessionId,
           },
         );
 
@@ -482,6 +487,7 @@ export class ConvexChatRepository extends BaseRepository {
       // Use real-time subscription instead of polling
       const convexChatId = IdUtils.toConvexChatId(chatId);
       let lastContent = "";
+      let lastThinking: string | undefined;
       let iterations = 0;
       const maxIterations = 300; // 30 seconds timeout
 
@@ -491,7 +497,7 @@ export class ConvexChatRepository extends BaseRepository {
           api.chats.subscribeToChatUpdates,
           {
             chatId: convexChatId,
-            sessionId: this.sessionId,
+            sessionId: this._sessionId,
           },
         );
 
@@ -520,9 +526,16 @@ export class ConvexChatRepository extends BaseRepository {
             }
           }
 
-          // Yield thinking updates if available
-          if (streamingMessage.thinking && streamingMessage.thinking !== lastContent) {
-            yield { type: "metadata", metadata: { thinking: streamingMessage.thinking } };
+          // Yield thinking updates if available (only when it changes)
+          if (
+            typeof streamingMessage.thinking === "string" &&
+            streamingMessage.thinking !== lastThinking
+          ) {
+            yield {
+              type: "metadata",
+              metadata: { thinking: streamingMessage.thinking },
+            };
+            lastThinking = streamingMessage.thinking;
           }
         } else {
           // Check if there's a completed assistant message
