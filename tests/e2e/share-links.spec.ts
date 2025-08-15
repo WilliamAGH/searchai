@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 import { clickReactElement } from "./utils/react-click";
 import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
@@ -59,10 +60,12 @@ test.describe("share modal link variants", () => {
         true,
         "No messages found - chat may not have been created properly",
       );
+      return;
     }
 
     // Try multiple selectors for the share button
-    let shareButton = null;
+    let shareButton: Locator | null = null;
+    let shareButtonSelector: string | null = null;
     const selectors = [
       'button[aria-label="Share chat"]',
       'button[title*="Share"]',
@@ -73,10 +76,10 @@ test.describe("share modal link variants", () => {
     for (const selector of selectors) {
       try {
         const button = page.locator(selector).first();
-        if (await button.isVisible({ timeout: 2000 })) {
-          shareButton = button;
-          break;
-        }
+        await expect(button).toBeVisible({ timeout: 2000 });
+        shareButton = button;
+        shareButtonSelector = selector;
+        break;
       } catch {
         // Continue to next selector
       }
@@ -88,6 +91,7 @@ test.describe("share modal link variants", () => {
         true,
         "Share button not found - sharing may not be supported in this environment",
       );
+      return;
     }
 
     await expect(shareButton).toBeVisible({ timeout: 15000 });
@@ -95,7 +99,7 @@ test.describe("share modal link variants", () => {
     // Open share modal via the button near the input
     const reactClickSuccess = await clickReactElement(
       page,
-      'button[aria-label="Share chat"]',
+      shareButtonSelector ?? 'button[aria-label="Share chat"]',
     );
     if (!reactClickSuccess) {
       // Fallback to normal click if React fiber fails
@@ -106,7 +110,7 @@ test.describe("share modal link variants", () => {
     await page.waitForTimeout(1000);
 
     // Try multiple selectors for the modal
-    let modal = null;
+    let modal: Locator | null = null;
     const modalSelectors = [
       '[role="dialog"][aria-modal="true"][aria-labelledby="share-modal-title"]',
       '[role="dialog"][aria-modal="true"]',
@@ -117,10 +121,9 @@ test.describe("share modal link variants", () => {
     for (const selector of modalSelectors) {
       try {
         const modalElement = page.locator(selector);
-        if (await modalElement.isVisible({ timeout: 2000 })) {
-          modal = modalElement;
-          break;
-        }
+        await expect(modalElement).toBeVisible({ timeout: 2000 });
+        modal = modalElement;
+        break;
       } catch {
         // Continue to next selector
       }
@@ -132,6 +135,7 @@ test.describe("share modal link variants", () => {
         true,
         "Share modal not found - modals may not be supported in this environment",
       );
+      return;
     }
 
     await expect(modal).toBeVisible({ timeout: 15000 });
@@ -224,7 +228,7 @@ test.describe("share modal link variants", () => {
     // Re-open modal
     const reactClickSuccess2 = await clickReactElement(
       page,
-      'button[aria-label="Share chat"]',
+      shareButtonSelector ?? 'button[aria-label="Share chat"]',
     );
     if (!reactClickSuccess2) {
       // Fallback to normal click if React fiber fails
@@ -236,7 +240,9 @@ test.describe("share modal link variants", () => {
     await expect(modal2).toBeVisible({ timeout: 10000 });
 
     // Fetch the URL directly via Playwright's API client if we're running with the proxy runtime
-    const llmUrl = await urlInput.inputValue();
+    const urlInput2 = modal2.locator("#share-url-input");
+    await expect(urlInput2).toBeVisible({ timeout: 5000 });
+    const llmUrl = await urlInput2.inputValue();
     if (process.env.PLAYWRIGHT_RUNTIME === "proxy") {
       let resp = await page.request.get(llmUrl, {
         headers: { Accept: "text/plain" },
