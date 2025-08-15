@@ -10,14 +10,16 @@ import * as React from "react";
 
 // React 19 has act in the main React export
 // We need to ensure compatibility with React Testing Library
-const act = React.act || function(callback) {
-  // Fallback for environments where React.act is not available
-  const result = callback();
-  if (result && typeof result.then === 'function') {
-    return result;
-  }
-  return Promise.resolve(result);
-};
+const act =
+  React.act ||
+  function (callback) {
+    // Fallback for environments where React.act is not available
+    const result = callback();
+    if (result && typeof result.then === "function") {
+      return result;
+    }
+    return Promise.resolve(result);
+  };
 
 // Ensure React.act exists for Testing Library compatibility
 if (!React.act) {
@@ -25,7 +27,7 @@ if (!React.act) {
 }
 
 // Also ensure global React has act
-if (typeof globalThis !== 'undefined') {
+if (typeof globalThis !== "undefined") {
   if (!globalThis.React) {
     (globalThis as any).React = React;
   }
@@ -49,12 +51,12 @@ vi.mock("react-dom/test-utils", () => ({
 // Patch React Testing Library's act detection
 beforeAll(() => {
   // React Testing Library looks for React.act
-  if (!React.act) {
-    Object.defineProperty(React, 'act', {
-      value: act,
-      writable: false,
-      configurable: true
-    });
+  // We can't modify the imported React directly, but we can ensure
+  // the global has it for compatibility
+  if (typeof globalThis !== "undefined" && globalThis.React) {
+    if (!globalThis.React.act) {
+      (globalThis.React as any).act = act;
+    }
   }
 });
 
@@ -84,7 +86,9 @@ expect.extend({
     return {
       pass,
       message: () =>
-        pass ? "expected element to be enabled" : "expected element to be disabled",
+        pass
+          ? "expected element to be enabled"
+          : "expected element to be disabled",
     };
   },
 } as any);
