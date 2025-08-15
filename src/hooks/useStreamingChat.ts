@@ -60,18 +60,16 @@ export function useStreamingChat(
   // Update local state when streaming data changes
   useEffect(() => {
     if (streamingData?.streamingState) {
-      // FIXED: Implement robust streaming with proper content change detection
+      // FIXED: Implement proper streaming that shows incremental updates
       const newContent = streamingData.streamingState.content || "";
       const currentContent = localState.streamingContent;
       
-      // For streaming, detect when new content arrives
+      // For streaming, always use the latest content to show incremental updates
       let accumulatedContent = currentContent;
       if (streamingData.streamingState.isStreaming) {
-        // During streaming, check if we have new content
-        if (newContent && newContent !== currentContent) {
-          // New content arrived - this creates the streaming effect
-          accumulatedContent = newContent;
-        }
+        // During streaming, always use the latest content from backend
+        // This ensures we see incremental updates as they arrive
+        accumulatedContent = newContent;
       } else if (newContent) {
         // Not streaming, use final content
         accumulatedContent = newContent;
