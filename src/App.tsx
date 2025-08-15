@@ -24,7 +24,7 @@ import { SignInModal } from "./components/SignInModal";
 import { SignUpModal } from "./components/SignUpModal";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { SignOutButton } from "./SignOutButton";
+import { SignOutButton } from "./components/SignOutButton";
 import { useClaimAnonymousChats } from "./hooks/useClaimAnonymousChats";
 
 // Direct import to avoid Suspense delays in E2E/preview
