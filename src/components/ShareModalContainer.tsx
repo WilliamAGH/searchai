@@ -10,8 +10,9 @@
  * - Uses optional `chatActions.shareChat` to persist/upgrade sharing mode.
  * - Computes `exportBase` via optional `resolveApi` helper or window.origin.
  */
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import { ShareModal } from "./ShareModal";
+import { logger } from "../lib/logger";
 
 type ChatPrivacy = "private" | "shared" | "public";
 
@@ -64,7 +65,7 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
         return resolveApi("/api/chatTextMarkdown");
       } catch (error) {
         // Fall back to default if resolveApi fails
-        console.debug("Failed to resolve API path", error);
+        logger.debug("Failed to resolve API path", error);
       }
     }
     return `${window.location.origin}/api/chatTextMarkdown`;
