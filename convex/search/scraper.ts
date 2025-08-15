@@ -4,8 +4,59 @@
  */
 
 import { v } from "convex/values";
-import { action } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 import { logger } from "../lib/logger";
+
+// SSRF Protection: Block private IP ranges and localhost
+const PRIVATE_IPV4 = [
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+  /^169\.254\./,
+];
+const PRIVATE_IPV6 = [/^\[?::1\]?/, /^\[?fc00:/i, /^\[?fe80:/i];
+
+function isSafeUrl(raw: string): { ok: boolean; reason?: string } {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return { ok: false, reason: "Invalid URL" };
+  }
+  if (!/^https?:$/.test(u.protocol))
+    return { ok: false, reason: "Protocol not allowed" };
+  const host = u.hostname.toLowerCase();
+
+  // Block localhost-ish
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local")
+  ) {
+    return { ok: false, reason: "Localhost blocked" };
+  }
+  // Block obvious private IPv4
+  if (PRIVATE_IPV4.some((re) => re.test(host)))
+    return { ok: false, reason: "Private IPv4 blocked" };
+  // Block obvious private IPv6
+  if (PRIVATE_IPV6.some((re) => re.test(host)))
+    return { ok: false, reason: "Private IPv6 blocked" };
+
+  // Optional: block link-local hostnames commonly used internally
+  const internalish = [
+    "intranet",
+    "corp",
+    "internal",
+    "lan",
+    "home",
+    "localdomain",
+  ];
+  if (internalish.some((s) => host.endsWith(`.${s}`))) {
+    return { ok: false, reason: "Internal hostname blocked" };
+  }
+  return { ok: true };
+}
 
 /**
  * Scrape and clean web page content
@@ -17,7 +68,7 @@ import { logger } from "../lib/logger";
  * @param url - Absolute URL to fetch
  * @returns {title, content, summary}
  */
-export const scrapeUrl = action({
+export const scrapeUrl = internalAction({
   args: { url: v.string() },
   returns: v.object({
     title: v.string(),
@@ -32,6 +83,16 @@ export const scrapeUrl = action({
     content: string;
     summary?: string;
   }> => {
+    // SSRF Protection: Validate URL before fetching
+    const safety = isSafeUrl(args.url);
+    if (!safety.ok) {
+      logger.warn("🚫 Blocked unsafe scrape URL", {
+        url: args.url,
+        reason: safety.reason,
+      });
+      throw new Error(`Unsafe URL: ${safety.reason}`);
+    }
+
     // Short-TTL in-process cache to avoid repeat scrapes across adjacent queries
     const SCRAPE_TTL_MS = 2 * 60 * 1000; // 2 minutes
     const globalAny: any = globalThis as any;
@@ -72,6 +133,7 @@ export const scrapeUrl = action({
           Connection: "keep-alive",
         },
         signal: AbortSignal.timeout(10000), // 10 second timeout
+        redirect: "manual", // Don't auto-follow potential SSRF pivots
       });
 
       logger.info("📊 Scrape response received:", {

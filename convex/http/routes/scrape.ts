@@ -4,7 +4,7 @@
  */
 
 import { httpAction } from "../../_generated/server";
-import { api } from "../../_generated/api";
+import { internal } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 
@@ -165,7 +165,8 @@ export function registerScrapeRoutes(http: HttpRouter) {
       dlog("URL:", url);
 
       try {
-        const result = await ctx.runAction(api.search.scrapeUrl, { url });
+        // @ts-ignore - Known Convex TS2589 type instantiation issue
+        const result = await ctx.runAction(internal.search.scrapeUrl, { url });
 
         dlog("🌐 SCRAPE RESULT:", JSON.stringify(result, null, 2));
 
