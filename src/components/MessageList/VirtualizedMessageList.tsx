@@ -1,6 +1,18 @@
 import React, { useRef, useEffect, useMemo } from "react";
 import type { Message } from "../../lib/types/message";
 
+// Helper for stable ephemeral keys for messages without IDs
+const ephemeralKeyMap = new WeakMap<Message, string>();
+
+const getEphemeralKey = (msg: Message): string => {
+  let k = ephemeralKeyMap.get(msg);
+  if (!k) {
+    k = `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    ephemeralKeyMap.set(msg, k);
+  }
+  return k;
+};
+
 export interface VirtualizedMessageListProps {
   messages: Message[];
   renderItem: (message: Message, index: number) => React.ReactNode;
@@ -71,10 +83,7 @@ export function VirtualizedMessageList({
             const actualIndex = groupIndex * 10 + index;
             return (
               <div
-                key={
-                  message._id ||
-                  `msg-${message.role}-${actualIndex}-${message.timestamp || Date.now()}-${message.content?.slice(0, 20) || "empty"}`
-                }
+                key={message._id ?? getEphemeralKey(message)}
                 className="message-item"
                 data-message-index={actualIndex}
               >

@@ -91,7 +91,10 @@ export function MessageSkeleton({
       >
         <span className="sr-only">Loading content, please wait...</span>
         {Array.from({ length: lines }).map((_, i) => (
-          <LineSkeleton key={`line-${i}-${Date.now()}`} width={lineWidths[i % lineWidths.length]} />
+          <LineSkeleton
+            key={`line-${i}`}
+            width={lineWidths[i % lineWidths.length]}
+          />
         ))}
       </div>
     );
@@ -106,7 +109,7 @@ export function MessageSkeleton({
       >
         <span className="sr-only">Loading, please wait...</span>
         {Array.from({ length: count }).map((_, i) => (
-          <SimpleSkeletonItem key={`simple-${i}-${Date.now()}`} />
+          <SimpleSkeletonItem key={`simple-${i}`} />
         ))}
       </div>
     );
@@ -121,7 +124,7 @@ export function MessageSkeleton({
     >
       <span className="sr-only">Loading messages, please wait...</span>
       {Array.from({ length: count }).map((_, index) => (
-        <MessageSkeletonItem key={`skeleton-${index}-${Date.now()}`} />
+        <MessageSkeletonItem key={`skeleton-${index}`} />
       ))}
     </div>
   );
@@ -155,7 +158,7 @@ export function LoadErrorState({
   message = ErrorMessages.MESSAGES_FAILED,
   className = "",
 }: ErrorStateProps) {
-  const canRetry = retryCount < maxRetries && onRetry;
+  const canRetry = retryCount < maxRetries && Boolean(onRetry);
 
   return (
     <div
