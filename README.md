@@ -20,6 +20,15 @@ Built with React + Vite on the frontend and Convex on the backend.
 - Non-blocking topic-change suggestions (banner) with stricter gating, cooldowns, and Enter-to-send preserved.
 - Shared DRY summarization (`buildContextSummary`) used by planner and generation paths.
 
+### Persistence & Deep Links
+
+- Convex-only persistence: The app enforces Convex as the single source of truth for chats/messages (including anonymous sessions via `sessionId`). If Convex is unavailable or misconfigured, chat creation and message sending are disabled and a user-facing toast indicates the service is unavailable.
+- Deep links: Visiting `/chat/:chatId`, `/s/:shareId`, or `/p/:publicId` selects the corresponding chat. Share/public routes remain on their canonical URLs.
+
+Troubleshooting:
+- Ensure `VITE_CONVEX_URL` is set. If not, `useChatRepository()` will not initialize and the UI will show a service-unavailable message for chat actions.
+- If you see navigation issues, verify routes and query params match the expected patterns above.
+
 ## Structure
 
 - `src/` — React app and components
