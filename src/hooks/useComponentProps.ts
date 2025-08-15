@@ -40,6 +40,14 @@ interface UseComponentPropsArgs {
   loadError?: Error | null;
   retryCount?: number;
   onClearError?: () => void;
+  // NEW: Add streaming state
+  streamingState?: {
+    isStreaming: boolean;
+    streamingContent: string;
+    streamingMessageId?: string;
+    thinking?: string;
+    searchProgress?: any;
+  };
 }
 
 /**
@@ -75,6 +83,8 @@ export function useComponentProps({
   loadError,
   retryCount,
   onClearError,
+  // NEW: Add streaming state for real-time updates
+  streamingState,
 }: UseComponentPropsArgs) {
   const chatSidebarProps = useMemo(
     () => ({
@@ -144,6 +154,8 @@ export function useComponentProps({
       loadError,
       retryCount,
       onClearError,
+      // NEW: Add streaming state for real-time updates
+      streamingState,
     }),
     [
       currentMessages,
@@ -160,6 +172,8 @@ export function useComponentProps({
       loadError,
       retryCount,
       onClearError,
+      // NEW: Include streaming state in dependencies
+      streamingState,
     ],
   );
 

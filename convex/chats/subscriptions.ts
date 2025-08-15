@@ -63,6 +63,15 @@ export const subscribeToChatUpdates = query({
       streamedContent: streamingMessage?.streamedContent || undefined,
       rollingSummary: chat.rollingSummary,
       lastUpdated: Date.now(),
+      // NEW: Add streaming state for real-time updates
+      streamingState: streamingMessage ? {
+        messageId: streamingMessage._id,
+        isStreaming: true,
+        content: streamingMessage.content,
+        streamedContent: streamingMessage.streamedContent,
+        thinking: streamingMessage.thinking,
+        searchProgress: streamingMessage.searchProgress,
+      } : null,
     };
   },
 });

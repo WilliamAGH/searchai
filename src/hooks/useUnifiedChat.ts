@@ -10,6 +10,7 @@ import { useChatRepository } from "./useChatRepository";
 import { useChatMigration } from "./useChatMigration";
 import { useChatDataLoader } from "./useChatDataLoader";
 import { createChatActions } from "./useChatActions";
+import { useStreamingChat } from "./useStreamingChat";
 import type { ChatState, ChatActions } from "./types";
 
 // Re-export types for backward compatibility
@@ -32,6 +33,9 @@ export function useUnifiedChat() {
 
   // Handle migration when user authenticates
   useChatMigration(repository, isAuthenticated, state, actions.refreshChats);
+
+  // NEW: Add streaming hook for real-time updates
+  const streamingState = useStreamingChat(state.currentChatId);
 
   return {
     // State
@@ -58,6 +62,9 @@ export function useUnifiedChat() {
     // Auth state
     isAuthenticated,
     repository,
+
+    // NEW: Add streaming state
+    streamingState,
 
     // Actions
     ...actions,

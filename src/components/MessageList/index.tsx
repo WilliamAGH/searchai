@@ -49,6 +49,14 @@ interface MessageListProps {
   loadError?: Error | null;
   retryCount?: number;
   onClearError?: () => void;
+  // NEW: Add streaming state for real-time updates
+  streamingState?: {
+    isStreaming: boolean;
+    streamingContent: string;
+    streamingMessageId?: string;
+    thinking?: string;
+    searchProgress?: any;
+  };
 }
 
 /**
@@ -74,11 +82,13 @@ export function MessageList({
   loadError,
   retryCount = 0,
   onClearError,
+  // NEW: Add streaming state
+  streamingState,
 }: MessageListProps) {
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const previousMessagesLengthRef = useRef(messages.length);
+  const previousMessagesLengthRef = useRef(currentMessages.length);
   const isLoadingMoreRef = useRef(false);
   const [collapsedById, setCollapsedById] = React.useState<
     Record<string, boolean>
@@ -90,6 +100,29 @@ export function MessageList({
   const [_hoveredCitationUrl, setHoveredCitationUrl] = React.useState<
     string | null
   >(null);
+
+  // NEW: Enhance messages with streaming content for real-time updates
+  const enhancedMessages = React.useMemo(() => {
+    if (!streamingState?.isStreaming || !streamingState?.streamingMessageId) {
+      return messages;
+    }
+    
+    return messages.map(msg => {
+      if (msg.id === streamingState.streamingMessageId) {
+        return {
+          ...msg,
+          content: msg.content + (streamingState.streamingContent || ""),
+          isStreaming: true,
+          thinking: streamingState.thinking,
+        };
+      }
+      return msg;
+    });
+  }, [messages, streamingState]);
+
+  // Use enhanced messages for all operations
+  const currentMessages = enhancedMessages;
+  const messagesLength = currentMessages.length;
 
   /**
    * Scroll to bottom of messages
@@ -138,13 +171,13 @@ export function MessageList({
 
   // Debug logging
   useEffect(() => {
-    if (Array.isArray(messages)) {
+    if (Array.isArray(currentMessages)) {
       logger.debug("🖼️ MessageList render", {
-        count: messages.length,
-        firstRole: messages[0]?.role,
+        count: currentMessages.length,
+        firstRole: currentMessages[0]?.role,
       });
     }
-  }, [messages]);
+  }, [currentMessages]);
 
   // Detect when user scrolls manually
   useEffect(() => {
@@ -166,7 +199,7 @@ export function MessageList({
     setCollapsedById((prev) => {
       const updates: Record<string, boolean> = {};
 
-      messages.forEach((m, index) => {
+      currentMessages.forEach((m, index) => {
         const id = m._id || String(index);
         if (!id || m.role !== "assistant") return;
 
@@ -199,7 +232,7 @@ export function MessageList({
       }
       return prev;
     });
-  }, [messages]);
+  }, [currentMessages]);
 
   /**
    * Toggle collapsed state for element
@@ -240,7 +273,7 @@ export function MessageList({
   // Track when messages change to preserve scroll on load more
   useEffect(() => {
     const prevLength = previousMessagesLengthRef.current;
-    const currLength = messages.length;
+    const currLength = messagesLength;
 
     // If messages increased and we were loading more, preserve scroll
     if (currLength > prevLength && isLoadingMoreRef.current) {
@@ -251,7 +284,7 @@ export function MessageList({
     }
 
     previousMessagesLengthRef.current = currLength;
-  }, [messages.length]);
+  }, [messagesLength]);
 
   return (
     <div
@@ -259,16 +292,16 @@ export function MessageList({
       className="flex-1 overflow-y-auto relative overscroll-contain"
     >
       <ScrollToBottomFab
-        visible={userHasScrolled && messages.length > 0}
+        visible={userHasScrolled && messagesLength > 0}
         onClick={handleScrollToBottom}
       />
 
       {/* Show skeleton when initially loading messages */}
-      {isLoadingMessages && messages.length === 0 ? (
+      {isLoadingMessages && messagesLength === 0 ? (
         <div className="px-4 sm:px-6 py-6 sm:py-8">
           <MessageSkeleton count={5} />
         </div>
-      ) : messages.length === 0 ? (
+      ) : messagesLength === 0 ? (
         <EmptyState onToggleSidebar={onToggleSidebar} />
       ) : (
         <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
@@ -283,7 +316,7 @@ export function MessageList({
 
           {/* Test hook: hidden count for E2E smoke assertions */}
           <span data-testid="count" style={{ display: "none" }}>
-            {messages.length}
+            {messagesLength}
           </span>
 
           {/* Load More Button at the top for loading older messages */}
@@ -299,9 +332,9 @@ export function MessageList({
           {isLoadingMore && !loadError && <LoadingMoreIndicator />}
 
           {/* Use virtualization for large message lists (100+ messages) */}
-          {messages.length > 100 ? (
+          {messagesLength > 100 ? (
             <VirtualizedMessageList
-              messages={messages}
+              messages={currentMessages}
               className="space-y-6 sm:space-y-8"
               estimatedItemHeight={150}
               renderItem={(message, index) => (
@@ -322,7 +355,7 @@ export function MessageList({
               )}
             />
           ) : (
-            messages.map((message, index) => (
+            currentMessages.map((message, index) => (
               <MessageItem
                 key={
                   message._id ||

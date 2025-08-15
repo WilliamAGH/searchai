@@ -431,6 +431,8 @@ function ChatInterfaceComponent({
     loadError,
     retryCount,
     onClearError: clearError,
+    // NEW: Add streaming state for real-time updates
+    streamingState: chatState.streamingState,
   });
 
   return (

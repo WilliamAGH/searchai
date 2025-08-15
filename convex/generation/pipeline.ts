@@ -399,7 +399,7 @@ async function streamResponseToMessage(args: {
 
   let accumulatedContent = "";
   let lastUpdateTime = Date.now();
-  const updateInterval = 100; // Update every 100ms
+  const updateInterval = 25; // Update every 25ms for better responsiveness (was 100ms)
   let chunkCount = 0;
 
   try {

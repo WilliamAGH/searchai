@@ -467,6 +467,98 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
+  // NEW: Real-time streaming method using Convex subscriptions
+  async *generateResponseStreaming(
+    chatId: string,
+    message: string,
+  ): AsyncGenerator<StreamChunk> {
+    try {
+      // Start the generation
+      await this.client.action(api.ai.generateStreamingResponse, {
+        chatId: IdUtils.toConvexChatId(chatId),
+        message,
+      });
+
+      // Use real-time subscription instead of polling
+      const convexChatId = IdUtils.toConvexChatId(chatId);
+      let lastContent = "";
+      let iterations = 0;
+      const maxIterations = 300; // 30 seconds timeout
+
+      while (iterations < maxIterations) {
+        // Query the subscription endpoint for real-time data
+        const updates = await this.client.query(
+          api.chats.subscribeToChatUpdates,
+          {
+            chatId: convexChatId,
+            sessionId: this.sessionId,
+          },
+        );
+
+        if (!updates) {
+          yield { type: "error", error: "Failed to get chat updates" };
+          return;
+        }
+
+        // Check for streaming content in messages
+        const streamingMessage = updates.messages?.find(
+          (m) => m.role === "assistant" && m.isStreaming,
+        );
+
+        if (streamingMessage) {
+          // Yield new content as it arrives
+          if (
+            streamingMessage.content &&
+            streamingMessage.content !== lastContent
+          ) {
+            const newContent = streamingMessage.content.substring(
+              lastContent.length,
+            );
+            if (newContent) {
+              yield { type: "content", content: newContent };
+              lastContent = streamingMessage.content;
+            }
+          }
+
+          // Yield thinking updates if available
+          if (streamingMessage.thinking && streamingMessage.thinking !== lastContent) {
+            yield { type: "metadata", metadata: { thinking: streamingMessage.thinking } };
+          }
+        } else {
+          // Check if there's a completed assistant message
+          const completedMessage = updates.messages
+            ?.filter((m) => m.role === "assistant")
+            .pop();
+
+          if (completedMessage && completedMessage.content) {
+            // Yield any remaining content
+            if (completedMessage.content !== lastContent) {
+              const finalContent = completedMessage.content.substring(
+                lastContent.length,
+              );
+              if (finalContent) {
+                yield { type: "content", content: finalContent };
+              }
+            }
+            yield { type: "done" };
+            return;
+          }
+        }
+
+        // Reduced wait time for better responsiveness
+        await new Promise((resolve) => setTimeout(resolve, 25)); // Was 100ms
+        iterations++;
+      }
+
+      yield { type: "error", error: "Response timeout" };
+    } catch (error) {
+      yield {
+        type: "error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
   async searchWeb(query: string): Promise<unknown> {
     try {
       return await this.client.action(api.search.searchWeb, {
