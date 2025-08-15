@@ -358,10 +358,11 @@ export class LocalChatRepository extends BaseRepository {
         };
         shareId = result.shareId;
         publicId = result.publicId;
-      } else {
+      } else if (privacy === "shared") {
         // Fallback to local IDs on non-200
-        if (privacy === "shared") shareId = generateLocalId("s");
-        else publicId = generateLocalId("p");
+        shareId = generateLocalId("s");
+      } else {
+        publicId = generateLocalId("p");
       }
     } catch {
       // Network or proxy unavailable — fallback to local IDs
