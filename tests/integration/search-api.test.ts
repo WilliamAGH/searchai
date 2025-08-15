@@ -108,11 +108,15 @@ describe.skip("Search API with 100% Synthetic Behavior", () => {
         }),
       };
 
-      const plan = await callAction(planSearch, {
-        chatId: "test-chat-id" as any,
-        newMessage: "What is the capital of France?",
-        maxContextMessages: 10,
-      }, mockContext);
+      const plan = await callAction(
+        planSearch,
+        {
+          chatId: "test-chat-id" as any,
+          newMessage: "What is the capital of France?",
+          maxContextMessages: 10,
+        },
+        mockContext,
+      );
 
       expect(plan.shouldSearch).toBe(true);
       expect(plan.queries.length).toBeGreaterThan(0);
@@ -134,11 +138,15 @@ describe.skip("Search API with 100% Synthetic Behavior", () => {
         }),
       };
 
-      const plan = await callAction(planSearch, {
-        chatId: "test-chat-id" as any,
-        newMessage: "Hello",
-        maxContextMessages: 10,
-      }, mockContext);
+      const plan = await callAction(
+        planSearch,
+        {
+          chatId: "test-chat-id" as any,
+          newMessage: "Hello",
+          maxContextMessages: 10,
+        },
+        mockContext,
+      );
 
       expect(plan.shouldSearch).toBe(false);
       expect(plan.queries).toEqual([]);
@@ -159,11 +167,15 @@ describe.skip("Search API with 100% Synthetic Behavior", () => {
         }),
       };
 
-      const plan = await callAction(planSearch, {
-        chatId: "test-chat-id" as any,
-        newMessage: "Now let me ask about a completely different topic",
-        maxContextMessages: 10,
-      }, mockContext);
+      const plan = await callAction(
+        planSearch,
+        {
+          chatId: "test-chat-id" as any,
+          newMessage: "Now let me ask about a completely different topic",
+          maxContextMessages: 10,
+        },
+        mockContext,
+      );
 
       expect(plan.suggestNewChat).toBe(true);
     });
@@ -185,18 +197,26 @@ describe.skip("Search API with 100% Synthetic Behavior", () => {
       };
 
       // First call
-      const plan1 = await callAction(planSearch, {
-        chatId,
-        newMessage: message,
-        maxContextMessages: 10,
-      }, mockContext);
+      const plan1 = await callAction(
+        planSearch,
+        {
+          chatId,
+          newMessage: message,
+          maxContextMessages: 10,
+        },
+        mockContext,
+      );
 
       // Second call (should use cache)
-      const plan2 = await callAction(planSearch, {
-        chatId,
-        newMessage: message,
-        maxContextMessages: 10,
-      }, mockContext);
+      const plan2 = await callAction(
+        planSearch,
+        {
+          chatId,
+          newMessage: message,
+          maxContextMessages: 10,
+        },
+        mockContext,
+      );
 
       expect(plan1).toEqual(plan2);
       expect(searchTestHelper.verifyCaching(message)).toBe(true);
@@ -377,11 +397,15 @@ describe.skip("Search API with 100% Synthetic Behavior", () => {
       };
 
       // 1. Plan the search
-      const plan = await callAction(planSearch, {
-        chatId: "test-chat" as any,
-        newMessage: "What are the latest AI developments?",
-        maxContextMessages: 10,
-      }, mockContext);
+      const plan = await callAction(
+        planSearch,
+        {
+          chatId: "test-chat" as any,
+          newMessage: "What are the latest AI developments?",
+          maxContextMessages: 10,
+        },
+        mockContext,
+      );
 
       expect(plan.shouldSearch).toBe(true);
 

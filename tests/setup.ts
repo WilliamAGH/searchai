@@ -5,34 +5,26 @@
 // Set up React act environment for testing
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
-// Import React and vi from vitest first
+// Import React and expect from vitest
 import * as React from "react";
-import { vi, expect } from "vitest";
-
-// Mock react-dom/test-utils BEFORE any other imports to prevent the error
-vi.mock("react-dom/test-utils", () => ({
-  act: (callback: () => void | Promise<void>) => {
-    // In React 19, act is handled internally by React Testing Library
-    // Just execute the callback directly
-    return callback();
-  },
-}));
+import { expect } from "vitest";
 
 // Ensure global React is available for Testing Library
 if (typeof globalThis !== "undefined" && !globalThis.React) {
   (globalThis as any).React = React;
 }
+
 // Best practice: use Testing Library's jest-dom matchers
 // (toBeInTheDocument, toBeDisabled, etc.)
 // This static import works after installing the package.
 // It coexists with the minimal polyfills below.
 // If your environment lacks network access, you can comment this out.
-// eslint-disable-next-line import/no-unresolved, import/no-unassigned-import
+// eslint-disable-next-line import/no-unresolved
+// oxlint-disable-next-line no-unassigned-import
 import "@testing-library/jest-dom/vitest";
-// (No-op: static import above loads matchers when installed.)
 
-// React 19 doesn't export act directly - it's handled internally by React Testing Library v16+
-// No need to mock react-dom/test-utils as Testing Library handles act automatically
+// React 19 + Testing Library v16+ handles act automatically
+// No need to mock react-dom/test-utils
 
 // Custom matchers for tests
 expect.extend({

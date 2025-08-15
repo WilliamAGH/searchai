@@ -86,8 +86,8 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Wait for the AI response to complete (not just thinking status)
     await expect(async () => {
-      const a = await page.locator('text=AI is thinking').count();
-      const b = await page.locator('text=Composing response...').count();
+      const a = await page.locator("text=AI is thinking").count();
+      const b = await page.locator("text=Composing response...").count();
       expect(a + b).toBe(0);
     }).toPass({ timeout: 30000 });
 
@@ -123,8 +123,8 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Wait for the AI response to complete (not just thinking status)
     await expect(async () => {
-      const a = await page.locator('text=AI is thinking').count();
-      const b = await page.locator('text=Composing response...').count();
+      const a = await page.locator("text=AI is thinking").count();
+      const b = await page.locator("text=Composing response...").count();
       expect(a + b).toBe(0);
     }).toPass({ timeout: 30000 });
 
@@ -181,8 +181,8 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Wait for the AI response to complete (not just thinking status)
     await expect(async () => {
-      const a = await page.locator('text=AI is thinking').count();
-      const b = await page.locator('text=Composing response...').count();
+      const a = await page.locator("text=AI is thinking").count();
+      const b = await page.locator("text=Composing response...").count();
       expect(a + b).toBe(0);
     }).toPass({ timeout: 30000 });
 
@@ -212,8 +212,8 @@ test.describe("Search Functionality with Mocked APIs", () => {
 
     // Wait for the AI response to complete (not just thinking status)
     await expect(async () => {
-      const a = await page.locator('text=AI is thinking').count();
-      const b = await page.locator('text=Composing response...').count();
+      const a = await page.locator("text=AI is thinking").count();
+      const b = await page.locator("text=Composing response...").count();
       expect(a + b).toBe(0);
     }).toPass({ timeout: 30000 });
 

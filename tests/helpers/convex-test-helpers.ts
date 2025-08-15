@@ -71,19 +71,19 @@ export function createMockQueryContext() {
 export async function callAction<T extends (...args: any[]) => any>(
   action: T,
   args: Parameters<T>[1],
-  contextOverrides?: Partial<ReturnType<typeof createMockActionContext>>
+  contextOverrides?: Partial<ReturnType<typeof createMockActionContext>>,
 ): Promise<ReturnType<T>> {
   const context = {
     ...createMockActionContext(),
     ...contextOverrides,
   };
-  
+
   // Extract the handler from the action definition
   const handler = (action as any).handler;
   if (!handler) {
     throw new Error("Invalid action: missing handler");
   }
-  
+
   return handler(context, args);
 }
 
@@ -93,18 +93,18 @@ export async function callAction<T extends (...args: any[]) => any>(
 export async function callMutation<T extends (...args: any[]) => any>(
   mutation: T,
   args: Parameters<T>[1],
-  contextOverrides?: Partial<ReturnType<typeof createMockMutationContext>>
+  contextOverrides?: Partial<ReturnType<typeof createMockMutationContext>>,
 ): Promise<ReturnType<T>> {
   const context = {
     ...createMockMutationContext(),
     ...contextOverrides,
   };
-  
+
   const handler = (mutation as any).handler;
   if (!handler) {
     throw new Error("Invalid mutation: missing handler");
   }
-  
+
   return handler(context, args);
 }
 
@@ -114,17 +114,17 @@ export async function callMutation<T extends (...args: any[]) => any>(
 export async function callQuery<T extends (...args: any[]) => any>(
   query: T,
   args: Parameters<T>[1],
-  contextOverrides?: Partial<ReturnType<typeof createMockQueryContext>>
+  contextOverrides?: Partial<ReturnType<typeof createMockQueryContext>>,
 ): Promise<ReturnType<T>> {
   const context = {
     ...createMockQueryContext(),
     ...contextOverrides,
   };
-  
+
   const handler = (query as any).handler;
   if (!handler) {
     throw new Error("Invalid query: missing handler");
   }
-  
+
   return handler(context, args);
 }
