@@ -15,7 +15,7 @@ interface MessageWithSources {
  * Format conversation with sources for sharing/copying
  */
 export function formatConversationWithSources(
-  messages: MessageWithSources[]
+  messages: MessageWithSources[],
 ): string {
   return messages
     .map((msg) => {
@@ -52,14 +52,14 @@ export function formatMessage(message: MessageWithSources): string {
  */
 export function extractSourceUrls(message: MessageWithSources): string[] {
   const urls: string[] = [];
-  
+
   if (message.searchResults) {
-    urls.push(...message.searchResults.map(r => r.url));
+    urls.push(...message.searchResults.map((r) => r.url));
   }
-  
+
   if (message.sources) {
-    urls.push(...message.sources.map(s => s.url));
+    urls.push(...message.sources.map((s) => s.url));
   }
-  
+
   return [...new Set(urls)]; // Remove duplicates
 }
