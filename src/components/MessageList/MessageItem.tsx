@@ -119,13 +119,25 @@ export const MessageItem = React.memo(
             <div className="mb-3">
               <StreamingStatus
                 stage={
-                  !message.thinking && !message.content ? "searching" :
-                  message.thinking?.toLowerCase().includes("search") ? "searching" :
-                  message.thinking?.toLowerCase().includes("analyz") || 
-                  message.thinking?.toLowerCase().includes("process") ? "thinking" :
-                  message.content && message.content.trim() ? "streaming" : "thinking"
+                  !message.thinking && !message.content
+                    ? "searching"
+                    : message.thinking?.toLowerCase().includes("search")
+                      ? "searching"
+                      : message.thinking?.toLowerCase().includes("analyz") ||
+                          message.thinking?.toLowerCase().includes("process")
+                        ? "thinking"
+                        : message.content && message.content.trim()
+                          ? "streaming"
+                          : "thinking"
                 }
-                message={message.thinking}
+                message={
+                  message.thinking ||
+                  (!message.content
+                    ? "Searching for information"
+                    : message.content.trim()
+                      ? "Generating response"
+                      : "Processing")
+                }
                 className=""
               />
             </div>

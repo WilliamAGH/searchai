@@ -27,7 +27,7 @@ function AnimatedDots() {
           className="w-1 h-1 bg-current rounded-full mx-0.5 animate-pulse"
           style={{
             animationDelay: `${i * 200}ms`,
-            animationDuration: '1.5s',
+            animationDuration: "1.5s",
           }}
         />
       ))}
@@ -38,7 +38,7 @@ function AnimatedDots() {
 // Progress bar component
 function ProgressBar({ value, max = 100 }: { value: number; max?: number }) {
   const percentage = Math.min(100, (value / max) * 100);
-  
+
   return (
     <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
       <div
@@ -53,7 +53,12 @@ function ProgressBar({ value, max = 100 }: { value: number; max?: number }) {
 function StatusIcon({ stage }: { stage: StreamingStatusProps["stage"] }) {
   const icons = {
     searching: (
-      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg
+        className="w-4 h-4 animate-spin"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -63,7 +68,12 @@ function StatusIcon({ stage }: { stage: StreamingStatusProps["stage"] }) {
       </svg>
     ),
     thinking: (
-      <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg
+        className="w-4 h-4 animate-pulse"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -73,7 +83,12 @@ function StatusIcon({ stage }: { stage: StreamingStatusProps["stage"] }) {
       </svg>
     ),
     streaming: (
-      <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg
+        className="w-4 h-4 animate-pulse"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -83,10 +98,10 @@ function StatusIcon({ stage }: { stage: StreamingStatusProps["stage"] }) {
       </svg>
     ),
     complete: (
-      <svg 
-        className="w-4 h-4 animate-scale-in" 
-        fill="none" 
-        stroke="currentColor" 
+      <svg
+        className="w-4 h-4 animate-scale-in"
+        fill="none"
+        stroke="currentColor"
         viewBox="0 0 24 24"
       >
         <path
@@ -140,10 +155,10 @@ export function StreamingStatus({
   // Generate contextual messages
   const getStatusMessage = () => {
     if (displayMessage) return displayMessage;
-    
+
     switch (stage) {
       case "searching":
-        return searchResults 
+        return searchResults
           ? `Found ${searchResults} results`
           : "Searching the web";
       case "thinking":
@@ -158,15 +173,18 @@ export function StreamingStatus({
   };
 
   const statusMessage = getStatusMessage();
-  const showDots = stage === "searching" || stage === "thinking" || stage === "streaming";
-  const showProgress = progress && (progress.current !== undefined || progress.total !== undefined);
+  const showDots =
+    stage === "searching" || stage === "thinking" || stage === "streaming";
+  const showProgress =
+    progress &&
+    (progress.current !== undefined || progress.total !== undefined);
 
   if (stage === "idle") return null;
 
   return (
     <div
       className={`flex flex-col gap-2 transition-all duration-200 ${className} ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
       }`}
     >
       <div className="flex items-center gap-2">
@@ -183,7 +201,7 @@ export function StreamingStatus({
             <StatusIcon stage={stage} />
           </div>
         )}
-        
+
         <span
           className={`
             text-sm font-medium transition-opacity duration-150
@@ -191,18 +209,18 @@ export function StreamingStatus({
             ${stage === "thinking" ? "text-purple-700 dark:text-purple-300" : ""}
             ${stage === "streaming" ? "text-emerald-700 dark:text-emerald-300" : ""}
             ${stage === "complete" ? "text-green-700 dark:text-green-300" : ""}
-            ${isVisible ? 'opacity-100' : 'opacity-0'}
+            ${isVisible ? "opacity-100" : "opacity-0"}
           `}
         >
           {statusMessage}
           {showDots && <AnimatedDots />}
         </span>
       </div>
-      
+
       {showProgress && progress && (
-        <ProgressBar 
-          value={progress.current || 0} 
-          max={progress.total || 100} 
+        <ProgressBar
+          value={progress.current || 0}
+          max={progress.total || 100}
         />
       )}
     </div>
@@ -210,23 +228,25 @@ export function StreamingStatus({
 }
 
 // Compact version for inline use
-export function StreamingStatusCompact({ 
-  stage, 
-  className = "" 
+export function StreamingStatusCompact({
+  stage,
+  className = "",
 }: Pick<StreamingStatusProps, "stage" | "className">) {
   if (stage === "idle" || stage === "complete") return null;
-  
+
   return (
     <div
       className={`inline-flex items-center gap-1.5 transition-opacity duration-200 ${className}`}
     >
       <div className="w-3 h-3 animate-spin">
-        <div className={`
+        <div
+          className={`
           w-full h-full rounded-full border-2 border-t-transparent
           ${stage === "searching" ? "border-blue-500" : ""}
           ${stage === "thinking" ? "border-purple-500" : ""}
           ${stage === "streaming" ? "border-emerald-500" : ""}
-        `} />
+        `}
+        />
       </div>
       <span className="text-xs text-gray-500 dark:text-gray-400">
         {stage === "searching" && "Searching"}

@@ -13,15 +13,15 @@ interface LoadingTextProps {
 
 // Default loading messages for consistency
 export const LoadingMessages = {
-  DEFAULT: "Loading...",
-  GENERATING: "Generating response...",
-  GENERATING_SHORT: "Generating…",
-  PROCESSING: "Processing...",
-  CREATING: "Creating...",
-  LOADING_MESSAGES: "Loading messages...",
-  LOADING_MORE: "Loading more messages...",
-  LOADING_INTERFACE: "Loading chat interface...",
-  THINKING: "AI is thinking and generating response...",
+  DEFAULT: "Loading",
+  GENERATING: "Generating response",
+  GENERATING_SHORT: "Generating",
+  PROCESSING: "Processing",
+  CREATING: "Creating",
+  LOADING_MESSAGES: "Loading messages",
+  LOADING_MORE: "Loading more messages",
+  LOADING_INTERFACE: "Loading chat interface",
+  THINKING: "AI is thinking and generating response",
 } as const;
 
 export const LoadingText: React.FC<LoadingTextProps> = ({

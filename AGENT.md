@@ -235,21 +235,24 @@ export function validateChatMessage(message: string) {
 ### Three-Phase Update Protocol
 
 #### Phase 1: Pre-Update Planning
+
 **BEFORE making any code changes:**
 
 1. **Map All Usages**:
+
    ```bash
    # Find all imports of the module/function
    grep -r "import.*ModuleName" --include="*.ts" --include="*.tsx"
-   
+
    # Find all function calls
    grep -r "functionName(" --include="*.ts" --include="*.tsx"
-   
+
    # Find all type references
    grep -r "TypeName" --include="*.ts" --include="*.tsx"
    ```
 
 2. **Create Update Checklist**:
+
    ```typescript
    // TODO: Update Plan for [Function/Type/Module Name]
    // [ ] src/components/Chat/ChatInput.tsx - line 45
@@ -266,9 +269,11 @@ export function validateChatMessage(message: string) {
    - What parameter changes ripple through the codebase?
 
 #### Phase 2: During Updates
+
 **WHILE making changes:**
 
 1. **Track Every Change**:
+
    ```typescript
    // CHANGE LOG:
    // ✓ Updated function signature in convex/lib/security/validation.ts
@@ -278,6 +283,7 @@ export function validateChatMessage(message: string) {
    ```
 
 2. **Verify Parameter Agreement**:
+
    - Function signatures match across all calls
    - Type parameters align everywhere
    - Import paths are consistent
@@ -290,21 +296,24 @@ export function validateChatMessage(message: string) {
    - Middleware or interceptors in the chain
 
 #### Phase 3: Post-Update Audit
+
 **AFTER completing updates:**
 
 1. **Comprehensive Usage Audit**:
+
    ```bash
    # Verify no old patterns remain
    grep -r "oldFunctionName" --include="*.ts" --include="*.tsx"
-   
+
    # Check for type mismatches
    npm run typecheck
-   
+
    # Verify all imports resolve
    npm run build
    ```
 
 2. **Expanded Search for Missed Updates**:
+
    - Search for partial matches (might catch variations)
    - Check test files for mock implementations
    - Review configuration files
@@ -321,30 +330,33 @@ export function validateChatMessage(message: string) {
 **❌ CRITICAL FAILURES:**
 
 1. **Parameter Mismatch**:
+
    ```typescript
    // Function updated to take 3 parameters
    function processChat(id: string, message: string, userId: string) {}
-   
+
    // But some calls still use 2 parameters
    processChat(id, message); // 💥 Runtime error!
    ```
 
 2. **Type Definition Drift**:
+
    ```typescript
    // Type updated in one place
-   type ChatMessage = { id: string; content: string; timestamp: number }
-   
+   type ChatMessage = { id: string; content: string; timestamp: number };
+
    // But old type still used elsewhere
-   type ChatMessage = { id: string; text: string } // 💥 Type mismatch!
+   type ChatMessage = { id: string; text: string }; // 💥 Type mismatch!
    ```
 
 3. **Import Path Inconsistency**:
+
    ```typescript
    // Some files use new path
-   import { validate } from '@/lib/validation/chat'
-   
+   import { validate } from "@/lib/validation/chat";
+
    // Others still use old path
-   import { validate } from '../../../utils/validate' // 💥 Module not found!
+   import { validate } from "../../../utils/validate"; // 💥 Module not found!
    ```
 
 ### The Update Verification Checklist
@@ -394,14 +406,16 @@ grep -r "functionName" --include="*.md" --include="*.ts" --include="*.tsx"
 ### Zero Tolerance for Incomplete Updates
 
 **THE CONSEQUENCES:**
+
 - Partial updates = Broken features
 - Missed usages = Runtime errors
 - Inconsistent parameters = Type errors
 - Forgotten imports = Build failures
 
 **THE SOLUTION:**
+
 - Plan comprehensively
-- Update systematically  
+- Update systematically
 - Verify exhaustively
 - Never assume completeness
 

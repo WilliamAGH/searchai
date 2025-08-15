@@ -436,13 +436,15 @@ export const MessageList = React.memo(function MessageList({
               ))
           )}
 
-          {/* Show search progress for non-generating stages */}
+          {/* Show search progress ONLY if we don't have a streaming message showing it */}
           {isGenerating &&
             searchProgress &&
             searchProgress.stage !== "generating" &&
-            searchProgress.stage !== "idle" && (
-              <SearchProgress progress={searchProgress} />
-            )}
+            searchProgress.stage !== "idle" &&
+            // Only show if no streaming message exists
+            !currentMessages.some(
+              (msg) => msg.role === "assistant" && msg.isStreaming,
+            ) && <SearchProgress progress={searchProgress} />}
         </div>
       )}
       <div ref={messagesEndRef} />
