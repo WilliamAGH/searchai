@@ -19,7 +19,6 @@ export function useStreamingChat(chatId: string | null) {
     streamingContent: streamingData?.streamingState?.streamedContent ?? "",
     streamingMessageId: streamingData?.streamingState?.messageId,
     thinking: streamingData?.streamingState?.thinking,
-    searchProgress: streamingData?.streamingState?.searchProgress,
     // Additional streaming metadata
     hasStreamingState: !!streamingData?.streamingState,
     lastUpdated: streamingData?.lastUpdated,

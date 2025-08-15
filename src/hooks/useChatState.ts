@@ -58,7 +58,6 @@ export interface ChatState {
     streamingContent: string;
     streamingMessageId?: any; // Convex ID type - will be Id<"messages">
     thinking?: string;
-    searchProgress?: any;
   };
 }
 

@@ -70,7 +70,7 @@ export const subscribeToChatUpdates = query({
         content: streamingMessage.content,
         streamedContent: streamingMessage.streamedContent,
         thinking: streamingMessage.thinking,
-        searchProgress: streamingMessage.searchProgress,
+        // Note: searchProgress field doesn't exist in schema
       } : null,
     };
   },
