@@ -25,11 +25,8 @@ function Harness({
 
 describe("useUrlStateSync deep-link selection", () => {
   it("selects chat by shareId on /s/:shareId without changing route", async () => {
-    const selectChat = vi.fn().mockResolvedValue(undefined);
-    const localChats = [
-      { id: "c1", shareId: "s_abc" },
-      { id: "c2" },
-    ];
+    const selectChat = vi.fn().mockResolvedValue(null);
+    const localChats = [{ id: "c1", shareId: "s_abc" }, { id: "c2" }];
     render(
       <Harness
         path="/s/s_abc"
@@ -47,4 +44,3 @@ describe("useUrlStateSync deep-link selection", () => {
     expect(selectChat).toHaveBeenCalledWith("c1");
   });
 });
-

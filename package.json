@@ -25,6 +25,8 @@
     "test:ci": "vitest run --reporter=dot --pool=vmForks --poolOptions.vmForks.singleFork",
     "test:watch": "vitest",
     "test:vitest": "vitest run",
+    "test:vitest:prepush": "vitest run --reporter=verbose --pool=forks --poolOptions.forks.singleFork --coverage.enabled=false",
+    "test:precommit": "vitest run --reporter=dot --pool=forks --poolOptions.forks.singleFork --coverage.enabled=false",
     "test:playwright": "playwright test",
     "test:playwright:headless": "playwright test tests/e2e/minimal-smoke.spec.ts",
     "test:all": "npm-run-all --sequential test:vitest test:playwright:headless",

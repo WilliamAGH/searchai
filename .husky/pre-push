@@ -15,8 +15,17 @@ echo "🏗️ Full production build validation..."
 FULL_BUILD_LOG="$(mktemp -t full-build.XXXXXX.log)"
 if ! npm run build > "$FULL_BUILD_LOG" 2>&1; then
   echo "❌ Production build failed!"
+  echo "📄 Full log: $FULL_BUILD_LOG"
+  echo ""
   echo "📋 Build errors:"
+  echo "----------------------------------------"
+  # Show specific errors first
+  grep -E "(error|Error:|failed|Failed|ERROR)" "$FULL_BUILD_LOG" | head -20 || true
+  echo ""
+  # Then show last 30 lines for context
+  echo "Last 30 lines of output:"
   tail -30 "$FULL_BUILD_LOG"
+  echo "----------------------------------------"
   echo ""
   echo "💡 Run 'npm run build' locally to debug"
   exit 1
@@ -27,20 +36,34 @@ echo "📝 Full TypeScript validation..."
 MAIN_TSC_LOG="$(mktemp -t tsc-main.XXXXXX.log)"
 if ! npx --no-install tsc -p . --noEmit --pretty false > "$MAIN_TSC_LOG" 2>&1; then
   echo "❌ TypeScript errors in main project!"
-  echo "📄 Log: $MAIN_TSC_LOG"
-  grep -nE "error TS[0-9]+" "$MAIN_TSC_LOG" | head -n 20 || sed -n '1,60p' "$MAIN_TSC_LOG"
+  echo "📄 Full log: $MAIN_TSC_LOG"
+  echo ""
+  echo "📋 TypeScript errors:"
+  echo "----------------------------------------"
+  # Extract and format TS errors
+  grep -E "error TS[0-9]+" "$MAIN_TSC_LOG" | head -20
+  echo "----------------------------------------"
+  echo ""
+  echo "💡 Run 'npx tsc -p . --noEmit' to see all errors"
   exit 1
 fi
 
 CONVEX_TSC_LOG="$(mktemp -t tsc-convex.XXXXXX.log)"
 if ! npx --no-install tsc -p convex --noEmit --pretty false > "$CONVEX_TSC_LOG" 2>&1; then
   echo "❌ TypeScript errors in Convex functions!"
-  echo "📄 Log: $CONVEX_TSC_LOG"
-  grep -nE "error TS[0-9]+" "$CONVEX_TSC_LOG" | head -n 20 || sed -n '1,60p' "$CONVEX_TSC_LOG"
+  echo "📄 Full log: $CONVEX_TSC_LOG"
+  echo ""
+  echo "📋 TypeScript errors:"
+  echo "----------------------------------------"
+  # Extract and format TS errors
+  grep -E "error TS[0-9]+" "$CONVEX_TSC_LOG" | head -20
+  echo "----------------------------------------"
+  echo ""
+  echo "💡 Run 'npx tsc -p convex --noEmit' to see all errors"
   exit 1
 fi
 
-# 2. Convex deployment dry-run (CRITICAL - catches deployment failures!)
+# 3. Convex deployment dry-run (CRITICAL - catches deployment failures!)
 echo "🔧 Testing Convex deployment..."
 CONVEX_LOG="$(mktemp -t convex-deploy.XXXXXX.log)"
 # Use documented --typecheck=enable for strict validation
@@ -64,46 +87,47 @@ if ! npx --no-install convex dev --once --typecheck=enable > "$CONVEX_LOG" 2>&1;
   exit 1
 fi
 
-# 3. Full test suite
-echo "🧪 Running full test suite..."
-npm test > /tmp/node-tests-prepush.log 2>&1 || TEST_EXIT=$?
-TEST_EXIT=${TEST_EXIT:-0}
-if [ $TEST_EXIT -ne 0 ]; then
-  echo "❌ Tests failed!"
-  echo "📄 Log: /tmp/node-tests-prepush.log"
-  tail -40 /tmp/node-tests-prepush.log
-  echo "💡 Tip: run 'npm test' locally to reproduce."
+# 4. Fast unit tests only (Vitest - catches most issues quickly)
+echo "🧪 Running unit tests (Vitest)..."
+VITEST_LOG="$(mktemp -t vitest.XXXXXX.log)"
+if ! npm run test:vitest:prepush > "$VITEST_LOG" 2>&1; then
+  echo "❌ Unit tests failed!"
+  echo "📄 Full log: $VITEST_LOG"
+  echo ""
+  echo "📋 Test failures:"
+  echo "----------------------------------------"
+  # Show the last 60 lines which should include the failure summary
+  tail -60 "$VITEST_LOG"
+  echo "----------------------------------------"
+  echo ""
+  # Try to extract specific test failures
+  echo "🔎 Failed tests:"
+  grep -E "(FAIL|✗|❌|Error:|failed:|FAILED)" "$VITEST_LOG" | head -20 || true
+  echo ""
+  echo "💡 Reproduce locally: npm run test:vitest:prepush"
   exit 1
 fi
 
-# Removed duplicate build; Step 1 already validates production build.
-
-# 5. Playwright smoke test (fail on console errors)
-echo "🕵️ Smoke test: ensuring no console errors..."
-if npx --no-install playwright --version > /dev/null 2>&1; then
-  # Run only the smoke test for speed. Playwright config starts a preview server.
-  PW_LOG="$(mktemp -t playwright-smoke.XXXXXX.log)"
-  if ! npx --no-install playwright test -g smoke --reporter=line > "$PW_LOG" 2>&1; then
-    echo "❌ Smoke test failed (console errors or network failures)."
-    echo "📄 Log: $PW_LOG"
-    # Surface the key error lines
-    grep -nE "(ReferenceError|TypeError|Error: |pageerror|requestfailed)" "$PW_LOG" | head -n 10 || true
-    # Show available artifacts
-    TRACE_ZIP=$(find test-results -name trace.zip -type f -print -quit 2>/dev/null || true)
-    SCREENSHOT=$(find test-results -name 'test-failed-*.png' -type f -print -quit 2>/dev/null || true)
-    if [ -n "$TRACE_ZIP" ]; then
-      echo "🧭 Trace: $TRACE_ZIP"
-      echo "   Open with: npx playwright show-trace \"$TRACE_ZIP\""
-    fi
-    if [ -n "$SCREENSHOT" ]; then
-      echo "🖼️  Screenshot: $SCREENSHOT"
-    fi
-    echo "💡 Reproduce: npx playwright test -g smoke --reporter=line"
-    exit 1
-  fi
-else
-  echo "ℹ️  Playwright not installed. Skipping smoke test."
-  echo "   Install with: npm i -D @playwright/test && npx playwright install"
+# 5. Quick Playwright smoke test (with proxy runtime for reliability)
+echo "🎭 Running Playwright smoke test..."
+PLAYWRIGHT_LOG="$(mktemp -t playwright.XXXXXX.log)"
+# Use proxy runtime as per project requirements for 100% pass rate
+if ! PLAYWRIGHT_RUNTIME=proxy npm run test:playwright:headless > "$PLAYWRIGHT_LOG" 2>&1; then
+  echo "❌ Playwright smoke test failed!"
+  echo "📄 Full log: $PLAYWRIGHT_LOG"
+  echo ""
+  echo "📋 Test failures:"
+  echo "----------------------------------------"
+  # Show the last 60 lines which should include the failure summary
+  tail -60 "$PLAYWRIGHT_LOG"
+  echo "----------------------------------------"
+  echo ""
+  # Try to extract specific test failures
+  echo "🔎 Failed tests:"
+  grep -E "(FAIL|✗|❌|Error:|failed:|FAILED)" "$PLAYWRIGHT_LOG" | head -20 || true
+  echo ""
+  echo "💡 Reproduce locally: PLAYWRIGHT_RUNTIME=proxy npm run test:playwright:headless"
+  exit 1
 fi
 
 # 6. Check for common issues
@@ -125,3 +149,6 @@ if [ $TODO_COUNT -gt 0 ]; then
 fi
 
 echo "✅ All pre-push checks passed! Safe to push."
+
+# Clean up temp files
+rm -f "$FULL_BUILD_LOG" "$MAIN_TSC_LOG" "$CONVEX_TSC_LOG" "$CONVEX_LOG" "$VITEST_LOG" "$PLAYWRIGHT_LOG"

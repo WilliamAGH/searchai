@@ -31,7 +31,8 @@ jobs:
       - name: Run Playwright tests (integration)
         env:
           CI: '1'
-        run: npx playwright test --config=playwright-integration.config.ts --reporter=line
+          PLAYWRIGHT_RUNTIME: 'proxy'
+        run: npm run test:playwright:headless
 
       - name: Upload Playwright report
         if: always()

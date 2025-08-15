@@ -5,40 +5,27 @@
 // Set up React act environment for testing
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
-// Import React and setup act compatibility
+// Import React
 import * as React from "react";
-
-// React 19 has act in the main React export
-// We use it directly without trying to redefine it
-const act = React.act;
 
 // Ensure global React is available for Testing Library
 if (typeof globalThis !== "undefined" && !globalThis.React) {
   (globalThis as any).React = React;
 }
 
-// Export act for use in tests
-export { act };
-
-// Mock react-dom/test-utils to provide act for backward compatibility
-import { vi, expect } from "vitest";
+// Import Testing Library utilities
+import { expect } from "vitest";
 // Best practice: use Testing Library's jest-dom matchers
 // (toBeInTheDocument, toBeDisabled, etc.)
 // This static import works after installing the package.
 // It coexists with the minimal polyfills below.
 // If your environment lacks network access, you can comment this out.
-// eslint-disable-next-line import/no-unresolved
+// eslint-disable-next-line import/no-unresolved, import/no-unassigned-import
 import "@testing-library/jest-dom/vitest";
 // (No-op: static import above loads matchers when installed.)
 
-// Mock the react-dom/test-utils module
-vi.mock("react-dom/test-utils", () => ({
-  act: act,
-  unstable_act: act,
-}));
-
-// React Testing Library will automatically detect React.act in React 19
-// No patching needed since act is already available
+// React 19 doesn't export act directly - it's handled internally by React Testing Library v16+
+// No need to mock react-dom/test-utils as Testing Library handles act automatically
 
 // Custom matchers for tests
 expect.extend({
