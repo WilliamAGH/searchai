@@ -54,9 +54,15 @@ export function isOnlyDotsMessage(content: string | undefined | null): boolean {
 export function shouldFilterMessage(message: {
   content?: string;
   role: string;
+  thinking?: string | null;
 }): boolean {
   // Only filter assistant messages with placeholder content
   if (message.role !== "assistant") return false;
+
+  // If the model is "thinking", keep it visible even if content is empty
+  if (typeof message.thinking === "string" && message.thinking.trim() !== "") {
+    return false;
+  }
 
   if (!message.content) return true;
   const trimmed = message.content.trim();
