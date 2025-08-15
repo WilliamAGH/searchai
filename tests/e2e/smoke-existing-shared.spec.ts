@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { clickReactElement } from "./utils/react-click";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 import { collectFilteredConsoleErrors } from "../helpers/console-helpers";
 
 test.describe("smoke: existing shared/public chat open has no console errors", () => {
@@ -7,6 +8,9 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
     page,
     baseURL,
   }) => {
+    // Set up MSW to mock search and AI endpoints
+    await setupMSWForTest(page);
+
     const { consoleErrors, cleanup } = collectFilteredConsoleErrors(page);
     const requestFailures: string[] = [];
     const responseFailures: string[] = [];
@@ -71,6 +75,9 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
     await page.goto(shareUrl, { waitUntil: "domcontentloaded" });
 
     cleanup();
+
+    // Clean up MSW
+    await cleanupMSWForTest(page);
 
     expect.soft(requestFailures, requestFailures.join("\n")).toEqual([]);
     expect.soft(responseFailures, responseFailures.join("\n")).toEqual([]);
