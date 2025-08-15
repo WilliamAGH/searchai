@@ -6,18 +6,13 @@
 import React from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { ContentWithCitations } from "../ContentWithCitations";
+import { MessageSources } from "./MessageSources";
 import { ReasoningDisplay } from "../ReasoningDisplay";
 import { CopyButton } from "../CopyButton";
-import { MessageSources } from "./MessageSources";
-import { Spinner } from "../ui/Spinner";
-import { LoadingText } from "../ui/LoadingText";
-import { ThreeDots } from "../ui/ThreeDots";
-import {
-  extractPlainText,
-  formatConversationWithSources,
-} from "../../lib/clipboard";
+import { StreamingStatus } from "../StreamingStatus";
+import { formatConversationWithSources } from "../../lib/utils/shareFormatter";
+import { extractPlainText } from "../../lib/utils/textUtils";
 import type { Message } from "../../lib/types/message";
-import { shouldShowAnimatedDots } from "../../lib/utils/textUtils";
 
 interface MessageItemProps {
   message: Message;
@@ -119,21 +114,22 @@ export const MessageItem = React.memo(
             </div>
           )}
 
-          {/* 2) Thinking status - shows real-time AI processing */}
-          {message.role === "assistant" &&
-            message.thinking &&
-            message.thinking.trim() && (
-              <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
-                <Spinner size="sm" aria-label="AI is thinking" />
-                <LoadingText message={message.thinking} className="flex-1">
-                  {/* Only show animated dots if text doesn't already contain static dots */}
-                  {shouldShowAnimatedDots(
-                    message.thinking,
-                    message.isStreaming || false,
-                  ) && <ThreeDots size="sm" color="bg-blue-500" />}
-                </LoadingText>
-              </div>
-            )}
+          {/* 2) Unified streaming status - seamless transitions */}
+          {message.role === "assistant" && message.isStreaming && (
+            <div className="mb-3">
+              <StreamingStatus
+                stage={
+                  !message.thinking && !message.content ? "searching" :
+                  message.thinking?.toLowerCase().includes("search") ? "searching" :
+                  message.thinking?.toLowerCase().includes("analyz") || 
+                  message.thinking?.toLowerCase().includes("process") ? "thinking" :
+                  message.content && message.content.trim() ? "streaming" : "thinking"
+                }
+                message={message.thinking}
+                className=""
+              />
+            </div>
+          )}
 
           {/* 3) Reasoning / thinking - positioned below sources */}
           {message.role === "assistant" &&
