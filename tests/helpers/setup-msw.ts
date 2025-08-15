@@ -11,11 +11,13 @@ export async function setupMSWForTest(page: Page) {
       // Create a global flag to indicate MSW is enabled
       window.__MSW_ENABLED__ = true;
 
-      // Set up fetch interception for search APIs
+      // Set up fetch interception for search APIs and AI service
       const originalFetch = window.fetch;
 
       window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = typeof input === "string" ? input : input.toString();
+
+        console.log("🔧 MSW intercepting request:", url);
 
         // Intercept search API calls
         if (
@@ -24,6 +26,11 @@ export async function setupMSWForTest(page: Page) {
           url.includes("duckduckgo.com") ||
           url.includes("/api/search")
         ) {
+          console.log("🔧 MSW handling search API request");
+
+          // Add a small delay to simulate network latency
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
           // Return mock search results
           const mockResponse = {
             status: 200,
@@ -54,11 +61,66 @@ export async function setupMSWForTest(page: Page) {
           return new Response(mockResponse.body, mockResponse);
         }
 
-        // For non-search requests, use the original fetch
+        // Intercept AI service endpoint (/api/ai)
+        if (url.includes("/api/ai")) {
+          console.log("🔧 MSW handling AI service request");
+
+          // Add a small delay to simulate network latency
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Parse the request body to get the user's message
+          let message = "test message";
+          if (init?.body) {
+            try {
+              const body = JSON.parse(init.body as string);
+              message = body.message || "test message";
+            } catch {
+              // Use default message if parsing fails
+              message = "test message";
+            }
+          }
+
+          console.log("🔧 MSW generating AI response for message:", message);
+
+          // Generate a simple AI response for testing
+          const aiResponse =
+            "This is a mock AI response for testing purposes. I understand your question and I'm here to help.";
+
+          console.log("🔧 MSW returning AI response");
+
+          // Return SSE stream format that the application expects
+          const stream = new ReadableStream({
+            start(controller) {
+              // Send the response as a single chunk
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ content: aiResponse })}\n\n`,
+                ),
+              );
+              controller.close();
+            },
+          });
+
+          return new Response(stream, {
+            status: 200,
+            statusText: "OK",
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            },
+          });
+        }
+
+        console.log("🔧 MSW passing through request:", url);
+
+        // For non-intercepted requests, use the original fetch
         return originalFetch(input, init);
       };
 
-      console.log("🔧 MSW fetch interception enabled for search APIs");
+      console.log(
+        "🔧 MSW fetch interception enabled for search APIs and AI service",
+      );
     });
 
     console.log("✅ MSW setup completed for test");

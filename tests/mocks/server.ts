@@ -4,6 +4,7 @@
  */
 
 import { setupServer } from "msw/node";
+import { beforeAll, afterEach, afterAll } from "vitest";
 import { searchHandlers } from "./search-api-mocks";
 
 // Create MSW server with search handlers

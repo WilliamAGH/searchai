@@ -291,12 +291,60 @@ export const searchHandlers = [
         });
       }
 
-      // Default response for other OpenRouter requests
+      // Default response for other OpenRouter requests (AI chat completions)
+      // Generate more realistic AI responses based on the user's message
+      const userMessage =
+        body.messages?.[body.messages.length - 1]?.content || "";
+      let aiResponse = "I understand your question. Let me help you with that.";
+
+      // Generate contextual responses based on the user's message
+      if (
+        userMessage.toLowerCase().includes("news") ||
+        userMessage.toLowerCase().includes("latest")
+      ) {
+        aiResponse =
+          "Based on current information, here are the latest developments: Recent advances in AI technology have shown significant progress in natural language processing and machine learning. Researchers continue to make breakthroughs in areas like computer vision and autonomous systems. The industry is seeing increased investment and adoption across various sectors.";
+      } else if (
+        userMessage.toLowerCase().includes("react") ||
+        userMessage.toLowerCase().includes("hooks")
+      ) {
+        aiResponse =
+          "React Hooks are functions that allow you to use state and other React features in functional components. They were introduced in React 16.8 to solve common problems with class components. Key hooks include useState for state management, useEffect for side effects, and useContext for consuming context. Hooks must be called at the top level of your component and cannot be called inside loops, conditions, or nested functions.";
+      } else if (
+        userMessage.toLowerCase().includes("ai") ||
+        userMessage.toLowerCase().includes("artificial intelligence")
+      ) {
+        aiResponse =
+          "Artificial Intelligence (AI) is a broad field of computer science focused on creating systems that can perform tasks typically requiring human intelligence. This includes machine learning, natural language processing, computer vision, and robotics. AI has applications in healthcare, finance, transportation, and many other industries. Current AI systems excel at pattern recognition and data analysis, though they still face challenges in areas like common sense reasoning and general intelligence.";
+      } else if (userMessage.toLowerCase().includes("machine learning")) {
+        aiResponse =
+          "Machine Learning is a subset of AI that enables computers to learn and improve from experience without being explicitly programmed. It uses algorithms to identify patterns in data and make predictions or decisions. Common approaches include supervised learning (using labeled data), unsupervised learning (finding hidden patterns), and reinforcement learning (learning through trial and error). Popular algorithms include neural networks, decision trees, and support vector machines.";
+      } else if (userMessage.toLowerCase().includes("quantum")) {
+        aiResponse =
+          "Quantum computing is an emerging technology that leverages quantum mechanical phenomena like superposition and entanglement to process information. Unlike classical computers that use bits (0 or 1), quantum computers use quantum bits or qubits that can exist in multiple states simultaneously. This enables them to solve certain complex problems much faster than classical computers, particularly in areas like cryptography, optimization, and molecular modeling.";
+      } else if (
+        userMessage.toLowerCase().includes("william callahan") ||
+        userMessage.toLowerCase().includes("searchai")
+      ) {
+        aiResponse =
+          "William Callahan is the creator and developer of SearchAI.io, an AI-powered search application that combines web search with conversational AI. He has experience in building AI applications and is passionate about making AI technology more accessible. SearchAI.io demonstrates his expertise in integrating multiple search providers and AI services to create a comprehensive search experience.";
+      } else if (
+        userMessage.toLowerCase().includes("hello") ||
+        userMessage.toLowerCase().includes("hi")
+      ) {
+        aiResponse =
+          "Hello! I'm here to help you with your questions. I can search the web for current information and provide detailed answers on a wide range of topics. What would you like to know about?";
+      } else {
+        // Generic helpful response for other queries
+        aiResponse =
+          "I'd be happy to help you with that question. While I can provide general information based on my training, for the most current and specific details, I'd recommend searching the web or consulting authoritative sources. Is there a particular aspect of this topic you'd like me to explain further?";
+      }
+
       return HttpResponse.json({
         choices: [
           {
             message: {
-              content: "This is a mock AI response for testing.",
+              content: aiResponse,
             },
           },
         ],
@@ -317,28 +365,99 @@ export const searchHandlers = [
       return new HttpResponse(null, { status: 500 });
     }
 
-    const results = generateSearchResults(query, 10);
+    const results = generateSearchResults(query, 5);
 
-    // DuckDuckGo HTML format (simplified)
-    const html = `
-      <html>
-        <body>
-          ${results
-            .map(
-              (r) => `
-            <div class="result">
-              <a class="result__a" href="${r.url}">${r.title}</a>
-              <div class="result__snippet">${r.snippet}</div>
-            </div>
-          `,
-            )
-            .join("")}
-        </body>
-      </html>
-    `;
+    // DuckDuckGo JSON format (instant answer API)
+    const duckDuckGoResponse = {
+      Abstract: results.length > 0 ? results[0].snippet : "",
+      AbstractURL: results.length > 0 ? results[0].url : "",
+      Heading: results.length > 0 ? results[0].title : query,
+      RelatedTopics: results.slice(0, 3).map((r) => ({
+        FirstURL: r.url,
+        Text: `${r.title} - ${r.snippet}`,
+      })),
+    };
 
-    return new HttpResponse(html, {
-      headers: { "Content-Type": "text/html" },
+    return HttpResponse.json(duckDuckGoResponse);
+  }),
+
+  // AI service endpoint handler (/api/ai)
+  http.post("/api/ai", async ({ request }) => {
+    const body = (await request.json()) as any;
+    const message = body.message || "";
+
+    if (responseDelay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, responseDelay));
+    }
+
+    if (errorRate > 0 && Math.random() < errorRate) {
+      return new HttpResponse(null, { status: 503 });
+    }
+
+    // Generate contextual AI response based on the user's message
+    let aiResponse = "I understand your question. Let me help you with that.";
+
+    if (
+      message.toLowerCase().includes("news") ||
+      message.toLowerCase().includes("latest")
+    ) {
+      aiResponse =
+        "Based on current information, here are the latest developments: Recent advances in AI technology have shown significant progress in natural language processing and machine learning. Researchers continue to make breakthroughs in areas like computer vision and autonomous systems. The industry is seeing increased investment and adoption across various sectors.";
+    } else if (
+      message.toLowerCase().includes("react") ||
+      message.toLowerCase().includes("hooks")
+    ) {
+      aiResponse =
+        "React Hooks are functions that allow you to use state and other React features in functional components. They were introduced in React 16.8 to solve common problems with class components. Key hooks include useState for state management, useEffect for side effects, and useContext for consuming context. Hooks must be called at the top level of your component and cannot be called inside loops, conditions, or nested functions.";
+    } else if (
+      message.toLowerCase().includes("ai") ||
+      message.toLowerCase().includes("artificial intelligence")
+    ) {
+      aiResponse =
+        "Artificial Intelligence (AI) is a broad field of computer science focused on creating systems that can perform tasks typically requiring human intelligence. This includes machine learning, natural language processing, computer vision, and robotics. AI has applications in healthcare, finance, transportation, and many other industries. Current AI systems excel at pattern recognition and data analysis, though they still face challenges in areas like common sense reasoning and general intelligence.";
+    } else if (message.toLowerCase().includes("machine learning")) {
+      aiResponse =
+        "Machine Learning is a subset of AI that enables computers to learn and improve from experience without being explicitly programmed. It uses algorithms to identify patterns in data and make predictions or decisions. Common approaches include supervised learning (using labeled data), unsupervised learning (finding hidden patterns), and reinforcement learning (learning through trial and error). Popular algorithms include neural networks, decision trees, and support vector machines.";
+    } else if (message.toLowerCase().includes("quantum")) {
+      aiResponse =
+        "Quantum computing is an emerging technology that leverages quantum mechanical phenomena like superposition and entanglement to process information. Unlike classical computers that use bits (0 or 1), quantum computers use quantum bits or qubits that can exist in multiple states simultaneously. This enables them to solve certain complex problems much faster than classical computers, particularly in areas like cryptography, optimization, and molecular modeling.";
+    } else if (
+      message.toLowerCase().includes("william callahan") ||
+      message.toLowerCase().includes("searchai")
+    ) {
+      aiResponse =
+        "William Callahan is the creator and developer of SearchAI.io, an AI-powered search application that combines web search with conversational AI. He has experience in building AI applications and is passionate about making AI technology more accessible. SearchAI.io demonstrates his expertise in integrating multiple search providers and AI services to create a comprehensive search experience.";
+    } else if (
+      message.toLowerCase().includes("hello") ||
+      message.toLowerCase().includes("hi")
+    ) {
+      aiResponse =
+        "Hello! I'm here to help you with your questions. I can search the web for current information and provide detailed answers on a wide range of topics. What would you like to know about?";
+    } else {
+      // Generic helpful response for other queries
+      aiResponse =
+        "I'd be happy to help you with that question. While I can provide general information based on my training, for the most current and specific details, I'd recommend searching the web or consulting authoritative sources. Is there a particular aspect of this topic you'd like me to explain further?";
+    }
+
+    // Return SSE stream format that the application expects
+    const stream = new ReadableStream({
+      start(controller) {
+        // Send the response as a single chunk
+        controller.enqueue(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ content: aiResponse })}\n\n`,
+          ),
+        );
+        controller.close();
+      },
+    });
+
+    return new HttpResponse(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
   }),
 ];
