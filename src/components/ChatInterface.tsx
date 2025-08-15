@@ -30,6 +30,7 @@ import { isTopicChange } from "../lib/utils/topicDetection";
 import { mapMessagesToLocal } from "../lib/utils/messageMapper";
 import { buildUserHistory } from "../lib/utils/chatHistory";
 import { ChatSidebar } from "./ChatSidebar";
+import { ChatToolbar } from "./ChatToolbar";
 import { FollowUpPrompt } from "./FollowUpPrompt";
 import { logger } from "../lib/logger";
 import { MessageInput } from "./MessageInput";
@@ -529,6 +530,11 @@ export function ChatInterface({
               }}
             />
           )}
+          <ChatToolbar
+            onShare={openShareModal}
+            messages={messages}
+            chatTitle={currentChat?.title}
+          />
           <MessageInput key={currentChatId || "root"} {...messageInputProps} />
         </div>
       </div>
