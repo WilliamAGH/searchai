@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { useConvex } from "convex/react";
 import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import { ConvexChatRepository } from "../lib/repositories/ConvexChatRepository";
+import { LocalChatRepository } from "../lib/repositories/LocalChatRepository";
 import { useAnonymousSession } from "./useAnonymousSession";
 
 export function useChatRepository(): IChatRepository | null {
@@ -14,14 +15,18 @@ export function useChatRepository(): IChatRepository | null {
   const sessionId = useAnonymousSession();
 
   const repository = useMemo<IChatRepository | null>(() => {
-    // ALWAYS use Convex repository when client is available
-    // This works for both authenticated and unauthenticated users
+    // FIX: Restore fallback logic for reliability
     if (convexClient) {
-      return new ConvexChatRepository(convexClient, sessionId || undefined);
+      try {
+        return new ConvexChatRepository(convexClient, sessionId || undefined);
+      } catch (error) {
+        console.warn("Convex repository failed, falling back to local:", error);
+        return new LocalChatRepository();
+      }
     }
 
-    // Only return null if Convex is not available (should rarely happen)
-    return null;
+    // FIX: Return local repository when Convex unavailable
+    return new LocalChatRepository();
   }, [convexClient, sessionId]);
 
   return repository;

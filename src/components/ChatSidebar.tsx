@@ -1,8 +1,17 @@
 import { useMutation } from "convex/react";
 import React from "react";
 import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
-import type { Chat } from "../lib/types/chat";
+/* --------------------------------------------------------------
+   IMPORTANT: Convex‑generated types are the *single source of truth*.
+   We import the document type directly from the generated data model
+   instead of a hand‑rolled duplicate. This eliminates the TS2589/
+   “excessively deep” error and guarantees that the ID we pass to
+   Convex is a proper `Id<"chats">`.
+   -------------------------------------------------------------- */
+import type { Doc, Id } from "../../convex/_generated/dataModel";
+
+// Alias the generated document type for readability.
+type Chat = Doc<"chats">;
 import { logger } from "../lib/logger";
 
 /**
@@ -69,8 +78,13 @@ export function ChatSidebar({
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const attr = e.currentTarget.getAttribute("data-chat-id");
       if (!attr) return;
+      // Find the chat object whose typed Id matches the attribute
       const match = chats.find((c) => String(c._id) === attr);
-      handleSelectChat(match ? match._id : attr);
+      // Ensure we always pass a proper Convex Id type to the parent callback
+      const selectedId: Id<"chats"> = match
+        ? match._id
+        : (attr as unknown as Id<"chats">);
+      handleSelectChat(selectedId);
     },
     [chats, handleSelectChat],
   );

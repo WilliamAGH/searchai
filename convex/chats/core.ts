@@ -60,6 +60,7 @@ export const getUserChats = query({
   },
   returns: v.array(v.object({
     _id: v.id("chats"),
+    _creationTime: v.number(), // FIX: Add Convex system field
     title: v.string(),
     userId: v.optional(v.id("users")),
     sessionId: v.optional(v.string()),
@@ -69,6 +70,7 @@ export const getUserChats = query({
     createdAt: v.number(),
     updatedAt: v.number(),
     rollingSummary: v.optional(v.string()),
+    rollingSummaryUpdatedAt: v.optional(v.number()), // FIX: Add missing field from schema
   })),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -143,6 +145,7 @@ export const getChatById = query({
   },
   returns: v.union(v.object({
     _id: v.id("chats"),
+    _creationTime: v.number(), // FIX: Add Convex system field
     title: v.string(),
     userId: v.optional(v.id("users")),
     sessionId: v.optional(v.string()),
@@ -152,6 +155,7 @@ export const getChatById = query({
     createdAt: v.number(),
     updatedAt: v.number(),
     rollingSummary: v.optional(v.string()),
+    rollingSummaryUpdatedAt: v.optional(v.number()), // FIX: Add missing field from schema
   }), v.null()),
   handler: async (ctx, args) => {
     return await validateChatAccess(ctx, args.chatId, args.sessionId);
@@ -171,6 +175,7 @@ export const getChat = query({
   },
   returns: v.union(v.object({
     _id: v.id("chats"),
+    _creationTime: v.number(), // FIX: Add Convex system field
     title: v.string(),
     userId: v.optional(v.id("users")),
     sessionId: v.optional(v.string()),
@@ -180,6 +185,7 @@ export const getChat = query({
     createdAt: v.number(),
     updatedAt: v.number(),
     rollingSummary: v.optional(v.string()),
+    rollingSummaryUpdatedAt: v.optional(v.number()), // FIX: Add missing field from schema
   }), v.null()),
   handler: async (ctx, args) => {
     // Reuse validation logic
