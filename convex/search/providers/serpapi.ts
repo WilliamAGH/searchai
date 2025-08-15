@@ -3,6 +3,8 @@
  * Uses Google search via SerpAPI for high-quality results
  */
 
+import { logger } from "../../lib/logger";
+
 export interface SearchResult {
   title: string;
   url: string;
@@ -39,7 +41,7 @@ export async function searchWithSerpApiDuckDuckGo(
     maxResults,
     timestamp: new Date().toISOString(),
   };
-  console.info("🔍 SERP API Request:", requestLog);
+  logger.info("🔍 SERP API Request:", requestLog);
 
   try {
     const response = await fetch(apiUrl, {
@@ -55,12 +57,12 @@ export async function searchWithSerpApiDuckDuckGo(
       endpoint: "https://serpapi.com/search.json",
       queryLength: query.length,
     } as const;
-    console.info("📊 SERP API Response:", safeLog);
+    logger.info("📊 SERP API Response:", safeLog);
 
     if (!response.ok) {
       const errorText = await response.text();
       const errorMessage = `SERP API returned ${response.status} ${response.statusText}: ${errorText}`;
-      console.error("❌ SERP API Error Details:", {
+      logger.error("❌ SERP API Error Details:", {
         status: response.status,
         statusText: response.statusText,
         errorText,
@@ -72,7 +74,7 @@ export async function searchWithSerpApiDuckDuckGo(
     }
 
     const data: SerpApiResponse = await response.json();
-    console.info("✅ SERP API Success:", {
+    logger.info("✅ SERP API Success:", {
       hasOrganic: !!data.organic_results,
       count: data.organic_results?.length || 0,
       queryLength: query.length,
@@ -89,7 +91,7 @@ export async function searchWithSerpApiDuckDuckGo(
           relevanceScore: 0.9,
         }));
 
-      console.info("📋 SERP API Results Parsed:", {
+      logger.info("📋 SERP API Results Parsed:", {
         resultCount: results.length,
         sampleResults: results.slice(0, 2).map((r) => ({
           title: r.title,
@@ -102,13 +104,13 @@ export async function searchWithSerpApiDuckDuckGo(
       return results;
     }
 
-    console.log("⚠️ SERP API No Results:", {
+    logger.debug("⚠️ SERP API No Results:", {
       queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
     return [];
   } catch (error) {
-    console.error("💥 SERP API Exception:", {
+    logger.error("💥 SERP API Exception:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : "No stack trace",
       queryLength: query.length,

@@ -5,6 +5,7 @@
 
 import { v } from "convex/values";
 import { action } from "../_generated/server";
+import { logger } from "../lib/logger";
 
 /**
  * Scrape and clean web page content
@@ -54,7 +55,7 @@ export const scrapeUrl = action({
     if (hit && hit.exp > now) {
       return hit.val;
     }
-    console.info("🌐 Scraping URL initiated:", {
+    logger.info("🌐 Scraping URL initiated:", {
       url: args.url,
       timestamp: new Date().toISOString(),
     });
@@ -73,7 +74,7 @@ export const scrapeUrl = action({
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
-      console.info("📊 Scrape response received:", {
+      logger.info("📊 Scrape response received:", {
         url: args.url,
         status: response.status,
         statusText: response.statusText,
@@ -87,12 +88,12 @@ export const scrapeUrl = action({
           statusText: response.statusText,
           timestamp: new Date().toISOString(),
         };
-        console.error("❌ HTTP error during scraping:", errorDetails);
+        logger.error("❌ HTTP error during scraping:", errorDetails);
         throw new Error(`HTTP ${response.status} ${response.statusText}`);
       }
 
       const contentType = response.headers.get("content-type") || "";
-      console.info("📄 Content type check:", {
+      logger.info("📄 Content type check:", {
         url: args.url,
         contentType: contentType,
       });
@@ -103,12 +104,12 @@ export const scrapeUrl = action({
           contentType: contentType,
           timestamp: new Date().toISOString(),
         };
-        console.error("❌ Non-HTML content type:", errorDetails);
+        logger.error("❌ Non-HTML content type:", errorDetails);
         throw new Error(`Not an HTML page. Content-Type: ${contentType}`);
       }
 
       const html = await response.text();
-      console.info("✅ HTML content fetched:", {
+      logger.info("✅ HTML content fetched:", {
         url: args.url,
         contentLength: html.length,
         timestamp: new Date().toISOString(),
@@ -124,7 +125,7 @@ export const scrapeUrl = action({
         title = h1Match ? h1Match[1].trim() : new URL(args.url).hostname;
       }
 
-      console.info("🏷️ Title extracted:", {
+      logger.info("🏷️ Title extracted:", {
         url: args.url,
         title: title,
         method: titleMatch ? "title tag" : h1Match ? "h1 tag" : "hostname",
@@ -144,7 +145,7 @@ export const scrapeUrl = action({
         .replace(/\s+/g, " ")
         .trim();
 
-      console.info("🧹 Content cleaned:", {
+      logger.info("🧹 Content cleaned:", {
         url: args.url,
         originalLength: html.length,
         cleanedLength: content.length,
@@ -157,7 +158,7 @@ export const scrapeUrl = action({
           contentLength: content.length,
           timestamp: new Date().toISOString(),
         };
-        console.error("❌ Content too short after cleaning:", errorDetails);
+        logger.error("❌ Content too short after cleaning:", errorDetails);
         throw new Error(`Content too short (${content.length} characters)`);
       }
 
@@ -181,7 +182,7 @@ export const scrapeUrl = action({
         content = content.replace(pattern, "");
       }
 
-      console.log("🗑️ Junk content removed:", {
+      logger.debug("🗑️ Junk content removed:", {
         url: args.url,
         removedCount: removedJunkCount,
       });
@@ -189,7 +190,7 @@ export const scrapeUrl = action({
       // Limit content length
       if (content.length > 5000) {
         content = `${content.substring(0, 5000)}...`;
-        console.info("✂️ Content truncated:", {
+        logger.info("✂️ Content truncated:", {
           url: args.url,
           newLength: content.length,
         });
@@ -203,7 +204,7 @@ export const scrapeUrl = action({
 
       const result = { title, content, summary };
       cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
-      console.info("✅ Scraping completed successfully:", {
+      logger.info("✅ Scraping completed successfully:", {
         url: args.url,
         resultLength: content.length,
         summaryLength: summary.length,
@@ -212,7 +213,7 @@ export const scrapeUrl = action({
 
       return result;
     } catch (error) {
-      console.error("💥 Scraping failed with exception:", {
+      logger.error("💥 Scraping failed with exception:", {
         url: args.url,
         error: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : "No stack trace",
