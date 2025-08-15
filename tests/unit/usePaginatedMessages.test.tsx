@@ -1,17 +1,18 @@
 import { test, expect, describe, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
+
+// Mock dependencies before any imports that might use them
+vi.mock('convex/react', () => ({
+  useQuery: vi.fn(),
+  useAction: vi.fn(),
+}));
+
+// Import after mocking
 import { usePaginatedMessages } from '../../src/hooks/usePaginatedMessages';
 
-// Create mocks outside to be accessible in module mock
-const mockUseQuery = vi.fn();
-const mockUseAction = vi.fn();
-
-// Mock dependencies
-vi.mock('convex/react', () => ({
-  useQuery: mockUseQuery,
-  useAction: mockUseAction,
-}));
+// Get references to mocks for use in tests
+const { useQuery: mockUseQuery, useAction: mockUseAction } = await import('convex/react');
 
 vi.mock('../../convex/_generated/api', () => ({
   api: {
