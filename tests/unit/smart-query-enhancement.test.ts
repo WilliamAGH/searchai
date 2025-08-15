@@ -26,7 +26,7 @@ function mockSmartEnhanceQueries(options: {
   enhancements: string[];
   maxQueries: number;
 }): EnhancedQuery[] {
-  const { queries, context, userMessage, enhancements, maxQueries } = options;
+  const { queries, context, userMessage, _enhancements, maxQueries } = options;
   
   // Handle edge cases properly
   if (!queries || queries.length === 0) {
@@ -72,53 +72,6 @@ function mockSmartEnhanceQueries(options: {
   }
   
   return enhancedQueries;
-}
-
-/**
- * Mock implementation of query analysis
- */
-function mockAnalyzeAndEnhanceQuery(options: {
-  query: string;
-  context: string;
-  userMessage: string;
-  enhancements: string[];
-  isPrimaryQuery: boolean;
-}): EnhancedQuery {
-  const { query, context, userMessage, enhancements, isPrimaryQuery } = options;
-  
-  let enhancedQuery = query;
-  let enhancementType: EnhancedQuery['enhancementType'] = 'none';
-  let confidence = 1.0;
-
-  // Only enhance primary queries or when it makes sense
-  if (isPrimaryQuery) {
-    const analysis = mockAnalyzeQueryEnhancement(query, context, userMessage);
-    
-    if (analysis.shouldEnhance && analysis.enhancement) {
-      enhancedQuery = `${query} ${analysis.enhancement}`.trim();
-      enhancementType = analysis.type;
-      confidence = analysis.confidence;
-    }
-  }
-
-  // Apply enhancement search terms if they're highly relevant
-  if (enhancements.length > 0 && isPrimaryQuery) {
-    const relevantEnhancements = mockFilterRelevantEnhancements(enhancements, query, context);
-    if (relevantEnhancements.length > 0) {
-      enhancedQuery = `${enhancedQuery} ${relevantEnhancements.slice(0, 2).join(" ")}`.trim();
-      if (enhancementType === 'none') {
-        enhancementType = 'context';
-        confidence = 0.8;
-      }
-    }
-  }
-
-  return {
-    original: query,
-    enhanced: enhancedQuery,
-    enhancementType,
-    confidence,
-  };
 }
 
 /**
@@ -170,7 +123,7 @@ function mockAnalyzeQueryEnhancement(
   }
   
   // Detect context-dependent queries
-  if (query.length < 10 && !query.includes('?')) {
+  if (mockIsContextDependentQuery(query)) {
     const contextEntity = mockExtractMostRelevantEntity(context, query);
     if (contextEntity && !query.toLowerCase().includes(contextEntity.toLowerCase())) {
       return {
@@ -204,10 +157,6 @@ function mockIsFollowUpQuestion(query: string): boolean {
     /^(what|how|where|when|why)\s+is\s+(it|this|that)\b/i,
     /^(it|this|that)\s+(is|does|works?)\b/i,
     /^(how|what)\s+does\s+(it|this|that)\b/i,
-    // Catch "what about machine learning?" pattern
-    /^(what|how|where|when|why)\s+about\s+\w+/i,
-    // Catch "what is this?" pattern
-    /^(what|how|where|when|why)\s+is\s+(this|that|it)\b/i,
     // Catch "tell me more about it" pattern
     /^tell me more about\s+(it|this|that)\b/i,
     // Catch "how does that work?" pattern
