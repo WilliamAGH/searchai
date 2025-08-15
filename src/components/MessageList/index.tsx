@@ -87,7 +87,6 @@ export function MessageList({
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const previousMessagesLengthRef = useRef(currentMessages.length);
   const isLoadingMoreRef = useRef(false);
   const [collapsedById, setCollapsedById] = React.useState<
     Record<string, boolean>
@@ -105,10 +104,10 @@ export function MessageList({
     if (!streamingState?.isStreaming || !streamingState?.streamingMessageId) {
       return messages;
     }
-    
-    return messages.map(msg => {
+
+    return messages.map((msg) => {
       // Compare IDs properly - handle both string and Convex ID types
-      const msgId = typeof msg.id === 'string' ? msg.id : msg._id;
+      const msgId = typeof msg.id === "string" ? msg.id : msg._id;
       if (msgId === streamingState.streamingMessageId) {
         return {
           ...msg,
@@ -124,6 +123,9 @@ export function MessageList({
   // Use enhanced messages for all operations
   const currentMessages = enhancedMessages;
   const messagesLength = currentMessages.length;
+
+  // Initialize ref after currentMessages is available
+  const previousMessagesLengthRef = useRef(currentMessages.length);
 
   /**
    * Scroll to bottom of messages
