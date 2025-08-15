@@ -197,7 +197,6 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,
-      onShare: isMobile ? () => setShowShareModal(true) : undefined,
     }),
     [
       isGenerating,
@@ -205,8 +204,6 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       handleSendMessage,
       handleDraftChange,
       userHistory,
-      isMobile,
-      setShowShareModal,
     ],
   );
 

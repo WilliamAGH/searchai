@@ -5,32 +5,60 @@
 // Set up React act environment for testing
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
-// React 19 moved act from react-dom/test-utils to react package
-// This setup ensures compatibility for both import styles
-
-// Export act from React package for modern imports
-export { act } from "react";
-
-// Also make act available from react-dom/test-utils for legacy compatibility
-import { act } from "react";
+// Import React and setup act compatibility
 import * as React from "react";
 
-// Ensure React.act exists for any code that expects it
+// React 19 has act in the main React export
+// We need to ensure compatibility with React Testing Library
+const act = React.act || function(callback) {
+  // Fallback for environments where React.act is not available
+  const result = callback();
+  if (result && typeof result.then === 'function') {
+    return result;
+  }
+  return Promise.resolve(result);
+};
+
+// Ensure React.act exists for Testing Library compatibility
 if (!React.act) {
   (React as any).act = act;
 }
 
+// Also ensure global React has act
+if (typeof globalThis !== 'undefined') {
+  if (!globalThis.React) {
+    (globalThis as any).React = React;
+  }
+  if (globalThis.React && !globalThis.React.act) {
+    (globalThis.React as any).act = act;
+  }
+}
+
+// Export act for use in tests
+export { act };
+
 // Mock react-dom/test-utils to provide act for backward compatibility
-const testUtils = { act };
+import { vi, expect, beforeAll } from "vitest";
 
-// Use vi.mock to override react-dom/test-utils
-import { vi, expect } from "vitest";
-vi.doMock("react-dom/test-utils", () => testUtils);
+// Mock the react-dom/test-utils module
+vi.mock("react-dom/test-utils", () => ({
+  act: act,
+  unstable_act: act,
+}));
 
-// Try to install Testing Library jest-dom matchers for Vitest.
-// If the package is unavailable in this sandbox, fall back to minimal matchers
-// to satisfy common expectations in unit tests.
-// Minimal polyfills for matchers used in our tests
+// Patch React Testing Library's act detection
+beforeAll(() => {
+  // React Testing Library looks for React.act
+  if (!React.act) {
+    Object.defineProperty(React, 'act', {
+      value: act,
+      writable: false,
+      configurable: true
+    });
+  }
+});
+
+// Custom matchers for tests
 expect.extend({
   toBeInTheDocument(received: unknown) {
     const pass =
