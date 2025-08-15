@@ -147,9 +147,9 @@ const creatorEnhancement: EnhancementRule = {
 
     // Additional safeguard: check if the query is actually about SearchAI or its creator
     // This prevents false positives on generic questions like "what is a mac?"
-    const isGenericQuestion = 
-      lower.startsWith("what is") || 
-      lower.startsWith("how to") || 
+    const isGenericQuestion =
+      lower.startsWith("what is") ||
+      lower.startsWith("how to") ||
       lower.startsWith("where is") ||
       lower.startsWith("when is") ||
       lower.startsWith("why is") ||
@@ -158,7 +158,9 @@ const creatorEnhancement: EnhancementRule = {
 
     // More restrictive logic: only trigger on specific creator/app questions
     // Not on generic "what is X" or "how to" questions
-    return (mentionsWilliam || (isAboutCreator && isAboutApp)) && !isGenericQuestion;
+    return (
+      (mentionsWilliam || (isAboutCreator && isAboutApp)) && !isGenericQuestion
+    );
   },
 
   enhanceQuery: (query: string) => {
@@ -167,15 +169,16 @@ const creatorEnhancement: EnhancementRule = {
     const primary = "williamcallahan.com";
     const brand = "aVenture";
     const secondary = "aventure.vc";
-    
+
+    const enhanced = `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
+
     // Log when this enhancement is applied for debugging
     console.info("🔧 Creator enhancement applied to query:", {
       original: query,
-      enhanced: `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`,
-      timestamp: new Date().toISOString(),
+      enhanced,
     });
-    
-    return `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
+
+    return enhanced;
   },
 
   enhanceSearchTerms: (terms: string[]) => {
@@ -543,6 +546,9 @@ export function applyEnhancements(
     enhanceResponse?: boolean;
   } = {},
 ) {
+  // Debug flag to control logging verbosity (dev only)
+  const DEBUG_ENHANCEMENTS = process.env.NODE_ENV === "development";
+
   // Sort rules by priority
   const sortedRules = [...ENHANCEMENT_RULES]
     .filter((rule) => rule.enabled)
@@ -566,9 +572,9 @@ export function applyEnhancements(
     if (options.enhanceQuery && rule.enhanceQuery) {
       const beforeEnhancement = result.enhancedQuery;
       result.enhancedQuery = rule.enhanceQuery(result.enhancedQuery);
-      
-      // Log when query enhancement occurs for debugging
-      if (beforeEnhancement !== result.enhancedQuery) {
+
+      // Log when query enhancement occurs for debugging (dev only)
+      if (DEBUG_ENHANCEMENTS && beforeEnhancement !== result.enhancedQuery) {
         console.info("🔧 Query enhanced by rule:", {
           ruleId: rule.id,
           ruleName: rule.name,
@@ -611,11 +617,11 @@ export function applyEnhancements(
   result.enhancedSearchTerms = [...new Set(result.enhancedSearchTerms)];
   result.prioritizedUrls = [...new Set(result.prioritizedUrls)];
 
-  // Log enhancement summary for debugging
-  if (matchingRules.length > 0) {
+  // Log enhancement summary for debugging (dev only)
+  if (DEBUG_ENHANCEMENTS && matchingRules.length > 0) {
     console.info("🔧 Enhancement summary:", {
       messageLength: message.length,
-      matchedRules: matchingRules.map(r => ({ id: r.id, name: r.name })),
+      matchedRules: matchingRules.map((r) => ({ id: r.id, name: r.name })),
       queryChanged: result.enhancedQuery !== message,
       searchTermsAdded: result.enhancedSearchTerms.length,
       timestamp: new Date().toISOString(),
