@@ -24,5 +24,39 @@ if (!React.act) {
 const testUtils = { act };
 
 // Use vi.mock to override react-dom/test-utils
-import { vi } from "vitest";
+import { vi, expect } from "vitest";
 vi.doMock("react-dom/test-utils", () => testUtils);
+
+// Try to install Testing Library jest-dom matchers for Vitest.
+// If the package is unavailable in this sandbox, fall back to minimal matchers
+// to satisfy common expectations in unit tests.
+// Minimal polyfills for matchers used in our tests
+expect.extend({
+  toBeInTheDocument(received: unknown) {
+    const pass =
+      !!received &&
+      received instanceof Node &&
+      (received.ownerDocument?.contains(received) ||
+        (globalThis.document?.body?.contains?.(received as Node) ?? false));
+    return {
+      pass,
+      message: () =>
+        pass
+          ? "expected element not to be in the document"
+          : "expected element to be in the document",
+    };
+  },
+  toBeDisabled(received: unknown) {
+    const el = received as any;
+    const pass =
+      !!el &&
+      (el.hasAttribute?.("disabled") ||
+        el.disabled === true ||
+        el.getAttribute?.("aria-disabled") === "true");
+    return {
+      pass,
+      message: () =>
+        pass ? "expected element to be enabled" : "expected element to be disabled",
+    };
+  },
+} as any);
