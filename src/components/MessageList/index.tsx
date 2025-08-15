@@ -106,19 +106,29 @@ export const MessageList = React.memo(function MessageList({
     // If we have real-time messages from the subscription, use those
     if (streamingState?.messages && streamingState.messages.length > 0) {
       // Map subscription messages to the expected format
-      const realtimeMessages = streamingState.messages.map((msg: unknown) => ({
-        ...msg,
-        id: msg._id || msg.id,
-        // Mark the streaming message
-        isStreaming: msg._id === streamingState.streamingMessageId || msg.isStreaming,
-        // Use the full content from the streaming message
-        content: msg._id === streamingState.streamingMessageId && streamingState.streamingContent
-          ? streamingState.streamingContent
-          : msg.content || "",
-        thinking: msg._id === streamingState.streamingMessageId 
-          ? streamingState.thinking 
-          : msg.thinking,
-      }));
+      const realtimeMessages = streamingState.messages.map((msg: unknown) => {
+        // Type guard for message structure
+        const message = msg as Record<string, unknown>;
+        const msgId = message._id || message.id;
+
+        return {
+          ...message,
+          id: msgId,
+          // Mark the streaming message
+          isStreaming:
+            msgId === streamingState.streamingMessageId || message.isStreaming,
+          // Use the full content from the streaming message
+          content:
+            msgId === streamingState.streamingMessageId &&
+            streamingState.streamingContent
+              ? streamingState.streamingContent
+              : (message.content as string) || "",
+          thinking:
+            msgId === streamingState.streamingMessageId
+              ? streamingState.thinking
+              : message.thinking,
+        };
+      });
       return realtimeMessages;
     }
 
@@ -244,12 +254,16 @@ export const MessageList = React.memo(function MessageList({
           }
         }
 
-        // Reasoning should expand while streaming, collapse when content starts
+        // Reasoning should expand while streaming, collapse when done
         if (hasReasoning) {
           const reasoningId = `reasoning-${id}`;
-          if (prev[reasoningId] === undefined) {
-            // Show reasoning while it's being generated, collapse when content arrives
-            updates[reasoningId] = hasContent && !isStreaming;
+          // Auto-expand when streaming starts or reasoning exists without content
+          // Auto-collapse when streaming ends AND content exists
+          const shouldCollapse = !isStreaming && hasContent;
+          
+          // Only update if state needs to change
+          if (prev[reasoningId] !== shouldCollapse) {
+            updates[reasoningId] = shouldCollapse;
           }
         }
       });
@@ -327,6 +341,14 @@ export const MessageList = React.memo(function MessageList({
       {isLoadingMessages && messagesLength === 0 ? (
         <div className="px-4 sm:px-6 py-6 sm:py-8">
           <MessageSkeleton count={5} />
+        </div>
+      ) : loadError && onClearError ? (
+        <div className="px-4 sm:px-6 py-6 sm:py-8">
+          <LoadErrorState
+            error={loadError}
+            onRetry={onClearError}
+            retryCount={retryCount}
+          />
         </div>
       ) : messagesLength === 0 ? (
         <EmptyState onToggleSidebar={onToggleSidebar} />

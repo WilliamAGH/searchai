@@ -49,8 +49,12 @@ export function registerAIRoutes(http: HttpRouter) {
         );
       }
 
-      // Validate payload structure
-      if (!rawPayload || typeof rawPayload !== "object") {
+      // Validate payload structure (must be a plain object, not array or null)
+      if (
+        !rawPayload ||
+        typeof rawPayload !== "object" ||
+        Array.isArray(rawPayload)
+      ) {
         return corsResponse(
           JSON.stringify({ error: "Invalid request payload" }),
           400,
@@ -541,7 +545,8 @@ function createStreamingResponse(
                 const streamData = {
                   type: "chunk",
                   content: chunkContent,
-                  thinking: chunk.choices?.[0]?.delta?.reasoning || "",
+                  thinking: "",
+                  reasoning: chunk.choices?.[0]?.delta?.reasoning || "",
                   searchResults,
                   sources,
                   provider: "openrouter",
