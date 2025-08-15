@@ -53,6 +53,24 @@ export function isConvexChatId(id: string): id is Id<"chats"> {
 }
 
 /**
+ * Runtime type guard for Convex message ID validation
+ * Convex IDs are 32-character base32 strings (lowercase alphanumeric)
+ */
+export function isConvexMessageId(id: string): id is Id<"messages"> {
+  return /^[0-9a-z]{32}$/.test(id);
+}
+
+/**
+ * Generic runtime type guard for any Convex ID validation
+ * Convex IDs are 32-character base32 strings (lowercase alphanumeric)
+ * @param id - The string to validate
+ * @returns True if the string is a valid Convex ID format
+ */
+export function isConvexId(id: string): boolean {
+  return /^[0-9a-z]{32}$/.test(id);
+}
+
+/**
  * Create a deferred timestamp that updates after hydration
  */
 export function useDeferredTimestamp(): number {
