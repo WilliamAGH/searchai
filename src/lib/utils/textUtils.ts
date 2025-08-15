@@ -17,12 +17,12 @@ export function containsDots(text: string | undefined | null): boolean {
   // - Ellipsis character: …
   // - Three bullets: •••
   // - Ends with dots (for "Loading..." etc)
+  const t = text.trimEnd();
   return (
-    text.includes("...") ||
-    text.includes("…") ||
-    text.includes("•••") ||
-    text.endsWith("..") ||
-    text.endsWith("..")
+    t.includes("...") ||
+    t.includes("…") ||
+    t.includes("•••") ||
+    t.endsWith("..")
   );
 }
 
