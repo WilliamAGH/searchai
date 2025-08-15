@@ -32,9 +32,9 @@ const defaultStreamingState: StreamingState = {
 
 // Runtime type guard for Convex ID validation
 function isConvexChatId(id: string): id is Id<"chats"> {
-  // Convex IDs are typically 24-character hex strings
+  // Convex IDs are 32-character alphanumeric strings
   // This pattern matches the actual Convex ID format
-  return /^[0-9a-f]{24}$/.test(id);
+  return /^[0-9a-z]{32}$/.test(id);
 }
 
 export function useStreamingChat(

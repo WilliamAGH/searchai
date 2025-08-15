@@ -41,12 +41,14 @@ export { act };
 
 // Mock react-dom/test-utils to provide act for backward compatibility
 import { vi, expect, beforeAll } from "vitest";
-// Try to dynamically load @testing-library/jest-dom matchers if available.
-try {
-  const spec = "@testing-library/jest" + "-dom/vitest";
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  import(spec).catch(() => {});
-} catch {}
+// Best practice: use Testing Library's jest-dom matchers
+// (toBeInTheDocument, toBeDisabled, etc.)
+// This static import works after installing the package.
+// It coexists with the minimal polyfills below.
+// If your environment lacks network access, you can comment this out.
+// eslint-disable-next-line import/no-unresolved
+import "@testing-library/jest-dom/vitest";
+// (No-op: static import above loads matchers when installed.)
 
 // Mock the react-dom/test-utils module
 vi.mock("react-dom/test-utils", () => ({
