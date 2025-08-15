@@ -33,6 +33,9 @@ export default defineConfig({
       "tests/**/*.spec.ts",
       "tests/smoke/**",
       "convex/_generated/**",
+      // Exclude Playwright tests that should not run with Vitest
+      "tests/integration/chat-message-chaining.test.ts",
+      "tests/integration/race-condition-fix.test.ts",
     ],
     reporter: process.env.CI ? ["default", "json", "html"] : ["default"],
     ...(process.env.CI && {
