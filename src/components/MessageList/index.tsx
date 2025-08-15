@@ -64,6 +64,18 @@ interface MessageListProps {
 /**
  * Main message list component
  */
+// Helper for stable ephemeral keys for messages without IDs
+const ephemeralKeyMap = new WeakMap<Message, string>();
+
+const getEphemeralKey = (msg: Message): string => {
+  let k = ephemeralKeyMap.get(msg);
+  if (!k) {
+    k = `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    ephemeralKeyMap.set(msg, k);
+  }
+  return k;
+};
+
 /**
  * Render the message list for a chat conversation with pagination support.
  * Memoized to prevent unnecessary re-renders during streaming.
@@ -394,10 +406,7 @@ export const MessageList = React.memo(function MessageList({
               estimatedItemHeight={150}
               renderItem={(message, index) => (
                 <MessageItem
-                  key={
-                    message._id ||
-                    `message-${index}-${message.timestamp || Date.now()}`
-                  }
+                  key={message._id ?? getEphemeralKey(message)}
                   message={message}
                   index={index}
                   collapsedById={collapsedById}
@@ -414,10 +423,7 @@ export const MessageList = React.memo(function MessageList({
               .filter((message) => !shouldFilterMessage(message))
               .map((message, index) => (
                 <MessageItem
-                  key={
-                    message._id ||
-                    `message-${index}-${message.timestamp || Date.now()}`
-                  }
+                  key={message._id ?? getEphemeralKey(message)}
                   message={message}
                   index={index}
                   collapsedById={collapsedById}
