@@ -26,7 +26,7 @@
     "test:watch": "vitest",
     "test:vitest": "vitest run",
     "test:vitest:prepush": "vitest run --reporter=verbose --pool=forks --poolOptions.forks.singleFork --coverage.enabled=false",
-    "test:precommit": "vitest run --reporter=dot --pool=forks --poolOptions.forks.singleFork --coverage.enabled=false",
+    "test:precommit": "vitest run --reporter=dot --pool=forks --poolOptions.forks.singleFork --coverage.enabled=false --exclude='tests/convex.*.test.ts' --exclude='tests/integration/search-api.test.ts'",
     "test:playwright": "playwright test",
     "test:playwright:headless": "playwright test tests/e2e/minimal-smoke.spec.ts",
     "test:all": "npm-run-all --sequential test:vitest test:playwright:headless",

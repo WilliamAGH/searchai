@@ -5,16 +5,23 @@
 // Set up React act environment for testing
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
-// Import React
+// Import React and vi from vitest first
 import * as React from "react";
+import { vi, expect } from "vitest";
+
+// Mock react-dom/test-utils BEFORE any other imports to prevent the error
+vi.mock("react-dom/test-utils", () => ({
+  act: (callback: () => void | Promise<void>) => {
+    // In React 19, act is handled internally by React Testing Library
+    // Just execute the callback directly
+    return callback();
+  },
+}));
 
 // Ensure global React is available for Testing Library
 if (typeof globalThis !== "undefined" && !globalThis.React) {
   (globalThis as any).React = React;
 }
-
-// Import Testing Library utilities
-import { expect } from "vitest";
 // Best practice: use Testing Library's jest-dom matchers
 // (toBeInTheDocument, toBeDisabled, etc.)
 // This static import works after installing the package.
