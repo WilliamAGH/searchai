@@ -149,13 +149,53 @@ describe("LocalChatRepository (basic operations)", () => {
     const chatIdA = "local_chat_del_A";
     const chatIdB = "local_chat_del_B";
     const primedChats = [
-      { _id: chatIdA, title: "A", createdAt: 1, updatedAt: 1, privacy: "private", isLocal: true, source: "local" },
-      { _id: chatIdB, title: "B", createdAt: 1, updatedAt: 1, privacy: "private", isLocal: true, source: "local" },
+      {
+        _id: chatIdA,
+        title: "A",
+        createdAt: 1,
+        updatedAt: 1,
+        privacy: "private",
+        isLocal: true,
+        source: "local",
+      },
+      {
+        _id: chatIdB,
+        title: "B",
+        createdAt: 1,
+        updatedAt: 1,
+        privacy: "private",
+        isLocal: true,
+        source: "local",
+      },
     ];
     const primedMsgs = [
-      { _id: "ma1", chatId: chatIdA, role: "user", content: "a", timestamp: 1, isLocal: true, source: "local" },
-      { _id: "mb1", chatId: chatIdB, role: "assistant", content: "b", timestamp: 2, isLocal: true, source: "local" },
-      { _id: "ma2", chatId: chatIdA, role: "assistant", content: "aa", timestamp: 3, isLocal: true, source: "local" },
+      {
+        _id: "ma1",
+        chatId: chatIdA,
+        role: "user",
+        content: "a",
+        timestamp: 1,
+        isLocal: true,
+        source: "local",
+      },
+      {
+        _id: "mb1",
+        chatId: chatIdB,
+        role: "assistant",
+        content: "b",
+        timestamp: 2,
+        isLocal: true,
+        source: "local",
+      },
+      {
+        _id: "ma2",
+        chatId: chatIdA,
+        role: "assistant",
+        content: "aa",
+        timestamp: 3,
+        isLocal: true,
+        source: "local",
+      },
     ];
     localStorage.setItem(KEYS.CHATS, JSON.stringify(primedChats));
     localStorage.setItem(KEYS.MESSAGES, JSON.stringify(primedMsgs));

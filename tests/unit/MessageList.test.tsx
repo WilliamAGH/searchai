@@ -1,27 +1,33 @@
-import { test, expect, describe, beforeEach, afterEach, vi } from 'vitest';
-import React from 'react';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
-import { MessageList } from '../../src/components/MessageList';
-import type { Message } from '../../src/lib/types/message';
-import type { Chat } from '../../src/lib/types/chat';
+import { test, expect, describe, beforeEach, afterEach, vi } from "vitest";
+import React from "react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
+import { MessageList } from "../../src/components/MessageList";
+import type { Message } from "../../src/lib/types/message";
+import type { Chat } from "../../src/lib/types/chat";
 
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
 
 // Mock dependencies
-vi.mock('convex/react', () => ({
+vi.mock("convex/react", () => ({
   useMutation: vi.fn(() => vi.fn()),
 }));
 
-vi.mock('../../convex/_generated/api', () => ({
+vi.mock("../../convex/_generated/api", () => ({
   api: {
     messages: {
-      deleteMessage: 'deleteMessage',
+      deleteMessage: "deleteMessage",
     },
   },
 }));
 
-vi.mock('../../src/lib/logger', () => ({
+vi.mock("../../src/lib/logger", () => ({
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -31,25 +37,27 @@ vi.mock('../../src/lib/logger', () => ({
 }));
 
 // Mock child components to simplify testing
-vi.mock('../../src/components/MessageList/EmptyState', () => ({
+vi.mock("../../src/components/MessageList/EmptyState", () => ({
   EmptyState: vi.fn(() => <div data-testid="empty-state">No messages</div>),
 }));
 
-vi.mock('../../src/components/MessageList/MessageItem', () => ({
+vi.mock("../../src/components/MessageList/MessageItem", () => ({
   MessageItem: vi.fn(({ message }) => (
-    <div data-testid={`message-${message.id}`}>
-      {message.content}
-    </div>
+    <div data-testid={`message-${message.id}`}>{message.content}</div>
   )),
 }));
 
-vi.mock('../../src/components/MessageList/ScrollToBottomFab', () => ({
+vi.mock("../../src/components/MessageList/ScrollToBottomFab", () => ({
   ScrollToBottomFab: vi.fn(() => null),
 }));
 
-vi.mock('../../src/components/MessageList/MessageSkeleton', () => ({
-  MessageSkeleton: vi.fn(() => <div data-testid="message-skeleton">Loading...</div>),
-  LoadingMoreIndicator: vi.fn(() => <div data-testid="loading-more">Loading more...</div>),
+vi.mock("../../src/components/MessageList/MessageSkeleton", () => ({
+  MessageSkeleton: vi.fn(() => (
+    <div data-testid="message-skeleton">Loading...</div>
+  )),
+  LoadingMoreIndicator: vi.fn(() => (
+    <div data-testid="loading-more">Loading more...</div>
+  )),
   LoadErrorState: vi.fn(({ onRetry }) => (
     <div data-testid="load-error">
       Error loading messages
@@ -58,17 +66,17 @@ vi.mock('../../src/components/MessageList/MessageSkeleton', () => ({
   )),
 }));
 
-vi.mock('../../src/components/SearchProgress', () => ({
+vi.mock("../../src/components/SearchProgress", () => ({
   SearchProgress: vi.fn(({ progress }) => (
     <div data-testid="search-progress">{progress?.message}</div>
   )),
 }));
 
-vi.mock('../../src/components/LoadMoreButton', () => ({
+vi.mock("../../src/components/LoadMoreButton", () => ({
   LoadMoreButton: vi.fn(({ onClick, isLoading }) => (
-    <button 
-      data-testid="load-more-button" 
-      onClick={onClick} 
+    <button
+      data-testid="load-more-button"
+      onClick={onClick}
       disabled={isLoading}
     >
       Load More
@@ -76,11 +84,11 @@ vi.mock('../../src/components/LoadMoreButton', () => ({
   )),
 }));
 
-vi.mock('../../src/components/MessageList/VirtualizedMessageList', () => ({
+vi.mock("../../src/components/MessageList/VirtualizedMessageList", () => ({
   VirtualizedMessageList: vi.fn(() => null),
 }));
 
-describe('MessageList', () => {
+describe("MessageList", () => {
   const mockOnToggleSidebar = vi.fn();
   const mockOnShare = vi.fn();
   const mockOnDeleteLocalMessage = vi.fn();
@@ -90,28 +98,28 @@ describe('MessageList', () => {
 
   const mockMessages: Message[] = [
     {
-      id: 'msg1',
-      chatId: 'chat1',
-      role: 'user',
-      content: 'Hello',
-      createdAt: new Date('2024-01-01T10:00:00'),
+      id: "msg1",
+      chatId: "chat1",
+      role: "user",
+      content: "Hello",
+      createdAt: new Date("2024-01-01T10:00:00"),
       isLocal: false,
     },
     {
-      id: 'msg2',
-      chatId: 'chat1',
-      role: 'assistant',
-      content: 'Hi there!',
-      createdAt: new Date('2024-01-01T10:01:00'),
+      id: "msg2",
+      chatId: "chat1",
+      role: "assistant",
+      content: "Hi there!",
+      createdAt: new Date("2024-01-01T10:01:00"),
       isLocal: false,
     },
   ];
 
   const mockChat: Chat = {
-    id: 'chat1',
-    title: 'Test Chat',
-    createdAt: new Date('2024-01-01T10:00:00'),
-    privacy: 'private',
+    id: "chat1",
+    title: "Test Chat",
+    createdAt: new Date("2024-01-01T10:00:00"),
+    privacy: "private",
     messages: mockMessages,
     metadata: {},
   };
@@ -124,58 +132,60 @@ describe('MessageList', () => {
     cleanup();
   });
 
-  test('should render empty state when no messages', () => {
+  test("should render empty state when no messages", () => {
     const { container } = render(
       <MessageList
         messages={[]}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
-      />
+      />,
     );
 
     const emptyState = container.querySelector('[data-testid="empty-state"]');
     expect(emptyState).toBeTruthy();
-    expect(emptyState?.textContent).toBe('No messages');
+    expect(emptyState?.textContent).toBe("No messages");
   });
 
-  test('should render messages when provided', () => {
+  test("should render messages when provided", () => {
     const { container } = render(
       <MessageList
         messages={mockMessages}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
-      />
+      />,
     );
 
     const msg1 = container.querySelector('[data-testid="message-msg1"]');
     const msg2 = container.querySelector('[data-testid="message-msg2"]');
-    
+
     expect(msg1).toBeTruthy();
     expect(msg2).toBeTruthy();
-    expect(msg1?.textContent).toBe('Hello');
-    expect(msg2?.textContent).toBe('Hi there!');
+    expect(msg1?.textContent).toBe("Hello");
+    expect(msg2?.textContent).toBe("Hi there!");
   });
 
-  test('should show loading skeleton when isLoadingMessages is true', () => {
+  test("should show loading skeleton when isLoadingMessages is true", () => {
     const { container } = render(
       <MessageList
         messages={[]}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
         isLoadingMessages={true}
-      />
+      />,
     );
 
-    const skeleton = container.querySelector('[data-testid="message-skeleton"]');
+    const skeleton = container.querySelector(
+      '[data-testid="message-skeleton"]',
+    );
     expect(skeleton).toBeTruthy();
-    expect(skeleton?.textContent).toBe('Loading...');
+    expect(skeleton?.textContent).toBe("Loading...");
   });
 
-  test('should show search progress when provided', () => {
+  test("should show search progress when provided", () => {
     const searchProgress = {
-      stage: 'searching' as const,
-      message: 'Searching for information...',
-      urls: ['http://example.com'],
+      stage: "searching" as const,
+      message: "Searching for information...",
+      urls: ["http://example.com"],
     };
 
     const { container } = render(
@@ -184,15 +194,15 @@ describe('MessageList', () => {
         isGenerating={true}
         onToggleSidebar={mockOnToggleSidebar}
         searchProgress={searchProgress}
-      />
+      />,
     );
 
     const progress = container.querySelector('[data-testid="search-progress"]');
     expect(progress).toBeTruthy();
-    expect(progress?.textContent).toBe('Searching for information...');
+    expect(progress?.textContent).toBe("Searching for information...");
   });
 
-  test('should show load more button when hasMore is true', () => {
+  test("should show load more button when hasMore is true", () => {
     const { container } = render(
       <MessageList
         messages={mockMessages}
@@ -200,15 +210,17 @@ describe('MessageList', () => {
         onToggleSidebar={mockOnToggleSidebar}
         hasMore={true}
         onLoadMore={mockOnLoadMore}
-      />
+      />,
     );
 
-    const loadMoreButton = container.querySelector('[data-testid="load-more-button"]') as HTMLButtonElement;
+    const loadMoreButton = container.querySelector(
+      '[data-testid="load-more-button"]',
+    ) as HTMLButtonElement;
     expect(loadMoreButton).toBeTruthy();
     expect(loadMoreButton?.disabled).toBe(false);
   });
 
-  test('should handle load more click', async () => {
+  test("should handle load more click", async () => {
     mockOnLoadMore.mockResolvedValue(undefined);
 
     const { container } = render(
@@ -218,12 +230,14 @@ describe('MessageList', () => {
         onToggleSidebar={mockOnToggleSidebar}
         hasMore={true}
         onLoadMore={mockOnLoadMore}
-      />
+      />,
     );
 
-    const loadMoreButton = container.querySelector('[data-testid="load-more-button"]') as HTMLButtonElement;
+    const loadMoreButton = container.querySelector(
+      '[data-testid="load-more-button"]',
+    ) as HTMLButtonElement;
     expect(loadMoreButton).toBeTruthy();
-    
+
     fireEvent.click(loadMoreButton);
 
     await waitFor(() => {
@@ -231,7 +245,7 @@ describe('MessageList', () => {
     });
   });
 
-  test('should disable load more button when loading', () => {
+  test("should disable load more button when loading", () => {
     const { container } = render(
       <MessageList
         messages={mockMessages}
@@ -240,31 +254,33 @@ describe('MessageList', () => {
         hasMore={true}
         onLoadMore={mockOnLoadMore}
         isLoadingMore={true}
-      />
+      />,
     );
 
-    const loadMoreButton = container.querySelector('[data-testid="load-more-button"]') as HTMLButtonElement;
+    const loadMoreButton = container.querySelector(
+      '[data-testid="load-more-button"]',
+    ) as HTMLButtonElement;
     expect(loadMoreButton).toBeTruthy();
     expect(loadMoreButton?.disabled).toBe(true);
   });
 
-  test('should show loading more indicator', () => {
+  test("should show loading more indicator", () => {
     const { container } = render(
       <MessageList
         messages={mockMessages}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
         isLoadingMore={true}
-      />
+      />,
     );
 
     const loadingMore = container.querySelector('[data-testid="loading-more"]');
     expect(loadingMore).toBeTruthy();
-    expect(loadingMore?.textContent).toBe('Loading more...');
+    expect(loadingMore?.textContent).toBe("Loading more...");
   });
 
-  test('should show error state when loadError is provided', () => {
-    const error = new Error('Failed to load messages');
+  test("should show error state when loadError is provided", () => {
+    const error = new Error("Failed to load messages");
 
     const { container } = render(
       <MessageList
@@ -273,16 +289,16 @@ describe('MessageList', () => {
         onToggleSidebar={mockOnToggleSidebar}
         loadError={error}
         onClearError={mockOnClearError}
-      />
+      />,
     );
 
     const loadError = container.querySelector('[data-testid="load-error"]');
     expect(loadError).toBeTruthy();
-    expect(loadError?.textContent).toContain('Error loading messages');
+    expect(loadError?.textContent).toContain("Error loading messages");
   });
 
-  test('should handle retry on error', () => {
-    const error = new Error('Failed to load messages');
+  test("should handle retry on error", () => {
+    const error = new Error("Failed to load messages");
 
     const { container } = render(
       <MessageList
@@ -291,24 +307,24 @@ describe('MessageList', () => {
         onToggleSidebar={mockOnToggleSidebar}
         loadError={error}
         onClearError={mockOnClearError}
-      />
+      />,
     );
 
-    const retryButton = container.querySelector('button');
+    const retryButton = container.querySelector("button");
     expect(retryButton).toBeTruthy();
-    
+
     if (retryButton) {
       fireEvent.click(retryButton);
       expect(mockOnClearError).toHaveBeenCalled();
     }
   });
 
-  test('should handle delete local message', () => {
+  test("should handle delete local message", () => {
     const localMessage: Message = {
-      id: 'local-msg',
-      chatId: 'chat1',
-      role: 'user',
-      content: 'Local message',
+      id: "local-msg",
+      chatId: "chat1",
+      role: "user",
+      content: "Local message",
       createdAt: new Date(),
       isLocal: true,
     };
@@ -319,20 +335,20 @@ describe('MessageList', () => {
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
         onDeleteLocalMessage={mockOnDeleteLocalMessage}
-      />
+      />,
     );
 
     const msg = container.querySelector('[data-testid="message-local-msg"]');
     expect(msg).toBeTruthy();
-    expect(msg?.textContent).toBe('Local message');
+    expect(msg?.textContent).toBe("Local message");
   });
 
-  test('should handle streaming state', () => {
+  test("should handle streaming state", () => {
     const streamingState = {
       isStreaming: true,
-      streamingContent: 'Streaming content...',
-      streamingMessageId: 'msg3',
-      thinking: 'Thinking...',
+      streamingContent: "Streaming content...",
+      streamingMessageId: "msg3",
+      thinking: "Thinking...",
     };
 
     const { container } = render(
@@ -341,17 +357,17 @@ describe('MessageList', () => {
         isGenerating={true}
         onToggleSidebar={mockOnToggleSidebar}
         streamingState={streamingState}
-      />
+      />,
     );
 
     const msg1 = container.querySelector('[data-testid="message-msg1"]');
     const msg2 = container.querySelector('[data-testid="message-msg2"]');
-    
+
     expect(msg1).toBeTruthy();
     expect(msg2).toBeTruthy();
   });
 
-  test('should render with current chat', () => {
+  test("should render with current chat", () => {
     const { container } = render(
       <MessageList
         messages={mockMessages}
@@ -359,23 +375,23 @@ describe('MessageList', () => {
         onToggleSidebar={mockOnToggleSidebar}
         currentChat={mockChat}
         onShare={mockOnShare}
-      />
+      />,
     );
 
     const msg1 = container.querySelector('[data-testid="message-msg1"]');
     const msg2 = container.querySelector('[data-testid="message-msg2"]');
-    
+
     expect(msg1).toBeTruthy();
     expect(msg2).toBeTruthy();
   });
 
-  test('should handle multiple messages with pagination', () => {
+  test("should handle multiple messages with pagination", () => {
     const manyMessages: Message[] = Array.from({ length: 20 }, (_, i) => ({
       id: `msg${i}`,
-      chatId: 'chat1',
-      role: i % 2 === 0 ? 'user' : 'assistant',
+      chatId: "chat1",
+      role: i % 2 === 0 ? "user" : "assistant",
       content: `Message ${i}`,
-      createdAt: new Date(`2024-01-01T10:${i.toString().padStart(2, '0')}:00`),
+      createdAt: new Date(`2024-01-01T10:${i.toString().padStart(2, "0")}:00`),
       isLocal: false,
     }));
 
@@ -386,48 +402,52 @@ describe('MessageList', () => {
         onToggleSidebar={mockOnToggleSidebar}
         hasMore={true}
         onLoadMore={mockOnLoadMore}
-      />
+      />,
     );
 
     const msg0 = container.querySelector('[data-testid="message-msg0"]');
     const msg1 = container.querySelector('[data-testid="message-msg1"]');
-    const loadMore = container.querySelector('[data-testid="load-more-button"]');
-    
+    const loadMore = container.querySelector(
+      '[data-testid="load-more-button"]',
+    );
+
     expect(msg0).toBeTruthy();
     expect(msg1).toBeTruthy();
     expect(loadMore).toBeTruthy();
   });
 
-  test('should handle empty search progress', () => {
+  test("should handle empty search progress", () => {
     const { container } = render(
       <MessageList
         messages={mockMessages}
         isGenerating={true}
         onToggleSidebar={mockOnToggleSidebar}
         searchProgress={null}
-      />
+      />,
     );
 
     const msg1 = container.querySelector('[data-testid="message-msg1"]');
-    const searchProgress = container.querySelector('[data-testid="search-progress"]');
-    
+    const searchProgress = container.querySelector(
+      '[data-testid="search-progress"]',
+    );
+
     expect(msg1).toBeTruthy();
     expect(searchProgress).toBeFalsy();
   });
 
-  test('should handle message with search results', () => {
+  test("should handle message with search results", () => {
     const messageWithResults: Message = {
-      id: 'msg-with-results',
-      chatId: 'chat1',
-      role: 'assistant',
-      content: 'Here are the search results',
+      id: "msg-with-results",
+      chatId: "chat1",
+      role: "assistant",
+      content: "Here are the search results",
       createdAt: new Date(),
       isLocal: false,
       searchResults: [
         {
-          title: 'Result 1',
-          snippet: 'Snippet 1',
-          url: 'http://example.com/1',
+          title: "Result 1",
+          snippet: "Snippet 1",
+          url: "http://example.com/1",
           relevanceScore: 0.9,
         },
       ],
@@ -438,24 +458,26 @@ describe('MessageList', () => {
         messages={[messageWithResults]}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
-      />
+      />,
     );
 
-    const msg = container.querySelector('[data-testid="message-msg-with-results"]');
+    const msg = container.querySelector(
+      '[data-testid="message-msg-with-results"]',
+    );
     expect(msg).toBeTruthy();
-    expect(msg?.textContent).toBe('Here are the search results');
+    expect(msg?.textContent).toBe("Here are the search results");
   });
 
-  test('should handle retry count changes', () => {
+  test("should handle retry count changes", () => {
     const { container, rerender } = render(
       <MessageList
         messages={[]}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
-        loadError={new Error('Failed')}
+        loadError={new Error("Failed")}
         retryCount={0}
         onClearError={mockOnClearError}
-      />
+      />,
     );
 
     let loadError = container.querySelector('[data-testid="load-error"]');
@@ -470,7 +492,7 @@ describe('MessageList', () => {
         loadError={null}
         retryCount={1}
         onClearError={mockOnClearError}
-      />
+      />,
     );
 
     loadError = container.querySelector('[data-testid="load-error"]');
