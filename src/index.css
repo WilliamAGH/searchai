@@ -448,6 +448,79 @@ html.dark .prose code {
   animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+/* Orb glow animation for assistant avatar when processing */
+@keyframes orb-glow {
+  0%,
+  100% {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    opacity: 0.85;
+    filter: brightness(1.2) saturate(1.2);
+  }
+}
+
+.animate-orb-glow {
+  animation: orb-glow 1.5s ease-in-out infinite;
+  position: relative;
+}
+
+/* Subtle pulsing ring effect using inset box-shadow instead of border */
+.animate-orb-glow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4);
+  animation: orb-ring 1.5s ease-in-out infinite;
+}
+
+@keyframes orb-ring {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+/* Animated ellipsis dots for processing text */
+@keyframes ellipsis-dot {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+}
+
+.animate-ellipsis-dot {
+  animation: ellipsis-dot 1.4s infinite;
+  display: inline-block;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animation-delay-400 {
+  animation-delay: 400ms;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-slide-up,
   .animate-scale-in {
