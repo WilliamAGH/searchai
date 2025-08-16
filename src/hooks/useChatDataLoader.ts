@@ -22,11 +22,19 @@ export function useChatDataLoader(
     const loadChats = async () => {
       if (!mounted) return;
 
+      // In development, log chat loading for debugging
+      // Debug logging in development only
+      // [CHAT_LOADER] Loading chats from repository
+
       setState((prev) => ({ ...prev, isLoading: true }));
       try {
         const chats = await repository.getChats();
 
         if (!mounted) return;
+
+        // In development, log loaded chats for debugging
+        // Debug: Loaded chats from repository
+        // Count: chats.length
 
         setState((prev) => ({
           ...prev,

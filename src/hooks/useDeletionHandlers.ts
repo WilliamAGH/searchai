@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { logger } from "../lib/logger";
 import type { Id } from "../../convex/_generated/dataModel";
+import { isConvexId } from "../lib/utils/id";
 
 interface UseDeletionHandlersProps {
   chatState: {
-    chats: Array<{ id: string; title?: string }>;
+    chats: Array<{ id: string; _id?: Id<"chats">; title?: string }>;
     messages: Array<{ id: string }>;
   };
   chatActions: {
@@ -88,22 +89,22 @@ export function useDeletionHandlers({
 
   const handleRequestDeleteChat = useCallback(
     async (chatId: Id<"chats"> | string) => {
+      logger.info("[useDeletionHandlers] Requesting deletion for:", { chatId });
       try {
-        // Validate the chat ID before casting
-        let convexChatId: Id<"chats">;
-        if (typeof chatId === "string") {
-          // Import isConvexChatId for validation
-          const { isConvexChatId } = await import("../lib/utils/id");
-          if (!isConvexChatId(chatId)) {
-            logger.warn("Invalid chat ID for deletion:", { chatId });
-            setUndoBanner({ show: true, message: "Invalid chat identifier" });
-            return;
-          }
-          convexChatId = chatId;
-        } else {
-          convexChatId = chatId;
+        const idToDelete =
+          typeof chatId === "string" ? chatId : (chatId as Id<"chats">);
+
+        if (!isConvexId(idToDelete)) {
+          logger.warn("Invalid chat ID for deletion:", { chatId });
+          setUndoBanner({ show: true, message: "Invalid chat identifier" });
+          return;
         }
-        await deleteChat({ chatId: convexChatId });
+
+        logger.info("[useDeletionHandlers] Deleting chat with validated ID:", {
+          idToDelete,
+        });
+
+        await deleteChat({ chatId: idToDelete as Id<"chats"> });
 
         // Show success banner
         setUndoBanner({

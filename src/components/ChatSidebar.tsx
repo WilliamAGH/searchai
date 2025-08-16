@@ -61,7 +61,7 @@ export function ChatSidebar({
   onSelectChat,
   onNewChat,
   onDeleteLocalChat,
-  onRequestDeleteChat,
+  onRequestDeleteChat: _onRequestDeleteChat,
   isOpen: _isOpen,
   onToggle,
   isCreatingChat = false,
@@ -108,37 +108,49 @@ export function ChatSidebar({
   const handleDeleteClick = React.useCallback(
     async (e: React.MouseEvent<HTMLButtonElement>) => {
       const attr = e.currentTarget.getAttribute("data-chat-id");
-      if (!attr) return;
-      const match = chats.find((c) => String(c._id) === attr);
+      if (!attr) {
+        logger.warn(
+          "[SIDEBAR] handleDeleteClick: No data-chat-id attribute found",
+        );
+        return;
+      }
+
+      const chatToDelete = chats.find((c) => String(c._id) === attr);
+
+      logger.info("[SIDEBAR] Delete requested for chat:", {
+        idFromAttr: attr,
+        matchedChat: chatToDelete ? { ...chatToDelete } : "not_found",
+      });
+
+      if (!chatToDelete) {
+        logger.error("[SIDEBAR] No matching chat found for ID:", attr);
+        return;
+      }
+
       try {
-        if (!window.confirm("Delete this chat? This cannot be undone.")) return;
-        if (onRequestDeleteChat) {
-          onRequestDeleteChat(match ? match._id : attr);
-        } else if (match) {
-          if (isConvexChatId(match._id)) {
-            await deleteChat({ chatId: match._id });
-          } else {
-            onDeleteLocalChat?.(match._id);
-          }
+        if (!window.confirm("Delete this chat? This cannot be undone.")) {
+          logger.info("[SIDEBAR] Delete cancelled by user");
+          return;
         }
-        if (match && currentChatId === match._id) {
+
+        logger.info("[SIDEBAR] Deleting chat:", { chatId: chatToDelete._id });
+        if (isConvexChatId(chatToDelete._id)) {
+          await deleteChat({ chatId: chatToDelete._id });
+          logger.info("[SIDEBAR] Convex chat deleted successfully");
+        } else {
+          onDeleteLocalChat?.(chatToDelete._id);
+          logger.info("[SIDEBAR] Local chat deleted successfully");
+        }
+
+        if (currentChatId === chatToDelete._id) {
           onSelectChat(null);
+          logger.info("[SIDEBAR] Resetting current chat");
         }
       } catch (err) {
-        // Only log warnings in dev to avoid noise in production
-        if (import.meta.env.DEV) {
-          logger.warn("Chat deletion failed:", err);
-        }
+        logger.error("[SIDEBAR] Chat deletion failed:", err);
       }
     },
-    [
-      chats,
-      onRequestDeleteChat,
-      onDeleteLocalChat,
-      deleteChat,
-      onSelectChat,
-      currentChatId,
-    ],
+    [chats, deleteChat, onDeleteLocalChat, onSelectChat, currentChatId],
   );
 
   // Always render the sidebar container so tests can locate the "New Chat" button
