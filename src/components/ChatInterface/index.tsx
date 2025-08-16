@@ -43,6 +43,7 @@ import {
 } from "../../lib/utils/httpUtils";
 import { isTopicChange } from "../../lib/utils/topicDetection";
 import { mapMessagesToLocal } from "../../lib/utils/messageMapper";
+import { ANON_SESSION_KEY } from "../../lib/constants/session";
 import { buildUserHistory } from "../../lib/utils/chatHistory";
 
 function ChatInterfaceComponent({
@@ -115,7 +116,7 @@ function ChatInterfaceComponent({
     logger.debug(
       "[CHAT_INTERFACE] Current sessionId:",
       (window as unknown as { sessionId?: string }).sessionId ||
-        localStorage.getItem("sessionId"),
+        localStorage.getItem(ANON_SESSION_KEY),
     );
     logger.debug("[CHAT_INTERFACE] Is authenticated:", isAuthenticated);
     logger.debug(

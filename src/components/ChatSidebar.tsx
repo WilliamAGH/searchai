@@ -210,10 +210,7 @@ export function ChatSidebar({
           <div className="p-2">
             {chats.map((chat, index) => (
               <div
-                key={
-                  chat._id ||
-                  `chat-${index}-${chat.title?.slice(0, 20) || "untitled"}-${chat.updatedAt}`
-                }
+                key={chat._id || chat.id || `chat-${index}`}
                 className="flex items-center gap-2 mb-1 pr-2 min-w-0"
               >
                 <button
