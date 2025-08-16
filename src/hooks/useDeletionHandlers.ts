@@ -107,7 +107,12 @@ export function useDeletionHandlers({
             idToDelete,
           });
 
+          // Delete from Convex backend
           await deleteChat({ chatId: idToDelete as Id<"chats"> });
+
+          // Also remove from local state to update UI immediately
+          // This prevents stale UI while waiting for Convex subscription to update
+          await chatActions.deleteChat(idToDelete);
         } else {
           // This is a local chat ID, delegate to local deletion
           logger.info(
@@ -140,7 +145,7 @@ export function useDeletionHandlers({
         });
       }
     },
-    [deleteChat, clearAllTimeouts, handleDeleteLocalChat],
+    [deleteChat, clearAllTimeouts, handleDeleteLocalChat, chatActions],
   );
 
   const handleDeleteLocalMessage = useCallback(
