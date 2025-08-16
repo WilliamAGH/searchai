@@ -94,17 +94,31 @@ export function useDeletionHandlers({
         const idToDelete =
           typeof chatId === "string" ? chatId : (chatId as Id<"chats">);
 
-        if (!isConvexId(idToDelete)) {
-          logger.warn("Invalid chat ID for deletion:", { chatId });
-          setUndoBanner({ show: true, message: "Invalid chat identifier" });
+        // Only validate as Convex ID if it looks like one (starts with 'j')
+        // Local chat IDs are UUIDs and should be handled by handleDeleteLocalChat
+        if (idToDelete.startsWith("j")) {
+          if (!isConvexId(idToDelete)) {
+            logger.warn("Invalid Convex chat ID for deletion:", { chatId });
+            setUndoBanner({ show: true, message: "Invalid chat identifier" });
+            return;
+          }
+
+          logger.info("[useDeletionHandlers] Deleting Convex chat with ID:", {
+            idToDelete,
+          });
+
+          await deleteChat({ chatId: idToDelete as Id<"chats"> });
+        } else {
+          // This is a local chat ID, delegate to local deletion
+          logger.info(
+            "[useDeletionHandlers] Delegating to local chat deletion:",
+            {
+              idToDelete,
+            },
+          );
+          handleDeleteLocalChat(idToDelete);
           return;
         }
-
-        logger.info("[useDeletionHandlers] Deleting chat with validated ID:", {
-          idToDelete,
-        });
-
-        await deleteChat({ chatId: idToDelete as Id<"chats"> });
 
         // Show success banner
         setUndoBanner({
@@ -126,7 +140,7 @@ export function useDeletionHandlers({
         });
       }
     },
-    [deleteChat, clearAllTimeouts],
+    [deleteChat, clearAllTimeouts, handleDeleteLocalChat],
   );
 
   const handleDeleteLocalMessage = useCallback(
