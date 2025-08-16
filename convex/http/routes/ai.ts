@@ -410,7 +410,6 @@ async function handleOpenRouterStreaming(
     model: "google/gemini-2.5-flash",
     messages,
     temperature: 0.8, // Increased for more creative/verbose responses
-    max_tokens: 6000, // Increased from 4000 for longer responses
     stream: true,
     // Enable caching for repeated context
     top_p: 0.95, // Slightly wider nucleus sampling
@@ -430,7 +429,7 @@ async function handleOpenRouterStreaming(
     messagesCount: openRouterBody.messages?.length ?? 0,
     sysPromptChars: openRouterBody.messages?.[0]?.content?.length ?? 0,
     temperature: openRouterBody.temperature,
-    max_tokens: openRouterBody.max_tokens,
+    reasoning: openRouterBody.reasoning,
     stream: openRouterBody.stream,
   });
 
