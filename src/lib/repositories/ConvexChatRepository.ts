@@ -21,11 +21,17 @@ export class ConvexChatRepository extends BaseRepository {
   protected storageType = "convex" as const;
   private client: ConvexClient;
   private _sessionId?: string;
+  private _allSessionIds?: string[];
 
-  constructor(client: ConvexClient, sessionId?: string) {
+  constructor(
+    client: ConvexClient,
+    sessionId?: string,
+    allSessionIds?: string[],
+  ) {
     super();
     this.client = client;
     this._sessionId = sessionId;
+    this._allSessionIds = allSessionIds;
 
     // Log initialization for debugging
     logger.debug("ConvexChatRepository initialized", {
@@ -43,6 +49,14 @@ export class ConvexChatRepository extends BaseRepository {
     });
   }
 
+  // Allow updating all session IDs
+  setAllSessionIds(sessionIds: string[] | undefined) {
+    this._allSessionIds = sessionIds;
+    logger.debug("ConvexChatRepository allSessionIds updated", {
+      count: sessionIds?.length || 0,
+    });
+  }
+
   // Getter for sessionId
   get sessionId(): string | undefined {
     return this._sessionId;
@@ -56,9 +70,17 @@ export class ConvexChatRepository extends BaseRepository {
   // Chat operations
   async getChats(): Promise<UnifiedChat[]> {
     try {
+      logger.debug(
+        "[CONVEX_REPO] Getting chats with sessionId:",
+        this.effectiveSessionId,
+        "allSessionIds:",
+        this._allSessionIds,
+      );
       const chats = await this.client.query(api.chats.getUserChats, {
         sessionId: this.effectiveSessionId,
+        sessionIds: this._allSessionIds, // Pass all session IDs for anonymous users
       });
+      logger.debug("[CONVEX_REPO] Retrieved", chats?.length, "chats");
       if (!chats) return [];
 
       return chats.map((chat) => ({
@@ -81,6 +103,12 @@ export class ConvexChatRepository extends BaseRepository {
   }
 
   async getChatById(id: string): Promise<UnifiedChat | null> {
+    logger.debug(
+      "[CONVEX_REPO] Getting chat by ID:",
+      id,
+      "with sessionId:",
+      this.effectiveSessionId,
+    );
     try {
       if (!IdUtils.isConvexId(id)) {
         // Try to find by opaque ID or share ID
@@ -690,8 +718,10 @@ export class ConvexChatRepository extends BaseRepository {
 
   private convexToUnifiedMessage(msg: unknown): UnifiedMessage {
     const m = msg as Record<string, unknown>;
+    const messageId = IdUtils.toUnifiedId(m._id as Id<"messages">);
     return {
-      id: IdUtils.toUnifiedId(m._id as Id<"messages">),
+      _id: messageId, // CRITICAL: Include _id for React keys and delete functionality
+      id: messageId,
       chatId: IdUtils.toUnifiedId(m.chatId as Id<"chats">),
       role: m.role as "user" | "assistant" | "system",
       content: (m.content || "") as string,

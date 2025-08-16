@@ -205,11 +205,8 @@ export class LocalChatRepository extends BaseRepository {
     this.aiService.abort();
 
     try {
-      // Persist the user's message immediately so UI reflects it and toolbar is available
-      await this.addMessage(chatId, {
-        role: "user",
-        content: message,
-      });
+      // NOTE: User message is already added by useChatActions before calling generateResponse
+      // Don't add it again here to avoid duplicates
       // Get messages for context
       const localMessages = await this.getAllMessages();
       const context = {
@@ -246,14 +243,24 @@ export class LocalChatRepository extends BaseRepository {
           }
         },
         onMessageCreate: async (_message) => {
-          // Save initial assistant message placeholder and capture its ID
-          const created = await this.addMessage(chatId, {
-            role: "assistant",
-            content: "",
-            // Metadata fields will be updated as chunks arrive
-            isStreaming: true,
-          });
-          assistantMessageId = created.id;
+          // NOTE: Assistant message is already created by useChatActions
+          // We just need to find it to update it
+          const allMessages = await this.getAllMessages();
+          const assistantMsg = allMessages
+            .filter((m) => m.chatId === chatId && m.role === "assistant")
+            .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+          if (assistantMsg) {
+            assistantMessageId = assistantMsg.id;
+          } else {
+            // Fallback: create one if not found (shouldn't happen)
+            const created = await this.addMessage(chatId, {
+              role: "assistant",
+              content: "",
+              isStreaming: true,
+            });
+            assistantMessageId = created.id;
+          }
 
           // Yield initial metadata
           if (_message.searchResults || _message.sources) {
