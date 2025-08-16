@@ -10,6 +10,7 @@ import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { generateShareId, generatePublicId } from "../lib/uuid";
+import { debugStart, debugEnd, debugError } from "../lib/debug";
 
 /**
  * Create new chat
@@ -27,6 +28,7 @@ export const createChat = mutation({
   },
   returns: v.id("chats"),
   handler: async (ctx, args) => {
+    debugStart("chats.core.createChat", { hasSessionId: !!args.sessionId });
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
 
@@ -34,16 +36,23 @@ export const createChat = mutation({
     const shareId = generateShareId();
     const publicId = generatePublicId();
 
-    return await ctx.db.insert("chats", {
-      title: args.title,
-      userId: userId || undefined,
-      sessionId: !userId ? args.sessionId : undefined,
-      shareId,
-      publicId,
-      privacy: "private",
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      const id = await ctx.db.insert("chats", {
+        title: args.title,
+        userId: userId || undefined,
+        sessionId: !userId ? args.sessionId : undefined,
+        shareId,
+        publicId,
+        privacy: "private",
+        createdAt: now,
+        updatedAt: now,
+      });
+      debugEnd("chats.core.createChat", { id });
+      return id;
+    } catch (e) {
+      debugError("chats.core.createChat", e);
+      throw e;
+    }
   },
 });
 
@@ -78,15 +87,21 @@ export const getUserChats = query({
     }),
   ),
   handler: async (ctx, args) => {
+    debugStart("chats.core.getUserChats", {
+      hasSessionId: !!args.sessionId,
+      sessionIdsCount: args.sessionIds?.length || 0,
+    });
     const userId = await getAuthUserId(ctx);
 
     // Authenticated users - return their chats
     if (userId) {
-      return await ctx.db
+      const result = await ctx.db
         .query("chats")
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .order("desc")
         .collect();
+      debugEnd("chats.core.getUserChats", { count: result.length });
+      return result;
     }
 
     // Anonymous users - return ALL their chats across all session IDs
@@ -105,17 +120,24 @@ export const getUserChats = query({
       const uniqueChats = Array.from(
         new Map(allChats.map((chat) => [chat._id, chat])).values(),
       );
-      return uniqueChats.sort((a, b) => b._creationTime - a._creationTime);
+      const sorted = uniqueChats.sort(
+        (a, b) => b._creationTime - a._creationTime,
+      );
+      debugEnd("chats.core.getUserChats", { count: sorted.length });
+      return sorted;
     } else if (args.sessionId) {
       // Fallback to single session ID for backwards compatibility
-      return await ctx.db
+      const result = await ctx.db
         .query("chats")
         .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
         .order("desc")
         .collect();
+      debugEnd("chats.core.getUserChats", { count: result.length });
+      return result;
     }
 
     // No userId or sessionId - return empty
+    debugEnd("chats.core.getUserChats", { count: 0 });
     return [];
   },
 });
@@ -185,7 +207,10 @@ export const getChatById = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    return await validateChatAccess(ctx, args.chatId, args.sessionId);
+    debugStart("chats.core.getChatById", { hasSessionId: !!args.sessionId });
+    const res = await validateChatAccess(ctx, args.chatId, args.sessionId);
+    debugEnd("chats.core.getChatById", { found: !!res });
+    return res;
   },
 });
 
@@ -220,8 +245,10 @@ export const getChat = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    // Reuse validation logic
-    return await validateChatAccess(ctx, args.chatId, args.sessionId);
+    debugStart("chats.core.getChat", { hasSessionId: !!args.sessionId });
+    const res = await validateChatAccess(ctx, args.chatId, args.sessionId);
+    debugEnd("chats.core.getChat", { found: !!res });
+    return res;
   },
 });
 
@@ -261,8 +288,13 @@ export const getChatByOpaqueId = query({
 
     // Use try-catch to handle invalid IDs gracefully
     try {
+      debugStart("chats.core.getChatByOpaqueId", {
+        hasSessionId: !!args.sessionId,
+      });
       // Reuse validation logic
-      return await validateChatAccess(ctx, chatId, args.sessionId);
+      const res = await validateChatAccess(ctx, chatId, args.sessionId);
+      debugEnd("chats.core.getChatByOpaqueId", { found: !!res });
+      return res;
     } catch {
       // Invalid ID format will throw when accessing the database
       return null;
@@ -298,6 +330,7 @@ export const getChatByShareId = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
+    debugStart("chats.core.getChatByShareId");
     const chat = await ctx.db
       .query("chats")
       .withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
@@ -311,6 +344,7 @@ export const getChatByShareId = query({
       if (chat.userId !== userId) return null;
     }
 
+    debugEnd("chats.core.getChatByShareId", { found: !!chat });
     return chat;
   },
 });
@@ -337,6 +371,7 @@ export const getChatByPublicId = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
+    debugStart("chats.core.getChatByPublicId");
     const chat = await ctx.db
       .query("chats")
       .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
@@ -348,6 +383,7 @@ export const getChatByPublicId = query({
       return null;
     }
 
+    debugEnd("chats.core.getChatByPublicId", { found: !!chat });
     return chat;
   },
 });

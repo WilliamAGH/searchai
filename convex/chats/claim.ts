@@ -6,6 +6,7 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { debugStart, debugEnd } from "../lib/debug";
 
 /**
  * Claim anonymous chats when user signs up or logs in
@@ -21,6 +22,7 @@ export const claimAnonymousChats = mutation({
     claimed: v.number(),
   }),
   handler: async (ctx, args) => {
+    debugStart("chats.claim.claimAnonymousChats");
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Must be authenticated to claim chats");
 
@@ -39,6 +41,8 @@ export const claimAnonymousChats = mutation({
       });
     }
 
-    return { claimed: anonymousChats.length };
+    const result = { claimed: anonymousChats.length };
+    debugEnd("chats.claim.claimAnonymousChats", result);
+    return result;
   },
 });
