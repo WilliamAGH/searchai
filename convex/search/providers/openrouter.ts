@@ -3,7 +3,7 @@
  * Uses Perplexity Sonar model for AI-powered web search
  */
 
-import type { SearchResult } from "./serpapi";
+import type { SearchResult } from "./index";
 
 interface OpenRouterResponse {
   choices?: Array<{

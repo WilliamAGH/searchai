@@ -7,7 +7,7 @@ import { v } from "convex/values";
 import { action, internalAction, internalMutation } from "./_generated/server";
 import { vSearchResult } from "./lib/validators";
 import { api, internal } from "./_generated/api";
-import type { SearchResult } from "./search/providers/serpapi";
+import type { SearchResult } from "./search/providers/index";
 
 // Check if we're in test mode - skip real API calls
 const IS_TEST_MODE =

@@ -7,7 +7,7 @@
 import { httpAction } from "../../_generated/server";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
-import type { SearchResult } from "../../search/providers/serpapi";
+import type { SearchResult } from "../../search/providers/index";
 import { applyEnhancements } from "../../enhancements";
 import { normalizeSearchResults } from "../../lib/security/sanitization";
 

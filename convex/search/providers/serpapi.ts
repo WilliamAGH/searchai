@@ -4,17 +4,7 @@
  */
 
 import { logger } from "../../lib/logger";
-
-export interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-  // Optional scraped content fields
-  content?: string; // Full scraped content
-  fullTitle?: string; // Title from scraped page
-  summary?: string; // Summary from scraped content
-}
+import type { SearchResult } from "./index";
 
 interface SerpApiResponse {
   organic_results?: Array<{
