@@ -1,14 +1,7 @@
-/**
- * Hook to manage anonymous session ID
- * Creates and persists a session ID for unauthenticated users
- * This allows anonymous users to reconnect to their chats
- * Uses UUID v7 for time-sortable, collision-resistant session IDs
- */
-
 import { useEffect, useState } from "react";
 import { useConvexAuth } from "convex/react";
 import { uuidv7 } from "uuidv7";
-import { ANON_SESSION_KEY } from "../lib/constants/session";
+import { ANON_SESSION_KEY, ALL_SESSIONS_KEY } from "../lib/constants/session";
 
 function generateSessionId(): string {
   return uuidv7();
@@ -31,6 +24,24 @@ export function useAnonymousSession(): string | null {
     if (!isLoading && !isAuthenticated) {
       const newId = generateSessionId();
       localStorage.setItem(ANON_SESSION_KEY, newId);
+
+      // Track all session IDs in historical list
+      const stored = localStorage.getItem(ALL_SESSIONS_KEY);
+      let historical: string[] = [];
+      try {
+        historical = stored ? JSON.parse(stored) : [];
+        // Ensure it's an array
+        if (!Array.isArray(historical)) historical = [];
+      } catch {
+        // If parsing fails, start with empty array
+        historical = [];
+      }
+
+      if (!historical.includes(newId)) {
+        const updated = [...historical, newId];
+        localStorage.setItem(ALL_SESSIONS_KEY, JSON.stringify(updated));
+      }
+
       return newId;
     }
 
@@ -50,6 +61,24 @@ export function useAnonymousSession(): string | null {
         // Generate new session ID
         existingId = generateSessionId();
         localStorage.setItem(ANON_SESSION_KEY, existingId);
+
+        // Track all session IDs in historical list
+        const stored = localStorage.getItem(ALL_SESSIONS_KEY);
+        let historical: string[] = [];
+        try {
+          historical = stored ? JSON.parse(stored) : [];
+          // Ensure it's an array
+          if (!Array.isArray(historical)) historical = [];
+        } catch {
+          // If parsing fails, start with empty array
+          historical = [];
+        }
+
+        if (!historical.includes(existingId)) {
+          const updated = [...historical, existingId];
+          localStorage.setItem(ALL_SESSIONS_KEY, JSON.stringify(updated));
+          // Note: We don't update the allSessionIds state here as this hook doesn't manage it
+        }
       }
 
       setSessionId(existingId);

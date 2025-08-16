@@ -1,8 +1,3 @@
-/**
- * Hook to manage ALL session IDs this browser has used
- * This allows anonymous users to access all their chats across session rotations
- */
-
 import { useEffect, useState } from "react";
 import { useConvexAuth } from "convex/react";
 import { ALL_SESSIONS_KEY, ANON_SESSION_KEY } from "../lib/constants/session";
@@ -14,7 +9,15 @@ export function useAllSessionIds(): string[] {
 
     // Get all historical session IDs
     const stored = localStorage.getItem(ALL_SESSIONS_KEY);
-    const historical = stored ? JSON.parse(stored) : [];
+    let historical: string[] = [];
+    try {
+      historical = stored ? JSON.parse(stored) : [];
+      // Ensure it's an array
+      if (!Array.isArray(historical)) historical = [];
+    } catch {
+      // If parsing fails, start with empty array
+      historical = [];
+    }
 
     // Get current session ID
     const current = localStorage.getItem(ANON_SESSION_KEY);
@@ -37,7 +40,15 @@ export function useAllSessionIds(): string[] {
 
     // Get all historical session IDs
     const stored = localStorage.getItem(ALL_SESSIONS_KEY);
-    const historical = stored ? JSON.parse(stored) : [];
+    let historical: string[] = [];
+    try {
+      historical = stored ? JSON.parse(stored) : [];
+      // Ensure it's an array
+      if (!Array.isArray(historical)) historical = [];
+    } catch {
+      // If parsing fails, start with empty array
+      historical = [];
+    }
 
     // Add current to historical if not already there
     if (!historical.includes(currentSessionId)) {
