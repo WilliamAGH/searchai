@@ -137,6 +137,7 @@ export function ChatLayout({
            messageListProps.messages.some(m => m.role === 'assistant') && (
             <ChatToolbar
               onShare={_openShareModal}
+              onNewChat={chatSidebarProps.onNewChat}
               messages={messageListProps.messages}
               chatTitle={currentChat?.title}
             />
