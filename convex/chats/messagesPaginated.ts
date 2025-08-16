@@ -140,6 +140,24 @@ export const getRecentChatMessages = query({
     chatId: v.id("chats"),
     limit: v.optional(v.number()),
   },
+  returns: v.array(
+    v.object({
+      _id: v.id("messages"),
+      role: v.union(
+        v.literal("user"),
+        v.literal("assistant"),
+        v.literal("system"),
+      ),
+      content: v.optional(v.string()),
+      timestamp: v.optional(v.number()),
+      isStreaming: v.optional(v.boolean()),
+      streamedContent: v.optional(v.string()),
+      thinking: v.optional(v.string()),
+      searchResults: v.optional(v.array(vSearchResult)),
+      sources: v.optional(v.array(v.string())),
+      reasoning: v.optional(v.any()),
+    }),
+  ),
   handler: async (ctx, args) => {
     // Auth and chat
     const userId = await getAuthUserId(ctx);

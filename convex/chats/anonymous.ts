@@ -49,6 +49,24 @@ export const getAnonymousChats = query({
   args: {
     sessionId: v.string(),
   },
+  returns: v.array(
+    v.object({
+      _id: v.id("chats"),
+      _creationTime: v.number(),
+      title: v.string(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      privacy: v.optional(
+        v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+      ),
+      userId: v.optional(v.id("users")),
+      sessionId: v.optional(v.string()),
+      shareId: v.optional(v.string()),
+      publicId: v.optional(v.string()),
+      rollingSummary: v.optional(v.string()),
+      rollingSummaryUpdatedAt: v.optional(v.number()),
+    }),
+  ),
   handler: async (ctx, args) => {
     debugStart("chats.anonymous.getAnonymousChats");
     const userId = await getAuthUserId(ctx);
