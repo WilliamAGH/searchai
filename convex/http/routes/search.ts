@@ -9,7 +9,11 @@ import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
 import { normalizeUrlForKey } from "../../lib/url";
-import { checkRateLimit, getClientIP, createRateLimitedResponse } from "../../lib/security/rateLimit";
+import {
+  checkRateLimit,
+  getClientIP,
+  createRateLimitedResponse,
+} from "../../lib/security/rateLimit";
 
 /**
  * Register search routes on the HTTP router
@@ -47,11 +51,14 @@ export function registerSearchRoutes(http: HttpRouter) {
         windowMs: 60000, // 1 minute
         keyPrefix: "rate_limit",
       });
-      
+
       if (rateLimitResult.isRateLimited) {
-        return createRateLimitedResponse("Rate limit exceeded for search endpoint", rateLimitResult.rateLimitHeaders);
+        return createRateLimitedResponse(
+          "Rate limit exceeded for search endpoint",
+          rateLimitResult.rateLimitHeaders,
+        );
       }
-      
+
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();

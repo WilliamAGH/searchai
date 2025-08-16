@@ -346,28 +346,31 @@ function formatSearchResultsForContext(searchResults: SearchResult[]): string {
   if (!searchResults || searchResults.length === 0) {
     return "";
   }
-  
-  const formattedResults = searchResults.map((result, index) => {
-    let resultStr = `[${index + 1}] ${result.fullTitle || result.title}\n`;
-    resultStr += `URL: ${result.url}\n`;
-    
-    // Include scraped content if available
-    if (result.content) {
-      // Limit content to prevent context overflow
-      const maxContentLength = 1000;
-      const truncatedContent = result.content.length > maxContentLength 
-        ? result.content.slice(0, maxContentLength) + "..."
-        : result.content;
-      resultStr += `Content: ${truncatedContent}\n`;
-    } else if (result.summary) {
-      resultStr += `Summary: ${result.summary}\n`;
-    } else {
-      resultStr += `Snippet: ${result.snippet}\n`;
-    }
-    
-    return resultStr;
-  }).join("\n---\n\n");
-  
+
+  const formattedResults = searchResults
+    .map((result, index) => {
+      let resultStr = `[${index + 1}] ${result.fullTitle || result.title}\n`;
+      resultStr += `URL: ${result.url}\n`;
+
+      // Include scraped content if available
+      if (result.content) {
+        // Limit content to prevent context overflow
+        const maxContentLength = 1000;
+        const truncatedContent =
+          result.content.length > maxContentLength
+            ? result.content.slice(0, maxContentLength) + "..."
+            : result.content;
+        resultStr += `Content: ${truncatedContent}\n`;
+      } else if (result.summary) {
+        resultStr += `Summary: ${result.summary}\n`;
+      } else {
+        resultStr += `Snippet: ${result.snippet}\n`;
+      }
+
+      return resultStr;
+    })
+    .join("\n---\n\n");
+
   return `\n\nSearch Results with Content:\n${formattedResults}`;
 }
 
@@ -390,8 +393,10 @@ async function handleOpenRouterStreaming(
   // Build message history including system prompt and chat history
   // Include search results with scraped content in the user message
   const searchContext = formatSearchResultsForContext(searchResults);
-  const enhancedMessage = searchContext ? `${message}${searchContext}` : message;
-  
+  const enhancedMessage = searchContext
+    ? `${message}${searchContext}`
+    : message;
+
   const messages = [
     {
       role: "system",

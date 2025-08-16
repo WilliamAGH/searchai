@@ -9,7 +9,7 @@ export const vSearchResult = v.object({
   snippet: v.string(),
   relevanceScore: v.number(),
   // Optional scraped content fields
-  content: v.optional(v.string()),  // Full scraped content
+  content: v.optional(v.string()), // Full scraped content
   fullTitle: v.optional(v.string()), // Title from scraped page
-  summary: v.optional(v.string()),   // Summary from scraped content
+  summary: v.optional(v.string()), // Summary from scraped content
 });

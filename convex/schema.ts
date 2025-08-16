@@ -59,9 +59,9 @@ const applicationTables = {
           snippet: v.string(),
           relevanceScore: v.number(), // Required, not optional - consistent with most definitions
           // Enhanced fields from content scraping
-          content: v.optional(v.string()),   // Full scraped content
+          content: v.optional(v.string()), // Full scraped content
           fullTitle: v.optional(v.string()), // Title from scraped page
-          summary: v.optional(v.string()),   // Summary from scraped content
+          summary: v.optional(v.string()), // Summary from scraped content
         }),
       ),
     ),
@@ -117,7 +117,7 @@ const applicationTables = {
 export default defineSchema({
   ...authTables,
   ...applicationTables,
-  
+
   /**
    * Rate limits table
    * - Tracks HTTP endpoint usage
