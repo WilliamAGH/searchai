@@ -9,7 +9,6 @@ import { ContentWithCitations } from "../ContentWithCitations";
 import { MessageSources } from "./MessageSources";
 import { ReasoningDisplay } from "../ReasoningDisplay";
 import { CopyButton } from "../CopyButton";
-import { StreamingStatus } from "../StreamingStatus";
 import { formatConversationWithSources } from "../../lib/utils/shareFormatter";
 import { extractPlainText } from "../../lib/utils/textUtils";
 import type { Message } from "../../lib/types/message";
@@ -56,11 +55,8 @@ export const MessageItem = React.memo(
     }, [message._id, onDeleteMessage]);
 
     return (
-      <div
-        className="flex gap-2 sm:gap-4 max-w-full overflow-hidden"
-        data-role={message.role}
-      >
-        <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center">
+      <div className="flex gap-2 sm:gap-4 max-w-full" data-role={message.role}>
+        <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
           {message.role === "user" ? (
             <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
               <svg
@@ -79,9 +75,13 @@ export const MessageItem = React.memo(
               </svg>
             </div>
           ) : (
-            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+            <div
+              className={`relative w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center transition-all duration-300 ${
+                message.isStreaming ? "animate-orb-glow" : ""
+              }`}
+            >
               <svg
-                className="w-4 h-4 text-white"
+                className="w-4 h-4 text-white z-10"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -113,34 +113,25 @@ export const MessageItem = React.memo(
             </div>
           )}
 
-          {/* 2) Unified streaming status - seamless transitions */}
-          {message.role === "assistant" && message.isStreaming && (
-            <div className="mb-3">
-              <StreamingStatus
-                stage={
-                  !message.thinking && !message.content
-                    ? "searching"
-                    : message.thinking?.toLowerCase().includes("search")
-                      ? "searching"
-                      : message.thinking?.toLowerCase().includes("analyz") ||
-                          message.thinking?.toLowerCase().includes("process")
-                        ? "thinking"
-                        : message.content && message.content.trim()
-                          ? "streaming"
-                          : "thinking"
-                }
-                message={
-                  message.thinking ||
-                  (!message.content
-                    ? "Searching for information"
-                    : message.content.trim()
-                      ? "Generating response"
-                      : "Processing")
-                }
-                className=""
-              />
-            </div>
-          )}
+          {/* 2) Streaming status text - minimal and elegant */}
+          {message.role === "assistant" &&
+            message.isStreaming &&
+            !message.content?.trim() && (
+              <div className="mb-3">
+                <span className="text-sm text-gray-500 dark:text-gray-400 italic">
+                  {message.thinking || "Processing"}
+                  <span className="inline-flex ml-0.5">
+                    <span className="animate-ellipsis-dot">.</span>
+                    <span className="animate-ellipsis-dot animation-delay-200">
+                      .
+                    </span>
+                    <span className="animate-ellipsis-dot animation-delay-400">
+                      .
+                    </span>
+                  </span>
+                </span>
+              </div>
+            )}
 
           {/* 3) Reasoning / thinking - positioned below sources */}
           {message.role === "assistant" &&
