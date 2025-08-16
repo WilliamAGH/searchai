@@ -8,8 +8,7 @@
 import { useEffect, useState } from "react";
 import { useConvexAuth } from "convex/react";
 import { uuidv7 } from "uuidv7";
-
-const SESSION_KEY = "searchai:anonymousSessionId";
+import { ANON_SESSION_KEY } from "../lib/constants/session";
 
 function generateSessionId(): string {
   return uuidv7();
@@ -24,14 +23,14 @@ export function useAnonymousSession(): string | null {
 
     // If we're still loading auth state, check localStorage
     // to see if we should prepare a session ID
-    const existingId = localStorage.getItem(SESSION_KEY);
+    const existingId = localStorage.getItem(ANON_SESSION_KEY);
     if (existingId) return existingId;
 
     // If no existing ID and not loading, create one immediately
     // This prevents race conditions where repository is created without sessionId
     if (!isLoading && !isAuthenticated) {
       const newId = generateSessionId();
-      localStorage.setItem(SESSION_KEY, newId);
+      localStorage.setItem(ANON_SESSION_KEY, newId);
       return newId;
     }
 
@@ -45,19 +44,26 @@ export function useAnonymousSession(): string | null {
     // Only need session ID for unauthenticated users
     if (!isAuthenticated) {
       // Check for existing session ID
-      let existingId = localStorage.getItem(SESSION_KEY);
+      let existingId = localStorage.getItem(ANON_SESSION_KEY);
 
       if (!existingId) {
         // Generate new session ID
         existingId = generateSessionId();
-        localStorage.setItem(SESSION_KEY, existingId);
+        localStorage.setItem(ANON_SESSION_KEY, existingId);
       }
 
       setSessionId(existingId);
+      // Expose for debugging in development
+      if (
+        (import.meta as unknown as { env?: { DEV?: boolean } })?.env?.DEV &&
+        typeof window !== "undefined"
+      ) {
+        (window as unknown as { sessionId?: string }).sessionId = existingId;
+      }
     } else {
       // Clear session ID when authenticated
       setSessionId(null);
-      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(ANON_SESSION_KEY);
     }
   }, [isAuthenticated, isLoading]);
 

@@ -5,9 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useConvexAuth } from "convex/react";
-
-const ALL_SESSIONS_KEY = "searchai:allSessionIds";
-const CURRENT_SESSION_KEY = "searchai:anonymousSessionId";
+import { ALL_SESSIONS_KEY, ANON_SESSION_KEY } from "../lib/constants/session";
 
 export function useAllSessionIds(): string[] {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -19,7 +17,7 @@ export function useAllSessionIds(): string[] {
     const historical = stored ? JSON.parse(stored) : [];
 
     // Get current session ID
-    const current = localStorage.getItem(CURRENT_SESSION_KEY);
+    const current = localStorage.getItem(ANON_SESSION_KEY);
 
     // Combine and deduplicate
     const combined = current
@@ -34,7 +32,7 @@ export function useAllSessionIds(): string[] {
     if (isLoading || isAuthenticated) return;
 
     // Get current session ID
-    const currentSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
+    const currentSessionId = localStorage.getItem(ANON_SESSION_KEY);
     if (!currentSessionId) return;
 
     // Get all historical session IDs
