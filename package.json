@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "validate:quick": "oxlint && tsc -p . --noEmit && tsc -p convex --noEmit && npm run -s test",
     "dev": "NODE_ENV=development DEBUG=* npm-run-all --parallel dev:frontend dev:backend",
