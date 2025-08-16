@@ -37,6 +37,11 @@ export function useAnonymousSession(): string | null {
         historical = [];
       }
 
+      // In development, log session tracking for debugging
+      if (import.meta.env.DEV) {
+        console.debug("[SESSION] Adding new session ID to history:", newId);
+      }
+
       if (!historical.includes(newId)) {
         const updated = [...historical, newId];
         localStorage.setItem(ALL_SESSIONS_KEY, JSON.stringify(updated));

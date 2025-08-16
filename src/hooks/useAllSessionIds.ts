@@ -19,6 +19,11 @@ export function useAllSessionIds(): string[] {
       historical = [];
     }
 
+    // In development, log session tracking for debugging
+    if (import.meta.env.DEV) {
+      console.debug("[ALL_SESSIONS] Loaded historical sessions:", historical);
+    }
+
     // Get current session ID
     const current = localStorage.getItem(ANON_SESSION_KEY);
 
@@ -48,6 +53,11 @@ export function useAllSessionIds(): string[] {
     } catch {
       // If parsing fails, start with empty array
       historical = [];
+    }
+
+    // In development, log session tracking for debugging
+    if (import.meta.env.DEV) {
+      console.debug("[ALL_SESSIONS] Loaded historical sessions:", historical);
     }
 
     // Add current to historical if not already there
