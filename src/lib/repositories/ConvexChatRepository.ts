@@ -216,7 +216,13 @@ export class ConvexChatRepository extends BaseRepository {
         chatId: IdUtils.toConvexChatId(id),
       });
     } catch (error) {
-      logger.error("Failed to delete chat from Convex:", error);
+      // Only log as error if it's not a "chat not found" issue
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes("Chat not found")) {
+        logger.debug("Chat already deleted from backend:", id);
+      } else {
+        logger.error("Failed to delete chat from Convex:", error);
+      }
       throw error;
     }
   }
