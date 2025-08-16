@@ -9,6 +9,10 @@ import { vSearchResult } from "./lib/validators";
 import { api, internal } from "./_generated/api";
 import type { SearchResult } from "./search/providers/serpapi";
 
+// Check if we're in test mode - skip real API calls
+const IS_TEST_MODE =
+  process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test";
+
 // Import search providers
 import {
   searchWithOpenRouter,
@@ -94,6 +98,34 @@ export const searchWeb = action({
     const maxResults = args.maxResults || 5;
     const trimmedQuery = args.query.trim();
     const enrichWithContent = args.enrichWithContent !== false; // Default to true
+
+    // TEST MODE: Return mock results without hitting real APIs
+    if (IS_TEST_MODE) {
+      console.log(
+        "[TEST MODE] Returning mock search results for:",
+        trimmedQuery,
+      );
+      const mockResults: SearchResult[] = [
+        {
+          title: `Test Result 1 for "${trimmedQuery}"`,
+          url: `https://example.com/test1`,
+          snippet: `This is a test search result for "${trimmedQuery}". It contains relevant information for testing.`,
+          relevanceScore: 0.95,
+        },
+        {
+          title: `Test Result 2 for "${trimmedQuery}"`,
+          url: `https://example.com/test2`,
+          snippet: `Another test result with information about "${trimmedQuery}" for E2E testing purposes.`,
+          relevanceScore: 0.85,
+        },
+      ];
+
+      return {
+        results: mockResults.slice(0, maxResults),
+        searchMethod: "fallback" as const,
+        hasRealResults: false,
+      };
+    }
 
     if (trimmedQuery.length === 0) {
       return {
@@ -280,6 +312,20 @@ export const planSearch = action({
   }),
   handler: async (ctx, args) => {
     const now = Date.now();
+
+    // TEST MODE: Return mock plan without hitting OpenRouter
+    if (IS_TEST_MODE) {
+      console.log("[TEST MODE] Returning mock search plan");
+      return {
+        shouldSearch: true,
+        contextSummary: "Test mode context",
+        queries: [`test query for ${args.newMessage}`.slice(0, 50)],
+        suggestNewChat: false,
+        decisionConfidence: 0.95,
+        reasons: "test_mode",
+      };
+    }
+
     // Note: Metrics recording removed from action context due to TS2589
     // Metrics are handled at the frontend layer instead
     // Short-circuit on empty input to avoid unnecessary planning/LLM calls

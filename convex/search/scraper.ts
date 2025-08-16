@@ -93,6 +93,20 @@ export const scrapeUrl = internalAction({
       throw new Error(`Unsafe URL: ${safety.reason}`);
     }
 
+    // Handle known problematic sites early
+    const hostname = new URL(args.url).hostname.toLowerCase();
+    if (hostname.includes("reddit.com")) {
+      logger.info("🚫 Skipping Reddit scraping (blocked by Reddit)", {
+        url: args.url,
+      });
+      return {
+        title: "Reddit Content",
+        content:
+          "Reddit blocks automated scraping. Please visit the link directly to view the content.",
+        summary: "Reddit content (scraping blocked)",
+      };
+    }
+
     // Short-TTL in-process cache to avoid repeat scrapes across adjacent queries
     const SCRAPE_TTL_MS = 2 * 60 * 1000; // 2 minutes
     const globalAny: any = globalThis as any;
@@ -122,10 +136,11 @@ export const scrapeUrl = internalAction({
     });
 
     try {
-      const response = await fetch(args.url, {
+      // First attempt with manual redirect to check for redirects
+      let response = await fetch(args.url, {
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (compatible; SearchChat/1.0; Web Content Reader)",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           Accept:
             "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.5",
@@ -133,7 +148,7 @@ export const scrapeUrl = internalAction({
           Connection: "keep-alive",
         },
         signal: AbortSignal.timeout(10000), // 10 second timeout
-        redirect: "manual", // Don't auto-follow potential SSRF pivots
+        redirect: "manual", // Check for redirects first
       });
 
       logger.info("📊 Scrape response received:", {
@@ -143,6 +158,65 @@ export const scrapeUrl = internalAction({
         ok: response.ok,
       });
 
+      // Handle redirects (301, 302, 303, 307, 308)
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const location = response.headers.get("location");
+        if (location) {
+          logger.info("🔄 Following redirect:", {
+            from: args.url,
+            to: location,
+            status: response.status,
+          });
+
+          // Resolve relative URLs
+          const redirectUrl = new URL(location, args.url).toString();
+
+          // Validate the redirect URL for SSRF protection
+          const redirectSafety = isSafeUrl(redirectUrl);
+          if (!redirectSafety.ok) {
+            logger.warn("🚫 Blocked unsafe redirect URL", {
+              url: redirectUrl,
+              reason: redirectSafety.reason,
+            });
+            throw new Error(`Unsafe redirect URL: ${redirectSafety.reason}`);
+          }
+
+          // Follow the redirect
+          response = await fetch(redirectUrl, {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              Accept:
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "en-US,en;q=0.5",
+              "Accept-Encoding": "gzip, deflate",
+              Connection: "keep-alive",
+            },
+            signal: AbortSignal.timeout(10000),
+            redirect: "follow", // Allow further redirects
+          });
+        }
+      }
+
+      // Handle various error status codes more gracefully
+      if (response.status === 403) {
+        logger.warn("⚠️ Access forbidden (403):", { url: args.url });
+        return {
+          title: hostname,
+          content: `Access to ${hostname} is restricted. The site has blocked automated access.`,
+          summary: `Content unavailable from ${hostname} (access restricted)`,
+        };
+      }
+
+      if (response.status === 404) {
+        logger.warn("⚠️ Page not found (404):", { url: args.url });
+        return {
+          title: hostname,
+          content: `Page not found at ${args.url}`,
+          summary: "Page not found (404)",
+        };
+      }
+
       if (!response.ok) {
         const errorDetails = {
           url: args.url,
@@ -151,7 +225,12 @@ export const scrapeUrl = internalAction({
           timestamp: new Date().toISOString(),
         };
         logger.error("❌ HTTP error during scraping:", errorDetails);
-        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        // Return graceful fallback instead of throwing
+        return {
+          title: hostname,
+          content: `Unable to fetch content from ${hostname} (HTTP ${response.status})`,
+          summary: `Content unavailable (HTTP ${response.status})`,
+        };
       }
 
       const contentType = response.headers.get("content-type") || "";
