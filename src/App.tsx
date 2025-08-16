@@ -420,6 +420,16 @@ export default function App() {
               // Provide explicit icons to avoid Sonner referencing its internal
               // icon components before initialization in some bundlers.
               icons={toastIcons}
+              // Theme-aware configuration
+              toastOptions={{
+                duration: 4000,
+                className: "font-serif dark:font-mono",
+                style: {
+                  // These will be overridden by CSS but provide fallbacks
+                  fontFamily: "inherit",
+                  fontSize: "inherit",
+                },
+              }}
             />
 
             <SignInModal
