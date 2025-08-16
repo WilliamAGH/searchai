@@ -278,8 +278,14 @@ export const getChatByOpaqueId = query({
   ),
   handler: async (ctx, args) => {
     // Validate the ID format before using it
-    // Convex IDs are exactly 32 characters in base32 encoding
-    if (!/^[a-z0-9]{32}$/.test(args.opaqueId)) {
+    // Convex IDs start with 'j' and are 32-33 chars of alphanumeric
+    if (
+      !args.opaqueId ||
+      args.opaqueId.length < 32 ||
+      args.opaqueId.length > 33 ||
+      !args.opaqueId.startsWith("j") ||
+      !/^[a-z0-9]+$/.test(args.opaqueId)
+    ) {
       return null;
     }
 
