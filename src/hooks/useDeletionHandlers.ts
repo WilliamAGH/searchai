@@ -13,6 +13,7 @@ interface UseDeletionHandlersProps {
     createChat: (chat: { id: string; title?: string }) => void;
     deleteMessage: (id: string) => Promise<void>;
     addMessage: (msg: { id: string }) => void;
+    refreshChats?: () => Promise<void>;
   };
   deleteChat: (args: { chatId: Id<"chats"> }) => Promise<void>;
   deleteMessage: (args: { messageId: Id<"messages"> }) => Promise<void>;
@@ -107,12 +108,26 @@ export function useDeletionHandlers({
             idToDelete,
           });
 
-          // Delete from Convex backend
-          await deleteChat({ chatId: idToDelete as Id<"chats"> });
+          try {
+            // Delete from Convex backend
+            await deleteChat({ chatId: idToDelete as Id<"chats"> });
+          } catch (error) {
+            // If the chat is not found in backend, it might be already deleted
+            // Still remove from local state to keep UI in sync
+            logger.warn(
+              "[useDeletionHandlers] Convex deletion failed, removing from local state anyway:",
+              error,
+            );
+          }
 
-          // Also remove from local state to update UI immediately
-          // This prevents stale UI while waiting for Convex subscription to update
+          // Always remove from local state to update UI
+          // This ensures UI stays in sync even if backend deletion fails
           await chatActions.deleteChat(idToDelete);
+
+          // Refresh the chat list to ensure UI is fully synced with backend
+          if (chatActions.refreshChats) {
+            await chatActions.refreshChats();
+          }
         } else {
           // This is a local chat ID, delegate to local deletion
           logger.info(
