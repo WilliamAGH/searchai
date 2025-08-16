@@ -107,13 +107,37 @@ function ChatInterfaceComponent({
   const allChats = useMemo(() => {
     let baseChats: Chat[] = [];
 
+    logger.debug(
+      "[CHAT_INTERFACE] Building allChats from:",
+      chats.length,
+      "chats",
+    );
+    logger.debug(
+      "[CHAT_INTERFACE] Current sessionId:",
+      (window as unknown as { sessionId?: string }).sessionId ||
+        localStorage.getItem("sessionId"),
+    );
+    logger.debug("[CHAT_INTERFACE] Is authenticated:", isAuthenticated);
+    logger.debug(
+      "[CHAT_INTERFACE] Raw chats:",
+      chats.map((c) => ({
+        id: c.id,
+        _id: (c as unknown as { _id?: string })._id,
+        title: c.title,
+        sessionId: (c as unknown as { sessionId?: string }).sessionId,
+      })),
+    );
+
     // The unified hook handles both authenticated and unauthenticated states
     // Convert from unified format to local format for compatibility
     if (chats && chats.length > 0) {
       baseChats = chats.map((chat) =>
         createChatFromData(
           {
-            _id: chat.id || chat._id,
+            // CRITICAL: Use the unified 'id' field as _id to ensure uniqueness
+            // UnifiedChat has 'id' as primary identifier
+            _id: chat.id,
+            id: chat.id,
             title: chat.title,
             createdAt: chat.createdAt,
             updatedAt: chat.updatedAt,
@@ -176,13 +200,24 @@ function ChatInterfaceComponent({
 
   const handleSelectChat = useCallback(
     (id: Id<"chats"> | string) => {
+      logger.debug("[CHAT_INTERFACE] handleSelectChat called with:", id);
+      logger.debug(
+        "[CHAT_INTERFACE] Current chat before selection:",
+        currentChatId,
+      );
       userSelectedChatAtRef.current = Date.now();
       navHandleSelectChat(String(id));
+      logger.debug(
+        "[CHAT_INTERFACE] Called navHandleSelectChat with:",
+        String(id),
+      );
     },
-    [navHandleSelectChat],
+    [navHandleSelectChat, currentChatId],
   );
 
   // Use paginated messages for authenticated users with Convex chats
+  // CRITICAL: Only use pagination with valid Convex chat IDs (contain '|')
+  const isValidConvexChatId = currentChatId && isConvexChatId(currentChatId);
   const {
     messages: paginatedMessages,
     isLoading: isLoadingMessages,
@@ -194,18 +229,31 @@ function ChatInterfaceComponent({
     refresh: _refreshMessages,
     clearError,
   } = usePaginatedMessages({
-    chatId: isAuthenticated && currentChatId ? currentChatId : null,
+    chatId: isAuthenticated && isValidConvexChatId ? currentChatId : null,
     initialLimit: 50,
-    enabled: isAuthenticated && !!currentChatId,
+    enabled: isAuthenticated && isValidConvexChatId,
   });
 
   // Use paginated messages when available, fallback to regular messages
+  // CRITICAL: Only use ONE source of messages to prevent duplicate keys
   const effectiveMessages = useMemo(() => {
-    if (isAuthenticated && currentChatId && paginatedMessages.length > 0) {
+    // For authenticated users with valid Convex chats, use paginated messages
+    if (
+      isAuthenticated &&
+      isValidConvexChatId &&
+      (paginatedMessages.length > 0 || isLoadingMessages)
+    ) {
       return paginatedMessages;
     }
+    // For everyone else (anonymous, invalid IDs), use regular messages
     return messages;
-  }, [isAuthenticated, currentChatId, paginatedMessages, messages]);
+  }, [
+    isAuthenticated,
+    isValidConvexChatId,
+    paginatedMessages,
+    messages,
+    isLoadingMessages,
+  ]);
 
   const currentMessages = useMemo(
     () => mapMessagesToLocal(effectiveMessages, isAuthenticated),
@@ -219,15 +267,14 @@ function ChatInterfaceComponent({
   useUrlStateSync({
     currentChatId,
     isAuthenticated,
-    propChatId,
+    _propChatId: propChatId,
     propShareId,
     propPublicId,
     chatByOpaqueId,
     chatByShareId,
     chatByPublicId,
-    localChats: chatState.chats,
-    selectChat: chatActions.selectChat,
-    userSelectedChatAtRef,
+    _localChats: chatState.chats,
+    _selectChat: chatActions.selectChat,
   });
   useMetaTags({ currentChatId, allChats });
 

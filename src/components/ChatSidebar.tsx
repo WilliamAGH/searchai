@@ -66,10 +66,16 @@ export function ChatSidebar({
   onToggle,
   isCreatingChat = false,
 }: ChatSidebarProps) {
+  logger.debug("[SIDEBAR] Rendering with:", {
+    chatCount: chats.length,
+    currentChatId,
+    chats: chats.map((c) => ({ id: c.id, _id: c._id, title: c.title })),
+  });
   const deleteChat = useMutation(api.chats.deleteChat);
 
   const handleSelectChat = React.useCallback(
     (chatId: Id<"chats"> | string) => {
+      logger.debug("[SIDEBAR] handleSelectChat called with:", chatId);
       onSelectChat(chatId);
     },
     [onSelectChat],
@@ -79,15 +85,21 @@ export function ChatSidebar({
   const handleSelectClick = React.useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const attr = e.currentTarget.getAttribute("data-chat-id");
-      if (!attr) return;
+      logger.debug("[SIDEBAR] handleSelectClick - data-chat-id:", attr);
+      if (!attr) {
+        console.error("[SIDEBAR] No data-chat-id attribute found!");
+        return;
+      }
       // Find the chat object whose typed Id matches the attribute
       const match = chats.find((c) => String(c._id) === attr);
+      logger.debug("[SIDEBAR] Found matching chat:", match);
       // Ensure we pass a correctly-typed value (Id or string) to the parent callback
       const selectedId: Id<"chats"> | string = match
         ? match._id
         : isConvexChatId(attr)
           ? (attr as Id<"chats">)
           : attr;
+      logger.debug("[SIDEBAR] Selecting chat with ID:", selectedId);
       handleSelectChat(selectedId);
     },
     [chats, handleSelectChat],
