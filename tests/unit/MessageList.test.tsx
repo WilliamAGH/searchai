@@ -201,7 +201,7 @@ describe("MessageList", () => {
     const manyMessages = Array.from({ length: 50 }, (_, i) => ({
       id: `msg${i}`,
       chatId: "chat1",
-      role: i % 2 === 0 ? "user" : "assistant" as "user" | "assistant",
+      role: i % 2 === 0 ? "user" : ("assistant" as "user" | "assistant"),
       content: `Message ${i}`,
       createdAt: new Date(`2024-01-01T10:${String(i).padStart(2, "0")}:00`),
       isLocal: false,
@@ -248,7 +248,7 @@ describe("MessageList", () => {
     const manyMessages = Array.from({ length: 50 }, (_, i) => ({
       id: `msg${i}`,
       chatId: "chat1",
-      role: i % 2 === 0 ? "user" : "assistant" as "user" | "assistant",
+      role: i % 2 === 0 ? "user" : ("assistant" as "user" | "assistant"),
       content: `Message ${i}`,
       createdAt: new Date(`2024-01-01T10:${String(i).padStart(2, "0")}:00`),
       isLocal: false,
@@ -281,7 +281,7 @@ describe("MessageList", () => {
     const manyMessages = Array.from({ length: 50 }, (_, i) => ({
       id: `msg${i}`,
       chatId: "chat1",
-      role: i % 2 === 0 ? "user" : "assistant" as "user" | "assistant",
+      role: i % 2 === 0 ? "user" : ("assistant" as "user" | "assistant"),
       content: `Message ${i}`,
       createdAt: new Date(`2024-01-01T10:${String(i).padStart(2, "0")}:00`),
       isLocal: false,

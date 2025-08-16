@@ -90,13 +90,35 @@ export async function setupMSWForTest(page: Page) {
 
           // Return SSE stream format that the application expects
           const stream = new ReadableStream({
-            start(controller) {
-              // Send the response as a single chunk
+            async start(controller) {
+              // Send initial progress
               controller.enqueue(
                 new TextEncoder().encode(
-                  `data: ${JSON.stringify({ content: aiResponse })}\n\n`,
+                  `data: ${JSON.stringify({ type: "metadata", metadata: { stage: "searching" } })}\n\n`,
                 ),
               );
+
+              await new Promise((resolve) => setTimeout(resolve, 100));
+
+              // Send the response content as a single chunk for simplicity
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ type: "content", content: aiResponse })}\n\n`,
+                ),
+              );
+
+              await new Promise((resolve) => setTimeout(resolve, 100));
+
+              // Send a done signal to complete the stream
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ type: "done" })}\n\n`,
+                ),
+              );
+
+              // Send final "[DONE]" marker that some SSE clients expect
+              controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+
               controller.close();
             },
           });
