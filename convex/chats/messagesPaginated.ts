@@ -7,7 +7,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
 import { vSearchResult } from "../lib/validators";
 
 /**
@@ -23,7 +22,7 @@ export const getChatMessagesPaginated = query({
   args: {
     chatId: v.id("chats"),
     limit: v.optional(v.number()),
-    cursor: v.optional(v.string()),
+    cursor: v.optional(v.id("messages")), // Fix: Use Id<"messages"> since cursor is a message ID
   },
   returns: v.object({
     messages: v.array(
@@ -44,7 +43,7 @@ export const getChatMessagesPaginated = query({
         reasoning: v.optional(v.string()),
       }),
     ),
-    nextCursor: v.optional(v.string()),
+    nextCursor: v.optional(v.id("messages")), // Fix: Use Id<"messages"> since cursor is a message ID
     hasMore: v.boolean(),
   }),
   handler: async (ctx, args) => {
@@ -110,8 +109,8 @@ export const getChatMessagesPaginated = query({
 
     // If we have a cursor, validate and start after it
     if (args.cursor) {
-      // The cursor we return is a message _id. Type it to narrow return type
-      const cursorMessage = await ctx.db.get(args.cursor as Id<"messages">);
+      // The cursor we return is a message _id
+      const cursorMessage = await ctx.db.get(args.cursor);
       if (!cursorMessage) {
         // Invalid/expired cursor: recover by returning the most recent page
         return await fetchPage(baseQuery);
@@ -141,6 +140,24 @@ export const getRecentChatMessages = query({
     chatId: v.id("chats"),
     limit: v.optional(v.number()),
   },
+  returns: v.array(
+    v.object({
+      _id: v.id("messages"),
+      role: v.union(
+        v.literal("user"),
+        v.literal("assistant"),
+        v.literal("system"),
+      ),
+      content: v.optional(v.string()),
+      timestamp: v.optional(v.number()),
+      isStreaming: v.optional(v.boolean()),
+      streamedContent: v.optional(v.string()),
+      thinking: v.optional(v.string()),
+      searchResults: v.optional(v.array(vSearchResult)),
+      sources: v.optional(v.array(v.string())),
+      reasoning: v.optional(v.any()),
+    }),
+  ),
   handler: async (ctx, args) => {
     // Auth and chat
     const userId = await getAuthUserId(ctx);
@@ -165,7 +182,18 @@ export const getRecentChatMessages = query({
       .order("desc")
       .take(limit);
 
-    // Reverse to get chronological order
-    return messages.reverse();
+    // Reverse to get chronological order and map to return only validated fields
+    return messages.reverse().map((m) => ({
+      _id: m._id,
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp,
+      isStreaming: m.isStreaming,
+      streamedContent: m.streamedContent,
+      thinking: m.thinking,
+      searchResults: m.searchResults,
+      sources: m.sources,
+      reasoning: m.reasoning,
+    }));
   },
 });

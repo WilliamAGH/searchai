@@ -4,9 +4,11 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test.describe("Critical User Paths", () => {
   test("user can create and send a message", async ({ page }) => {
+    await setupMSWForTest(page);
     await page.goto("/");
 
     // Find message input
@@ -25,9 +27,12 @@ test.describe("Critical User Paths", () => {
     ).toBeVisible({
       timeout: 15000,
     });
+
+    await cleanupMSWForTest(page);
   });
 
   test("user can create new chat", async ({ page }) => {
+    await setupMSWForTest(page);
     await page.goto("/");
 
     // Click new chat button
@@ -37,9 +42,12 @@ test.describe("Critical User Paths", () => {
 
     // Verify URL changed
     await expect(page).toHaveURL(/\/chat\/.+/, { timeout: 5000 });
+
+    await cleanupMSWForTest(page);
   });
 
   test("authentication flow works", async ({ page }) => {
+    await setupMSWForTest(page);
     await page.goto("/");
 
     // Look for sign in button
@@ -55,9 +63,12 @@ test.describe("Critical User Paths", () => {
         page.locator('[role="dialog"], .auth-modal, .sign-in-modal').first(),
       ).toBeVisible({ timeout: 5000 });
     }
+
+    await cleanupMSWForTest(page);
   });
 
   test("share functionality exists", async ({ page }) => {
+    await setupMSWForTest(page);
     await page.goto("/");
 
     // Create a message first
@@ -67,14 +78,25 @@ test.describe("Critical User Paths", () => {
     await input.fill("Message to share");
     await input.press("Enter");
 
-    // Look for share button
+    // Wait for the message to be processed and chat to be created
+    await expect(page.locator('text="Message to share"')).toBeVisible({
+      timeout: 15000,
+    });
+
+    // Wait a bit for the chat to be fully created
+    await page.waitForTimeout(2000);
+
+    // Look for share button - it should now be visible
     const shareBtn = page
       .locator('[title*="Share"], button:has-text("Share")')
       .first();
     await expect(shareBtn).toBeVisible({ timeout: 10000 });
+
+    await cleanupMSWForTest(page);
   });
 
   test("AI response generation works", async ({ page }) => {
+    await setupMSWForTest(page);
     await page.goto("/");
 
     // Send a message that should trigger AI
@@ -88,5 +110,7 @@ test.describe("Critical User Paths", () => {
     await expect(
       page.locator('[data-role="assistant"], .assistant-message').first(),
     ).toBeVisible({ timeout: 30000 });
+
+    await cleanupMSWForTest(page);
   });
 });

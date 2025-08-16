@@ -32,5 +32,24 @@
     "MD031": false,
     "MD032": false,
     "MD026": false
-  }
+  },
+  "git.enabled": true,
+  "git.path": "git",
+  "terminal.integrated.env.osx": {
+    "IS_REACT_ACT_ENVIRONMENT": "true"
+  },
+  "terminal.integrated.inheritEnv": true,
+  "vitest.commandLine": "npm run test:precommit",
+  "vitest.include": [
+    "tests/**/*.test.{ts,tsx}",
+    "src/**/__tests__/**/*.{test,spec}.{ts,tsx}"
+  ],
+  "vitest.exclude": [
+    "tests/e2e/**",
+    "tests/smoke/**",
+    "tests/convex.*.test.ts",
+    "tests/integration/search-api.test.ts"
+  ],
+  "testing.automaticallyOpenPeekView": "never",
+  "testing.followRunningTest": false
 }

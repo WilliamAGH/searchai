@@ -38,7 +38,7 @@ function setupInitialAndLoadMoreMocks() {
     queryImpl: (name, args) => {
       console.log("Query called:", name, args);
       // initial query returns the first page whenever not skipped
-      if (args === "skip") return undefined;
+      if (args === "skip") return;
       return initial;
     },
     actionImpl: async (_name, args) => {

@@ -7,6 +7,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 import { logger } from "../lib/logger";
+import { Spinner } from "./ui/Spinner";
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -70,13 +71,12 @@ export function MobileSidebar({
       try {
         if (!window.confirm("Delete this chat? This cannot be undone.")) return;
         if (onRequestDeleteChat) {
-          onRequestDeleteChat(chatId);
+          // Await the deletion to catch any errors
+          await onRequestDeleteChat(chatId);
+        } else if (typeof chatId === "string") {
+          onDeleteLocalChat?.(chatId);
         } else {
-          if (typeof chatId === "string") {
-            onDeleteLocalChat?.(chatId);
-          } else {
-            await deleteChat({ chatId });
-          }
+          await deleteChat({ chatId });
         }
         if (isCurrentChat) {
           onSelectChat(null);
@@ -104,7 +104,7 @@ export function MobileSidebar({
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog
         as="div"
-        className="relative z-50 lg:hidden mobile-sidebar-dialog"
+        className="relative z-50 mobile-sidebar-dialog"
         onClose={onClose}
         initialFocus={closeButtonRef}
       >
@@ -207,26 +207,11 @@ export function MobileSidebar({
                     className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isCreatingChat ? (
-                      <svg
-                        className="w-5 h-5 animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <title>Creating chat</title>
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
+                      <Spinner
+                        size="sm"
+                        className="w-5 h-5"
+                        aria-label="Creating chat"
+                      />
                     ) : (
                       <svg
                         className="w-5 h-5"
@@ -244,7 +229,7 @@ export function MobileSidebar({
                         />
                       </svg>
                     )}
-                    {isCreatingChat ? "Creating..." : "New Chat"}
+                    {isCreatingChat ? "Creating" : "New Chat"}
                   </button>
 
                   <div className="space-y-1">
@@ -257,9 +242,12 @@ export function MobileSidebar({
                       </div>
                     ) : (
                       <div className="space-y-1">
-                        {chats.map((chat) => (
+                        {chats.map((chat, index) => (
                           <div
-                            key={chat._id}
+                            key={
+                              chat._id ||
+                              `mobile-chat-${index}-${chat.title?.slice(0, 20) || "untitled"}-${chat.updatedAt}`
+                            }
                             className="flex items-center gap-2 pr-2 min-w-0"
                           >
                             <button
@@ -276,11 +264,6 @@ export function MobileSidebar({
                                 {chat.title}
                               </div>
                               <div className="text-xs text-gray-500 flex items-center gap-1 min-w-0">
-                                {"isLocal" in chat && chat.isLocal && (
-                                  <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
-                                    Local
-                                  </span>
-                                )}
                                 <span className="truncate">
                                   {new Date(
                                     chat.updatedAt,

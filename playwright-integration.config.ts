@@ -19,6 +19,8 @@ export default defineConfig({
   ],
   use: {
     baseURL: "http://localhost:5173",
+    // Ensure tests run in headless mode (no browser windows)
+    headless: true,
     trace: "on",
     screenshot: "on",
     video: "retain-on-failure",
@@ -43,7 +45,7 @@ export default defineConfig({
   webServer: [
     {
       command: process.env.CI
-        ? "vite preview --strictPort --port 5173"
+        ? "npm run build && vite preview --strictPort --port 5173"
         : "npm run dev:frontend",
       port: 5173,
       url: "http://localhost:5173",

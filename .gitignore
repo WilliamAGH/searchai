@@ -10,6 +10,7 @@ lerna-debug.log*
 trace.zip
 test-results
 coverage
+.puppy*
 playwright-report
 *.bak
 .crush*

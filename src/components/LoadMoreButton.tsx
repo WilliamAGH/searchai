@@ -3,7 +3,8 @@
  * Displays a button to load earlier messages in chat history
  */
 
-import { ChevronUp, Loader2 } from "lucide-react";
+import { ChevronUp } from "lucide-react";
+import { Spinner } from "./ui/Spinner";
 
 interface LoadMoreButtonProps {
   onClick: () => void;
@@ -40,7 +41,7 @@ export function LoadMoreButton({
       >
         {isLoading ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            <Spinner size="sm" aria-label="Loading more messages" />
             <span>Loading...</span>
           </>
         ) : (

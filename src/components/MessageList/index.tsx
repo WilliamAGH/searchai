@@ -19,6 +19,7 @@ import {
   LoadErrorState,
 } from "./MessageSkeleton";
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
+import { shouldFilterMessage } from "./DeprecatedDotMessage";
 import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
 
@@ -49,15 +50,66 @@ interface MessageListProps {
   loadError?: Error | null;
   retryCount?: number;
   onClearError?: () => void;
+  // NEW: Add streaming state for real-time updates
+  streamingState?: {
+    isStreaming: boolean;
+    streamingContent: string;
+    streamingMessageId?: Id<"messages"> | string;
+    thinking?: string;
+    // Real-time messages from subscription (loosely typed on purpose)
+    messages?: ReadonlyArray<unknown>;
+  };
 }
 
 /**
  * Main message list component
  */
+// Helper for stable ephemeral keys for messages without IDs
+const ephemeralKeyMap = new WeakMap<Message, string>();
+let ephemeralKeyCounter = 0;
+
+const getEphemeralKey = (msg: Message, index?: number): string => {
+  if (!msg) {
+    // Fallback for invalid message objects
+    const fallbackKey = `invalid-${index ?? 0}-${Date.now().toString(36)}-${++ephemeralKeyCounter}`;
+    if (import.meta.env.DEV) {
+      console.warn("[KEY] No message object, using fallback:", fallbackKey);
+    }
+    return fallbackKey;
+  }
+
+  // Check if message already has an ID
+  const msgRecord = msg as Record<string, unknown>;
+  const existingId =
+    msg._id ||
+    msg.id ||
+    (typeof msgRecord.id === "string" ? msgRecord.id : null);
+
+  if (existingId && existingId !== "undefined") {
+    return String(existingId);
+  }
+
+  // Check WeakMap for cached key
+  let k = ephemeralKeyMap.get(msg);
+  if (!k) {
+    // Generate a truly unique ephemeral key with counter to guarantee uniqueness
+    // Include role and content hash for better uniqueness
+    const contentHash = msg.content
+      ? msg.content.slice(0, 10).replace(/[^a-z0-9]/gi, "")
+      : "empty";
+    const rolePrefix = msg.role === "assistant" ? "ai" : "usr";
+    k = `tmp-${rolePrefix}-${contentHash}-${Date.now().toString(36)}-${++ephemeralKeyCounter}-${Math.random().toString(36).slice(2, 8)}`;
+    ephemeralKeyMap.set(msg, k);
+  }
+
+  return k;
+};
+
 /**
  * Render the message list for a chat conversation with pagination support.
+ * Memoized to prevent unnecessary re-renders during streaming.
  */
-export function MessageList({
+export const MessageList = React.memo(function MessageList({
   messages,
   isGenerating,
   onToggleSidebar,
@@ -74,11 +126,12 @@ export function MessageList({
   loadError,
   retryCount = 0,
   onClearError,
+  // NEW: Add streaming state
+  streamingState,
 }: MessageListProps) {
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const previousMessagesLengthRef = useRef(messages.length);
   const isLoadingMoreRef = useRef(false);
   const [collapsedById, setCollapsedById] = React.useState<
     Record<string, boolean>
@@ -90,6 +143,40 @@ export function MessageList({
   const [_hoveredCitationUrl, setHoveredCitationUrl] = React.useState<
     string | null
   >(null);
+
+  // CRITICAL: Just use messages as-is, no enhancement
+  // All message handling should happen upstream
+  // Exception: Apply streaming content for active streaming messages
+  const enhancedMessages = React.useMemo(() => {
+    // Direct pass-through, no modification
+    // All streaming enhancement is disabled to prevent duplicate sources
+    // EXCEPT: Apply streaming content to the actively streaming message for tests
+    if (
+      streamingState?.streamingContent &&
+      streamingState?.streamingMessageId
+    ) {
+      return messages.map((msg) => {
+        if (msg._id === streamingState.streamingMessageId && msg.isStreaming) {
+          return {
+            ...msg,
+            content: streamingState.streamingContent,
+          };
+        }
+        return msg;
+      });
+    }
+    return messages;
+  }, [messages, streamingState]);
+
+  // Use enhanced messages for all operations
+  const currentMessages = enhancedMessages;
+  const messagesLength = currentMessages.length;
+
+  // Initialize ref with correct length on first render
+  const previousMessagesLengthRef = useRef(0);
+  if (previousMessagesLengthRef.current === 0 && messagesLength > 0) {
+    previousMessagesLengthRef.current = messagesLength;
+  }
 
   /**
    * Scroll to bottom of messages
@@ -112,15 +199,13 @@ export function MessageList({
           return;
         if (onRequestDeleteMessage) {
           onRequestDeleteMessage(String(messageId));
+        } else if (
+          String(messageId).startsWith("local_") ||
+          String(messageId).startsWith("msg_")
+        ) {
+          onDeleteLocalMessage?.(String(messageId));
         } else {
-          if (
-            String(messageId).startsWith("local_") ||
-            String(messageId).startsWith("msg_")
-          ) {
-            onDeleteLocalMessage?.(String(messageId));
-          } else {
-            await deleteMessage({ messageId: messageId as Id<"messages"> });
-          }
+          await deleteMessage({ messageId: messageId as Id<"messages"> });
         }
       } catch (err) {
         logger.error("Failed to delete message", err);
@@ -136,15 +221,20 @@ export function MessageList({
     }
   }, [userHasScrolled, scrollToBottom]);
 
-  // Debug logging
+  // Debug logging - only log significant changes
   useEffect(() => {
-    if (Array.isArray(messages)) {
-      logger.debug("🖼️ MessageList render", {
-        count: messages.length,
-        firstRole: messages[0]?.role,
-      });
+    if (Array.isArray(currentMessages) && import.meta.env.DEV) {
+      // Only log when message count actually changes
+      const prevCount = previousMessagesLengthRef.current;
+      if (prevCount !== currentMessages.length) {
+        logger.debug("🖼️ MessageList updated", {
+          prevCount,
+          newCount: currentMessages.length,
+          firstRole: currentMessages[0]?.role,
+        });
+      }
     }
-  }, [messages]);
+  }, [currentMessages]); // Include full array dependency to satisfy React linter
 
   // Detect when user scrolls manually
   useEffect(() => {
@@ -166,7 +256,7 @@ export function MessageList({
     setCollapsedById((prev) => {
       const updates: Record<string, boolean> = {};
 
-      messages.forEach((m, index) => {
+      currentMessages.forEach((m, index) => {
         const id = m._id || String(index);
         if (!id || m.role !== "assistant") return;
 
@@ -184,12 +274,16 @@ export function MessageList({
           }
         }
 
-        // Reasoning should expand while streaming, collapse when content starts
+        // Reasoning should expand while streaming, collapse when done
         if (hasReasoning) {
           const reasoningId = `reasoning-${id}`;
-          if (prev[reasoningId] === undefined) {
-            // Show reasoning while it's being generated, collapse when content arrives
-            updates[reasoningId] = hasContent && !isStreaming;
+          // Auto-expand when streaming starts or reasoning exists without content
+          // Auto-collapse when streaming ends AND content exists
+          const shouldCollapse = !isStreaming && hasContent;
+
+          // Only update if state needs to change
+          if (prev[reasoningId] !== shouldCollapse) {
+            updates[reasoningId] = shouldCollapse;
           }
         }
       });
@@ -199,7 +293,7 @@ export function MessageList({
       }
       return prev;
     });
-  }, [messages]);
+  }, [currentMessages]);
 
   /**
    * Toggle collapsed state for element
@@ -240,7 +334,7 @@ export function MessageList({
   // Track when messages change to preserve scroll on load more
   useEffect(() => {
     const prevLength = previousMessagesLengthRef.current;
-    const currLength = messages.length;
+    const currLength = messagesLength;
 
     // If messages increased and we were loading more, preserve scroll
     if (currLength > prevLength && isLoadingMoreRef.current) {
@@ -251,7 +345,7 @@ export function MessageList({
     }
 
     previousMessagesLengthRef.current = currLength;
-  }, [messages.length]);
+  }, [messagesLength]);
 
   return (
     <div
@@ -259,16 +353,24 @@ export function MessageList({
       className="flex-1 overflow-y-auto relative overscroll-contain"
     >
       <ScrollToBottomFab
-        visible={userHasScrolled && messages.length > 0}
+        visible={userHasScrolled && messagesLength > 0}
         onClick={handleScrollToBottom}
       />
 
       {/* Show skeleton when initially loading messages */}
-      {isLoadingMessages && messages.length === 0 ? (
+      {isLoadingMessages && messagesLength === 0 ? (
         <div className="px-4 sm:px-6 py-6 sm:py-8">
           <MessageSkeleton count={5} />
         </div>
-      ) : messages.length === 0 ? (
+      ) : loadError && onClearError ? (
+        <div className="px-4 sm:px-6 py-6 sm:py-8">
+          <LoadErrorState
+            error={loadError}
+            onRetry={onClearError}
+            retryCount={retryCount}
+          />
+        </div>
+      ) : messagesLength === 0 ? (
         <EmptyState onToggleSidebar={onToggleSidebar} />
       ) : (
         <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
@@ -283,11 +385,12 @@ export function MessageList({
 
           {/* Test hook: hidden count for E2E smoke assertions */}
           <span data-testid="count" style={{ display: "none" }}>
-            {messages.length}
+            {messagesLength}
           </span>
 
           {/* Load More Button at the top for loading older messages */}
-          {hasMore && onLoadMore && !loadError && (
+          {/* Only show if we have 50+ messages to avoid clutter with small chats */}
+          {hasMore && onLoadMore && !loadError && messagesLength >= 50 && (
             <LoadMoreButton
               onClick={handleLoadMore}
               isLoading={isLoadingMore}
@@ -299,17 +402,16 @@ export function MessageList({
           {isLoadingMore && !loadError && <LoadingMoreIndicator />}
 
           {/* Use virtualization for large message lists (100+ messages) */}
-          {messages.length > 100 ? (
+          {messagesLength > 100 ? (
             <VirtualizedMessageList
-              messages={messages}
+              messages={currentMessages.filter(
+                (message) => !shouldFilterMessage(message),
+              )}
               className="space-y-6 sm:space-y-8"
               estimatedItemHeight={150}
               renderItem={(message, index) => (
                 <MessageItem
-                  key={
-                    message._id ||
-                    `message-${index}-${message.timestamp || Date.now()}`
-                  }
+                  key={message._id ?? getEphemeralKey(message, index)}
                   message={message}
                   index={index}
                   collapsedById={collapsedById}
@@ -322,81 +424,62 @@ export function MessageList({
               )}
             />
           ) : (
-            messages.map((message, index) => (
-              <MessageItem
-                key={
-                  message._id ||
-                  `message-${index}-${message.timestamp || Date.now()}`
+            currentMessages
+              .filter((message) => !shouldFilterMessage(message))
+              .map((message, index) => {
+                const messageKey =
+                  message._id ?? getEphemeralKey(message, index);
+                // Safety check - key should NEVER be undefined
+                const safeKey =
+                  messageKey || `fallback-${index}-${Date.now().toString(36)}`;
+
+                if (import.meta.env.DEV) {
+                  // Log all keys to debug duplicates
+                  logger.debug(`[KEY] Message ${index}:`, {
+                    key: safeKey,
+                    _id: message._id,
+                    role: message.role,
+                    contentStart: message.content?.substring(0, 20),
+                  });
+
+                  if (!messageKey) {
+                    console.error("[KEY] WARNING: Message has no key!", {
+                      message,
+                      index,
+                      _id: message._id,
+                      generatedKey: getEphemeralKey(message, index),
+                    });
+                  }
                 }
-                message={message}
-                index={index}
-                collapsedById={collapsedById}
-                hoveredSourceUrl={hoveredSourceUrl}
-                onToggleCollapsed={toggleCollapsed}
-                onDeleteMessage={handleDeleteMessage}
-                onSourceHover={setHoveredSourceUrl}
-                onCitationHover={setHoveredCitationUrl}
-              />
-            ))
+
+                return (
+                  <MessageItem
+                    key={safeKey}
+                    message={message}
+                    index={index}
+                    collapsedById={collapsedById}
+                    hoveredSourceUrl={hoveredSourceUrl}
+                    onToggleCollapsed={toggleCollapsed}
+                    onDeleteMessage={handleDeleteMessage}
+                    onSourceHover={setHoveredSourceUrl}
+                    onCitationHover={setHoveredCitationUrl}
+                  />
+                );
+              })
           )}
 
-          {/* Show "AI is thinking" when in generating stage */}
+          {/* Show search progress ONLY if we don't have a streaming message showing it */}
           {isGenerating &&
             searchProgress &&
-            searchProgress.stage === "generating" && (
-              <div className="flex gap-2 sm:gap-4">
-                <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 animate-spin"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                    <span>AI is thinking and generating response...</span>
-                    <div className="flex space-x-1">
-                      <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:0ms]"></div>
-                      <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:100ms]"></div>
-                      <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:200ms]"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          {/* Show search progress for non-generating stages */}
-          {isGenerating &&
-            searchProgress &&
-            searchProgress.stage !== "generating" && (
-              <SearchProgress progress={searchProgress} />
-            )}
+            searchProgress.stage !== "generating" &&
+            searchProgress.stage !== "idle" &&
+            // Only show if no streaming message exists
+            !currentMessages.some(
+              (msg) => msg.role === "assistant" && msg.isStreaming,
+            ) && <SearchProgress progress={searchProgress} />}
         </div>
       )}
       <div ref={messagesEndRef} />
     </div>
   );
-}
+});

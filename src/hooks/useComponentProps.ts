@@ -24,9 +24,9 @@ interface UseComponentPropsArgs {
   handleNewChatButton: () => Promise<void>;
   startNewChatSession: () => Promise<void>;
   handleDeleteLocalChat: (chatId: string) => void;
-  handleRequestDeleteChat: (chatId: Id<"chats">) => void;
+  handleRequestDeleteChat: (chatId: Id<"chats"> | string) => void;
   handleDeleteLocalMessage: (messageId: string) => void;
-  handleRequestDeleteMessage: (messageId: Id<"messages">) => void;
+  handleRequestDeleteMessage: (messageId: Id<"messages"> | string) => void;
   handleMobileSidebarClose: () => void;
   handleSendMessage: (message: string) => Promise<void>;
   handleDraftChange: (draft: string) => void;
@@ -40,62 +40,76 @@ interface UseComponentPropsArgs {
   loadError?: Error | null;
   retryCount?: number;
   onClearError?: () => void;
+  // NEW: Add streaming state
+  streamingState?: {
+    isStreaming: boolean;
+    streamingContent: string;
+    streamingMessageId?: Id<"messages"> | string;
+    thinking?: string;
+  };
 }
 
 /**
  * Hook to prepare component props for all child components
  */
-export function useComponentProps({
-  allChats,
-  currentChatId,
-  currentChat,
-  currentMessages,
-  sidebarOpen,
-  isMobile,
-  isGenerating,
-  searchProgress,
-  isCreatingChat,
-  isAuthenticated,
-  handleSelectChat,
-  handleNewChatButton,
-  handleDeleteLocalChat,
-  handleRequestDeleteChat,
-  handleDeleteLocalMessage,
-  handleRequestDeleteMessage,
-  handleMobileSidebarClose,
-  handleSendMessage,
-  handleDraftChange,
-  setShowShareModal,
-  userHistory,
-  // Pagination props
-  isLoadingMore,
-  hasMore,
-  onLoadMore,
-  isLoadingMessages,
-  loadError,
-  retryCount,
-  onClearError,
-}: UseComponentPropsArgs) {
+export function useComponentProps(args: UseComponentPropsArgs) {
+  const {
+    allChats,
+    currentChatId,
+    currentChat,
+    currentMessages,
+    sidebarOpen,
+    isMobile,
+    isGenerating,
+    searchProgress,
+    isCreatingChat,
+    isAuthenticated,
+    handleSelectChat,
+    handleToggleSidebar,
+    handleNewChatButton,
+    handleDeleteLocalChat,
+    handleRequestDeleteChat,
+    handleDeleteLocalMessage,
+    handleRequestDeleteMessage,
+    handleMobileSidebarClose,
+    handleSendMessage,
+    handleDraftChange,
+    setShowShareModal,
+    userHistory,
+    // Pagination props
+    isLoadingMore,
+    hasMore,
+    onLoadMore,
+    isLoadingMessages,
+    loadError,
+    retryCount,
+    onClearError,
+    // NEW: Add streaming state for real-time updates
+    streamingState,
+  } = args;
+
   const chatSidebarProps = useMemo(
     () => ({
       chats: allChats,
       currentChatId,
       onSelectChat: handleSelectChat,
-      onDeleteChat: currentChat?.isLocal
-        ? handleDeleteLocalChat
-        : handleRequestDeleteChat,
+      onDeleteLocalChat: handleDeleteLocalChat,
+      onRequestDeleteChat: handleRequestDeleteChat,
       onNewChat: handleNewChatButton,
+      isOpen: sidebarOpen,
+      onToggle: handleToggleSidebar,
       isCreatingChat,
     }),
     [
       allChats,
       currentChatId,
-      currentChat?.isLocal,
       isCreatingChat,
       handleSelectChat,
       handleDeleteLocalChat,
       handleRequestDeleteChat,
       handleNewChatButton,
+      sidebarOpen,
+      handleToggleSidebar,
     ],
   );
 
@@ -105,9 +119,8 @@ export function useComponentProps({
       chats: allChats,
       currentChatId,
       onSelectChat: handleSelectChat,
-      onDeleteChat: currentChat?.isLocal
-        ? handleDeleteLocalChat
-        : handleRequestDeleteChat,
+      onDeleteLocalChat: handleDeleteLocalChat,
+      onRequestDeleteChat: handleRequestDeleteChat,
       onNewChat: handleNewChatButton,
       onClose: handleMobileSidebarClose,
       isCreatingChat,
@@ -117,7 +130,6 @@ export function useComponentProps({
       isMobile,
       allChats,
       currentChatId,
-      currentChat?.isLocal,
       isCreatingChat,
       handleSelectChat,
       handleDeleteLocalChat,
@@ -133,9 +145,13 @@ export function useComponentProps({
       isGenerating,
       searchProgress,
       chatId: currentChatId,
-      onDeleteMessage: isAuthenticated
+      currentChat,
+      onToggleSidebar: handleToggleSidebar,
+      onShare: () => setShowShareModal(true),
+      onDeleteLocalMessage: handleDeleteLocalMessage,
+      onRequestDeleteMessage: isAuthenticated
         ? handleRequestDeleteMessage
-        : handleDeleteLocalMessage,
+        : undefined,
       // Pagination props (optional, passed through)
       isLoadingMore,
       hasMore,
@@ -144,13 +160,18 @@ export function useComponentProps({
       loadError,
       retryCount,
       onClearError,
+      // NEW: Add streaming state for real-time updates
+      streamingState,
     }),
     [
       currentMessages,
       isGenerating,
       searchProgress,
       currentChatId,
+      currentChat,
       isAuthenticated,
+      handleToggleSidebar,
+      setShowShareModal,
       handleRequestDeleteMessage,
       handleDeleteLocalMessage,
       isLoadingMore,
@@ -160,21 +181,23 @@ export function useComponentProps({
       loadError,
       retryCount,
       onClearError,
+      // NEW: Include streaming state in dependencies
+      streamingState,
     ],
   );
 
   const messageInputProps = useMemo(
     () => ({
-      disabled: isGenerating,
+      disabled: isGenerating, // Disable input while generating to match expected behavior
+      isGenerating, // Pass generation state separately for submit button
       placeholder: isGenerating
-        ? "Generating response..."
+        ? "AI is generating" // Show generation state
         : !currentChatId
-          ? "Start a new chat..."
-          : "Type your message...",
+          ? "Start a new chat"
+          : "Type your message",
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,
-      onShare: isMobile ? () => setShowShareModal(true) : undefined,
     }),
     [
       isGenerating,
@@ -182,8 +205,6 @@ export function useComponentProps({
       handleSendMessage,
       handleDraftChange,
       userHistory,
-      isMobile,
-      setShowShareModal,
     ],
   );
 

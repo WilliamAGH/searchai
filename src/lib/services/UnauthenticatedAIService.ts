@@ -84,7 +84,8 @@ export class UnauthenticatedAIService {
 
       const requestBody = {
         message,
-        systemPrompt: "You are a helpful AI assistant.",
+        systemPrompt:
+          "You are SearchAI, a knowledgeable and confident search assistant. You provide accurate, comprehensive answers based on search results and available information. You speak with authority when the information is clear, and transparently acknowledge limitations only when truly uncertain. Your goal is to be maximally helpful while maintaining accuracy.",
         searchResults: searchResults || [],
         sources: sources || [],
         chatHistory: chatHistory || [],

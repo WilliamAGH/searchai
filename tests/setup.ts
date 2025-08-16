@@ -5,24 +5,56 @@
 // Set up React act environment for testing
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
-// React 19 moved act from react-dom/test-utils to react package
-// This setup ensures compatibility for both import styles
-
-// Export act from React package for modern imports
-export { act } from "react";
-
-// Also make act available from react-dom/test-utils for legacy compatibility
-import { act } from "react";
+// Import React and expect from vitest
 import * as React from "react";
+import { expect } from "vitest";
 
-// Ensure React.act exists for any code that expects it
-if (!React.act) {
-  (React as any).act = act;
+// Ensure global React is available for Testing Library
+if (typeof globalThis !== "undefined" && !globalThis.React) {
+  (globalThis as any).React = React;
 }
 
-// Mock react-dom/test-utils to provide act for backward compatibility
-const testUtils = { act };
+// Best practice: use Testing Library's jest-dom matchers
+// (toBeInTheDocument, toBeDisabled, etc.)
+// This static import works after installing the package.
+// It coexists with the minimal polyfills below.
+// If your environment lacks network access, you can comment this out.
+// eslint-disable-next-line import/no-unresolved
+// oxlint-disable-next-line no-unassigned-import
+import "@testing-library/jest-dom/vitest";
 
-// Use vi.mock to override react-dom/test-utils
-import { vi } from "vitest";
-vi.doMock("react-dom/test-utils", () => testUtils);
+// React 19 + Testing Library v16+ handles act automatically
+// No need to mock react-dom/test-utils
+
+// Custom matchers for tests
+expect.extend({
+  toBeInTheDocument(received: unknown) {
+    const pass =
+      !!received &&
+      received instanceof Node &&
+      (received.ownerDocument?.contains(received) ||
+        (globalThis.document?.body?.contains?.(received as Node) ?? false));
+    return {
+      pass,
+      message: () =>
+        pass
+          ? "expected element not to be in the document"
+          : "expected element to be in the document",
+    };
+  },
+  toBeDisabled(received: unknown) {
+    const el = received as any;
+    const pass =
+      !!el &&
+      (el.hasAttribute?.("disabled") ||
+        el.disabled === true ||
+        el.getAttribute?.("aria-disabled") === "true");
+    return {
+      pass,
+      message: () =>
+        pass
+          ? "expected element to be enabled"
+          : "expected element to be disabled",
+    };
+  },
+} as any);

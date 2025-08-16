@@ -1,6 +1,33 @@
 import React, { useRef, useEffect, useMemo } from "react";
 import type { Message } from "../../lib/types/message";
 
+// Helper for stable ephemeral keys for messages without IDs
+const ephemeralKeyMap = new WeakMap<Message, string>();
+
+const getEphemeralKey = (msg: Message, index?: number): string => {
+  if (!msg) {
+    // Fallback for invalid message objects
+    return `invalid-${index ?? 0}-${Date.now().toString(36)}`;
+  }
+
+  let k = ephemeralKeyMap.get(msg);
+  if (!k) {
+    // Check if message has an id field (streaming messages)
+    const msgRecord = msg as Record<string, unknown>;
+    const existingId =
+      msg._id || (typeof msgRecord.id === "string" ? msgRecord.id : null);
+
+    if (existingId) {
+      k = String(existingId);
+    } else {
+      // Generate a truly unique ephemeral key
+      k = `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+    ephemeralKeyMap.set(msg, k);
+  }
+  return k;
+};
+
 export interface VirtualizedMessageListProps {
   messages: Message[];
   renderItem: (message: Message, index: number) => React.ReactNode;
@@ -69,9 +96,23 @@ export function VirtualizedMessageList({
         >
           {group.map((message, index) => {
             const actualIndex = groupIndex * 10 + index;
+            const messageKey =
+              message._id ?? getEphemeralKey(message, actualIndex);
+            const safeKey =
+              messageKey ||
+              `fallback-${actualIndex}-${Date.now().toString(36)}`;
+
+            if (!messageKey && import.meta.env.DEV) {
+              console.error("[KEY] VirtualizedList: Message has no key!", {
+                message,
+                actualIndex,
+                _id: message._id,
+              });
+            }
+
             return (
               <div
-                key={message._id || `msg-${actualIndex}`}
+                key={safeKey}
                 className="message-item"
                 data-message-index={actualIndex}
               >

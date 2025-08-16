@@ -4,15 +4,13 @@
  */
 
 import { BaseRepository } from "./ChatRepository";
-import {
+import type {
   UnifiedChat,
   UnifiedMessage,
   StreamChunk,
   ChatResponse,
-  IdUtils,
-  TitleUtils,
-  StorageUtils,
 } from "../types/unified";
+import { IdUtils, TitleUtils, StorageUtils } from "../types/unified";
 import {
   parseLocalChats,
   parseLocalMessages,
@@ -207,6 +205,8 @@ export class LocalChatRepository extends BaseRepository {
     this.aiService.abort();
 
     try {
+      // NOTE: User message is already added by useChatActions before calling generateResponse
+      // Don't add it again here to avoid duplicates
       // Get messages for context
       const localMessages = await this.getAllMessages();
       const context = {
@@ -242,27 +242,33 @@ export class LocalChatRepository extends BaseRepository {
             // Progress will be handled via message updates
           }
         },
-        onMessageCreate: async (message) => {
-          assistantMessageId = message._id;
-          // Save initial assistant message
-          await this.addMessage(chatId, {
-            role: "assistant",
-            content: "",
-            searchResults: message.searchResults,
-            sources: message.sources,
-            reasoning: message.reasoning,
-            searchMethod: message.searchMethod,
-            hasRealResults: message.hasRealResults,
-            isStreaming: true,
-          });
+        onMessageCreate: async (_message) => {
+          // NOTE: Assistant message is already created by useChatActions
+          // We just need to find it to update it
+          const allMessages = await this.getAllMessages();
+          const assistantMsg = allMessages
+            .filter((m) => m.chatId === chatId && m.role === "assistant")
+            .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+          if (assistantMsg) {
+            assistantMessageId = assistantMsg.id;
+          } else {
+            // Fallback: create one if not found (shouldn't happen)
+            const created = await this.addMessage(chatId, {
+              role: "assistant",
+              content: "",
+              isStreaming: true,
+            });
+            assistantMessageId = created.id;
+          }
 
           // Yield initial metadata
-          if (message.searchResults || message.sources) {
+          if (_message.searchResults || _message.sources) {
             metadata = {
-              searchResults: message.searchResults,
-              sources: message.sources,
-              searchMethod: message.searchMethod,
-              hasRealResults: message.hasRealResults,
+              searchResults: _message.searchResults,
+              sources: _message.sources,
+              searchMethod: _message.searchMethod,
+              hasRealResults: _message.hasRealResults,
             };
           }
         },
@@ -359,10 +365,11 @@ export class LocalChatRepository extends BaseRepository {
         };
         shareId = result.shareId;
         publicId = result.publicId;
-      } else {
+      } else if (privacy === "shared") {
         // Fallback to local IDs on non-200
-        if (privacy === "shared") shareId = generateLocalId("s");
-        else publicId = generateLocalId("p");
+        shareId = generateLocalId("s");
+      } else {
+        publicId = generateLocalId("p");
       }
     } catch {
       // Network or proxy unavailable — fallback to local IDs

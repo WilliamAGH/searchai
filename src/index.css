@@ -234,6 +234,88 @@
     overscroll-behavior-y: contain;
   }
 
+  /* Sonner Toast Notifications - Theme-aware styling */
+  /* Light mode toasts - use serif font */
+  html:not(.dark) [data-sonner-toaster] {
+    font-family:
+      "Playfair Display", "Georgia", "Times New Roman", serif !important;
+  }
+
+  html:not(.dark) [data-sonner-toast] {
+    font-family:
+      "Playfair Display", "Georgia", "Times New Roman", serif !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    letter-spacing: 0.01em !important;
+    background: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: var(--radius) !important;
+    box-shadow:
+      0 4px 6px -1px rgb(0 0 0 / 0.1),
+      0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+  }
+
+  html:not(.dark) [data-sonner-toast][data-type="success"] {
+    background: hsl(var(--primary) / 0.1) !important;
+    border-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  html:not(.dark) [data-sonner-toast][data-type="error"] {
+    background: hsl(var(--destructive) / 0.1) !important;
+    border-color: hsl(var(--destructive)) !important;
+    color: hsl(var(--destructive-foreground)) !important;
+  }
+
+  html:not(.dark) [data-sonner-toast][data-type="info"] {
+    background: hsl(var(--accent) / 0.1) !important;
+    border-color: hsl(var(--accent)) !important;
+  }
+
+  /* Dark mode toasts - use mono font */
+  html.dark [data-sonner-toaster] {
+    font-family: "JetBrains Mono", "SF Mono", monospace !important;
+  }
+
+  html.dark [data-sonner-toast] {
+    font-family: "JetBrains Mono", "SF Mono", monospace !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    letter-spacing: 0.02em !important;
+    background: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: var(--radius) !important;
+    box-shadow:
+      0 10px 15px -3px rgb(0 0 0 / 0.3),
+      0 4px 6px -4px rgb(0 0 0 / 0.3) !important;
+  }
+
+  html.dark [data-sonner-toast][data-type="success"] {
+    background: hsl(var(--primary) / 0.15) !important;
+    border-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  html.dark [data-sonner-toast][data-type="error"] {
+    background: hsl(var(--destructive) / 0.15) !important;
+    border-color: hsl(var(--destructive)) !important;
+    color: hsl(0 100% 70%) !important;
+  }
+
+  html.dark [data-sonner-toast][data-type="info"] {
+    background: hsl(var(--accent)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--accent-foreground)) !important;
+  }
+
+  /* Toast action buttons */
+  [data-sonner-toast] button {
+    font-family: inherit !important;
+    font-size: inherit !important;
+  }
+
   /* UI sans stack used for user-entered text and UI labels */
   .font-ui {
     font-family:
@@ -433,8 +515,97 @@ html.dark .prose code {
   animation: slide-up 0.3s ease-out both;
 }
 
+@keyframes scale-in {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Orb glow animation for assistant avatar when processing */
+@keyframes orb-glow {
+  0%,
+  100% {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    opacity: 0.85;
+    filter: brightness(1.2) saturate(1.2);
+  }
+}
+
+.animate-orb-glow {
+  animation: orb-glow 1.5s ease-in-out infinite;
+  position: relative;
+}
+
+/* Subtle pulsing ring effect using inset box-shadow instead of border */
+.animate-orb-glow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4);
+  animation: orb-ring 1.5s ease-in-out infinite;
+}
+
+@keyframes orb-ring {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+/* Animated ellipsis dots for processing text */
+@keyframes ellipsis-dot {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+}
+
+.animate-ellipsis-dot {
+  animation: ellipsis-dot 1.4s infinite;
+  display: inline-block;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animation-delay-400 {
+  animation-delay: 400ms;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-slide-up {
+  .animate-slide-up,
+  .animate-scale-in {
     animation: none !important;
   }
 }

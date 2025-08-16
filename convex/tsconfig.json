@@ -18,7 +18,10 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+
+    /* Fix iteration issues with Set/Map */
+    "downlevelIteration": true
   },
   "include": ["./**/*"],
   "exclude": ["./_generated", "../node_modules", "node_modules"]

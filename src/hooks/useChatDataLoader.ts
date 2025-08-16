@@ -17,10 +17,25 @@ export function useChatDataLoader(
   useEffect(() => {
     if (!repository) return;
 
+    let mounted = true;
+
     const loadChats = async () => {
+      if (!mounted) return;
+
+      // In development, log chat loading for debugging
+      // Debug logging in development only
+      // [CHAT_LOADER] Loading chats from repository
+
       setState((prev) => ({ ...prev, isLoading: true }));
       try {
         const chats = await repository.getChats();
+
+        if (!mounted) return;
+
+        // In development, log loaded chats for debugging
+        // Debug: Loaded chats from repository
+        // Count: chats.length
+
         setState((prev) => ({
           ...prev,
           chats,
@@ -28,6 +43,8 @@ export function useChatDataLoader(
           error: null,
         }));
       } catch (error) {
+        if (!mounted) return;
+
         logger.error("Failed to load chats:", error);
         setState((prev) => ({
           ...prev,
@@ -39,29 +56,27 @@ export function useChatDataLoader(
     };
 
     loadChats();
+
+    return () => {
+      mounted = false;
+    };
   }, [repository, setState]);
 
   // Auto-select first chat if none selected
+  // Note: Disabled to prevent conflicts with URL sync and route navigation
+  // The chat selection should be handled by URL state sync or explicit user action
+  /*
   useEffect(() => {
+    if (!repository) return;
+
+    // Check state directly to avoid re-running on setState changes
     setState((prev) => {
-      if (!prev.currentChatId && prev.chats.length > 0 && repository) {
+      // Only auto-select if we have chats but no current selection
+      if (!prev.currentChatId && prev.chats.length > 0) {
         const firstChat = prev.chats[0];
-
-        // Load messages for first chat asynchronously
-        repository
-          .getMessages(firstChat.id)
-          .then((messages) => {
-            setState((current) => ({
-              ...current,
-              currentChatId: firstChat.id,
-              currentChat: firstChat,
-              messages,
-            }));
-          })
-          .catch((error) => {
-            logger.error("Failed to load messages for first chat:", error);
-          });
-
+        
+        // Set the initial chat selection
+        // Messages will be loaded separately by other hooks
         return {
           ...prev,
           currentChatId: firstChat.id,
@@ -70,5 +85,6 @@ export function useChatDataLoader(
       }
       return prev;
     });
-  }, [repository, setState]);
+  }, [repository]); // Remove setState from deps to prevent loops
+  */
 }

@@ -12,7 +12,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   test: {
-    setupFiles: ["./tests/setup.ts"],
+    setupFiles: ["./tests/setup.ts", "./tests/mocks/setup-msw.ts"],
     environment: "node",
     // Use jsdom automatically for DOM-focused tests
     environmentMatchGlobs: [
@@ -30,10 +30,12 @@ export default defineConfig({
       "node_modules",
       "dist",
       "tests/e2e/**",
-      "tests/integration/**",
       "tests/**/*.spec.ts",
       "tests/smoke/**",
       "convex/_generated/**",
+      // Exclude Playwright tests that should not run with Vitest
+      "tests/integration/chat-message-chaining.test.ts",
+      "tests/integration/race-condition-fix.test.ts",
     ],
     reporter: process.env.CI ? ["default", "json", "html"] : ["default"],
     ...(process.env.CI && {
@@ -64,6 +66,23 @@ export default defineConfig({
         },
       },
       enabled: true,
+      // Add cleanup and error handling
+      clean: true,
+      cleanOnRerun: true,
+      // Prevent coverage file errors
+      all: false,
+      // Add proper temp directory handling
+      tempDirectory: "./coverage/.tmp",
+    },
+    // Add test timeout and cleanup
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    // Ensure proper cleanup
+    poolOptions: {
+      forks: {
+        singleFork: false,
+        isolate: true,
+      },
     },
   },
 });

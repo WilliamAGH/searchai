@@ -8,6 +8,7 @@ import { ChatSidebar } from "../ChatSidebar";
 import { MobileSidebar } from "../MobileSidebar";
 import { MessageList } from "../MessageList";
 import { MessageInput } from "../MessageInput";
+import { ChatToolbar } from "../ChatToolbar";
 import { FollowUpPrompt } from "../FollowUpPrompt";
 import { UndoBanner } from "../UndoBanner";
 import { ShareModalContainer } from "../ShareModalContainer";
@@ -66,7 +67,6 @@ interface ChatLayoutProps {
     chatId: string;
     privacy: "private" | "shared" | "public";
   }) => Promise<void>;
-  navigateWithVerification: (path: string) => Promise<void>;
   buildChatPath: (chatId: string) => string;
   fetchJsonWithRetry: <T>(url: string, init?: RequestInit) => Promise<T>;
   resolveApi: (path: string) => string;
@@ -97,7 +97,6 @@ export function ChatLayout({
   chatState: _chatState,
   chatActions,
   updateChatPrivacy: _updateChatPrivacy,
-  navigateWithVerification: _navigateWithVerification,
   buildChatPath: _buildChatPath,
   fetchJsonWithRetry: _fetchJsonWithRetry,
   resolveApi,
@@ -122,9 +121,31 @@ export function ChatLayout({
         {...swipeHandlers}
       >
         <div className="flex-1 flex flex-col min-h-0">
-          <MessageList key={String(currentChatId)} {...messageListProps} />
+          <MessageList
+            key={String(currentChatId)}
+            {...messageListProps}
+            currentChatId={currentChatId}
+            chatTitle={currentChat?.title}
+            onShareChat={_openShareModal}
+          />
+
+          {/* Chat-wide copy and share toolbar - only show when we have a persisted chat with messages */}
+          {currentChatId &&
+            messageListProps.messages?.length > 0 &&
+            messageListProps.messages.some((m) => m.role === "assistant") && (
+              <ChatToolbar
+                onShare={_openShareModal}
+                onNewChat={chatSidebarProps.onNewChat}
+                messages={messageListProps.messages}
+                chatTitle={currentChat?.title}
+              />
+            )}
         </div>
-        <div className="flex-shrink-0 relative pb-16">
+        <div
+          className={`flex-shrink-0 relative ${
+            showFollowUpPrompt ? "pb-16" : ""
+          }`}
+        >
           <FollowUpPrompt
             isOpen={showFollowUpPrompt}
             onContinue={handleContinueChat}
@@ -134,7 +155,6 @@ export function ChatLayout({
             hintConfidence={plannerHint?.confidence}
           />
 
-          {/* Remove share button - now using icon in MessageInput */}
           {undoBanner && (
             <UndoBanner
               type={undoBanner.message.includes("Chat") ? "chat" : "message"}

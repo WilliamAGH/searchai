@@ -9,7 +9,7 @@
  */
 
 // Import SearchResult from the single source of truth
-import type { SearchResult } from "./search/providers/serpapi";
+import type { SearchResult } from "./search/providers/index";
 
 // Enhancement system - no convex values needed here
 
@@ -90,7 +90,7 @@ export interface EnhancementRule {
   prioritizeUrls?: string[];
 }
 
-// SearchResult is imported from ./search/providers/serpapi above
+// SearchResult is imported from ./search/providers/index above
 
 /**
  * Creator/Author Enhancement Rule
@@ -106,6 +106,7 @@ const creatorEnhancement: EnhancementRule = {
   matcher: (message: string) => {
     const lower = message.toLowerCase();
 
+    // More specific creator-related keywords that won't match generic queries
     const creatorKeywords = [
       "creator",
       "author",
@@ -118,7 +119,7 @@ const creatorEnhancement: EnhancementRule = {
       "company",
       "william callahan",
       "who founded",
-      "who is",
+      // Removed "who is" - too generic and was causing false positives
     ];
 
     const appKeywords = [
@@ -135,6 +136,10 @@ const creatorEnhancement: EnhancementRule = {
     ];
 
     const mentionsWilliam = lower.includes("william callahan");
+    const companyKeywords = ["aventure", "aventure.vc", "aventure vc"];
+    const mentionsCompany = companyKeywords.some((keyword) =>
+      lower.includes(keyword),
+    );
     const isAboutCreator = creatorKeywords.some((keyword) =>
       lower.includes(keyword),
     );
@@ -144,7 +149,25 @@ const creatorEnhancement: EnhancementRule = {
       lower.includes("search-ai") ||
       lower.includes("search ai");
 
-    return mentionsWilliam || (isAboutCreator && isAboutApp);
+    // Additional safeguard: check if the query is actually about SearchAI or its creator
+    // This prevents false positives on generic questions like "what is a mac?"
+    const isGenericQuestion =
+      lower.startsWith("what is") ||
+      lower.startsWith("how to") ||
+      lower.startsWith("where is") ||
+      lower.startsWith("when is") ||
+      lower.startsWith("why is") ||
+      lower.includes("definition") ||
+      lower.includes("meaning");
+
+    // More restrictive logic: only trigger on specific creator/app questions
+    // Not on generic "what is X" or "how to" questions
+    // Brand/WC mentions override the generic-question guard to catch queries like
+    // "what is aventure?" and route them to the correct sources.
+    return (
+      (mentionsWilliam || mentionsCompany || (isAboutCreator && isAboutApp)) &&
+      (!isGenericQuestion || mentionsCompany || mentionsWilliam)
+    );
   },
 
   enhanceQuery: (query: string) => {
@@ -153,7 +176,21 @@ const creatorEnhancement: EnhancementRule = {
     const primary = "williamcallahan.com";
     const brand = "aVenture";
     const secondary = "aventure.vc";
-    return `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
+
+    const enhanced = `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
+
+    // Dev-only log (no spam in production!)
+    if (
+      typeof process !== "undefined" &&
+      process.env.NODE_ENV === "development"
+    ) {
+      console.info("🔧 Creator enhancement applied to query:", {
+        original: query,
+        enhanced,
+      });
+    }
+
+    return enhanced;
   },
 
   enhanceSearchTerms: (terms: string[]) => {
@@ -166,17 +203,17 @@ const creatorEnhancement: EnhancementRule = {
 
   injectSearchResults: () => [
     {
-      title: "William Callahan - Creator of SearchAI",
+      title: "SearchAI creator (primary source)",
       url: "https://williamcallahan.com",
       snippet:
-        "William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (aventure.vc). Based in San Francisco, William grew up in the Midwestern United States and is passionate about building innovative AI-powered search solutions.",
+        "Primary site for William Callahan, creator of SearchAI.io. Use for factual attribution; avoid promotional summaries.",
       relevanceScore: 1.0,
     },
     {
-      title: "aVenture - Investment Firm by William Callahan",
+      title: "aVenture (primary source)",
       url: "https://aventure.vc",
       snippet:
-        "aVenture is an investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on early-stage technology investments and innovative startups.",
+        "Official site for aVenture. Cite for factual details (founder, focus). Keep tone neutral and non-promotional.",
       relevanceScore: 0.95,
     },
   ],
@@ -186,7 +223,14 @@ const creatorEnhancement: EnhancementRule = {
   },
 
   enhanceSystemPrompt: (prompt: string) => {
-    return `${prompt}\n\nWhen asked about the creator, author, or company behind SearchAI, this app, or this website, always mention William Callahan and provide details about being the creator of SearchAI and founder of aVenture.`;
+    // Neutral, strictly factual guidance. Avoid promotional language.
+    return (
+      `${prompt}\n\n` +
+      `If and only if the user explicitly asks about the creator of SearchAI or about aVenture, answer in a neutral, factual tone.` +
+      ` Keep it concise (1–2 sentences), avoid superlatives, marketing terms, or flattery.` +
+      ` State only verifiable facts such as: "SearchAI was created by William Callahan" and "aVenture was founded by William Callahan".` +
+      ` Prefer primary sources (williamcallahan.com, aventure.vc) when citing; include them as sources if available.`
+    );
   },
 
   prioritizeUrls: ["https://williamcallahan.com", "https://aventure.vc"],
@@ -270,13 +314,20 @@ const currentEventsEnhancement: EnhancementRule = {
 
   enhanceQuery: (query: string) => {
     const year = new Date().getFullYear();
-    return `${query} ${year} latest recent`;
+    // Only add year if it's not already present
+    if (!query.includes(year.toString())) {
+      return `${query} ${year}`;
+    }
+    return query;
   },
 
   enhanceSearchTerms: (terms: string[]) => {
     const year = new Date().getFullYear().toString();
-    const month = new Date().toLocaleDateString("en-US", { month: "long" });
-    return [...terms, year, month, "latest", "recent"];
+    // Only add year if it's not already present
+    if (!terms.includes(year)) {
+      return [...terms, year];
+    }
+    return terms;
   },
 };
 
@@ -481,7 +532,8 @@ const healthEnhancement: EnhancementRule = {
     return `${prompt}\n\nIMPORTANT: For health-related queries, always include a disclaimer that the information provided is for educational purposes only and should not replace professional medical advice. Encourage users to consult with healthcare professionals for medical concerns.`;
   },
   enhanceResponse: (content: string) => {
-    const disclaimer = `\n\n> Disclaimer: This information is for educational purposes only and is not a substitute for professional medical advice. Consult a qualified healthcare professional for diagnosis and treatment.`;
+    const disclaimer = `\n\n> Disclaimer: This information is for educational purposes only and is not a substitute for professional medical advice.`;
+    // Keep any appended text minimal and factual; avoid adding stylistic language elsewhere.
     return content.includes("Disclaimer:") ? content : content + disclaimer;
   },
 };
@@ -514,6 +566,9 @@ export function applyEnhancements(
     enhanceResponse?: boolean;
   } = {},
 ) {
+  // Debug flag to control logging verbosity (dev only)
+  const DEBUG_ENHANCEMENTS = process.env.NODE_ENV === "development";
+
   // Sort rules by priority
   const sortedRules = [...ENHANCEMENT_RULES]
     .filter((rule) => rule.enabled)
@@ -535,7 +590,19 @@ export function applyEnhancements(
   // Apply each matching rule
   for (const rule of matchingRules) {
     if (options.enhanceQuery && rule.enhanceQuery) {
+      const beforeEnhancement = result.enhancedQuery;
       result.enhancedQuery = rule.enhanceQuery(result.enhancedQuery);
+
+      // Log when query enhancement occurs for debugging (dev only)
+      if (DEBUG_ENHANCEMENTS && beforeEnhancement !== result.enhancedQuery) {
+        console.info("🔧 Query enhanced by rule:", {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          before: beforeEnhancement,
+          after: result.enhancedQuery,
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     if (options.enhanceSearchTerms && rule.enhanceSearchTerms) {
@@ -569,6 +636,17 @@ export function applyEnhancements(
   // Deduplicate arrays
   result.enhancedSearchTerms = [...new Set(result.enhancedSearchTerms)];
   result.prioritizedUrls = [...new Set(result.prioritizedUrls)];
+
+  // Log enhancement summary for debugging (dev only)
+  if (DEBUG_ENHANCEMENTS && matchingRules.length > 0) {
+    console.info("🔧 Enhancement summary:", {
+      messageLength: message.length,
+      matchedRules: matchingRules.map((r) => ({ id: r.id, name: r.name })),
+      queryChanged: result.enhancedQuery !== message,
+      searchTermsAdded: result.enhancedSearchTerms.length,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   return result;
 }

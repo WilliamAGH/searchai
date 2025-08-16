@@ -3,12 +3,8 @@
  * Uses Google search via SerpAPI for high-quality results
  */
 
-export interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-}
+import { logger } from "../../lib/logger";
+import type { SearchResult } from "./index";
 
 interface SerpApiResponse {
   organic_results?: Array<{
@@ -29,23 +25,30 @@ interface SerpApiResponse {
  * @param maxResults - Max results to return
  * @returns Array of search results
  */
-export async function searchWithSerpApiDuckDuckGo(
+export async function searchWithSerpApi(
   query: string,
   maxResults: number,
 ): Promise<SearchResult[]> {
+  // Validate API key exists
+  if (!process.env.SERP_API_KEY) {
+    logger.error("❌ SERP_API_KEY not configured");
+    throw new Error("SERP_API_KEY is not configured on the server");
+  }
+
   const apiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${process.env.SERP_API_KEY}&hl=en&gl=us&num=${maxResults}`;
   const requestLog = {
     queryLength: query.length,
     maxResults,
     timestamp: new Date().toISOString(),
   };
-  console.info("🔍 SERP API Request:", requestLog);
+  logger.info("🔍 SERP API Request:", requestLog);
 
   try {
     const response = await fetch(apiUrl, {
       headers: {
         "User-Agent": "SearchChat/1.0 (Web Search Assistant)",
       },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
     });
 
     const safeLog = {
@@ -55,12 +58,12 @@ export async function searchWithSerpApiDuckDuckGo(
       endpoint: "https://serpapi.com/search.json",
       queryLength: query.length,
     } as const;
-    console.info("📊 SERP API Response:", safeLog);
+    logger.info("📊 SERP API Response:", safeLog);
 
     if (!response.ok) {
       const errorText = await response.text();
       const errorMessage = `SERP API returned ${response.status} ${response.statusText}: ${errorText}`;
-      console.error("❌ SERP API Error Details:", {
+      logger.error("❌ SERP API Error Details:", {
         status: response.status,
         statusText: response.statusText,
         errorText,
@@ -72,7 +75,7 @@ export async function searchWithSerpApiDuckDuckGo(
     }
 
     const data: SerpApiResponse = await response.json();
-    console.info("✅ SERP API Success:", {
+    logger.info("✅ SERP API Success:", {
       hasOrganic: !!data.organic_results,
       count: data.organic_results?.length || 0,
       queryLength: query.length,
@@ -89,7 +92,7 @@ export async function searchWithSerpApiDuckDuckGo(
           relevanceScore: 0.9,
         }));
 
-      console.info("📋 SERP API Results Parsed:", {
+      logger.info("📋 SERP API Results Parsed:", {
         resultCount: results.length,
         sampleResults: results.slice(0, 2).map((r) => ({
           title: r.title,
@@ -102,13 +105,13 @@ export async function searchWithSerpApiDuckDuckGo(
       return results;
     }
 
-    console.log("⚠️ SERP API No Results:", {
+    logger.debug("⚠️ SERP API No Results:", {
       queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
     return [];
   } catch (error) {
-    console.error("💥 SERP API Exception:", {
+    logger.error("💥 SERP API Exception:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : "No stack trace",
       queryLength: query.length,

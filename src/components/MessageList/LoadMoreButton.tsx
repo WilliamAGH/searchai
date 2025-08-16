@@ -4,6 +4,7 @@
  */
 
 import React from "react";
+import { Spinner } from "../ui/Spinner";
 
 interface LoadMoreButtonProps {
   isLoading: boolean;
@@ -33,7 +34,7 @@ export function LoadMoreButton({
     <div className="flex justify-center py-4">
       <button
         type="button"
-        data-testid="loadMore"
+        data-testid="load-more-button"
         onClick={onLoadMore}
         disabled={isLoading}
         className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -41,26 +42,7 @@ export function LoadMoreButton({
       >
         {isLoading ? (
           <>
-            <svg
-              className="animate-spin h-4 w-4"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
+            <Spinner size="sm" aria-label="Loading older messages" />
             <span>Loading messages...</span>
           </>
         ) : (
@@ -87,22 +69,5 @@ export function LoadMoreButton({
   );
 }
 
-/**
- * Loading skeleton for messages
- * Shows while initial messages are loading
- */
-export function MessageLoadingSkeleton() {
-  return (
-    <div className="space-y-4 p-4 animate-pulse">
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="flex gap-3">
-          <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex-shrink-0" />
-          <div className="flex-1 space-y-2">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+// Note: MessageLoadingSkeleton functionality has been merged into MessageSkeleton
+// Use: import { MessageSkeleton } from "./MessageSkeleton" with variant="simple"

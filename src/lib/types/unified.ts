@@ -4,7 +4,81 @@
  * Per AGENT.md: NO database entity types - use Doc<T> from Convex directly
  */
 
-import { Id } from "../../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
+import type { SearchResult } from "./message";
+
+/**
+ * Unified message type for repositories
+ * Uses 'id' field consistently across all storage backends
+ */
+export interface UnifiedMessage {
+  id: string; // Unified ID field (not _id)
+  chatId: string;
+  role: "user" | "assistant" | "system";
+  content?: string;
+  timestamp?: number;
+
+  // Search and AI metadata
+  searchResults?: SearchResult[];
+  sources?: string[];
+  reasoning?: string;
+  searchMethod?: "serp" | "openrouter" | "duckduckgo" | "fallback";
+  hasRealResults?: boolean;
+  isStreaming?: boolean;
+  streamedContent?: string;
+  thinking?: string;
+
+  // Source tracking
+  source?: "local" | "convex";
+  synced?: boolean;
+
+  // Original ID fields for compatibility
+  _id?: string; // Convex/Local original ID
+  _creationTime?: number; // Convex creation time
+}
+
+/**
+ * Unified chat type for repositories
+ * Uses 'id' field consistently across all storage backends
+ */
+export interface UnifiedChat {
+  id: string; // Unified ID field (not _id)
+  title?: string;
+  createdAt: number;
+  updatedAt: number;
+  privacy: "private" | "shared" | "public";
+  shareId?: string;
+  publicId?: string;
+  userId?: string;
+
+  // Source tracking
+  source?: "local" | "convex";
+  synced?: boolean;
+
+  // Original ID fields for compatibility
+  _id?: string; // Convex/Local original ID
+  _creationTime?: number; // Convex creation time
+}
+
+/**
+ * Stream chunk for real-time message updates
+ */
+export interface StreamChunk {
+  type: "content" | "metadata" | "error" | "done" | "chunk";
+  content?: string;
+  thinking?: string;
+  reasoning?: string;
+  metadata?: Partial<UnifiedMessage>;
+  error?: string;
+}
+
+/**
+ * Chat creation response
+ */
+export interface ChatResponse {
+  chat: UnifiedChat;
+  isNew: boolean;
+}
 
 /**
  * Operation for offline-first sync (future feature)
@@ -98,17 +172,27 @@ export const TitleUtils = {
       return trimmed;
     }
 
+    // Check if this is a loading/status message that shouldn't have ellipsis
+    const isLoadingMessage =
+      /^(Generating|Processing|Searching|Analyzing|Planning|Composing|Loading|Thinking)/i.test(
+        trimmed,
+      );
+
     // Try to break at word boundary
     const truncated = trimmed.substring(0, maxLength);
     const lastSpace = truncated.lastIndexOf(" ");
 
     // Prefer word boundary if it's at least halfway into the truncated text
     if (lastSpace >= Math.floor(maxLength / 2)) {
-      return truncated.substring(0, lastSpace) + "...";
+      // Don't add ellipsis to loading messages
+      return isLoadingMessage
+        ? truncated.substring(0, lastSpace)
+        : truncated.substring(0, lastSpace) + "...";
     }
 
     // Otherwise just truncate
-    return truncated + "...";
+    // Don't add ellipsis to loading messages
+    return isLoadingMessage ? truncated : truncated + "...";
   },
 
   /**

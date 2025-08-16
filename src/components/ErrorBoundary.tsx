@@ -5,7 +5,8 @@
  * Essential for production stability and user experience
  */
 
-import React, { Component, ReactNode } from "react";
+import type { ReactNode } from "react";
+import React, { Component } from "react";
 import { logger } from "../lib/logger";
 
 /**

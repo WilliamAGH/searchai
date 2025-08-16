@@ -9,11 +9,26 @@ Built with React + Vite on the frontend and Convex on the backend.
 - **API Endpoints**: HTTP routes in Convex serve unauthenticated users
 - **Real-time**: Convex mutations/actions for authenticated users
 
+### Project Rules & Guidance
+
+- See `.cursor/rules/*.mdc` for canonical engineering rules (Testing, Convex, Pagination, Chat domain, Migrations).
+- See `AGENT.md` for the overall development configuration and links to the rule files.
+
 ### Recent Improvements (Overview)
 
 - Context-aware planner with deterministic query augmentation and anchor queries for higher search relevance (auth + unauth flows).
 - Non-blocking topic-change suggestions (banner) with stricter gating, cooldowns, and Enter-to-send preserved.
 - Shared DRY summarization (`buildContextSummary`) used by planner and generation paths.
+
+### Persistence & Deep Links
+
+- Convex-only persistence: The app enforces Convex as the single source of truth for chats/messages (including anonymous sessions via `sessionId`). If Convex is unavailable or misconfigured, chat creation and message sending are disabled and a user-facing toast indicates the service is unavailable.
+- Deep links: Visiting `/chat/:chatId`, `/s/:shareId`, or `/p/:publicId` selects the corresponding chat. Share/public routes remain on their canonical URLs.
+
+Troubleshooting:
+
+- Ensure `VITE_CONVEX_URL` is set. If not, `useChatRepository()` will not initialize and the UI will show a service-unavailable message for chat actions.
+- If you see navigation issues, verify routes and query params match the expected patterns above.
 
 ## Structure
 
@@ -157,11 +172,14 @@ You MUST deploy Convex functions when:
 ### Development Deployment
 
 ```bash
-# Start dev server (auto-deploys on file changes)
+# Start dev server (auto-deploys on file changes to YOUR dev deployment)
 npx convex dev
 
-# Or deploy once without watching
+# Deploy once to dev without watching (useful for CI/testing)
 npx convex dev --once
+
+# Run with local backend (for testing without using cloud resources)
+npx convex dev --local --once
 ```
 
 ### Production Deployment
@@ -335,7 +353,7 @@ npm test
 - Install dependencies once: `npm i -D @playwright/test` then:
   - macOS/Windows: `npx playwright install`
   - Linux/CI: `npx playwright install --with-deps`
-- Serve the built app on <http://localhost:4173> via `npm run preview` (the Playwright config handles this automatically via `webServer`).
+- Serve the built app on <http://localhost:5173> via `npm run preview` (the Playwright config handles this automatically via `webServer`).
 - Run manually: `npx playwright test -g smoke --reporter=line` or `npm run test:smoke`.
 - The Husky pre-push hook runs this smoke test and fails the push if there are console errors or failed network requests on the home page.
 

@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 let idCounter = 0;
 
@@ -41,6 +42,60 @@ export function getSafeTimestamp(): number {
     return 0; // Will be updated on client hydration
   }
   return Date.now();
+}
+
+/**
+ * Runtime type guard for Convex chat ID validation
+ * Convex IDs are 32-33 character strings that:
+ * - Start with 'j'
+ * - Contain only lowercase letters and numbers
+ * Examples: jx7e5gwa92qprwdghxk0rzgmm57nrxsc, jx7042axq42zkrpd9768ycfs417nrk2f
+ */
+export function isConvexChatId(id: string): id is Id<"chats"> {
+  // Convex IDs start with 'j' and are 32-33 chars of alphanumeric
+  return (
+    typeof id === "string" &&
+    id.length >= 32 &&
+    id.length <= 33 &&
+    id.startsWith("j") &&
+    /^[a-z0-9]+$/.test(id)
+  );
+}
+
+/**
+ * Runtime type guard for Convex message ID validation
+ * Convex IDs are 32-33 character strings that:
+ * - Start with 'j'
+ * - Contain only lowercase letters and numbers
+ */
+export function isConvexMessageId(id: string): id is Id<"messages"> {
+  // Convex IDs start with 'j' and are 32-33 chars of alphanumeric
+  return (
+    typeof id === "string" &&
+    id.length >= 32 &&
+    id.length <= 33 &&
+    id.startsWith("j") &&
+    /^[a-z0-9]+$/.test(id)
+  );
+}
+
+/**
+ * Generic runtime type guard for any Convex ID validation
+ * Convex IDs are 32-33 character strings that:
+ * - Start with 'j'
+ * - Contain only lowercase letters and numbers
+ * @param id - The string to validate
+ * @returns True if the string is a valid Convex ID format
+ */
+export function isConvexId(id: string): boolean {
+  // Convex IDs start with 'j' and are 32-33 chars of alphanumeric
+  return (
+    typeof id === "string" &&
+    id.length >= 32 &&
+    id.length <= 33 &&
+    id.startsWith("j") &&
+    /^[a-z0-9]+$/.test(id)
+  );
 }
 
 /**

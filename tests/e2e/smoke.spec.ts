@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test("smoke: no console errors on home", async ({ page, baseURL }) => {
+  await setupMSWForTest(page);
+
   const consoleErrors: string[] = [];
   const requestFailures: string[] = [];
   const responseFailures: string[] = [];
@@ -41,7 +44,7 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
     }
   });
 
-  const target = baseURL ?? "http://localhost:4173";
+  const target = baseURL ?? "http://localhost:5180";
   await page.goto(target, { waitUntil: "domcontentloaded" });
 
   // Basic sanity: page renders something meaningful
@@ -80,4 +83,6 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
   expect
     .soft(consoleErrors, `No console errors.\n${consoleErrors.join("\n")}`)
     .toEqual([]);
+
+  await cleanupMSWForTest(page);
 });

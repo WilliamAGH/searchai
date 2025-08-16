@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { UnifiedChat, UnifiedMessage } from "../lib/types/unified";
+import type { Id } from "../../convex/_generated/dataModel";
 
 /**
  * Complete chat application state interface
@@ -52,6 +53,13 @@ export interface ChatState {
   isMobile: boolean;
   /** Sidebar visibility state */
   isSidebarOpen: boolean;
+  // NEW: Add streaming state for real-time updates
+  streamingState?: {
+    isStreaming: boolean;
+    streamingContent: string;
+    streamingMessageId?: Id<"messages"> | string;
+    thinking?: string;
+  };
 }
 
 /**

@@ -13,7 +13,9 @@ import React, {
 } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { isConvexChatId } from "../../lib/utils/id";
 import { useUnifiedChat } from "../../hooks/useUnifiedChat";
+import { useNavigate } from "react-router-dom";
 import { useChatNavigation } from "../../hooks/useChatNavigation";
 import { useDraftAnalyzer } from "../../hooks/useDraftAnalyzer";
 import { useMessageHandler } from "../../hooks/useMessageHandler";
@@ -30,6 +32,7 @@ import { useSidebarTiming } from "../../hooks/useSidebarTiming";
 import { usePaginatedMessages } from "../../hooks/usePaginatedMessages";
 import { logger } from "../../lib/logger";
 import { ChatLayout } from "./ChatLayout";
+import { toast } from "sonner";
 import type { Chat } from "../../lib/types/chat";
 import { createChatFromData } from "../../lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "../../lib/constants/topicDetection";
@@ -40,6 +43,7 @@ import {
 } from "../../lib/utils/httpUtils";
 import { isTopicChange } from "../../lib/utils/topicDetection";
 import { mapMessagesToLocal } from "../../lib/utils/messageMapper";
+import { ANON_SESSION_KEY } from "../../lib/constants/session";
 import { buildUserHistory } from "../../lib/utils/chatHistory";
 
 function ChatInterfaceComponent({
@@ -61,6 +65,7 @@ function ChatInterfaceComponent({
   onRequestSignUp?: () => void;
   onRequestSignIn?: () => void;
 }) {
+  const navigate = useNavigate();
   const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
   const apiBase = buildApiBase(convexUrl);
   const resolveApi = useCallback(
@@ -74,6 +79,7 @@ function ChatInterfaceComponent({
   const unified = useUnifiedChat();
   const chatState = unified;
   const chatActions = unified;
+  const isServiceAvailable = !!unified.repository;
   const currentChatId = chatState.currentChatId;
   const isGenerating = chatState.isGenerating || localIsGenerating;
   const searchProgress = chatState.searchProgress;
@@ -102,13 +108,37 @@ function ChatInterfaceComponent({
   const allChats = useMemo(() => {
     let baseChats: Chat[] = [];
 
+    logger.debug(
+      "[CHAT_INTERFACE] Building allChats from:",
+      chats.length,
+      "chats",
+    );
+    logger.debug(
+      "[CHAT_INTERFACE] Current sessionId:",
+      (window as unknown as { sessionId?: string }).sessionId ||
+        localStorage.getItem(ANON_SESSION_KEY),
+    );
+    logger.debug("[CHAT_INTERFACE] Is authenticated:", isAuthenticated);
+    logger.debug(
+      "[CHAT_INTERFACE] Raw chats:",
+      chats.map((c) => ({
+        id: c.id,
+        _id: (c as unknown as { _id?: string })._id,
+        title: c.title,
+        sessionId: (c as unknown as { sessionId?: string }).sessionId,
+      })),
+    );
+
     // The unified hook handles both authenticated and unauthenticated states
     // Convert from unified format to local format for compatibility
     if (chats && chats.length > 0) {
       baseChats = chats.map((chat) =>
         createChatFromData(
           {
-            _id: chat.id || chat._id,
+            // CRITICAL: Use the unified 'id' field as _id to ensure uniqueness
+            // UnifiedChat has 'id' as primary identifier
+            _id: chat.id,
+            id: chat.id,
             title: chat.title,
             createdAt: chat.createdAt,
             updatedAt: chat.updatedAt,
@@ -126,16 +156,13 @@ function ChatInterfaceComponent({
     return baseChats;
   }, [isAuthenticated, chats]);
 
-  const {
-    navigateWithVerification,
-    buildChatPath,
-    handleSelectChat: navHandleSelectChat,
-  } = useChatNavigation({
-    currentChatId,
-    allChats,
-    isAuthenticated,
-    onSelectChat: chatActions.selectChat,
-  });
+  const { buildChatPath, handleSelectChat: navHandleSelectChat } =
+    useChatNavigation({
+      currentChatId,
+      allChats,
+      isAuthenticated,
+      onSelectChat: chatActions.selectChat,
+    });
   const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
   const generateResponse = useAction(api.ai.generateStreamingResponse);
   const planSearch = useAction(api.search.planSearch);
@@ -171,13 +198,24 @@ function ChatInterfaceComponent({
 
   const handleSelectChat = useCallback(
     (id: Id<"chats"> | string) => {
+      logger.debug("[CHAT_INTERFACE] handleSelectChat called with:", id);
+      logger.debug(
+        "[CHAT_INTERFACE] Current chat before selection:",
+        currentChatId,
+      );
       userSelectedChatAtRef.current = Date.now();
       navHandleSelectChat(String(id));
+      logger.debug(
+        "[CHAT_INTERFACE] Called navHandleSelectChat with:",
+        String(id),
+      );
     },
-    [navHandleSelectChat],
+    [navHandleSelectChat, currentChatId],
   );
 
   // Use paginated messages for authenticated users with Convex chats
+  // CRITICAL: Only use pagination with valid Convex chat IDs (contain '|')
+  const isValidConvexChatId = currentChatId && isConvexChatId(currentChatId);
   const {
     messages: paginatedMessages,
     isLoading: isLoadingMessages,
@@ -189,31 +227,30 @@ function ChatInterfaceComponent({
     refresh: _refreshMessages,
     clearError,
   } = usePaginatedMessages({
-    chatId:
-      isAuthenticated && currentChatId && !currentChat?.isLocal
-        ? currentChatId
-        : null,
+    chatId: isAuthenticated && isValidConvexChatId ? currentChatId : null,
     initialLimit: 50,
-    enabled: isAuthenticated && !!currentChatId && !currentChat?.isLocal,
+    enabled: isAuthenticated && isValidConvexChatId,
   });
 
   // Use paginated messages when available, fallback to regular messages
+  // CRITICAL: Only use ONE source of messages to prevent duplicate keys
   const effectiveMessages = useMemo(() => {
+    // For authenticated users with valid Convex chats, use paginated messages
     if (
       isAuthenticated &&
-      currentChatId &&
-      !currentChat?.isLocal &&
-      paginatedMessages.length > 0
+      isValidConvexChatId &&
+      (paginatedMessages.length > 0 || isLoadingMessages)
     ) {
       return paginatedMessages;
     }
+    // For everyone else (anonymous, invalid IDs), use regular messages
     return messages;
   }, [
     isAuthenticated,
-    currentChatId,
-    currentChat?.isLocal,
+    isValidConvexChatId,
     paginatedMessages,
     messages,
+    isLoadingMessages,
   ]);
 
   const currentMessages = useMemo(
@@ -228,27 +265,30 @@ function ChatInterfaceComponent({
   useUrlStateSync({
     currentChatId,
     isAuthenticated,
-    propChatId,
+    _propChatId: propChatId,
     propShareId,
     propPublicId,
     chatByOpaqueId,
     chatByShareId,
     chatByPublicId,
-    localChats: chatState.chats,
-    selectChat: chatActions.selectChat,
-    userSelectedChatAtRef,
+    _localChats: chatState.chats,
+    _selectChat: chatActions.selectChat,
   });
   useMetaTags({ currentChatId, allChats });
 
   const handleNewChat = useCallback(
     async (_opts?: { userInitiated?: boolean }): Promise<string | null> => {
+      if (!isServiceAvailable) {
+        toast.error("Service unavailable: Cannot create new chats right now.");
+        return null;
+      }
       setIsCreatingChat(true);
       try {
         // Simply use the createChat action from useUnifiedChat
         const chat = await chatActions.createChat("New Chat");
         if (chat?.id) {
-          // Navigate to the new chat
-          await navigateWithVerification(`/chat/${chat.id}`);
+          // Navigate to the new chat using navHandleSelectChat
+          await navHandleSelectChat(chat.id);
           setIsCreatingChat(false);
           return chat.id;
         }
@@ -258,7 +298,7 @@ function ChatInterfaceComponent({
       setIsCreatingChat(false);
       return null;
     },
-    [chatActions, navigateWithVerification],
+    [isServiceAvailable, chatActions, navHandleSelectChat],
   );
 
   useEffect(() => {
@@ -271,10 +311,18 @@ function ChatInterfaceComponent({
     async (message: string, chatId: string) => {
       // This function is kept for backwards compatibility but now uses the unified flow
       // The generateResponse action will use sessionId for anonymous users
-      await generateResponse({
-        chatId: chatId as Id<"chats">, // Proper type cast
-        message,
-      });
+      // Only call the API if we have a valid Convex chat ID
+      if (isConvexChatId(chatId)) {
+        await generateResponse({
+          chatId,
+          message,
+        });
+      } else {
+        console.error(
+          "Cannot generate response: Invalid Convex chat ID",
+          chatId,
+        );
+      }
     },
     [generateResponse],
   );
@@ -330,6 +378,18 @@ function ChatInterfaceComponent({
     chatActions,
   });
 
+  // Wrap send with service-availability guard
+  const guardedHandleSendMessage = useCallback(
+    async (message: string) => {
+      if (!isServiceAvailable) {
+        toast.error("Service unavailable: Cannot send messages right now.");
+        return;
+      }
+      await handleSendMessage(message);
+    },
+    [isServiceAvailable, handleSendMessage],
+  );
+
   useEffect(() => {
     sendRefTemp.current = sendRef.current;
   }, [sendRef]);
@@ -373,6 +433,10 @@ function ChatInterfaceComponent({
     sidebarOpen,
     onToggleSidebar,
     onNewChat: async () => {
+      if (!isServiceAvailable) {
+        toast.error("Service unavailable: Cannot create new chats right now.");
+        return;
+      }
       // Reset state first
       userSelectedChatAtRef.current = Date.now();
       setMessageCount(0);
@@ -383,10 +447,8 @@ function ChatInterfaceComponent({
       const newChatId = await handleNewChat();
 
       if (!newChatId) {
-        // Navigate to home as fallback
-        await navigateWithVerification("/").catch(() => {
-          window.location.href = "/";
-        });
+        // Navigate to home as fallback (SPA)
+        navigate("/");
       }
     },
     onShare: openShareModal,
@@ -419,7 +481,7 @@ function ChatInterfaceComponent({
     handleDeleteLocalMessage,
     handleRequestDeleteMessage,
     handleMobileSidebarClose,
-    handleSendMessage,
+    handleSendMessage: guardedHandleSendMessage,
     handleDraftChange,
     setShowShareModal,
     userHistory,
@@ -431,6 +493,8 @@ function ChatInterfaceComponent({
     loadError,
     retryCount,
     onClearError: clearError,
+    // NEW: Add streaming state for real-time updates
+    streamingState: chatState.streamingState,
   });
 
   return (
@@ -459,7 +523,6 @@ function ChatInterfaceComponent({
       chatState={chatState}
       chatActions={chatActions}
       updateChatPrivacy={updateChatPrivacy}
-      navigateWithVerification={navigateWithVerification}
       buildChatPath={buildChatPath}
       fetchJsonWithRetry={fetchJsonWithRetry}
       resolveApi={resolveApi}

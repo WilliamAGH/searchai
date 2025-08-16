@@ -4,7 +4,59 @@
  */
 
 import { v } from "convex/values";
-import { action } from "../_generated/server";
+import { internalAction } from "../_generated/server";
+import { logger } from "../lib/logger";
+
+// SSRF Protection: Block private IP ranges and localhost
+const PRIVATE_IPV4 = [
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+  /^169\.254\./,
+];
+const PRIVATE_IPV6 = [/^\[?::1\]?/, /^\[?fc00:/i, /^\[?fe80:/i];
+
+function isSafeUrl(raw: string): { ok: boolean; reason?: string } {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return { ok: false, reason: "Invalid URL" };
+  }
+  if (!/^https?:$/.test(u.protocol))
+    return { ok: false, reason: "Protocol not allowed" };
+  const host = u.hostname.toLowerCase();
+
+  // Block localhost-ish
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local")
+  ) {
+    return { ok: false, reason: "Localhost blocked" };
+  }
+  // Block obvious private IPv4
+  if (PRIVATE_IPV4.some((re) => re.test(host)))
+    return { ok: false, reason: "Private IPv4 blocked" };
+  // Block obvious private IPv6
+  if (PRIVATE_IPV6.some((re) => re.test(host)))
+    return { ok: false, reason: "Private IPv6 blocked" };
+
+  // Optional: block link-local hostnames commonly used internally
+  const internalish = [
+    "intranet",
+    "corp",
+    "internal",
+    "lan",
+    "home",
+    "localdomain",
+  ];
+  if (internalish.some((s) => host.endsWith(`.${s}`))) {
+    return { ok: false, reason: "Internal hostname blocked" };
+  }
+  return { ok: true };
+}
 
 /**
  * Scrape and clean web page content
@@ -16,7 +68,7 @@ import { action } from "../_generated/server";
  * @param url - Absolute URL to fetch
  * @returns {title, content, summary}
  */
-export const scrapeUrl = action({
+export const scrapeUrl = internalAction({
   args: { url: v.string() },
   returns: v.object({
     title: v.string(),
@@ -31,6 +83,30 @@ export const scrapeUrl = action({
     content: string;
     summary?: string;
   }> => {
+    // SSRF Protection: Validate URL before fetching
+    const safety = isSafeUrl(args.url);
+    if (!safety.ok) {
+      logger.warn("🚫 Blocked unsafe scrape URL", {
+        url: args.url,
+        reason: safety.reason,
+      });
+      throw new Error(`Unsafe URL: ${safety.reason}`);
+    }
+
+    // Handle known problematic sites early
+    const hostname = new URL(args.url).hostname.toLowerCase();
+    if (hostname.includes("reddit.com")) {
+      logger.info("🚫 Skipping Reddit scraping (blocked by Reddit)", {
+        url: args.url,
+      });
+      return {
+        title: "Reddit Content",
+        content:
+          "Reddit blocks automated scraping. Please visit the link directly to view the content.",
+        summary: "Reddit content (scraping blocked)",
+      };
+    }
+
     // Short-TTL in-process cache to avoid repeat scrapes across adjacent queries
     const SCRAPE_TTL_MS = 2 * 60 * 1000; // 2 minutes
     const globalAny: any = globalThis as any;
@@ -54,16 +130,17 @@ export const scrapeUrl = action({
     if (hit && hit.exp > now) {
       return hit.val;
     }
-    console.info("🌐 Scraping URL initiated:", {
+    logger.info("🌐 Scraping URL initiated:", {
       url: args.url,
       timestamp: new Date().toISOString(),
     });
 
     try {
-      const response = await fetch(args.url, {
+      // First attempt with manual redirect to check for redirects
+      let response = await fetch(args.url, {
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (compatible; SearchChat/1.0; Web Content Reader)",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           Accept:
             "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.5",
@@ -71,14 +148,74 @@ export const scrapeUrl = action({
           Connection: "keep-alive",
         },
         signal: AbortSignal.timeout(10000), // 10 second timeout
+        redirect: "manual", // Check for redirects first
       });
 
-      console.info("📊 Scrape response received:", {
+      logger.info("📊 Scrape response received:", {
         url: args.url,
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
       });
+
+      // Handle redirects (301, 302, 303, 307, 308)
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const location = response.headers.get("location");
+        if (location) {
+          logger.info("🔄 Following redirect:", {
+            from: args.url,
+            to: location,
+            status: response.status,
+          });
+
+          // Resolve relative URLs
+          const redirectUrl = new URL(location, args.url).toString();
+
+          // Validate the redirect URL for SSRF protection
+          const redirectSafety = isSafeUrl(redirectUrl);
+          if (!redirectSafety.ok) {
+            logger.warn("🚫 Blocked unsafe redirect URL", {
+              url: redirectUrl,
+              reason: redirectSafety.reason,
+            });
+            throw new Error(`Unsafe redirect URL: ${redirectSafety.reason}`);
+          }
+
+          // Follow the redirect
+          response = await fetch(redirectUrl, {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              Accept:
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "en-US,en;q=0.5",
+              "Accept-Encoding": "gzip, deflate",
+              Connection: "keep-alive",
+            },
+            signal: AbortSignal.timeout(10000),
+            redirect: "follow", // Allow further redirects
+          });
+        }
+      }
+
+      // Handle various error status codes more gracefully
+      if (response.status === 403) {
+        logger.warn("⚠️ Access forbidden (403):", { url: args.url });
+        return {
+          title: hostname,
+          content: `Access to ${hostname} is restricted. The site has blocked automated access.`,
+          summary: `Content unavailable from ${hostname} (access restricted)`,
+        };
+      }
+
+      if (response.status === 404) {
+        logger.warn("⚠️ Page not found (404):", { url: args.url });
+        return {
+          title: hostname,
+          content: `Page not found at ${args.url}`,
+          summary: "Page not found (404)",
+        };
+      }
 
       if (!response.ok) {
         const errorDetails = {
@@ -87,12 +224,17 @@ export const scrapeUrl = action({
           statusText: response.statusText,
           timestamp: new Date().toISOString(),
         };
-        console.error("❌ HTTP error during scraping:", errorDetails);
-        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        logger.error("❌ HTTP error during scraping:", errorDetails);
+        // Return graceful fallback instead of throwing
+        return {
+          title: hostname,
+          content: `Unable to fetch content from ${hostname} (HTTP ${response.status})`,
+          summary: `Content unavailable (HTTP ${response.status})`,
+        };
       }
 
       const contentType = response.headers.get("content-type") || "";
-      console.info("📄 Content type check:", {
+      logger.info("📄 Content type check:", {
         url: args.url,
         contentType: contentType,
       });
@@ -103,12 +245,12 @@ export const scrapeUrl = action({
           contentType: contentType,
           timestamp: new Date().toISOString(),
         };
-        console.error("❌ Non-HTML content type:", errorDetails);
+        logger.error("❌ Non-HTML content type:", errorDetails);
         throw new Error(`Not an HTML page. Content-Type: ${contentType}`);
       }
 
       const html = await response.text();
-      console.info("✅ HTML content fetched:", {
+      logger.info("✅ HTML content fetched:", {
         url: args.url,
         contentLength: html.length,
         timestamp: new Date().toISOString(),
@@ -124,7 +266,7 @@ export const scrapeUrl = action({
         title = h1Match ? h1Match[1].trim() : new URL(args.url).hostname;
       }
 
-      console.info("🏷️ Title extracted:", {
+      logger.info("🏷️ Title extracted:", {
         url: args.url,
         title: title,
         method: titleMatch ? "title tag" : h1Match ? "h1 tag" : "hostname",
@@ -144,7 +286,7 @@ export const scrapeUrl = action({
         .replace(/\s+/g, " ")
         .trim();
 
-      console.info("🧹 Content cleaned:", {
+      logger.info("🧹 Content cleaned:", {
         url: args.url,
         originalLength: html.length,
         cleanedLength: content.length,
@@ -157,7 +299,7 @@ export const scrapeUrl = action({
           contentLength: content.length,
           timestamp: new Date().toISOString(),
         };
-        console.error("❌ Content too short after cleaning:", errorDetails);
+        logger.error("❌ Content too short after cleaning:", errorDetails);
         throw new Error(`Content too short (${content.length} characters)`);
       }
 
@@ -181,7 +323,7 @@ export const scrapeUrl = action({
         content = content.replace(pattern, "");
       }
 
-      console.log("🗑️ Junk content removed:", {
+      logger.debug("🗑️ Junk content removed:", {
         url: args.url,
         removedCount: removedJunkCount,
       });
@@ -189,7 +331,7 @@ export const scrapeUrl = action({
       // Limit content length
       if (content.length > 5000) {
         content = `${content.substring(0, 5000)}...`;
-        console.info("✂️ Content truncated:", {
+        logger.info("✂️ Content truncated:", {
           url: args.url,
           newLength: content.length,
         });
@@ -203,7 +345,7 @@ export const scrapeUrl = action({
 
       const result = { title, content, summary };
       cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
-      console.info("✅ Scraping completed successfully:", {
+      logger.info("✅ Scraping completed successfully:", {
         url: args.url,
         resultLength: content.length,
         summaryLength: summary.length,
@@ -212,7 +354,7 @@ export const scrapeUrl = action({
 
       return result;
     } catch (error) {
-      console.error("💥 Scraping failed with exception:", {
+      logger.error("💥 Scraping failed with exception:", {
         url: args.url,
         error: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : "No stack trace",

@@ -1,9 +1,20 @@
 import { useMutation } from "convex/react";
 import React from "react";
 import { api } from "../../convex/_generated/api";
+import { Spinner } from "./ui/Spinner";
+/* --------------------------------------------------------------
+   IMPORTANT: Convex‑generated types are the *single source of truth*.
+   We import the document type directly from the generated data model
+   instead of a hand‑rolled duplicate. This eliminates the TS2589/
+   “excessively deep” error and guarantees that the ID we pass to
+   Convex is a proper `Id<"chats">`.
+   -------------------------------------------------------------- */
 import type { Id } from "../../convex/_generated/dataModel";
+
+// Use the app-wide Chat union to support both local and server chats.
 import type { Chat } from "../lib/types/chat";
 import { logger } from "../lib/logger";
+import { isConvexChatId } from "../lib/utils/id";
 
 /**
  * Props for the ChatSidebar component
@@ -50,15 +61,21 @@ export function ChatSidebar({
   onSelectChat,
   onNewChat,
   onDeleteLocalChat,
-  onRequestDeleteChat,
+  onRequestDeleteChat: _onRequestDeleteChat,
   isOpen: _isOpen,
   onToggle,
   isCreatingChat = false,
 }: ChatSidebarProps) {
+  logger.debug("[SIDEBAR] Rendering with:", {
+    chatCount: chats.length,
+    currentChatId,
+    chats: chats.map((c) => ({ id: c.id, _id: c._id, title: c.title })),
+  });
   const deleteChat = useMutation(api.chats.deleteChat);
 
   const handleSelectChat = React.useCallback(
     (chatId: Id<"chats"> | string) => {
+      logger.debug("[SIDEBAR] handleSelectChat called with:", chatId);
       onSelectChat(chatId);
     },
     [onSelectChat],
@@ -67,47 +84,93 @@ export function ChatSidebar({
   // Avoid inline functions in JSX: use dataset-driven handlers
   const handleSelectClick = React.useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault(); // Prevent any default button behavior
+      e.stopPropagation(); // Stop event bubbling
+
       const attr = e.currentTarget.getAttribute("data-chat-id");
-      if (!attr) return;
+      logger.debug("[SIDEBAR] handleSelectClick - data-chat-id:", attr);
+      if (!attr) {
+        console.error("[SIDEBAR] No data-chat-id attribute found!");
+        return;
+      }
+      // Find the chat object whose typed Id matches the attribute
       const match = chats.find((c) => String(c._id) === attr);
-      handleSelectChat(match ? match._id : attr);
+      logger.debug("[SIDEBAR] Found matching chat:", match);
+      // Ensure we pass a correctly-typed value (Id or string) to the parent callback
+      const selectedId: Id<"chats"> | string = match
+        ? match._id
+        : isConvexChatId(attr)
+          ? (attr as Id<"chats">)
+          : attr;
+      logger.debug("[SIDEBAR] Selecting chat with ID:", selectedId);
+      handleSelectChat(selectedId);
     },
     [chats, handleSelectChat],
   );
 
   const handleDeleteClick = React.useCallback(
     async (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault(); // Prevent any default button behavior
+      e.stopPropagation(); // Stop event bubbling
+
       const attr = e.currentTarget.getAttribute("data-chat-id");
-      if (!attr) return;
-      const match = chats.find((c) => String(c._id) === attr);
+      if (!attr) {
+        logger.warn(
+          "[SIDEBAR] handleDeleteClick: No data-chat-id attribute found",
+        );
+        return;
+      }
+
+      const chatToDelete = chats.find((c) => String(c._id) === attr);
+
+      logger.info("[SIDEBAR] Delete requested for chat:", {
+        idFromAttr: attr,
+        matchedChat: chatToDelete ? { ...chatToDelete } : "not_found",
+      });
+
+      if (!chatToDelete) {
+        logger.error("[SIDEBAR] No matching chat found for ID:", attr);
+        return;
+      }
+
       try {
-        if (!window.confirm("Delete this chat? This cannot be undone.")) return;
-        if (onRequestDeleteChat) {
-          onRequestDeleteChat(match ? match._id : attr);
-        } else if (match) {
-          if (typeof match._id === "string") {
-            onDeleteLocalChat?.(match._id);
-          } else {
-            await deleteChat({ chatId: match._id });
-          }
+        if (!window.confirm("Delete this chat? This cannot be undone.")) {
+          logger.info("[SIDEBAR] Delete cancelled by user");
+          return;
         }
-        if (match && currentChatId === match._id) {
+
+        logger.info("[SIDEBAR] Deleting chat:", { chatId: chatToDelete._id });
+
+        // Use the proper deletion handler that includes error handling and UI updates
+        if (_onRequestDeleteChat) {
+          // This handler properly manages both Convex and local deletions
+          await _onRequestDeleteChat(chatToDelete._id);
+          logger.info("[SIDEBAR] Delete request handled");
+        } else if (isConvexChatId(chatToDelete._id)) {
+          // Fallback to direct Convex deletion
+          await deleteChat({ chatId: chatToDelete._id });
+          logger.info("[SIDEBAR] Convex chat deleted successfully");
+        } else {
+          // Fallback to local deletion
+          onDeleteLocalChat?.(chatToDelete._id);
+          logger.info("[SIDEBAR] Local chat deleted successfully");
+        }
+
+        if (currentChatId === chatToDelete._id) {
           onSelectChat(null);
+          logger.info("[SIDEBAR] Resetting current chat");
         }
       } catch (err) {
-        // Only log warnings in dev to avoid noise in production
-        if (import.meta.env.DEV) {
-          logger.warn("Chat deletion failed:", err);
-        }
+        logger.error("[SIDEBAR] Chat deletion failed:", err);
       }
     },
     [
       chats,
-      onRequestDeleteChat,
-      onDeleteLocalChat,
       deleteChat,
+      onDeleteLocalChat,
       onSelectChat,
       currentChatId,
+      _onRequestDeleteChat,
     ],
   );
 
@@ -150,26 +213,7 @@ export function ChatSidebar({
           className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isCreatingChat ? (
-            <svg
-              className="w-5 h-5 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <title>Creating chat</title>
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
+            <Spinner size="sm" className="w-5 h-5" aria-label="Creating chat" />
           ) : (
             <svg
               className="w-5 h-5"
@@ -186,7 +230,7 @@ export function ChatSidebar({
               />
             </svg>
           )}
-          {isCreatingChat ? "Creating..." : "New Chat"}
+          {isCreatingChat ? "Creating" : "New Chat"}
         </button>
       </div>
 
@@ -197,9 +241,9 @@ export function ChatSidebar({
           </div>
         ) : (
           <div className="p-2">
-            {chats.map((chat) => (
+            {chats.map((chat, index) => (
               <div
-                key={chat._id}
+                key={chat._id || chat.id || `chat-${index}`}
                 className="flex items-center gap-2 mb-1 pr-2 min-w-0"
               >
                 <button
@@ -214,11 +258,6 @@ export function ChatSidebar({
                     {chat.title}
                   </div>
                   <div className="text-sm text-muted-foreground flex items-center gap-1 min-w-0">
-                    {"isLocal" in chat && chat.isLocal && (
-                      <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
-                        Local
-                      </span>
-                    )}
                     <span className="truncate">
                       {new Date(chat.updatedAt).toLocaleDateString()}
                     </span>

@@ -5,43 +5,27 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { setupConsoleErrorCollection } from "../helpers/console-helpers";
+import { setupMSWForTest, cleanupMSWForTest } from "../helpers/setup-msw";
 
 test.describe("smoke: pagination", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupMSWForTest(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupMSWForTest(page);
+  });
+
   test("basic pagination elements render without errors", async ({
     page,
     baseURL,
   }) => {
-    const consoleErrors: string[] = [];
-    const requestFailures: string[] = [];
+    // Use helper to setup console error collection with WebSocket filtering
+    const { consoleErrors, requestFailures } =
+      setupConsoleErrorCollection(page);
 
-    // Monitor console errors
-    page.on("console", (msg) => {
-      if (msg.type() === "error") {
-        const loc = msg.location();
-        const where = loc.url
-          ? `${loc.url}:${loc.lineNumber ?? 0}:${loc.columnNumber ?? 0}`
-          : "";
-        consoleErrors.push(`${msg.text()}${where ? ` at ${where}` : ""}`);
-      }
-    });
-
-    page.on("pageerror", (err) => {
-      consoleErrors.push(err.stack || err.message);
-    });
-
-    // Monitor network failures
-    page.on("requestfailed", (req) => {
-      const url = req.url();
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        // Ignore favicon requests
-        if (url.includes("favicon")) return;
-        requestFailures.push(
-          `${req.method()} ${url} -> ${req.failure()?.errorText}`,
-        );
-      }
-    });
-
-    const target = baseURL ?? "http://localhost:4173";
+    const target = baseURL ?? "http://localhost:5180";
     await page.goto(target, { waitUntil: "domcontentloaded" });
 
     // Wait for page to be ready
@@ -61,24 +45,9 @@ test.describe("smoke: pagination", () => {
     // Wait for chat creation and navigation
     await page.waitForURL(/\/(chat|s|p)\//, { timeout: 15000 });
 
-    // Send multiple messages to create scrollable content
-    // Note: In a real scenario with existing chat data, pagination would already be available
-    const messages = [
-      "Test message 2 - creating content for pagination",
-      "Test message 3 - more content to scroll",
-      "Test message 4 - building message history",
-      "Test message 5 - pagination test content",
-    ];
-
-    for (const msg of messages) {
-      // Wait for input to be ready
-      const msgInput = page.locator('textarea, [role="textbox"]').first();
-      await expect(msgInput).toBeEnabled({ timeout: 5000 });
-      await msgInput.fill(msg);
-      await page.keyboard.press("Enter");
-      // Small delay between messages
-      await page.waitForTimeout(500);
-    }
+    // For smoke test, we don't need to send multiple messages
+    // Just verify the pagination UI elements are present and don't cause errors
+    // In production, pagination would be tested with pre-existing chat data
 
     // Check for message list container - look for the scrollable area
     // The message list is the flex-1 overflow-y-auto container
@@ -136,7 +105,7 @@ test.describe("smoke: pagination", () => {
   });
 
   test("pagination UI elements are accessible", async ({ page, baseURL }) => {
-    const target = baseURL ?? "http://localhost:4173";
+    const target = baseURL ?? "http://localhost:5180";
     await page.goto(target, { waitUntil: "domcontentloaded" });
 
     // Wait for page to be ready

@@ -2,7 +2,7 @@
 // This simulates how we match currentChat by stringified equality over allChats
 
 function deriveCurrentChat(currentChatId, allChats) {
-  if (!currentChatId) return undefined;
+  if (!currentChatId) return;
   const idStr = String(currentChatId);
   return allChats.find((c) => String(c._id) === idStr);
 }

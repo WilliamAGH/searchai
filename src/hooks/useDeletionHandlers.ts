@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { logger } from "../lib/logger";
 import type { Id } from "../../convex/_generated/dataModel";
+import { isConvexId } from "../lib/utils/id";
 
 interface UseDeletionHandlersProps {
   chatState: {
-    chats: Array<{ id: string; title?: string }>;
+    chats: Array<{ id: string; _id?: Id<"chats">; title?: string }>;
     messages: Array<{ id: string }>;
   };
   chatActions: {
@@ -12,6 +13,7 @@ interface UseDeletionHandlersProps {
     createChat: (chat: { id: string; title?: string }) => void;
     deleteMessage: (id: string) => Promise<void>;
     addMessage: (msg: { id: string }) => void;
+    refreshChats?: () => Promise<void>;
   };
   deleteChat: (args: { chatId: Id<"chats"> }) => Promise<void>;
   deleteMessage: (args: { messageId: Id<"messages"> }) => Promise<void>;
@@ -87,9 +89,56 @@ export function useDeletionHandlers({
   );
 
   const handleRequestDeleteChat = useCallback(
-    async (chatId: Id<"chats">) => {
+    async (chatId: Id<"chats"> | string) => {
+      logger.info("[useDeletionHandlers] Requesting deletion for:", { chatId });
       try {
-        await deleteChat({ chatId });
+        const idToDelete =
+          typeof chatId === "string" ? chatId : (chatId as Id<"chats">);
+
+        // Only validate as Convex ID if it looks like one (starts with 'j')
+        // Local chat IDs are UUIDs and should be handled by handleDeleteLocalChat
+        if (idToDelete.startsWith("j")) {
+          if (!isConvexId(idToDelete)) {
+            logger.warn("Invalid Convex chat ID for deletion:", { chatId });
+            setUndoBanner({ show: true, message: "Invalid chat identifier" });
+            return;
+          }
+
+          logger.info("[useDeletionHandlers] Deleting Convex chat with ID:", {
+            idToDelete,
+          });
+
+          try {
+            // Delete from Convex backend
+            await deleteChat({ chatId: idToDelete as Id<"chats"> });
+          } catch (error) {
+            // If the chat is not found in backend, it might be already deleted
+            // Still remove from local state to keep UI in sync
+            logger.warn(
+              "[useDeletionHandlers] Convex deletion failed, removing from local state anyway:",
+              error,
+            );
+          }
+
+          // Always remove from local state to update UI
+          // This ensures UI stays in sync even if backend deletion fails
+          await chatActions.deleteChat(idToDelete);
+
+          // Refresh the chat list to ensure UI is fully synced with backend
+          if (chatActions.refreshChats) {
+            await chatActions.refreshChats();
+          }
+        } else {
+          // This is a local chat ID, delegate to local deletion
+          logger.info(
+            "[useDeletionHandlers] Delegating to local chat deletion:",
+            {
+              idToDelete,
+            },
+          );
+          handleDeleteLocalChat(idToDelete);
+          return;
+        }
 
         // Show success banner
         setUndoBanner({
@@ -111,7 +160,7 @@ export function useDeletionHandlers({
         });
       }
     },
-    [deleteChat, clearAllTimeouts],
+    [deleteChat, clearAllTimeouts, handleDeleteLocalChat, chatActions],
   );
 
   const handleDeleteLocalMessage = useCallback(
@@ -150,9 +199,26 @@ export function useDeletionHandlers({
   );
 
   const handleRequestDeleteMessage = useCallback(
-    async (messageId: Id<"messages">) => {
+    async (messageId: Id<"messages"> | string) => {
       try {
-        await deleteMessage({ messageId });
+        // Validate the message ID before casting
+        let convexMessageId: Id<"messages">;
+        if (typeof messageId === "string") {
+          // Import isConvexMessageId for validation
+          const { isConvexMessageId } = await import("../lib/utils/id");
+          if (!isConvexMessageId(messageId)) {
+            logger.warn("Invalid message ID for deletion:", { messageId });
+            setUndoBanner({
+              show: true,
+              message: "Invalid message identifier",
+            });
+            return;
+          }
+          convexMessageId = messageId;
+        } else {
+          convexMessageId = messageId;
+        }
+        await deleteMessage({ messageId: convexMessageId });
 
         // Show success banner
         setUndoBanner({

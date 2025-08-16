@@ -263,7 +263,7 @@ describe("Message Sending Critical Path", () => {
 
   describe("deleteMessage", () => {
     it("should delete a message", async () => {
-      mockRepository.deleteMessage = vi.fn().mockResolvedValue(undefined);
+      mockRepository.deleteMessage = vi.fn().mockResolvedValue();
 
       await mockRepository.deleteMessage("message-id");
 

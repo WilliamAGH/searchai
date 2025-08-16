@@ -116,14 +116,20 @@ npx --no-install lint-staged
 
 # 5. Quick test run (ensure tests pass)
 echo "🧪 Running tests..."
-npm test --silent > /tmp/node-tests-precommit.log 2>&1 || TEST_EXIT=$?
+npm run test:precommit --silent > /tmp/node-tests-precommit.log 2>&1 || TEST_EXIT=$?
 TEST_EXIT=${TEST_EXIT:-0}
 if [ $TEST_EXIT -ne 0 ]; then
   echo "❌ Tests failed! Fix tests before committing."
   echo "📄 Log: /tmp/node-tests-precommit.log"
-  # Print last lines for quick context
-  tail -40 /tmp/node-tests-precommit.log
-  echo "💡 Tip: run 'npm test' locally to reproduce."
+  echo "--- Test failures ---"
+  # Try to extract specific test failures
+  if grep -E "(FAIL|✗|❌|Error:|failed:|FAILED)" /tmp/node-tests-precommit.log >/dev/null; then
+    grep -E "(FAIL|✗|❌|Error:|failed:|FAILED)" /tmp/node-tests-precommit.log | head -20
+  else
+    # Print last lines for quick context
+    tail -40 /tmp/node-tests-precommit.log
+  fi
+  echo "💡 Tip: run 'npm run test:precommit' locally to reproduce."
   exit 1
 fi
 

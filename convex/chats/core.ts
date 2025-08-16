@@ -10,6 +10,7 @@ import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { generateShareId, generatePublicId } from "../lib/uuid";
+import { debugStart, debugEnd, debugError } from "../lib/debug";
 
 /**
  * Create new chat
@@ -27,6 +28,7 @@ export const createChat = mutation({
   },
   returns: v.id("chats"),
   handler: async (ctx, args) => {
+    debugStart("chats.core.createChat", { hasSessionId: !!args.sessionId });
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
 
@@ -34,16 +36,23 @@ export const createChat = mutation({
     const shareId = generateShareId();
     const publicId = generatePublicId();
 
-    return await ctx.db.insert("chats", {
-      title: args.title,
-      userId: userId || undefined,
-      sessionId: !userId ? args.sessionId : undefined,
-      shareId,
-      publicId,
-      privacy: "private",
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      const id = await ctx.db.insert("chats", {
+        title: args.title,
+        userId: userId || undefined,
+        sessionId: !userId ? args.sessionId : undefined,
+        shareId,
+        publicId,
+        privacy: "private",
+        createdAt: now,
+        updatedAt: now,
+      });
+      debugEnd("chats.core.createChat", { id });
+      return id;
+    } catch (e) {
+      debugError("chats.core.createChat", e);
+      throw e;
+    }
   },
 });
 
@@ -57,30 +66,78 @@ export const createChat = mutation({
 export const getUserChats = query({
   args: {
     sessionId: v.optional(v.string()),
+    sessionIds: v.optional(v.array(v.string())), // Support multiple session IDs
   },
-  returns: v.array(v.any()),
+  returns: v.array(
+    v.object({
+      _id: v.id("chats"),
+      _creationTime: v.number(), // FIX: Add Convex system field
+      title: v.string(),
+      userId: v.optional(v.id("users")),
+      sessionId: v.optional(v.string()),
+      shareId: v.optional(v.string()),
+      publicId: v.optional(v.string()),
+      privacy: v.optional(
+        v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+      ),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      rollingSummary: v.optional(v.string()),
+      rollingSummaryUpdatedAt: v.optional(v.number()), // FIX: Add missing field from schema
+    }),
+  ),
   handler: async (ctx, args) => {
+    debugStart("chats.core.getUserChats", {
+      hasSessionId: !!args.sessionId,
+      sessionIdsCount: args.sessionIds?.length || 0,
+    });
     const userId = await getAuthUserId(ctx);
 
     // Authenticated users - return their chats
     if (userId) {
-      return await ctx.db
+      const result = await ctx.db
         .query("chats")
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .order("desc")
         .collect();
+      debugEnd("chats.core.getUserChats", { count: result.length });
+      return result;
     }
 
-    // Anonymous users - return session chats
-    if (args.sessionId) {
-      return await ctx.db
+    // Anonymous users - return ALL their chats across all session IDs
+    // This handles session rotation and ensures users don't lose access to their chats
+    if (args.sessionIds && args.sessionIds.length > 0) {
+      // Get chats from ALL session IDs this browser has used
+      const allChats = [];
+      for (const sid of args.sessionIds) {
+        const chats = await ctx.db
+          .query("chats")
+          .withIndex("by_sessionId", (q) => q.eq("sessionId", sid))
+          .collect();
+        allChats.push(...chats);
+      }
+      // Sort by creation time descending and deduplicate
+      const uniqueChats = Array.from(
+        new Map(allChats.map((chat) => [chat._id, chat])).values(),
+      );
+      const sorted = uniqueChats.sort(
+        (a, b) => b._creationTime - a._creationTime,
+      );
+      debugEnd("chats.core.getUserChats", { count: sorted.length });
+      return sorted;
+    } else if (args.sessionId) {
+      // Fallback to single session ID for backwards compatibility
+      const result = await ctx.db
         .query("chats")
         .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
         .order("desc")
         .collect();
+      debugEnd("chats.core.getUserChats", { count: result.length });
+      return result;
     }
 
     // No userId or sessionId - return empty
+    debugEnd("chats.core.getUserChats", { count: 0 });
     return [];
   },
 });
@@ -98,21 +155,23 @@ async function validateChatAccess(
 
   if (!chat) return null;
 
-  // For authenticated users: check userId matches
-  if (chat.userId) {
-    if (chat.userId !== userId) return null;
-  }
-  // For anonymous chats: check sessionId matches
-  else if (chat.sessionId) {
-    if (!sessionId || chat.sessionId !== sessionId) return null;
-  }
-  // For shared/public chats: check privacy setting
-  else if (chat.privacy === "shared" || chat.privacy === "public") {
-    // Allow access to shared/public chats
+  // FIX: Allow authenticated users to access their own chats
+  if (chat.userId && userId && chat.userId === userId) {
     return chat;
   }
 
-  return chat;
+  // FIX: Allow anonymous users to access their session chats
+  if (chat.sessionId && sessionId && chat.sessionId === sessionId) {
+    return chat;
+  }
+
+  // FIX: Allow access to shared/public chats
+  if (chat.privacy === "shared" || chat.privacy === "public") {
+    return chat;
+  }
+
+  // Default: deny access
+  return null;
 }
 
 /**
@@ -128,9 +187,30 @@ export const getChatById = query({
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
   },
-  returns: v.union(v.any(), v.null()),
+  returns: v.union(
+    v.object({
+      _id: v.id("chats"),
+      _creationTime: v.number(), // FIX: Add Convex system field
+      title: v.string(),
+      userId: v.optional(v.id("users")),
+      sessionId: v.optional(v.string()),
+      shareId: v.optional(v.string()),
+      publicId: v.optional(v.string()),
+      privacy: v.optional(
+        v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+      ),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      rollingSummary: v.optional(v.string()),
+      rollingSummaryUpdatedAt: v.optional(v.number()), // FIX: Add missing field from schema
+    }),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
-    return await validateChatAccess(ctx, args.chatId, args.sessionId);
+    debugStart("chats.core.getChatById", { hasSessionId: !!args.sessionId });
+    const res = await validateChatAccess(ctx, args.chatId, args.sessionId);
+    debugEnd("chats.core.getChatById", { found: !!res });
+    return res;
   },
 });
 
@@ -145,10 +225,30 @@ export const getChat = query({
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
   },
-  returns: v.union(v.any(), v.null()),
+  returns: v.union(
+    v.object({
+      _id: v.id("chats"),
+      _creationTime: v.number(), // FIX: Add Convex system field
+      title: v.string(),
+      userId: v.optional(v.id("users")),
+      sessionId: v.optional(v.string()),
+      shareId: v.optional(v.string()),
+      publicId: v.optional(v.string()),
+      privacy: v.optional(
+        v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+      ),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      rollingSummary: v.optional(v.string()),
+      rollingSummaryUpdatedAt: v.optional(v.number()), // FIX: Add missing field from schema
+    }),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
-    // Reuse validation logic
-    return await validateChatAccess(ctx, args.chatId, args.sessionId);
+    debugStart("chats.core.getChat", { hasSessionId: !!args.sessionId });
+    const res = await validateChatAccess(ctx, args.chatId, args.sessionId);
+    debugEnd("chats.core.getChat", { found: !!res });
+    return res;
   },
 });
 
@@ -157,11 +257,35 @@ export const getChatByOpaqueId = query({
     opaqueId: v.string(),
     sessionId: v.optional(v.string()),
   },
-  returns: v.union(v.any(), v.null()),
+  returns: v.union(
+    v.object({
+      _id: v.id("chats"),
+      _creationTime: v.number(),
+      title: v.string(),
+      userId: v.optional(v.id("users")),
+      sessionId: v.optional(v.string()),
+      shareId: v.optional(v.string()),
+      publicId: v.optional(v.string()),
+      privacy: v.optional(
+        v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+      ),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      rollingSummary: v.optional(v.string()),
+      rollingSummaryUpdatedAt: v.optional(v.number()),
+    }),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
     // Validate the ID format before using it
-    // Convex IDs are typically 25+ character alphanumeric strings
-    if (!/^[a-zA-Z0-9]{20,}$/.test(args.opaqueId)) {
+    // Convex IDs start with 'j' and are 32-33 chars of alphanumeric
+    if (
+      !args.opaqueId ||
+      args.opaqueId.length < 32 ||
+      args.opaqueId.length > 33 ||
+      !args.opaqueId.startsWith("j") ||
+      !/^[a-z0-9]+$/.test(args.opaqueId)
+    ) {
       return null;
     }
 
@@ -170,8 +294,13 @@ export const getChatByOpaqueId = query({
 
     // Use try-catch to handle invalid IDs gracefully
     try {
+      debugStart("chats.core.getChatByOpaqueId", {
+        hasSessionId: !!args.sessionId,
+      });
       // Reuse validation logic
-      return await validateChatAccess(ctx, chatId, args.sessionId);
+      const res = await validateChatAccess(ctx, chatId, args.sessionId);
+      debugEnd("chats.core.getChatByOpaqueId", { found: !!res });
+      return res;
     } catch {
       // Invalid ID format will throw when accessing the database
       return null;
@@ -187,8 +316,27 @@ export const getChatByOpaqueId = query({
  */
 export const getChatByShareId = query({
   args: { shareId: v.string() },
-  returns: v.union(v.any(), v.null()),
+  returns: v.union(
+    v.object({
+      _id: v.id("chats"),
+      _creationTime: v.number(),
+      title: v.string(),
+      userId: v.optional(v.id("users")),
+      sessionId: v.optional(v.string()),
+      shareId: v.optional(v.string()),
+      publicId: v.optional(v.string()),
+      privacy: v.optional(
+        v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+      ),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      rollingSummary: v.optional(v.string()),
+      rollingSummaryUpdatedAt: v.optional(v.number()),
+    }),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
+    debugStart("chats.core.getChatByShareId");
     const chat = await ctx.db
       .query("chats")
       .withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
@@ -202,14 +350,34 @@ export const getChatByShareId = query({
       if (chat.userId !== userId) return null;
     }
 
+    debugEnd("chats.core.getChatByShareId", { found: !!chat });
     return chat;
   },
 });
 
 export const getChatByPublicId = query({
   args: { publicId: v.string() },
-  returns: v.union(v.any(), v.null()),
+  returns: v.union(
+    v.object({
+      _id: v.id("chats"),
+      _creationTime: v.number(),
+      title: v.string(),
+      userId: v.optional(v.id("users")),
+      sessionId: v.optional(v.string()),
+      shareId: v.optional(v.string()),
+      publicId: v.optional(v.string()),
+      privacy: v.optional(
+        v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+      ),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      rollingSummary: v.optional(v.string()),
+      rollingSummaryUpdatedAt: v.optional(v.number()),
+    }),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
+    debugStart("chats.core.getChatByPublicId");
     const chat = await ctx.db
       .query("chats")
       .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
@@ -221,6 +389,7 @@ export const getChatByPublicId = query({
       return null;
     }
 
+    debugEnd("chats.core.getChatByPublicId", { found: !!chat });
     return chat;
   },
 });

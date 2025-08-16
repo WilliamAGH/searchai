@@ -1,36 +1,22 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   __extractKeywordsForTest as extractKW,
   __augmentQueryForTest as augmentQ,
 } from "../convex/search.ts";
 import { searchWithDuckDuckGo } from "../convex/search/providers/duckduckgo.ts";
 
-// Prevent live network calls in restricted environments by stubbing fetch
-beforeAll(() => {
-  if (typeof globalThis.fetch !== "function") {
-    // @ts-expect-error - adding fetch to global for tests
-    globalThis.fetch = (async () => ({
-      ok: true,
-      json: async () => ({}),
-    })) as any;
-  }
-  vi.stubGlobal(
-    "fetch",
-    // Minimal Response-like stub used by providers
-    vi.fn(
-      async () => ({ ok: true, json: async () => ({ results: [] }) }) as any,
-    ),
-  );
-});
-
-afterAll(() => {
-  vi.unstubAllGlobals();
-});
+// MSW handles all fetch mocking - no need for vi.stubGlobal
 
 describe("convex/search helpers", () => {
   it("searchWithDuckDuckGo returns a Promise", async () => {
+    // MSW now handles the HTTP calls - no real network requests
     const p = searchWithDuckDuckGo("test", 1);
     expect(p instanceof Promise).toBe(true);
+
+    // Let's also verify it resolves with mocked data
+    const results = await p;
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.length).toBeGreaterThan(0);
   });
 
   it("Keyword extraction and augmentation heuristics work", () => {

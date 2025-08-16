@@ -39,11 +39,12 @@ export function usePaginatedMessages({
   enabled = true,
 }: UsePaginatedMessagesOptions): PaginatedMessagesState {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [hasMore, setHasMore] = useState(true);
+  const [cursor, setCursor] = useState<Id<"messages"> | undefined>();
+  const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
   const loadingRef = useRef(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout>();
   // Session guard to avoid applying stale results after chat/navigation changes
@@ -73,50 +74,75 @@ export function usePaginatedMessages({
   }, [enabled, chatId]);
 
   // Pre-map initial messages for immediate render to avoid UI flicker in tests/SSR
+  // Use a stable reference by checking content equality, not reference equality
+  const initialMessagesRef = useRef<typeof initialMessages>();
+  const initialUnifiedMessagesRef = useRef<UnifiedMessage[]>([]);
+
+  // Only update if content actually changed
   const initialUnifiedMessages = useMemo<UnifiedMessage[]>(() => {
-    if (!initialMessages) return [];
+    if (!initialMessages) return initialUnifiedMessagesRef.current;
+
+    // Check if the actual message content changed
+    const hasChanged =
+      initialMessagesRef.current?.messages?.length !==
+        initialMessages.messages?.length ||
+      initialMessagesRef.current?.nextCursor !== initialMessages.nextCursor;
+
+    if (!hasChanged && initialUnifiedMessagesRef.current.length > 0) {
+      return initialUnifiedMessagesRef.current;
+    }
+
+    initialMessagesRef.current = initialMessages;
     const convexMessages = initialMessages.messages || [];
-    return convexMessages.map((msg) => ({
-      id: msg._id,
-      chatId:
-        chatId ?? String((msg as unknown as { chatId?: string }).chatId ?? ""),
-      role: msg.role,
-      content: msg.content || "",
-      timestamp: msg.timestamp || Date.now(),
-      isStreaming: msg.isStreaming,
-      streamedContent: msg.streamedContent,
-      thinking: msg.thinking,
-      searchResults: msg.searchResults,
-      sources: msg.sources,
-      reasoning: msg.reasoning,
-      synced: true,
-      source: "convex" as const,
-    }));
+    const unified = convexMessages.map((msg, index) => {
+      // Ensure we always have an ID, even for legacy messages
+      const messageId = msg._id || `legacy-${chatId}-${index}-${Date.now()}`;
+      return {
+        _id: messageId, // Preserve _id for delete functionality
+        id: messageId,
+        chatId:
+          chatId ??
+          String((msg as unknown as { chatId?: string }).chatId ?? ""),
+        role: msg.role,
+        content: msg.content || "",
+        timestamp: msg.timestamp || Date.now(),
+        isStreaming: msg.isStreaming,
+        streamedContent: msg.streamedContent,
+        thinking: msg.thinking,
+        searchResults: msg.searchResults,
+        sources: msg.sources,
+        reasoning: msg.reasoning,
+        synced: true,
+        source: "convex" as const,
+      };
+    });
+
+    initialUnifiedMessagesRef.current = unified;
+    return unified;
   }, [initialMessages, chatId]);
 
   // Load initial messages when they arrive (stateful for subsequent appends)
   useEffect(() => {
-    if (initialMessages) {
-      const unifiedMessages = initialUnifiedMessages;
-
+    if (initialMessages && !hasLoadedInitial) {
       // Log initial load performance
       if (initialLoadStartRef.current) {
         const loadTime = performance.now() - initialLoadStartRef.current;
         logger.info("Initial messages loaded", {
           chatId,
-          messagesLoaded: unifiedMessages.length,
+          messagesLoaded: initialUnifiedMessages.length,
           loadTime: Math.round(loadTime),
           hasMore: initialMessages.hasMore,
         });
         initialLoadStartRef.current = undefined;
       }
 
-      setMessages(unifiedMessages);
+      setMessages(initialUnifiedMessages);
       setCursor(initialMessages.nextCursor);
       setHasMore(initialMessages.hasMore);
       setError(null);
+      setHasLoadedInitial(true);
     }
-  }, [initialMessages, chatId, initialUnifiedMessages]);
+  }, [initialMessages, chatId, initialUnifiedMessages, hasLoadedInitial]);
 
   // Load more messages with retry logic
   const loadMore = useCallback(async () => {
@@ -128,6 +154,7 @@ export function usePaginatedMessages({
 
     const currentSession = sessionRef.current;
     const loadStartTime = performance.now();
+    let hasError = false;
 
     const attemptLoad = async (attempt = 1): Promise<void> => {
       const attemptStartTime = performance.now();
@@ -153,21 +180,27 @@ export function usePaginatedMessages({
 
         if (moreMessages) {
           const newUnifiedMessages: UnifiedMessage[] =
-            moreMessages.messages.map((msg) => ({
-              id: msg._id,
-              chatId: chatId,
-              role: msg.role,
-              content: msg.content || "",
-              timestamp: msg.timestamp || Date.now(),
-              isStreaming: msg.isStreaming,
-              streamedContent: msg.streamedContent,
-              thinking: msg.thinking,
-              searchResults: msg.searchResults,
-              sources: msg.sources,
-              reasoning: msg.reasoning,
-              synced: true,
-              source: "convex" as const,
-            }));
+            moreMessages.messages.map((msg, index) => {
+              // Ensure we always have an ID, even for legacy messages
+              const messageId =
+                msg._id || `legacy-more-${chatId}-${index}-${Date.now()}`;
+              return {
+                _id: messageId, // Preserve _id for delete functionality
+                id: messageId,
+                chatId: chatId,
+                role: msg.role,
+                content: msg.content || "",
+                timestamp: msg.timestamp || Date.now(),
+                isStreaming: msg.isStreaming,
+                streamedContent: msg.streamedContent,
+                thinking: msg.thinking,
+                searchResults: msg.searchResults,
+                sources: msg.sources,
+                reasoning: msg.reasoning,
+                synced: true,
+                source: "convex" as const,
+              };
+            });
 
           // Stale-guard: if session changed during async call, ignore results
           if (sessionRef.current !== currentSession) {
@@ -228,13 +261,14 @@ export function usePaginatedMessages({
           setRetryCount(0);
           setIsLoadingMore(false);
           loadingRef.current = false;
+          hasError = true;
         }
       }
     };
 
     await attemptLoad();
 
-    if (!error) {
+    if (!hasError) {
       const totalTime = performance.now() - loadStartTime;
       logger.info("Pagination operation completed", {
         chatId,
@@ -245,16 +279,17 @@ export function usePaginatedMessages({
       setIsLoadingMore(false);
       loadingRef.current = false;
     }
-  }, [chatId, cursor, hasMore, initialLimit, loadMoreAction, error]);
+  }, [chatId, cursor, hasMore, initialLimit, loadMoreAction]);
 
   // Refresh messages (reload from beginning)
   const refresh = useCallback(async () => {
     if (!chatId) return;
 
     setCursor(undefined);
-    setHasMore(true);
+    setHasMore(false);
     setMessages([]);
     setError(null);
+    setHasLoadedInitial(false);
 
     // The query will automatically re-run
   }, [chatId]);
@@ -271,9 +306,10 @@ export function usePaginatedMessages({
     sessionRef.current++;
     setMessages([]);
     setCursor(undefined);
-    setHasMore(true);
+    setHasMore(false);
     setError(null);
     setRetryCount(0);
+    setHasLoadedInitial(false);
 
     // Clear any pending retry timeouts
     if (retryTimeoutRef.current) {
@@ -290,11 +326,23 @@ export function usePaginatedMessages({
     };
   }, []);
 
+  // Return stable messages - use stateful messages once loaded, otherwise initial
+  const effectiveMessages = hasLoadedInitial
+    ? messages
+    : initialUnifiedMessages;
+
+  // CRITICAL: Only show "Load More" if we have messages AND backend says there are more
+  // This prevents infinite loops on empty chats
+  const effectiveHasMore =
+    initialMessages && effectiveMessages.length > 0
+      ? initialMessages.hasMore
+      : false;
+
   return {
-    messages: messages.length > 0 ? messages : initialUnifiedMessages,
+    messages: effectiveMessages,
     isLoading: !initialMessages && enabled && !!chatId,
     isLoadingMore,
-    hasMore,
+    hasMore: effectiveHasMore,
     error,
     retryCount,
     loadMore,

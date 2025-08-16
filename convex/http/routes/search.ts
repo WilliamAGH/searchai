@@ -3,12 +3,17 @@
  * - OPTIONS and POST /api/search endpoints
  */
 
+"use node";
 import { httpAction } from "../../_generated/server";
-import { api } from "../../_generated/api";
+import { api, internal } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
 import { normalizeUrlForKey } from "../../lib/url";
+import {
+  getClientIP,
+  createRateLimitedResponse,
+} from "../../lib/security/rateLimit";
 
 /**
  * Register search routes on the HTTP router
@@ -38,6 +43,29 @@ export function registerSearchRoutes(http: HttpRouter) {
     path: "/api/search",
     method: "POST",
     handler: httpAction(async (ctx, request) => {
+      // Rate limiting
+      const clientIP = getClientIP(request);
+      const rateLimitKey = `rate_limit:${clientIP}:search`;
+      // Type assertion to avoid TS2589 deep instantiation error
+      // This is a known Convex limitation with deeply nested types
+      // @ts-expect-error - TS2589: Type instantiation is excessively deep
+      const rateLimitMutation = internal.rateLimits.bumpAndCheck as any;
+      const rateLimitResult = (await ctx.runMutation(rateLimitMutation, {
+        key: rateLimitKey,
+        maxRequests: 10,
+        windowMs: 60000, // 1 minute
+      })) as {
+        isRateLimited: boolean;
+        rateLimitHeaders: Record<string, string>;
+      };
+
+      if (rateLimitResult.isRateLimited) {
+        return createRateLimitedResponse(
+          "Rate limit exceeded for search endpoint",
+          rateLimitResult.rateLimitHeaders,
+        );
+      }
+
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();

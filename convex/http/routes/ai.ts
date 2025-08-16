@@ -7,7 +7,7 @@
 import { httpAction } from "../../_generated/server";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
-import type { SearchResult } from "../../search/providers/serpapi";
+import type { SearchResult } from "../../search/providers/index";
 import { applyEnhancements } from "../../enhancements";
 import { normalizeSearchResults } from "../../lib/security/sanitization";
 
@@ -49,8 +49,12 @@ export function registerAIRoutes(http: HttpRouter) {
         );
       }
 
-      // Validate payload structure
-      if (!rawPayload || typeof rawPayload !== "object") {
+      // Validate payload structure (must be a plain object, not array or null)
+      if (
+        !rawPayload ||
+        typeof rawPayload !== "object" ||
+        Array.isArray(rawPayload)
+      ) {
         return corsResponse(
           JSON.stringify({ error: "Invalid request payload" }),
           400,
@@ -67,12 +71,14 @@ export function registerAIRoutes(http: HttpRouter) {
       }
       // Remove control characters and null bytes, then limit length
       const message = String(payload.message)
+        // eslint-disable-next-line no-control-regex
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
         .slice(0, 10000);
 
       // Sanitize optional systemPrompt
       const systemPrompt = payload.systemPrompt
         ? String(payload.systemPrompt)
+            // eslint-disable-next-line no-control-regex
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
             .slice(0, 2000)
         : undefined;
@@ -84,6 +90,7 @@ export function registerAIRoutes(http: HttpRouter) {
             .filter((s: unknown) => typeof s === "string")
             .map((s: unknown) =>
               String(s)
+                // eslint-disable-next-line no-control-regex
                 .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
                 .slice(0, 2048),
             )
@@ -147,7 +154,8 @@ export function registerAIRoutes(http: HttpRouter) {
 
       // Merge enhancement additions into provided system prompt
       let effectiveSystemPrompt = String(
-        systemPrompt || "You are a helpful AI assistant.",
+        systemPrompt ||
+          "You are SearchAI, a knowledgeable and confident search assistant. You provide accurate, comprehensive answers based on search results and available information. You speak with authority when the information is clear, and transparently acknowledge limitations only when truly uncertain. Your goal is to be maximally helpful while maintaining accuracy.",
       );
       if (enhancedSystemPromptAddition) {
         effectiveSystemPrompt += "\n\n" + enhancedSystemPromptAddition;
@@ -332,6 +340,41 @@ async function handleNoOpenRouter(
 }
 
 /**
+ * Format search results with scraped content for AI context
+ */
+function formatSearchResultsForContext(searchResults: SearchResult[]): string {
+  if (!searchResults || searchResults.length === 0) {
+    return "";
+  }
+
+  const formattedResults = searchResults
+    .map((result, index) => {
+      let resultStr = `[${index + 1}] ${result.fullTitle || result.title}\n`;
+      resultStr += `URL: ${result.url}\n`;
+
+      // Include scraped content if available
+      if (result.content) {
+        // Limit content to prevent context overflow
+        const maxContentLength = 1000;
+        const truncatedContent =
+          result.content.length > maxContentLength
+            ? result.content.slice(0, maxContentLength) + "..."
+            : result.content;
+        resultStr += `Content: ${truncatedContent}\n`;
+      } else if (result.summary) {
+        resultStr += `Summary: ${result.summary}\n`;
+      } else {
+        resultStr += `Snippet: ${result.snippet}\n`;
+      }
+
+      return resultStr;
+    })
+    .join("\n---\n\n");
+
+  return `\n\nSearch Results with Content:\n${formattedResults}`;
+}
+
+/**
  * Handle OpenRouter streaming response
  */
 async function handleOpenRouterStreaming(
@@ -348,25 +391,36 @@ async function handleOpenRouterStreaming(
   dlog("🔄 Attempting OpenRouter API call with streaming...");
 
   // Build message history including system prompt and chat history
+  // Include search results with scraped content in the user message
+  const searchContext = formatSearchResultsForContext(searchResults);
+  const enhancedMessage = searchContext
+    ? `${message}${searchContext}`
+    : message;
+
   const messages = [
     {
       role: "system",
-      content: `${effectiveSystemPrompt}\n\nIMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.`,
+      content: `${effectiveSystemPrompt}\n\nIMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.\n\nBe direct, comprehensive, and authoritative in your responses. Focus on providing value and actionable information rather than hedging or expressing uncertainty unless truly warranted.`,
     },
     ...(chatHistory || []),
-    { role: "user", content: message },
+    { role: "user", content: enhancedMessage },
   ];
 
   const openRouterBody = {
     model: "google/gemini-2.5-flash",
     messages,
-    temperature: 0.7,
-    max_tokens: 4000,
+    temperature: 0.8, // Increased for more creative/verbose responses
+    max_tokens: 6000, // Increased from 4000 for longer responses
     stream: true,
     // Enable caching for repeated context
-    top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0,
+    top_p: 0.95, // Slightly wider nucleus sampling
+    frequency_penalty: -0.2, // Negative value encourages elaboration
+    presence_penalty: 0.1, // Keep focused on topic
+    // For thinking models, control reasoning verbosity
+    // NOTE: OpenRouter only accepts ONE of effort or max_tokens, not both
+    reasoning: {
+      effort: "high" as const, // Use high effort for detailed thinking
+    },
   };
 
   dlog("🤖 OPENROUTER REQUEST:");
@@ -537,7 +591,9 @@ function createStreamingResponse(
                 const streamData = {
                   type: "chunk",
                   content: chunkContent,
-                  thinking: chunk.choices?.[0]?.delta?.reasoning || "",
+                  // Pass through thinking data from the chunk if available
+                  thinking: chunk.choices?.[0]?.delta?.thinking || undefined,
+                  reasoning: chunk.choices?.[0]?.delta?.reasoning || "",
                   searchResults,
                   sources,
                   provider: "openrouter",

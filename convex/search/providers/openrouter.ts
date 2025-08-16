@@ -3,7 +3,7 @@
  * Uses Perplexity Sonar model for AI-powered web search
  */
 
-import type { SearchResult } from "./serpapi";
+import type { SearchResult } from "./index";
 
 interface OpenRouterResponse {
   choices?: Array<{
@@ -46,7 +46,7 @@ export async function searchWithOpenRouter(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "perplexity/llama-3.1-sonar-small-128k-online",
+        model: "perplexity/sonar",
         messages: [
           {
             role: "system",
@@ -65,7 +65,11 @@ export async function searchWithOpenRouter(
   );
 
   if (!response.ok) {
-    throw new Error(`OpenRouter API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error(`OpenRouter API error: ${response.status}`, errorText);
+    throw new Error(
+      `OpenRouter API error: ${response.status} - ${errorText.substring(0, 200)}`,
+    );
   }
 
   const data: OpenRouterResponse = await response.json();

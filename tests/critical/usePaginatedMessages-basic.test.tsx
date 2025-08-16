@@ -14,7 +14,7 @@ describe.skip("usePaginatedMessages basic functionality", () => {
     // Setup simple mock
     vi.doMock("convex/react", () => ({
       useQuery: (_name: unknown, args: any) => {
-        if (args === "skip") return undefined;
+        if (args === "skip") return;
         return {
           messages: [
             { _id: "m1", role: "user", content: "hello", timestamp: 1000 },
@@ -104,7 +104,7 @@ describe.skip("usePaginatedMessages basic functionality", () => {
     vi.doMock("convex/react", () => ({
       useQuery: (_name: unknown, args: any) => {
         if (args !== "skip") queryCalled = true;
-        return undefined;
+        return;
       },
       useAction: () => async () => ({
         messages: [],

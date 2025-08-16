@@ -102,12 +102,10 @@ export function SignUpModal({
             e.preventDefault();
             last.focus();
           }
-        } else {
+        } else if (active === last) {
           // Forward tab
-          if (active === last) {
-            e.preventDefault();
-            first.focus();
-          }
+          e.preventDefault();
+          first.focus();
         }
       }
     };

@@ -18,7 +18,7 @@ test.describe("chat navigation", () => {
     page,
     baseURL,
   }) => {
-    await page.goto((baseURL ?? "http://localhost:4173") + HOME, {
+    await page.goto((baseURL ?? "http://localhost:5180") + HOME, {
       waitUntil: "domcontentloaded",
     });
 
@@ -39,7 +39,7 @@ test.describe("chat navigation", () => {
     baseURL,
   }) => {
     await page.setViewportSize(viewports.iPhone12);
-    await page.goto((baseURL ?? "http://localhost:4173") + HOME, {
+    await page.goto((baseURL ?? "http://localhost:5180") + HOME, {
       waitUntil: "domcontentloaded",
     });
 
@@ -59,7 +59,7 @@ test.describe("chat navigation", () => {
     baseURL,
   }) => {
     // Start at home and create a chat via UI
-    await page.goto((baseURL ?? "http://localhost:4173") + HOME);
+    await page.goto((baseURL ?? "http://localhost:5180") + HOME);
     await openMobileMenu(page);
     await page.getByRole("button", { name: /New Chat/i }).click();
     await expect(page).toHaveURL(/\/(chat|p|s)\//);
@@ -67,7 +67,7 @@ test.describe("chat navigation", () => {
     const firstUrl = page.url();
 
     // Navigate to home
-    await page.goto((baseURL ?? "http://localhost:4173") + HOME);
+    await page.goto((baseURL ?? "http://localhost:5180") + HOME);
     await expect(page).toHaveURL(/\/$/);
 
     // Back to chat
@@ -83,7 +83,7 @@ test.describe("chat navigation", () => {
     "migration from local to server preserves current selection",
     async ({ page, baseURL }) => {
       // This test requires auth setup + server mapping; mark fixme until test env supports it
-      await page.goto((baseURL ?? "http://localhost:4173") + HOME);
+      await page.goto((baseURL ?? "http://localhost:5180") + HOME);
     },
   );
 
@@ -91,7 +91,7 @@ test.describe("chat navigation", () => {
     "mobile swipe open/close is idempotent",
     async ({ page, baseURL }) => {
       await page.setViewportSize(viewports.iPhone12);
-      await page.goto((baseURL ?? "http://localhost:4173") + HOME);
+      await page.goto((baseURL ?? "http://localhost:5180") + HOME);
       // Implement swipe gestures with Playwright touch simulation when CI supports it
     },
   );

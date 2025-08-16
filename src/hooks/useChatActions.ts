@@ -127,7 +127,11 @@ export function createChatActions(
     },
 
     async selectChat(id: string | null) {
+      logger.debug("[CHAT_ACTIONS] selectChat called with:", id);
+      logger.debug("[CHAT_ACTIONS] Current repository:", repository?.type);
+
       if (!id) {
+        logger.debug("[CHAT_ACTIONS] Clearing current chat (id is null)");
         setState((prev) => ({
           ...prev,
           currentChatId: null,
@@ -137,47 +141,44 @@ export function createChatActions(
         return;
       }
 
-      if (!repository) return;
+      if (!repository) {
+        console.error("[CHAT_ACTIONS] No repository available!");
+        return;
+      }
 
       try {
-        // Parallelize fetching chat and messages
-        const [chat, messages] = await Promise.all([
-          repository.getChatById(id),
-          // Backward-compat: some tests/mock repos expose getChatMessages
-          // Prefer getMessages when available
-          (async () => {
-            if ("getMessages" in repository) {
-              return repository.getMessages(id);
-            }
-            // Support test harness that defines getChatMessages only
-            if (
-              "getChatMessages" in
-                (repository as unknown as Record<string, unknown>) &&
-              typeof (repository as unknown as { getChatMessages?: unknown })
-                .getChatMessages === "function"
-            ) {
-              return (
-                repository as unknown as {
-                  getChatMessages: (
-                    chatId: string,
-                  ) => Promise<UnifiedMessage[]>;
-                }
-              ).getChatMessages(id);
-            }
-            return [] as UnifiedMessage[];
-          })(),
-        ]);
+        logger.debug("[CHAT_ACTIONS] Fetching chat with ID:", id);
+        // Fetch chat and messages
+        const chat = await repository.getChatById(id);
+        logger.debug("[CHAT_ACTIONS] Retrieved chat:", chat);
+
+        // For non-paginated users, we need to fetch messages
+        // Paginated users will get messages from usePaginatedMessages
+        let messages: UnifiedMessage[] = [];
+        if ("getMessages" in repository) {
+          messages = await repository.getMessages(id);
+        }
 
         if (chat) {
+          logger.debug("[CHAT_ACTIONS] Setting current chat to:", id);
+          logger.debug("[CHAT_ACTIONS] Chat details:", {
+            id: chat.id,
+            _id: chat._id,
+            title: chat.title,
+            messageCount: messages.length,
+          });
           setState((prev) => ({
             ...prev,
             currentChatId: id,
             currentChat: chat,
-            messages,
+            messages, // Update messages for non-paginated users
             error: null,
           }));
+        } else {
+          console.error("[CHAT_ACTIONS] Chat not found for ID:", id);
         }
       } catch (error) {
+        console.error("[CHAT_ACTIONS] Error selecting chat:", error);
         setState((prev) => ({
           ...prev,
           error:
@@ -206,12 +207,38 @@ export function createChatActions(
           };
         });
       } catch (error) {
-        setState((prev) => ({
-          ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to delete chat",
-        }));
-        throw error;
+        // Check if it's a "chat not found" error - this is okay, just remove from UI
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const isChatNotFound = errorMessage.includes("Chat not found");
+
+        if (isChatNotFound) {
+          // Chat already deleted from backend, just clean up UI
+          logger.warn(
+            "[CHAT_ACTIONS] Chat not found in backend, removing from UI:",
+            id,
+          );
+          setState((prev) => {
+            const filtered = prev.chats.filter((c) => c.id !== id);
+            const wasCurrentChat = prev.currentChatId === id;
+
+            return {
+              ...prev,
+              chats: filtered,
+              currentChatId: wasCurrentChat ? null : prev.currentChatId,
+              currentChat: wasCurrentChat ? null : prev.currentChat,
+              messages: wasCurrentChat ? [] : prev.messages,
+              error: null, // No error for user since we handled it
+            };
+          });
+        } else {
+          // Other errors should be shown to user and re-thrown for tests
+          setState((prev) => ({
+            ...prev,
+            error: errorMessage,
+          }));
+          throw error;
+        }
       }
     },
 
@@ -276,16 +303,41 @@ export function createChatActions(
         return;
       }
 
-      // Update state to show generation is starting
-      // Also ensure we have the correct chat object for UI display
+      // Create a temporary ID for the streaming AI message with random component to ensure uniqueness
+      const tempAIMessageId = `streaming-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      // Add user message immediately with unique ID
+      const userMessage: UnifiedMessage = {
+        id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        role: "user",
+        content,
+        timestamp: Date.now(),
+        isStreaming: false,
+      };
+
+      // FIXED: Add placeholder AI message immediately to show loading state
+      const placeholderAIMessage: UnifiedMessage = {
+        id: tempAIMessageId,
+        role: "assistant",
+        content: "", // Empty content initially
+        timestamp: Date.now(),
+        isStreaming: true,
+        thinking: "Processing your request", // Show thinking state immediately
+      };
+
+      // Update state to show generation is starting with both messages
       setState((prev) => ({
         ...prev,
         isGenerating: true,
         error: null,
-        // Ensure currentChatId and currentChat match the chat we're sending to
         currentChatId: chatId,
         currentChat:
           prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+        messages: [...prev.messages, userMessage, placeholderAIMessage],
+        searchProgress: {
+          stage: "searching",
+          message: "Searching for information",
+        },
       }));
 
       try {
@@ -293,40 +345,82 @@ export function createChatActions(
         const generator = repository.generateResponse(chatId, content);
 
         let fullContent = "";
+
         for await (const chunk of generator) {
           if (chunk.type === "content") {
             fullContent += chunk.content;
-            // Update UI with streaming content
+
+            // FIXED: Update the existing placeholder message instead of adding a new one
             setState((prev) => ({
               ...prev,
-              searchProgress: { stage: "generating", message: fullContent },
+              messages: prev.messages.map((msg) =>
+                msg.id === tempAIMessageId
+                  ? {
+                      ...msg,
+                      content: fullContent,
+                      thinking: fullContent ? "" : "Processing", // Clear thinking when content starts
+                      isStreaming: true,
+                    }
+                  : msg,
+              ),
+              searchProgress: fullContent
+                ? { stage: "generating" }
+                : prev.searchProgress,
+            }));
+          } else if (chunk.type === "metadata" && chunk.metadata?.thinking) {
+            // Update thinking/reasoning if provided
+            setState((prev) => ({
+              ...prev,
+              messages: prev.messages.map((msg) =>
+                msg.id === tempAIMessageId
+                  ? { ...msg, thinking: chunk.metadata.thinking }
+                  : msg,
+              ),
             }));
           } else if (chunk.type === "error") {
             throw new Error(chunk.error);
           }
         }
 
-        // Refresh messages after generation completes
-        // This is critical for displaying the new messages
-        const messages = await repository.getMessages(chatId);
-        logger.debug("Messages refreshed after generation", {
-          chatId,
-          messageCount: messages.length,
-        });
-
-        setState((prev) => ({
-          ...prev,
-          messages,
-          isGenerating: false,
-          searchProgress: { stage: "idle" },
-          // Ensure currentChatId and currentChat are still set correctly
-          currentChatId: chatId,
-          currentChat:
-            prev.chats.find((c) => c.id === chatId) || prev.currentChat,
-        }));
+        // For non-paginated users, fetch the final messages after generation
+        // Paginated users will get updates via subscription
+        if ("getMessages" in repository) {
+          try {
+            const finalMessages = await repository.getMessages(chatId);
+            setState((prev) => ({
+              ...prev,
+              messages: finalMessages,
+              isGenerating: false,
+              searchProgress: { stage: "idle" },
+              currentChatId: chatId,
+              currentChat:
+                prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+            }));
+          } catch (error) {
+            logger.error("Failed to fetch messages after generation", error);
+            setState((prev) => ({
+              ...prev,
+              isGenerating: false,
+              searchProgress: { stage: "idle" },
+              error: "Failed to fetch messages after generation",
+            }));
+          }
+        } else {
+          // For paginated users, just update generation state
+          setState((prev) => ({
+            ...prev,
+            isGenerating: false,
+            searchProgress: { stage: "idle" },
+            currentChatId: chatId,
+            currentChat:
+              prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+          }));
+        }
       } catch (error) {
+        // Remove the temporary streaming message on error
         setState((prev) => ({
           ...prev,
+          messages: prev.messages.filter((msg) => msg.id !== tempAIMessageId),
           isGenerating: false,
           error:
             error instanceof Error ? error.message : "Failed to send message",

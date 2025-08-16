@@ -174,14 +174,75 @@ export const deleteMessage = mutation({
   args: { messageId: v.id("messages") },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Check if we're in development mode (Convex dev environment)
+    const isDev =
+      process.env.NODE_ENV !== "production" ||
+      process.env.CONVEX_DEPLOYMENT?.includes("dev");
+
+    if (isDev) {
+      console.log(
+        "[DELETE-BACKEND-1] Delete mutation called with ID:",
+        args.messageId,
+      );
+    }
+
     const message = await ctx.db.get(args.messageId);
-    if (!message) return null;
+    if (isDev) {
+      console.log("[DELETE-BACKEND-2] Message lookup result:", {
+        found: !!message,
+        messageId: args.messageId,
+        chatId: message?.chatId,
+      });
+    }
+
+    if (!message) {
+      if (isDev) {
+        console.error(
+          "[DELETE-BACKEND-2] ERROR: Message not found in database",
+        );
+      }
+      return null;
+    }
+
     const chat = await ctx.db.get(message.chatId);
     const userId = await getAuthUserId(ctx);
-    if (!chat) throw new Error("Chat not found");
-    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+
+    if (isDev) {
+      console.log("[DELETE-BACKEND-3] Authorization check:", {
+        has_chat: !!chat,
+        chat_userId: chat?.userId,
+        current_userId: userId,
+        is_owner: chat?.userId === userId || !chat?.userId,
+        chat_privacy: chat?.privacy,
+      });
+    }
+
+    if (!chat) {
+      if (isDev) {
+        console.error("[DELETE-BACKEND-3] ERROR: Chat not found");
+      }
+      throw new Error("Chat not found");
+    }
+
+    if (chat.userId && chat.userId !== userId) {
+      if (isDev) {
+        console.error(
+          "[DELETE-BACKEND-3] ERROR: Unauthorized - user does not own message",
+          {
+            chat_userId: chat.userId,
+            current_userId: userId,
+          },
+        );
+      }
+      throw new Error("Unauthorized");
+    }
 
     await ctx.db.delete(args.messageId);
+    if (isDev) {
+      console.log(
+        "[DELETE-BACKEND-4] Message deleted successfully from database",
+      );
+    }
 
     // Best-effort: invalidate planner cache (decoupled internal action)
     try {

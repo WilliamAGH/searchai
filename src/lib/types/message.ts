@@ -121,6 +121,7 @@ export interface MessageStreamChunk {
   type: "content" | "metadata" | "error" | "done" | "chunk";
   content?: string;
   thinking?: string;
+  reasoning?: string;
   metadata?: Partial<Message>;
   error?: string;
 }
@@ -129,7 +130,7 @@ export interface MessageStreamChunk {
  * Search progress state for UI updates
  */
 export interface SearchProgress {
-  stage: "searching" | "scraping" | "analyzing" | "generating";
+  stage: "idle" | "searching" | "scraping" | "analyzing" | "generating";
   message: string;
   urls?: string[];
   currentUrl?: string;
