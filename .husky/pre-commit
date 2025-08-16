@@ -98,16 +98,10 @@ if [ $CONVEX_TSC -ne 0 ]; then
   exit 1
 fi
 
-# Warn (do not fail) on process.env mentions to avoid false positives
-set +e
-grep -E "process\\.env" /tmp/convex-check.log > /dev/null
-HAS_PROC_ENV=$?
-set -e
-if [ ${HAS_PROC_ENV:-1} -eq 0 ]; then
-  echo "⚠️  Note: Found references to process.env in Convex code/logs."
-  echo "   Convex runtime prefers ctx.env.get('KEY') for server-side envs."
-  echo "   Matches:"
-  grep -nE "process\\.env" /tmp/convex-check.log | head -5
+# Warn (do not fail) on process.env mentions in Convex source (Convex prefers ctx.env.get)
+if grep -R -nE '\bprocess\.env\b' --include='*.ts' convex/ >/dev/null 2>&1; then
+  echo "⚠️  Note: Found process.env usage in convex/ (prefer ctx.env.get('KEY'))."
+  grep -R -nE '\bprocess\.env\b' --include='*.ts' convex/ | head -5
 fi
 
 # 4. Lint staged files (auto-fix issues)

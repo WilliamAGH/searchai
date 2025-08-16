@@ -6,10 +6,23 @@
 
 import { httpAction } from "../../_generated/server";
 import type { HttpRouter } from "convex/server";
-import { corsResponse, dlog } from "../utils";
+import { dlog } from "../utils";
+import { corsResponse } from "../cors";
 import type { SearchResult } from "../../search/providers/index";
 import { applyEnhancements } from "../../enhancements";
 import { normalizeSearchResults } from "../../lib/security/sanitization";
+
+// Helper to remove control characters and limit length (avoids control-char regex)
+function sanitizeText(input: unknown, maxLen: number): string {
+  const s = String(input ?? "");
+  let out = "";
+  for (const ch of s) {
+    const code = ch.codePointAt(0)!;
+    if (code >= 32 && code !== 127) out += ch;
+    if (out.length >= maxLen) break;
+  }
+  return out;
+}
 
 /**
  * Register AI routes on the HTTP router
@@ -70,17 +83,11 @@ export function registerAIRoutes(http: HttpRouter) {
         );
       }
       // Remove control characters and null bytes, then limit length
-      const message = String(payload.message)
-        // eslint-disable-next-line no-control-regex
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-        .slice(0, 10000);
+      const message = sanitizeText(payload.message, 10000);
 
       // Sanitize optional systemPrompt
       const systemPrompt = payload.systemPrompt
-        ? String(payload.systemPrompt)
-            // eslint-disable-next-line no-control-regex
-            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-            .slice(0, 2000)
+        ? sanitizeText(payload.systemPrompt, 2000)
         : undefined;
 
       // Validate and sanitize sources array
@@ -88,12 +95,7 @@ export function registerAIRoutes(http: HttpRouter) {
         ? payload.sources
             .slice(0, 20)
             .filter((s: unknown) => typeof s === "string")
-            .map((s: unknown) =>
-              String(s)
-                // eslint-disable-next-line no-control-regex
-                .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-                .slice(0, 2048),
-            )
+            .map((s: unknown) => sanitizeText(s, 2048))
         : undefined;
       const chatHistory = Array.isArray(payload.chatHistory)
         ? payload.chatHistory.slice(0, 50).map((m: unknown) => {
@@ -410,16 +412,12 @@ async function handleOpenRouterStreaming(
     model: "google/gemini-2.5-flash",
     messages,
     temperature: 0.8, // Increased for more creative/verbose responses
+    max_tokens: 6000, // Increased from 4000 for longer responses
     stream: true,
     // Enable caching for repeated context
     top_p: 0.95, // Slightly wider nucleus sampling
     frequency_penalty: -0.2, // Negative value encourages elaboration
     presence_penalty: 0.1, // Keep focused on topic
-    // For thinking models, control reasoning verbosity
-    // NOTE: OpenRouter only accepts ONE of effort or max_tokens, not both
-    reasoning: {
-      effort: "high" as const, // Use high effort for detailed thinking
-    },
   };
 
   dlog("🤖 OPENROUTER REQUEST:");
@@ -429,9 +427,7 @@ async function handleOpenRouterStreaming(
     messagesCount: openRouterBody.messages?.length ?? 0,
     sysPromptChars: openRouterBody.messages?.[0]?.content?.length ?? 0,
     temperature: openRouterBody.temperature,
-    ...(openRouterBody.reasoning
-      ? { reasoning: openRouterBody.reasoning }
-      : {}),
+    max_tokens: openRouterBody.max_tokens,
     stream: openRouterBody.stream,
   });
 

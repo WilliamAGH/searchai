@@ -88,8 +88,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
         // Allow localhost in development mode for testing
         const isDevelopment =
           process.env.NODE_ENV === "development" ||
-          process.env.CONVEX_DEPLOYMENT?.includes("dev") ||
-          !process.env.CONVEX_DEPLOYMENT;
+          (process.env.CONVEX_DEPLOYMENT?.includes?.("dev") ?? false);
 
         // Block localhost and loopback (except in development)
         if (
@@ -214,7 +213,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
           JSON.stringify(errorResponse, null, 2),
         );
 
-        return corsResponse(JSON.stringify(errorResponse));
+        return corsResponse(JSON.stringify(errorResponse), 502);
       }
     }),
   });

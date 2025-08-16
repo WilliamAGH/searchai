@@ -143,7 +143,7 @@ if grep -R -nE '^\s*console\.log\(' --include="*.ts" --include="*.tsx" convex/ s
 fi
 
 # Check for TODO comments
-TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX" --include="*.ts" --include="*.tsx" convex/ src/ | wc -l)
+TODO_COUNT=$(grep -R -nE "(TODO|FIXME|XXX)" --include="*.ts" --include="*.tsx" convex/ src/ | wc -l)
 if [ $TODO_COUNT -gt 0 ]; then
   echo "📝 Note: $TODO_COUNT TODO/FIXME comments found"
 fi
