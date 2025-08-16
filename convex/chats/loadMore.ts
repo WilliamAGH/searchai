@@ -4,8 +4,15 @@
  * - Provides action interface for frontend
  */
 import { action } from "../_generated/server";
-import { api } from "../_generated/api";
 import { v } from "convex/values";
+
+/**
+ * IMPORTANT TS2589 WORKAROUND:
+ * Using require pattern to avoid deep type instantiation error
+ * when calling the paginated query from an action
+ */
+// Use require to avoid TS2589 at import time
+const { api } = require("../_generated/api") as any;
 
 /**
  * Load more messages for a chat
@@ -55,8 +62,7 @@ export const loadMoreMessages = action({
   }),
   handler: async (ctx, args) => {
     try {
-      const result: any = await ctx.runQuery(
-        // @ts-ignore - Known Convex TS2589 issue with complex type inference
+      const result = await ctx.runQuery(
         api.chats.messagesPaginated.getChatMessagesPaginated,
         {
           chatId: args.chatId,

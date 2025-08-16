@@ -57,6 +57,7 @@ export const createChat = mutation({
 export const getUserChats = query({
   args: {
     sessionId: v.optional(v.string()),
+    sessionIds: v.optional(v.array(v.string())), // Support multiple session IDs
   },
   returns: v.array(
     v.object({
@@ -88,8 +89,25 @@ export const getUserChats = query({
         .collect();
     }
 
-    // Anonymous users - return session chats
-    if (args.sessionId) {
+    // Anonymous users - return ALL their chats across all session IDs
+    // This handles session rotation and ensures users don't lose access to their chats
+    if (args.sessionIds && args.sessionIds.length > 0) {
+      // Get chats from ALL session IDs this browser has used
+      const allChats = [];
+      for (const sid of args.sessionIds) {
+        const chats = await ctx.db
+          .query("chats")
+          .withIndex("by_sessionId", (q) => q.eq("sessionId", sid))
+          .collect();
+        allChats.push(...chats);
+      }
+      // Sort by creation time descending and deduplicate
+      const uniqueChats = Array.from(
+        new Map(allChats.map((chat) => [chat._id, chat])).values(),
+      );
+      return uniqueChats.sort((a, b) => b._creationTime - a._creationTime);
+    } else if (args.sessionId) {
+      // Fallback to single session ID for backwards compatibility
       return await ctx.db
         .query("chats")
         .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))

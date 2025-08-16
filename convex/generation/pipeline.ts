@@ -13,6 +13,10 @@ import { streamOpenRouter } from "./streaming";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
+// Check if we're in test mode - skip real API calls
+const IS_TEST_MODE =
+  process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test";
+
 // Configuration constant for the number of top search results to use
 const TOP_RESULTS = 3 as const;
 
@@ -609,7 +613,14 @@ export const generateStreamingResponse = action({
         userMessage: trimmed,
       });
 
-      console.info("✅ Generation step scheduled successfully");
+      // Watchdog: if streaming hasn't started shortly, trigger direct execution as fallback
+      await ctx.scheduler.runAfter(750, internal.ai.watchdogEnsureGeneration, {
+        chatId: args.chatId,
+        assistantMessageId,
+        userMessage: trimmed,
+      });
+
+      console.info("✅ Generation step scheduled successfully (with watchdog)");
     } catch (error) {
       console.error("❌ Failed to schedule generation step:", {
         error: error instanceof Error ? error.message : String(error),
@@ -642,12 +653,44 @@ export const generationStep = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Guard: if this message already started streaming, skip duplicate run
+    try {
+      const current = await ctx.runQuery(api.chats.subscribeToMessageStream, {
+        messageId: args.assistantMessageId,
+      });
+      if (
+        current &&
+        (current.streamedContent || current.thinking || current.content)
+      ) {
+        console.info(
+          "⏭️ Generation already appears to be underway, skipping duplicate run",
+          {
+            messageId: args.assistantMessageId,
+          },
+        );
+        return null;
+      }
+    } catch {}
     console.info("🔥 Generation step started:", {
       chatId: args.chatId,
       assistantMessageId: args.assistantMessageId,
       userMessageLength: args.userMessage.length,
       timestamp: new Date().toISOString(),
     });
+
+    // TEST MODE: Return mock response without hitting real APIs
+    if (IS_TEST_MODE) {
+      console.log("[TEST MODE] Generating mock AI response");
+
+      // Update message with mock content
+      await ctx.runMutation(internal.messages.updateMessage, {
+        messageId: args.assistantMessageId,
+        content: `This is a test response for "${args.userMessage}". In test mode, we don't make real API calls.`,
+        isStreaming: false,
+      });
+
+      return null;
+    }
 
     // 1. Build secure context FIRST and check if rolling summary needs update
     // Get messages via query since we're in an action context
@@ -910,6 +953,51 @@ export const generationStep = internalAction({
       });
     }
 
+    return null;
+  },
+});
+
+/**
+ * Watchdog: Ensure generation begins
+ * - If streaming hasn't started soon after scheduling, trigger direct execution
+ */
+export const watchdogEnsureGeneration = internalAction({
+  args: {
+    chatId: v.id("chats"),
+    assistantMessageId: v.id("messages"),
+    userMessage: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      const state = await ctx.runQuery(api.chats.subscribeToMessageStream, {
+        messageId: args.assistantMessageId,
+      } as any);
+
+      const alreadyStreaming = state?.isStreaming === true;
+      if (alreadyStreaming) {
+        console.info(
+          "🛡️ Watchdog: Streaming already in progress, nothing to do.",
+          {
+            messageId: args.assistantMessageId,
+          },
+        );
+        return null;
+      }
+
+      console.warn(
+        "🛡️ Watchdog: Streaming not started, invoking generation directly",
+        { messageId: args.assistantMessageId },
+      );
+
+      await ctx.runAction(internal.ai.generationStep, {
+        chatId: args.chatId,
+        assistantMessageId: args.assistantMessageId,
+        userMessage: args.userMessage,
+      });
+    } catch (error) {
+      console.error("Watchdog failed to ensure generation:", error);
+    }
     return null;
   },
 });

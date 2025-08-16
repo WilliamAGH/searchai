@@ -119,6 +119,7 @@ export const subscribeToMessageStream = query({
       content: v.optional(v.string()),
       streamedContent: v.optional(v.string()),
       isStreaming: v.boolean(),
+      thinking: v.optional(v.string()),
       completedAt: v.optional(v.number()),
     }),
   ),
@@ -131,6 +132,7 @@ export const subscribeToMessageStream = query({
       content: message.content,
       streamedContent: message.streamedContent,
       isStreaming: !!message.isStreaming,
+      thinking: message.thinking,
       completedAt: undefined,
     };
   },
