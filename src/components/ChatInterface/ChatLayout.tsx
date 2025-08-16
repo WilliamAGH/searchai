@@ -123,25 +123,25 @@ export function ChatLayout({
         {...swipeHandlers}
       >
         <div className="flex-1 flex flex-col min-h-0">
-          <MessageList 
-            key={String(currentChatId)} 
+          <MessageList
+            key={String(currentChatId)}
             {...messageListProps}
             currentChatId={currentChatId}
             chatTitle={currentChat?.title}
             onShareChat={_openShareModal}
           />
-          
+
           {/* Chat-wide copy and share toolbar - only show when we have a persisted chat with messages */}
-          {currentChatId && 
-           messageListProps.messages?.length > 0 && 
-           messageListProps.messages.some(m => m.role === 'assistant') && (
-            <ChatToolbar
-              onShare={_openShareModal}
-              onNewChat={chatSidebarProps.onNewChat}
-              messages={messageListProps.messages}
-              chatTitle={currentChat?.title}
-            />
-          )}
+          {currentChatId &&
+            messageListProps.messages?.length > 0 &&
+            messageListProps.messages.some((m) => m.role === "assistant") && (
+              <ChatToolbar
+                onShare={_openShareModal}
+                onNewChat={chatSidebarProps.onNewChat}
+                messages={messageListProps.messages}
+                chatTitle={currentChat?.title}
+              />
+            )}
         </div>
         <div
           className={`flex-shrink-0 relative ${

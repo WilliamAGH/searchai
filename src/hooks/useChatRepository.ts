@@ -10,10 +10,12 @@ import { useConvex } from "convex/react";
 import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import { ConvexChatRepository } from "../lib/repositories/ConvexChatRepository";
 import { useAnonymousSession } from "./useAnonymousSession";
+import { useAllSessionIds } from "./useAllSessionIds";
 
 export function useChatRepository(): IChatRepository | null {
   const convexClient = useConvex();
   const sessionId = useAnonymousSession();
+  const allSessionIds = useAllSessionIds();
 
   const repository = useMemo<IChatRepository | null>(() => {
     // Treat missing Convex URL as "service unavailable" for the UI guards.
@@ -32,12 +34,16 @@ export function useChatRepository(): IChatRepository | null {
       return null;
     }
     try {
-      return new ConvexChatRepository(convexClient, sessionId || undefined);
+      return new ConvexChatRepository(
+        convexClient,
+        sessionId || undefined,
+        allSessionIds.length > 0 ? allSessionIds : undefined,
+      );
     } catch (error) {
       console.error("Convex repository initialization failed:", error);
       return null;
     }
-  }, [convexClient, sessionId]);
+  }, [convexClient, sessionId, allSessionIds]);
 
   return repository;
 }

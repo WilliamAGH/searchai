@@ -1,7 +1,7 @@
 /**
  * Chat toolbar with Share and Copy icon buttons
  * Positioned at the bottom of the message list
- * 
+ *
  * 🎯 DESIGN PRINCIPLES:
  * - Icon-only buttons for minimal visual footprint
  * - Matches the app's icon button patterns (see CopyButton component)
@@ -22,8 +22,8 @@
  *
  * @example Correct usage in ChatLayout:
  * ```tsx
- * {currentChatId && 
- *  messageListProps.messages?.length > 0 && 
+ * {currentChatId &&
+ *  messageListProps.messages?.length > 0 &&
  *  messageListProps.messages.some(m => m.role === 'assistant') && (
  *   <ChatToolbar
  *     onShare={openShareModal}
@@ -38,16 +38,16 @@
  * // ❌ Missing messages.length check
  * {currentChatId && <ChatToolbar ... />}
  *
- * // ❌ Missing currentChatId check  
+ * // ❌ Missing currentChatId check
  * {messages.length > 0 && <ChatToolbar ... />}
  *
  * // ❌ No checks at all
  * <ChatToolbar ... />
- * 
+ *
  * // ❌ Text labels with icons (old design)
  * <span>Copy</span> // NO TEXT LABELS!
  * ```
- * 
+ *
  * REGRESSION PREVENTION:
  * If E2E tests fail, DO NOT remove the message checks!
  * Instead, ensure tests wait for messages before expecting toolbar.
@@ -72,7 +72,7 @@ interface ChatToolbarProps {
 
 /**
  * Icon-only toolbar with New Chat, Copy, and Share buttons for chat conversations.
- * 
+ *
  * DESIGN NOTES:
  * - Icon-only buttons following CopyButton component pattern
  * - Subtle presence with transparent background
@@ -81,7 +81,7 @@ interface ChatToolbarProps {
  *
  * ⚠️ CRITICAL: Parent component MUST ensure:
  * 1. currentChatId exists (Convex chat, not local)
- * 2. messages.length > 0 
+ * 2. messages.length > 0
  * 3. At least one assistant message exists
  *
  * @param onShare - Handler to open share modal
@@ -121,12 +121,12 @@ export function ChatToolbar({
       if (success) {
         setCopied(true);
         toast.success("Conversation copied to clipboard");
-        
+
         // Clear any existing timeout
         if (copyTimeoutRef.current) {
           clearTimeout(copyTimeoutRef.current);
         }
-        
+
         // Reset copied state after 2 seconds
         copyTimeoutRef.current = setTimeout(() => {
           setCopied(false);
@@ -175,7 +175,7 @@ export function ChatToolbar({
         onClick={handleCopyAll}
         disabled={copying || messages.length === 0}
         className={`p-2 rounded-lg transition-all duration-200 ${
-          copied 
+          copied
             ? "text-emerald-500 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300"
             : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
         } disabled:opacity-50 disabled:cursor-not-allowed`}
