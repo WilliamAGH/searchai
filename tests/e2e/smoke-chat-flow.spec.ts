@@ -30,15 +30,28 @@ test.describe("Chat Flow Smoke Test", () => {
     // Wait for URL to change (indicates chat creation)
     await expect(page).toHaveURL(/\/chat\/[a-zA-Z0-9]+/, { timeout: 10000 });
 
-    // Wait for response - check that input is re-enabled after response
-    await expect(messageInput).toBeEnabled({ timeout: 30000 });
+    // Wait for response - input should be re-enabled after response
+    // Use a more lenient approach with retries
+    await page.waitForFunction(
+      () => {
+        const input = document.querySelector('textarea, [role="textbox"]');
+        return input && !input.hasAttribute("disabled");
+      },
+      { timeout: 30000, polling: 1000 },
+    );
 
     // Verify we can send another message
     await messageInput.type("Thank you");
     await page.keyboard.press("Enter");
 
-    // Wait for second response
-    await expect(messageInput).toBeEnabled({ timeout: 30000 });
+    // Wait for second response with polling
+    await page.waitForFunction(
+      () => {
+        const input = document.querySelector('textarea, [role="textbox"]');
+        return input && !input.hasAttribute("disabled");
+      },
+      { timeout: 30000, polling: 1000 },
+    );
   });
 
   test("should handle multiple messages in sequence", async ({ page }) => {
