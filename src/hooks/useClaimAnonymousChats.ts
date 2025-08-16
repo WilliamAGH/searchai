@@ -6,8 +6,7 @@
 import { useEffect, useRef } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-
-const SESSION_KEY = "searchai:anonymousSessionId";
+import { ANON_SESSION_KEY } from "../lib/constants/session";
 
 export function useClaimAnonymousChats() {
   const { isAuthenticated } = useConvexAuth();
@@ -18,7 +17,7 @@ export function useClaimAnonymousChats() {
     async function claim() {
       // Only run once when user becomes authenticated
       if (isAuthenticated && !hasClaimedRef.current) {
-        const sessionId = localStorage.getItem(SESSION_KEY);
+        const sessionId = localStorage.getItem(ANON_SESSION_KEY);
 
         if (sessionId) {
           try {
@@ -26,7 +25,7 @@ export function useClaimAnonymousChats() {
             // Successfully claimed anonymous chats
 
             // Remove session ID after successful claim
-            localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(ANON_SESSION_KEY);
             hasClaimedRef.current = true;
           } catch {
             // Failed to claim anonymous chats - will retry on next login
