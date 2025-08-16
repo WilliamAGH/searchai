@@ -22,6 +22,9 @@ export const deleteChat = mutation({
     const chat = await ctx.db.get(args.chatId);
 
     if (!chat) throw new Error("Chat not found");
+
+    // Only check authorization if the chat belongs to a user
+    // Anonymous chats (with sessionId) can be deleted by anyone who has access to them
     if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
     // Delete all messages in the chat via async iteration to reduce memory usage
