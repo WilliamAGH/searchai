@@ -679,3 +679,28 @@ html.dark .message-textarea {
     scrollbar-width: none; /* Firefox */
   }
 }
+
+/* Safari-specific performance optimizations */
+@supports (-webkit-touch-callout: none) {
+  .message-textarea {
+    /* Prevent font boosting on iOS */
+    -webkit-text-size-adjust: 100%;
+    /* Hardware acceleration */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    /* Reduce repaints */
+    will-change: height;
+    /* Prevent rubber-band scrolling conflicts */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Disable complex font features on mobile Safari for performance */
+  @media (max-width: 768px) {
+    .message-textarea {
+      font-variant-numeric: normal;
+      font-feature-settings: normal;
+      /* Simpler font stack for mobile */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+  }
+}

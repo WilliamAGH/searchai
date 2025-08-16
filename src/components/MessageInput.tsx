@@ -6,7 +6,7 @@
  * - Disabled state during generation
  */
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 
 interface MessageInputProps {
   /** Callback when message is sent */
@@ -114,14 +114,14 @@ export function MessageInput({
           setMessage(next);
           onDraftChange?.(next);
         }
-        // Move caret to end after setting message
-        requestAnimationFrame(() => {
+        // Move caret to end after setting message (throttled)
+        setTimeout(() => {
           const el = textareaRef.current;
           if (el) {
             const len = el.value.length;
             el.setSelectionRange(len, len);
           }
-        });
+        }, 0);
         return;
       }
 
@@ -135,13 +135,13 @@ export function MessageInput({
           const next = history[idx] || "";
           setMessage(next);
           onDraftChange?.(next);
-          requestAnimationFrame(() => {
+          setTimeout(() => {
             const el = textareaRef.current;
             if (el) {
               const len = el.value.length;
               el.setSelectionRange(len, len);
             }
-          });
+          }, 0);
         } else {
           // Exiting history mode -> restore draft
           const restore = draftBeforeHistory ?? "";
@@ -149,13 +149,13 @@ export function MessageInput({
           setDraftBeforeHistory(null);
           setMessage(restore);
           onDraftChange?.(restore);
-          requestAnimationFrame(() => {
+          setTimeout(() => {
             const el = textareaRef.current;
             if (el) {
               const len = el.value.length;
               el.setSelectionRange(len, len);
             }
-          });
+          }, 0);
         }
         return;
       }
@@ -170,48 +170,74 @@ export function MessageInput({
     ],
   );
 
-  // Auto-resize height only, don't mess with padding
-  const adjustTextarea = () => {
+  // Auto-resize height with performance optimizations
+  const adjustTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
 
-    ta.style.height = "auto";
+    // Batch DOM operations
+    requestAnimationFrame(() => {
+      ta.style.height = "auto";
+      const style = window.getComputedStyle(ta);
+      const minH = parseFloat(style.minHeight) || 0;
+      const scrollH = ta.scrollHeight;
+      const target = Math.min(Math.max(scrollH, minH), MAX_TEXTAREA_HEIGHT);
+      ta.style.height = target + "px";
+    });
+  }, []);
 
-    const style = window.getComputedStyle(ta);
-    const minH = parseFloat(style.minHeight) || 0;
-    const scrollH = ta.scrollHeight;
-    const target = Math.min(Math.max(scrollH, minH), MAX_TEXTAREA_HEIGHT);
-
-    ta.style.height = target + "px";
-  };
-
-  // Autofocus once and manage focus
+  // Skip autofocus on iOS to prevent keyboard issues
   useEffect(() => {
-    if (disabled) return;
+    // Detect iOS Safari
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS || disabled) return;
+
     const el = textareaRef.current;
     if (!el) return;
-    try {
-      el.focus({ preventScroll: true });
-    } catch {
+
+    // Delay focus to avoid conflicts
+    const timer = setTimeout(() => {
       try {
-        el.focus();
-      } catch {}
-    }
+        el.focus({ preventScroll: true });
+      } catch {
+        // Silently fail on mobile
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [disabled]);
 
   // Consolidated adjustTextarea triggers: content changes, env changes, and viewport changes
   useEffect(() => {
     adjustTextarea();
-  }, [message, placeholder, disabled]);
+  }, [message, placeholder, disabled, adjustTextarea]);
+  // Throttle resize handlers for better performance
   useEffect(() => {
-    const handler: EventListener = () => requestAnimationFrame(adjustTextarea);
-    window.addEventListener("resize", handler);
-    window.addEventListener("orientationchange", handler);
+    let rafId: number | null = null;
+    let lastCall = 0;
+    const THROTTLE_MS = 100;
+
+    const handler: EventListener = () => {
+      const now = Date.now();
+      if (now - lastCall < THROTTLE_MS) return;
+
+      lastCall = now;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(adjustTextarea);
+    };
+
+    window.addEventListener("resize", handler, { passive: true });
+    window.addEventListener("orientationchange", handler, { passive: true });
+
     return () => {
       window.removeEventListener("resize", handler);
       window.removeEventListener("orientationchange", handler);
+      if (rafId) cancelAnimationFrame(rafId);
     };
-  }, []);
+  }, [adjustTextarea]);
+
+  // Throttle draft changes for better performance
+  const draftChangeTimerRef = useRef<NodeJS.Timeout>();
 
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -221,24 +247,43 @@ export function MessageInput({
         setHistoryIndex(null);
         setDraftBeforeHistory(null);
       }
-      onDraftChange?.(val);
+
+      // Throttle draft change callbacks
+      if (onDraftChange) {
+        if (draftChangeTimerRef.current) {
+          clearTimeout(draftChangeTimerRef.current);
+        }
+        draftChangeTimerRef.current = setTimeout(() => {
+          onDraftChange(val);
+        }, 150); // Throttle to 150ms
+      }
     },
     [historyIndex, onDraftChange],
   );
 
-  // Politely auto-focus the input once (desktop only, no modals)
+  // Cleanup draft change timer on unmount
+  useEffect(() => {
+    return () => {
+      if (draftChangeTimerRef.current) {
+        clearTimeout(draftChangeTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Skip auto-focus on mobile devices completely
   const hasAutoFocusedRef = useRef(false);
   useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    if (disabled) return;
-    if (hasAutoFocusedRef.current) return;
+    // Detect mobile/touch devices more reliably
+    const isMobile =
+      /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) ||
+      (typeof window !== "undefined" &&
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(pointer: coarse)").matches);
 
-    // Skip on touch-centric devices to avoid popping the keyboard
-    const isCoarse =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(pointer: coarse)").matches;
+    if (isMobile || disabled) return;
+
+    const el = textareaRef.current;
+    if (!el || hasAutoFocusedRef.current) return;
 
     // Avoid stealing focus if something else is active or a modal is open
     const hasModalOpen = !!document.querySelector(
@@ -247,24 +292,23 @@ export function MessageInput({
     const canStealFocus =
       document.activeElement === document.body &&
       document.visibilityState === "visible" &&
-      !isCoarse &&
       !hasModalOpen;
 
     // Only focus if the element is visible and enabled
     const isVisible = el.offsetParent !== null && !el.disabled;
     if (!canStealFocus || !isVisible) return;
 
-    const raf = requestAnimationFrame(() => {
+    // Use setTimeout instead of RAF for more predictable behavior
+    const timer = setTimeout(() => {
       try {
-        // Prevent scroll jumps on focus
         el.focus({ preventScroll: true });
       } catch {
-        el.focus();
+        // Silently fail
       }
-    });
+    }, 250);
 
     hasAutoFocusedRef.current = true;
-    return () => cancelAnimationFrame(raf);
+    return () => clearTimeout(timer);
   }, [disabled]);
 
   return (
