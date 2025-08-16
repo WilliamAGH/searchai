@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "validate:quick": "oxlint && tsc -p . --noEmit && tsc -p convex --noEmit && npm run -s test",
-    "dev": "npm-run-all --parallel dev:frontend dev:backend",
-    "dev:frontend": "vite --open",
+    "dev": "NODE_ENV=development DEBUG=* npm-run-all --parallel dev:frontend dev:backend",
+    "dev:frontend": "vite --open --clearScreen=false",
     "dev:backend": "convex dev",
     "build": "vite build",
     "preview": "vite preview --strictPort --port 4173",
@@ -40,6 +40,7 @@
     "test:search:all": "npm-run-all --sequential test:search test:integration:with-backend",
     "test:smoke": "playwright test -g smoke --reporter=line",
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test -g smoke --reporter=line",
+    "test:smoke:mock": "TEST_MODE=true playwright test -g smoke --reporter=line",
     "test:complete": "npm-run-all --sequential test:vitest test:integration:with-backend test:playwright",
     "prepare": "husky",
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",

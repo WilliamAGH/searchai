@@ -13,9 +13,9 @@ export interface SearchResult {
   snippet: string;
   relevanceScore: number;
   // Optional scraped content fields
-  content?: string;   // Full scraped content
-  fullTitle?: string; // Title from scraped page  
-  summary?: string;   // Summary from scraped content
+  content?: string; // Full scraped content
+  fullTitle?: string; // Title from scraped page
+  summary?: string; // Summary from scraped content
 }
 
 interface DuckDuckGoResponse {
@@ -59,7 +59,7 @@ export async function searchWithDuckDuckGo(
   // Extract instant answer results (including Wikipedia, etc.)
   if (data.Abstract && data.AbstractURL) {
     // Check if it's from a real external source (not DuckDuckGo itself)
-    const isExternal = !data.AbstractURL.includes('duckduckgo.com');
+    const isExternal = !data.AbstractURL.includes("duckduckgo.com");
     if (isExternal || results.length === 0) {
       results.push({
         title: data.Heading || query,
@@ -75,12 +75,21 @@ export async function searchWithDuckDuckGo(
 
   // Extract related topics, preferring external URLs
   if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-    const topics = data.RelatedTopics
-      .filter(topic => topic.FirstURL && topic.Text && topic.FirstURL.startsWith("http"))
+    const topics = data.RelatedTopics.filter(
+      (topic) =>
+        topic.FirstURL && topic.Text && topic.FirstURL.startsWith("http"),
+    )
       // Filter out DuckDuckGo category/disambiguation pages which just redirect
-      .filter(topic => !topic.FirstURL?.includes('duckduckgo.com/c/') && !topic.FirstURL?.includes('duckduckgo.com/d/'))
-      .map(topic => ({
-        title: topic.Text?.split(" - ")[0] || topic.Text?.substring(0, 100) || "Untitled",
+      .filter(
+        (topic) =>
+          !topic.FirstURL?.includes("duckduckgo.com/c/") &&
+          !topic.FirstURL?.includes("duckduckgo.com/d/"),
+      )
+      .map((topic) => ({
+        title:
+          topic.Text?.split(" - ")[0] ||
+          topic.Text?.substring(0, 100) ||
+          "Untitled",
         url: topic.FirstURL || "",
         snippet: topic.Text || "",
         relevanceScore: 0.7, // All remaining URLs are external after filtering
@@ -90,7 +99,7 @@ export async function searchWithDuckDuckGo(
       }))
       // Sort by relevance score
       .sort((a, b) => b.relevanceScore - a.relevanceScore);
-    
+
     // Add topics to results
     for (const topic of topics) {
       if (results.length >= maxResults) break;
@@ -112,7 +121,7 @@ export async function searchWithDuckDuckGo(
     },
     {
       title: `${query} - Wikipedia`,
-      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(query.replace(/ /g, '_'))}`,
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(query.replace(/ /g, "_"))}`,
       snippet: `Wikipedia article about "${query}"`,
       relevanceScore: 0.8,
       content: undefined,
@@ -151,31 +160,38 @@ export async function searchWithDuckDuckGo(
   // Intelligently select suggestions based on query type
   const queryLower = query.toLowerCase();
   let selectedSuggestions: SearchResult[] = [];
-  
+
   // Technical queries get Stack Overflow and GitHub
-  if (queryLower.match(/\b(code|programming|error|bug|api|function|javascript|python|react|node)\b/)) {
-    selectedSuggestions = webSearchSuggestions.filter(s => 
-      s.url.includes('stackoverflow.com') || s.url.includes('github.com')
+  if (
+    queryLower.match(
+      /\b(code|programming|error|bug|api|function|javascript|python|react|node)\b/,
+    )
+  ) {
+    selectedSuggestions = webSearchSuggestions.filter(
+      (s) =>
+        s.url.includes("stackoverflow.com") || s.url.includes("github.com"),
     );
   }
   // News/current events get Google News
   else if (queryLower.match(/\b(news|latest|recent|today|current|update)\b/)) {
-    selectedSuggestions = webSearchSuggestions.filter(s => s.url.includes('news.google.com'));
+    selectedSuggestions = webSearchSuggestions.filter((s) =>
+      s.url.includes("news.google.com"),
+    );
   }
   // General queries get Wikipedia and Reddit
   else {
-    selectedSuggestions = webSearchSuggestions.filter(s => 
-      s.url.includes('wikipedia.org') || s.url.includes('reddit.com')
+    selectedSuggestions = webSearchSuggestions.filter(
+      (s) => s.url.includes("wikipedia.org") || s.url.includes("reddit.com"),
     );
   }
 
   // Add selected suggestions to fill up to maxResults
   for (const suggestion of selectedSuggestions) {
     if (results.length >= maxResults) break;
-    
+
     // Don't add duplicate domains
     const domain = new URL(suggestion.url).hostname;
-    if (!results.some(r => new URL(r.url).hostname === domain)) {
+    if (!results.some((r) => new URL(r.url).hostname === domain)) {
       results.push(suggestion);
     }
   }

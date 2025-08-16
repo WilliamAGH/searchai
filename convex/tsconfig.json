@@ -19,7 +19,7 @@
     "module": "ESNext",
     "isolatedModules": true,
     "noEmit": true,
-    
+
     /* Fix iteration issues with Set/Map */
     "downlevelIteration": true
   },
