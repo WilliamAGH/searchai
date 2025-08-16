@@ -217,7 +217,8 @@ export class ConvexChatRepository extends BaseRepository {
       });
     } catch (error) {
       // Only log as error if it's not a "chat not found" issue
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       if (errorMessage.includes("Chat not found")) {
         logger.debug("Chat already deleted from backend:", id);
       } else {
