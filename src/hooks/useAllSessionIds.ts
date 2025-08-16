@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useConvexAuth } from "convex/react";
 import { ALL_SESSIONS_KEY, ANON_SESSION_KEY } from "../lib/constants/session";
+import { logger } from "../lib/logger";
 
 export function useAllSessionIds(): string[] {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -21,7 +22,7 @@ export function useAllSessionIds(): string[] {
 
     // In development, log session tracking for debugging
     if (import.meta.env.DEV) {
-      console.debug("[ALL_SESSIONS] Loaded historical sessions:", historical);
+      logger.debug("[ALL_SESSIONS] Loaded historical sessions:", historical);
     }
 
     // Get current session ID
@@ -57,7 +58,7 @@ export function useAllSessionIds(): string[] {
 
     // In development, log session tracking for debugging
     if (import.meta.env.DEV) {
-      console.debug("[ALL_SESSIONS] Loaded historical sessions:", historical);
+      logger.debug("[ALL_SESSIONS] Loaded historical sessions:", historical);
     }
 
     // Add current to historical if not already there

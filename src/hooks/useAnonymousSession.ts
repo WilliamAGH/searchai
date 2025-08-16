@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useConvexAuth } from "convex/react";
 import { uuidv7 } from "uuidv7";
 import { ANON_SESSION_KEY, ALL_SESSIONS_KEY } from "../lib/constants/session";
+import { logger } from "../lib/logger";
 
 function generateSessionId(): string {
   return uuidv7();
@@ -39,7 +40,7 @@ export function useAnonymousSession(): string | null {
 
       // In development, log session tracking for debugging
       if (import.meta.env.DEV) {
-        console.debug("[SESSION] Adding new session ID to history:", newId);
+        logger.debug("[SESSION] Adding new session ID to history:", newId);
       }
 
       if (!historical.includes(newId)) {
