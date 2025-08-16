@@ -30,6 +30,27 @@ export const bumpAndCheck = internalMutation({
     isRateLimited: boolean;
     rateLimitHeaders: Record<string, string>;
   }> => {
+    // Validate inputs
+    if (!Number.isFinite(windowMs) || windowMs <= 0) {
+      throw new Error("windowMs must be a positive number");
+    }
+    if (!Number.isFinite(maxRequests)) {
+      throw new Error("maxRequests must be a finite number");
+    }
+    if (maxRequests <= 0) {
+      // Explicit "block all" mode
+      const now = Date.now();
+      return {
+        isRateLimited: true,
+        rateLimitHeaders: {
+          "Retry-After": Math.ceil(windowMs / 1000).toString(),
+          "X-RateLimit-Limit": "0",
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": Math.ceil((now + windowMs) / 1000).toString(),
+        },
+      };
+    }
+
     const now = Date.now();
     const windowStart = now - windowMs;
 
@@ -49,8 +70,10 @@ export const bumpAndCheck = internalMutation({
 
     // If we're at or over the limit, reject the request
     if (currentCount >= maxRequests) {
-      const retryAfter = Math.ceil(
-        (windowMs - (now - existing!.lastRequest)) / 1000,
+      const last = existing?.lastRequest ?? now;
+      const retryAfter = Math.max(
+        0,
+        Math.ceil((windowMs - (now - last)) / 1000),
       );
       return {
         isRateLimited: true,
@@ -58,9 +81,7 @@ export const bumpAndCheck = internalMutation({
           "Retry-After": retryAfter.toString(),
           "X-RateLimit-Limit": String(maxRequests),
           "X-RateLimit-Remaining": "0",
-          "X-RateLimit-Reset": Math.ceil(
-            (existing!.lastRequest + windowMs) / 1000,
-          ).toString(),
+          "X-RateLimit-Reset": Math.ceil((last + windowMs) / 1000).toString(),
         },
       };
     }

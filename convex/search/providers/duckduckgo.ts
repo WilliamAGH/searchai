@@ -13,6 +13,10 @@ interface DuckDuckGoResponse {
   RelatedTopics?: Array<{
     FirstURL?: string;
     Text?: string;
+    Topics?: Array<{
+      FirstURL?: string;
+      Text?: string;
+    }>;
   }>;
   Abstract?: string;
   AbstractURL?: string;
@@ -34,14 +38,24 @@ export async function searchWithDuckDuckGo(
   maxResults: number,
 ): Promise<SearchResult[]> {
   const searchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+
+  // Add timeout for the fetch request
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
   const response = await fetch(searchUrl, {
     headers: {
       "User-Agent": "SearchChat/1.0 (Web Search Assistant)",
     },
+    signal: controller.signal,
   });
 
+  clearTimeout(timeoutId);
+
   if (!response.ok) {
-    throw new Error(`DuckDuckGo API returned ${response.status}`);
+    throw new Error(
+      `DuckDuckGo API returned ${response.status} ${response.statusText}`,
+    );
   }
 
   const data: DuckDuckGoResponse = await response.json();
@@ -64,12 +78,18 @@ export async function searchWithDuckDuckGo(
     }
   }
 
-  // Extract related topics, preferring external URLs
+  // Extract related topics, including nested "Topics" arrays, preferring external URLs
   if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-    const topics = data.RelatedTopics.filter(
-      (topic) =>
-        topic.FirstURL && topic.Text && topic.FirstURL.startsWith("http"),
-    )
+    // Flatten topics including nested Topics arrays
+    const flatTopics = data.RelatedTopics.flatMap((t) =>
+      t.Topics && t.Topics.length > 0 ? t.Topics : [t],
+    );
+
+    const topics = flatTopics
+      .filter(
+        (topic) =>
+          topic.FirstURL && topic.Text && topic.FirstURL.startsWith("http"),
+      )
       // Filter out DuckDuckGo category/disambiguation pages which just redirect
       .filter(
         (topic) =>

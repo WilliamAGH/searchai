@@ -10,8 +10,12 @@
 // We'll create a simple logger that can be easily identified and removed
 
 // Safe way to check if we're in a Node.js environment
-const isNode = typeof process !== "undefined" && process.env;
-const isDev = isNode ? process.env.NODE_ENV !== "production" : true;
+const isNode =
+  typeof process !== "undefined" && typeof process.env !== "undefined";
+// Default to no debug/info logs unless explicitly enabled or in development
+const nodeEnv = isNode ? process.env.NODE_ENV : undefined;
+const debugFlag = isNode ? process.env.CONVEX_DEBUG_LOGS : undefined;
+const isDev = nodeEnv === "development" || debugFlag === "1";
 
 export const logger = {
   /**

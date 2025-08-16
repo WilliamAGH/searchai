@@ -1100,11 +1100,6 @@ async function streamResponseToMessage(args: {
     top_p: 0.95, // Slightly wider nucleus sampling for more variety
     frequency_penalty: -0.2, // Negative value encourages some repetition (more verbose)
     presence_penalty: 0.1, // Slight penalty for new topics to stay focused
-    // For thinking models, control reasoning verbosity
-    // NOTE: OpenRouter only accepts ONE of effort or max_tokens, not both
-    reasoning: {
-      effort: "high" as const, // Use high effort for detailed thinking
-    },
   };
 
   let accumulatedContent = "";

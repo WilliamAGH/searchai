@@ -37,6 +37,15 @@ export async function searchWithOpenRouter(
   query: string,
   maxResults: number,
 ): Promise<SearchResult[]> {
+  // Preflight check for API key
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error("OPENROUTER_API_KEY is not configured on the server");
+  }
+
+  // Add timeout for the fetch request
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",
     {
@@ -61,12 +70,14 @@ export async function searchWithOpenRouter(
         max_tokens: 1000,
         temperature: 0.1,
       }),
+      signal: controller.signal,
     },
   );
 
+  clearTimeout(timeoutId);
+
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`OpenRouter API error: ${response.status}`, errorText);
     throw new Error(
       `OpenRouter API error: ${response.status} - ${errorText.substring(0, 200)}`,
     );
