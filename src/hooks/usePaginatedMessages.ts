@@ -39,7 +39,7 @@ export function usePaginatedMessages({
   enabled = true,
 }: UsePaginatedMessagesOptions): PaginatedMessagesState {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>();
+  const [cursor, setCursor] = useState<Id<"messages"> | undefined>();
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -77,39 +77,46 @@ export function usePaginatedMessages({
   // Use a stable reference by checking content equality, not reference equality
   const initialMessagesRef = useRef<typeof initialMessages>();
   const initialUnifiedMessagesRef = useRef<UnifiedMessage[]>([]);
-  
+
   // Only update if content actually changed
   const initialUnifiedMessages = useMemo<UnifiedMessage[]>(() => {
     if (!initialMessages) return initialUnifiedMessagesRef.current;
-    
+
     // Check if the actual message content changed
-    const hasChanged = initialMessagesRef.current?.messages?.length !== initialMessages.messages?.length ||
+    const hasChanged =
+      initialMessagesRef.current?.messages?.length !==
+        initialMessages.messages?.length ||
       initialMessagesRef.current?.nextCursor !== initialMessages.nextCursor;
-    
+
     if (!hasChanged && initialUnifiedMessagesRef.current.length > 0) {
       return initialUnifiedMessagesRef.current;
     }
-    
+
     initialMessagesRef.current = initialMessages;
     const convexMessages = initialMessages.messages || [];
-    const unified = convexMessages.map((msg) => ({
-      _id: msg._id, // Preserve _id for delete functionality
-      id: msg._id,
-      chatId:
-        chatId ?? String((msg as unknown as { chatId?: string }).chatId ?? ""),
-      role: msg.role,
-      content: msg.content || "",
-      timestamp: msg.timestamp || Date.now(),
-      isStreaming: msg.isStreaming,
-      streamedContent: msg.streamedContent,
-      thinking: msg.thinking,
-      searchResults: msg.searchResults,
-      sources: msg.sources,
-      reasoning: msg.reasoning,
-      synced: true,
-      source: "convex" as const,
-    }));
-    
+    const unified = convexMessages.map((msg, index) => {
+      // Ensure we always have an ID, even for legacy messages
+      const messageId = msg._id || `legacy-${chatId}-${index}-${Date.now()}`;
+      return {
+        _id: messageId, // Preserve _id for delete functionality
+        id: messageId,
+        chatId:
+          chatId ??
+          String((msg as unknown as { chatId?: string }).chatId ?? ""),
+        role: msg.role,
+        content: msg.content || "",
+        timestamp: msg.timestamp || Date.now(),
+        isStreaming: msg.isStreaming,
+        streamedContent: msg.streamedContent,
+        thinking: msg.thinking,
+        searchResults: msg.searchResults,
+        sources: msg.sources,
+        reasoning: msg.reasoning,
+        synced: true,
+        source: "convex" as const,
+      };
+    });
+
     initialUnifiedMessagesRef.current = unified;
     return unified;
   }, [initialMessages, chatId]);
@@ -173,22 +180,27 @@ export function usePaginatedMessages({
 
         if (moreMessages) {
           const newUnifiedMessages: UnifiedMessage[] =
-            moreMessages.messages.map((msg) => ({
-              _id: msg._id, // Preserve _id for delete functionality
-              id: msg._id,
-              chatId: chatId,
-              role: msg.role,
-              content: msg.content || "",
-              timestamp: msg.timestamp || Date.now(),
-              isStreaming: msg.isStreaming,
-              streamedContent: msg.streamedContent,
-              thinking: msg.thinking,
-              searchResults: msg.searchResults,
-              sources: msg.sources,
-              reasoning: msg.reasoning,
-              synced: true,
-              source: "convex" as const,
-            }));
+            moreMessages.messages.map((msg, index) => {
+              // Ensure we always have an ID, even for legacy messages
+              const messageId =
+                msg._id || `legacy-more-${chatId}-${index}-${Date.now()}`;
+              return {
+                _id: messageId, // Preserve _id for delete functionality
+                id: messageId,
+                chatId: chatId,
+                role: msg.role,
+                content: msg.content || "",
+                timestamp: msg.timestamp || Date.now(),
+                isStreaming: msg.isStreaming,
+                streamedContent: msg.streamedContent,
+                thinking: msg.thinking,
+                searchResults: msg.searchResults,
+                sources: msg.sources,
+                reasoning: msg.reasoning,
+                synced: true,
+                source: "convex" as const,
+              };
+            });
 
           // Stale-guard: if session changed during async call, ignore results
           if (sessionRef.current !== currentSession) {
@@ -274,9 +286,10 @@ export function usePaginatedMessages({
     if (!chatId) return;
 
     setCursor(undefined);
-    setHasMore(false); // Default to false until we know from the backend
+    setHasMore(false);
     setMessages([]);
     setError(null);
+    setHasLoadedInitial(false);
 
     // The query will automatically re-run
   }, [chatId]);
@@ -293,7 +306,7 @@ export function usePaginatedMessages({
     sessionRef.current++;
     setMessages([]);
     setCursor(undefined);
-    setHasMore(false); // Default to false until we know from the backend
+    setHasMore(false);
     setError(null);
     setRetryCount(0);
     setHasLoadedInitial(false);
@@ -314,8 +327,16 @@ export function usePaginatedMessages({
   }, []);
 
   // Return stable messages - use stateful messages once loaded, otherwise initial
-  const effectiveMessages = hasLoadedInitial ? messages : initialUnifiedMessages;
-  const effectiveHasMore = initialMessages ? initialMessages.hasMore : hasMore;
+  const effectiveMessages = hasLoadedInitial
+    ? messages
+    : initialUnifiedMessages;
+
+  // CRITICAL: Only show "Load More" if we have messages AND backend says there are more
+  // This prevents infinite loops on empty chats
+  const effectiveHasMore =
+    initialMessages && effectiveMessages.length > 0
+      ? initialMessages.hasMore
+      : false;
 
   return {
     messages: effectiveMessages,

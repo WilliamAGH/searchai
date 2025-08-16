@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { logger } from "../lib/logger";
 
 interface UseChatNavigationProps {
   currentChatId: string | null;
@@ -14,8 +14,6 @@ export function useChatNavigation({
   isAuthenticated: _isAuthenticated,
   onSelectChat,
 }: UseChatNavigationProps) {
-  const navigate = useNavigate();
-
   const buildChatPath = useCallback(
     (
       chatId: string,
@@ -36,21 +34,62 @@ export function useChatNavigation({
 
   const navigateWithVerification = useCallback(
     async (chatId: string) => {
+      logger.debug("[NAV] navigateWithVerification called with:", chatId);
+      logger.debug("[NAV] All chats count:", allChats.length);
+      logger.debug(
+        "[NAV] All chat IDs:",
+        allChats.map((c) => c.id),
+      );
+      logger.debug("[NAV] Looking for:", chatId);
+      logger.debug(
+        "[NAV] Chat details:",
+        allChats.map((c) => ({
+          id: c.id,
+          _id: (c as unknown as { _id?: string })._id,
+          title: c.title,
+        })),
+      );
+
       const chatExists = allChats.some((chat) => chat.id === chatId);
+      logger.debug("[NAV] Chat exists?", chatExists);
+
       if (chatExists) {
+        // CRITICAL: Only select the chat, don't navigate
+        // The URL sync will handle navigation automatically
+        logger.debug("[NAV] Calling onSelectChat with:", chatId);
         await onSelectChat(chatId);
-        navigate(buildChatPath(chatId));
+        logger.debug("[NAV] onSelectChat completed");
+        // REMOVED: navigate(buildChatPath(chatId)); - this causes loops!
         return true;
       }
-      return false;
+
+      // Chat doesn't exist in current list - might be stale or deleted
+      console.warn(
+        "[NAV] Chat not found in current list, attempting direct selection",
+        {
+          requestedId: chatId,
+          availableIds: allChats.map((c) => c.id).slice(0, 5), // Show first 5 for debugging
+        },
+      );
+
+      // Try to select it anyway - it might exist in the backend
+      // This allows navigation to work even if local state is out of sync
+      await onSelectChat(chatId);
+      return true;
     },
-    [allChats, onSelectChat, navigate, buildChatPath],
+    [allChats, onSelectChat],
   );
 
   const handleSelectChat = useCallback(
     async (chatId: string) => {
+      logger.debug("[NAV] handleSelectChat called with:", chatId);
+      logger.debug("[NAV] Current chat ID:", currentChatId);
+
       if (chatId !== currentChatId) {
+        logger.debug("[NAV] Different chat, calling navigateWithVerification");
         await navigateWithVerification(chatId);
+      } else {
+        logger.debug("[NAV] Same chat, skipping navigation");
       }
     },
     [currentChatId, navigateWithVerification],

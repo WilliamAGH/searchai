@@ -21,13 +21,13 @@ export function useChatDataLoader(
 
     const loadChats = async () => {
       if (!mounted) return;
-      
+
       setState((prev) => ({ ...prev, isLoading: true }));
       try {
         const chats = await repository.getChats();
-        
+
         if (!mounted) return;
-        
+
         setState((prev) => ({
           ...prev,
           chats,
@@ -36,7 +36,7 @@ export function useChatDataLoader(
         }));
       } catch (error) {
         if (!mounted) return;
-        
+
         logger.error("Failed to load chats:", error);
         setState((prev) => ({
           ...prev,
@@ -48,11 +48,11 @@ export function useChatDataLoader(
     };
 
     loadChats();
-    
+
     return () => {
       mounted = false;
     };
-  }, [repository]); // Remove setState from deps to prevent loops
+  }, [repository, setState]);
 
   // Auto-select first chat if none selected
   // Note: Disabled to prevent conflicts with URL sync and route navigation

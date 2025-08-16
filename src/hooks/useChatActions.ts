@@ -127,7 +127,11 @@ export function createChatActions(
     },
 
     async selectChat(id: string | null) {
+      logger.debug("[CHAT_ACTIONS] selectChat called with:", id);
+      logger.debug("[CHAT_ACTIONS] Current repository:", repository?.type);
+
       if (!id) {
+        logger.debug("[CHAT_ACTIONS] Clearing current chat (id is null)");
         setState((prev) => ({
           ...prev,
           currentChatId: null,
@@ -137,47 +141,44 @@ export function createChatActions(
         return;
       }
 
-      if (!repository) return;
+      if (!repository) {
+        console.error("[CHAT_ACTIONS] No repository available!");
+        return;
+      }
 
       try {
-        // Parallelize fetching chat and messages
-        const [chat, messages] = await Promise.all([
-          repository.getChatById(id),
-          // Backward-compat: some tests/mock repos expose getChatMessages
-          // Prefer getMessages when available
-          (async () => {
-            if ("getMessages" in repository) {
-              return repository.getMessages(id);
-            }
-            // Support test harness that defines getChatMessages only
-            if (
-              "getChatMessages" in
-                (repository as unknown as Record<string, unknown>) &&
-              typeof (repository as unknown as { getChatMessages?: unknown })
-                .getChatMessages === "function"
-            ) {
-              return (
-                repository as unknown as {
-                  getChatMessages: (
-                    chatId: string,
-                  ) => Promise<UnifiedMessage[]>;
-                }
-              ).getChatMessages(id);
-            }
-            return [] as UnifiedMessage[];
-          })(),
-        ]);
+        logger.debug("[CHAT_ACTIONS] Fetching chat with ID:", id);
+        // Fetch chat and messages
+        const chat = await repository.getChatById(id);
+        logger.debug("[CHAT_ACTIONS] Retrieved chat:", chat);
+
+        // For non-paginated users, we need to fetch messages
+        // Paginated users will get messages from usePaginatedMessages
+        let messages: UnifiedMessage[] = [];
+        if ("getMessages" in repository) {
+          messages = await repository.getMessages(id);
+        }
 
         if (chat) {
+          logger.debug("[CHAT_ACTIONS] Setting current chat to:", id);
+          logger.debug("[CHAT_ACTIONS] Chat details:", {
+            id: chat.id,
+            _id: chat._id,
+            title: chat.title,
+            messageCount: messages.length,
+          });
           setState((prev) => ({
             ...prev,
             currentChatId: id,
             currentChat: chat,
-            messages,
+            messages, // Update messages for non-paginated users
             error: null,
           }));
+        } else {
+          console.error("[CHAT_ACTIONS] Chat not found for ID:", id);
         }
       } catch (error) {
+        console.error("[CHAT_ACTIONS] Error selecting chat:", error);
         setState((prev) => ({
           ...prev,
           error:
@@ -276,12 +277,12 @@ export function createChatActions(
         return;
       }
 
-      // Create a temporary ID for the streaming AI message
-      const tempAIMessageId = `streaming-${Date.now()}`;
+      // Create a temporary ID for the streaming AI message with random component to ensure uniqueness
+      const tempAIMessageId = `streaming-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      // Add user message immediately
+      // Add user message immediately with unique ID
       const userMessage: UnifiedMessage = {
-        id: `user-${Date.now()}`,
+        id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         role: "user",
         content,
         timestamp: Date.now(),
@@ -355,23 +356,40 @@ export function createChatActions(
           }
         }
 
-        // Refresh messages after generation completes to get the final state
-        // with proper IDs and any additional metadata from the backend
-        const messages = await repository.getMessages(chatId);
-        logger.debug("Messages refreshed after generation", {
-          chatId,
-          messageCount: messages.length,
-        });
-
-        setState((prev) => ({
-          ...prev,
-          messages,
-          isGenerating: false,
-          searchProgress: { stage: "idle" },
-          currentChatId: chatId,
-          currentChat:
-            prev.chats.find((c) => c.id === chatId) || prev.currentChat,
-        }));
+        // For non-paginated users, fetch the final messages after generation
+        // Paginated users will get updates via subscription
+        if ("getMessages" in repository) {
+          try {
+            const finalMessages = await repository.getMessages(chatId);
+            setState((prev) => ({
+              ...prev,
+              messages: finalMessages,
+              isGenerating: false,
+              searchProgress: { stage: "idle" },
+              currentChatId: chatId,
+              currentChat:
+                prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+            }));
+          } catch (error) {
+            logger.error("Failed to fetch messages after generation", error);
+            setState((prev) => ({
+              ...prev,
+              isGenerating: false,
+              searchProgress: { stage: "idle" },
+              error: "Failed to fetch messages after generation",
+            }));
+          }
+        } else {
+          // For paginated users, just update generation state
+          setState((prev) => ({
+            ...prev,
+            isGenerating: false,
+            searchProgress: { stage: "idle" },
+            currentChatId: chatId,
+            currentChat:
+              prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+          }));
+        }
       } catch (error) {
         // Remove the temporary streaming message on error
         setState((prev) => ({
