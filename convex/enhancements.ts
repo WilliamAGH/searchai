@@ -567,7 +567,8 @@ export function applyEnhancements(
   } = {},
 ) {
   // Debug flag to control logging verbosity (dev only)
-  const DEBUG_ENHANCEMENTS = process.env.NODE_ENV === "development";
+  const DEBUG_ENHANCEMENTS =
+    typeof process !== "undefined" && process.env?.NODE_ENV === "development";
 
   // Sort rules by priority
   const sortedRules = [...ENHANCEMENT_RULES]

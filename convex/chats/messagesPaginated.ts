@@ -155,7 +155,7 @@ export const getRecentChatMessages = query({
       thinking: v.optional(v.string()),
       searchResults: v.optional(v.array(vSearchResult)),
       sources: v.optional(v.array(v.string())),
-      reasoning: v.optional(v.any()),
+      reasoning: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, args) => {
