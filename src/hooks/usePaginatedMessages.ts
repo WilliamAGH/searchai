@@ -274,7 +274,7 @@ export function usePaginatedMessages({
     if (!chatId) return;
 
     setCursor(undefined);
-    setHasMore(true);
+    setHasMore(false); // Default to false until we know from the backend
     setMessages([]);
     setError(null);
 
@@ -293,7 +293,7 @@ export function usePaginatedMessages({
     sessionRef.current++;
     setMessages([]);
     setCursor(undefined);
-    setHasMore(true);
+    setHasMore(false); // Default to false until we know from the backend
     setError(null);
     setRetryCount(0);
     setHasLoadedInitial(false);

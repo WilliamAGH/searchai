@@ -8,6 +8,7 @@ import { ChatSidebar } from "../ChatSidebar";
 import { MobileSidebar } from "../MobileSidebar";
 import { MessageList } from "../MessageList";
 import { MessageInput } from "../MessageInput";
+import { ChatToolbar } from "../ChatToolbar";
 import { FollowUpPrompt } from "../FollowUpPrompt";
 import { UndoBanner } from "../UndoBanner";
 import { ShareModalContainer } from "../ShareModalContainer";
@@ -129,6 +130,17 @@ export function ChatLayout({
             chatTitle={currentChat?.title}
             onShareChat={_openShareModal}
           />
+          
+          {/* Chat-wide copy and share toolbar - only show when we have a persisted chat with messages */}
+          {currentChatId && 
+           messageListProps.messages?.length > 0 && 
+           messageListProps.messages.some(m => m.role === 'assistant') && (
+            <ChatToolbar
+              onShare={_openShareModal}
+              messages={messageListProps.messages}
+              chatTitle={currentChat?.title}
+            />
+          )}
         </div>
         <div
           className={`flex-shrink-0 relative ${

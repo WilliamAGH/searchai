@@ -419,8 +419,8 @@ export const MessageList = React.memo(function MessageList({
           </span>
 
           {/* Load More Button at the top for loading older messages */}
-          {/* Only show if we have 50+ messages to avoid clutter with small chats */}
-          {hasMore && onLoadMore && !loadError && messagesLength >= 50 && (
+          {/* Only show if we truly have more messages AND have enough messages to warrant pagination UI */}
+          {hasMore && onLoadMore && !loadError && messagesLength >= 25 && (
             <LoadMoreButton
               onClick={handleLoadMore}
               isLoading={isLoadingMore}
