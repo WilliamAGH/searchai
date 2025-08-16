@@ -19,7 +19,12 @@ export function formatConversationWithSources(
 ): string {
   return messages
     .map((msg) => {
-      const role = msg.role === "assistant" ? "Assistant" : "User";
+      const role =
+        msg.role === "assistant"
+          ? "Assistant"
+          : msg.role === "system"
+            ? "System"
+            : "User";
       let formatted = `${role}: ${msg.content}`;
 
       // Add sources if available
