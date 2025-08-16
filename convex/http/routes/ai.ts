@@ -429,7 +429,9 @@ async function handleOpenRouterStreaming(
     messagesCount: openRouterBody.messages?.length ?? 0,
     sysPromptChars: openRouterBody.messages?.[0]?.content?.length ?? 0,
     temperature: openRouterBody.temperature,
-    reasoning: openRouterBody.reasoning,
+    ...(openRouterBody.reasoning
+      ? { reasoning: openRouterBody.reasoning }
+      : {}),
     stream: openRouterBody.stream,
   });
 
