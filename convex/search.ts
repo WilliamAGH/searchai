@@ -254,8 +254,10 @@ async function enrichSearchResults(
       });
 
       // Return enriched result with all fields properly defined
+      // IMPORTANT: Preserve the original snippet, use summary as a fallback
       return {
         ...result,
+        snippet: result.snippet || scrapedContent.summary || "",
         content: scrapedContent.content || undefined,
         fullTitle: scrapedContent.title || result.title,
         summary: scrapedContent.summary || undefined,
@@ -263,8 +265,10 @@ async function enrichSearchResults(
     } catch (error) {
       console.warn(`⚠️ Failed to scrape ${result.url}:`, error);
       // Return original result ensuring optional fields are undefined not null
+      // IMPORTANT: Preserve the original snippet field
       return {
         ...result,
+        snippet: result.snippet || "",
         content: result.content || undefined,
         fullTitle: result.fullTitle || undefined,
         summary: result.summary || undefined,
@@ -276,8 +280,10 @@ async function enrichSearchResults(
 
   // Combine enriched results with remaining un-scraped results
   // Ensure all results have proper undefined values for optional fields
+  // IMPORTANT: Preserve the original snippet field
   const remainingResults = results.slice(maxUrlsToScrape).map((r) => ({
     ...r,
+    snippet: r.snippet || "",
     content: r.content || undefined,
     fullTitle: r.fullTitle || undefined,
     summary: r.summary || undefined,
