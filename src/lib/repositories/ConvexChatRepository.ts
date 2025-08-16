@@ -78,7 +78,7 @@ export class ConvexChatRepository extends BaseRepository {
       );
       const chats = await this.client.query(api.chats.getUserChats, {
         sessionId: this.effectiveSessionId,
-        sessionIds: this._allSessionIds, // Pass all session IDs for anonymous users
+        sessionIds: this._allSessionIds || [], // Pass empty array instead of undefined
       });
       logger.debug("[CONVEX_REPO] Retrieved", chats?.length, "chats");
       if (!chats) return [];

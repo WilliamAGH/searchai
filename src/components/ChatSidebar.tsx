@@ -84,6 +84,9 @@ export function ChatSidebar({
   // Avoid inline functions in JSX: use dataset-driven handlers
   const handleSelectClick = React.useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault(); // Prevent any default button behavior
+      e.stopPropagation(); // Stop event bubbling
+
       const attr = e.currentTarget.getAttribute("data-chat-id");
       logger.debug("[SIDEBAR] handleSelectClick - data-chat-id:", attr);
       if (!attr) {
@@ -107,6 +110,9 @@ export function ChatSidebar({
 
   const handleDeleteClick = React.useCallback(
     async (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault(); // Prevent any default button behavior
+      e.stopPropagation(); // Stop event bubbling
+
       const attr = e.currentTarget.getAttribute("data-chat-id");
       if (!attr) {
         logger.warn(

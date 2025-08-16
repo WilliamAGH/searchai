@@ -37,7 +37,7 @@ export function useChatRepository(): IChatRepository | null {
       return new ConvexChatRepository(
         convexClient,
         sessionId || undefined,
-        allSessionIds.length > 0 ? allSessionIds : undefined,
+        allSessionIds, // Always pass the array, even if empty
       );
     } catch (error) {
       console.error("Convex repository initialization failed:", error);
