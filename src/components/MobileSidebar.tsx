@@ -71,7 +71,8 @@ export function MobileSidebar({
       try {
         if (!window.confirm("Delete this chat? This cannot be undone.")) return;
         if (onRequestDeleteChat) {
-          onRequestDeleteChat(chatId);
+          // Await the deletion to catch any errors
+          await onRequestDeleteChat(chatId);
         } else if (typeof chatId === "string") {
           onDeleteLocalChat?.(chatId);
         } else {

@@ -207,12 +207,38 @@ export function createChatActions(
           };
         });
       } catch (error) {
-        setState((prev) => ({
-          ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to delete chat",
-        }));
-        throw error;
+        // Check if it's a "chat not found" error - this is okay, just remove from UI
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const isChatNotFound = errorMessage.includes("Chat not found");
+
+        if (isChatNotFound) {
+          // Chat already deleted from backend, just clean up UI
+          logger.warn(
+            "[CHAT_ACTIONS] Chat not found in backend, removing from UI:",
+            id,
+          );
+          setState((prev) => {
+            const filtered = prev.chats.filter((c) => c.id !== id);
+            const wasCurrentChat = prev.currentChatId === id;
+
+            return {
+              ...prev,
+              chats: filtered,
+              currentChatId: wasCurrentChat ? null : prev.currentChatId,
+              currentChat: wasCurrentChat ? null : prev.currentChat,
+              messages: wasCurrentChat ? [] : prev.messages,
+              error: null, // No error for user since we handled it
+            };
+          });
+        } else {
+          // Other errors should be shown to user and re-thrown for tests
+          setState((prev) => ({
+            ...prev,
+            error: errorMessage,
+          }));
+          throw error;
+        }
       }
     },
 
