@@ -134,10 +134,18 @@ export function ChatSidebar({
         }
 
         logger.info("[SIDEBAR] Deleting chat:", { chatId: chatToDelete._id });
-        if (isConvexChatId(chatToDelete._id)) {
+
+        // Use the proper deletion handler that includes error handling and UI updates
+        if (_onRequestDeleteChat) {
+          // This handler properly manages both Convex and local deletions
+          await _onRequestDeleteChat(chatToDelete._id);
+          logger.info("[SIDEBAR] Delete request handled");
+        } else if (isConvexChatId(chatToDelete._id)) {
+          // Fallback to direct Convex deletion
           await deleteChat({ chatId: chatToDelete._id });
           logger.info("[SIDEBAR] Convex chat deleted successfully");
         } else {
+          // Fallback to local deletion
           onDeleteLocalChat?.(chatToDelete._id);
           logger.info("[SIDEBAR] Local chat deleted successfully");
         }
@@ -150,7 +158,14 @@ export function ChatSidebar({
         logger.error("[SIDEBAR] Chat deletion failed:", err);
       }
     },
-    [chats, deleteChat, onDeleteLocalChat, onSelectChat, currentChatId],
+    [
+      chats,
+      deleteChat,
+      onDeleteLocalChat,
+      onSelectChat,
+      currentChatId,
+      _onRequestDeleteChat,
+    ],
   );
 
   // Always render the sidebar container so tests can locate the "New Chat" button
