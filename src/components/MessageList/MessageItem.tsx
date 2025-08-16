@@ -57,7 +57,6 @@ export const MessageItem = React.memo(
 
     return (
       <div
-        key={message._id || `message-${index}-${safeTimestamp}`}
         className="flex gap-2 sm:gap-4 max-w-full overflow-hidden"
         data-role={message.role}
       >

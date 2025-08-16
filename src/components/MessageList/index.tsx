@@ -67,12 +67,41 @@ interface MessageListProps {
 // Helper for stable ephemeral keys for messages without IDs
 const ephemeralKeyMap = new WeakMap<Message, string>();
 
-const getEphemeralKey = (msg: Message): string => {
+const getEphemeralKey = (msg: Message, index?: number): string => {
+  if (!msg) {
+    // Fallback for invalid message objects
+    const fallbackKey = `invalid-${index ?? 0}-${Date.now().toString(36)}`;
+    if (import.meta.env.DEV) {
+      console.warn("[KEY] No message object, using fallback:", fallbackKey);
+    }
+    return fallbackKey;
+  }
+  
   let k = ephemeralKeyMap.get(msg);
   if (!k) {
-    k = `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    // Check if message has an id field (streaming messages)
+    const msgRecord = msg as Record<string, unknown>;
+    const existingId = msg._id || 
+      (typeof msgRecord.id === "string" ? msgRecord.id : null);
+    
+    if (existingId) {
+      k = String(existingId);
+    } else {
+      // Generate a truly unique ephemeral key
+      k = `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
     ephemeralKeyMap.set(msg, k);
   }
+  
+  // Final safety check - should never happen
+  if (!k) {
+    const emergencyKey = `emergency-${index ?? 0}-${Date.now().toString(36)}`;
+    if (import.meta.env.DEV) {
+      console.error("[KEY] CRITICAL: Key generation failed, using emergency key:", emergencyKey);
+    }
+    return emergencyKey;
+  }
+  
   return k;
 };
 
@@ -222,15 +251,20 @@ export const MessageList = React.memo(function MessageList({
     }
   }, [userHasScrolled, scrollToBottom]);
 
-  // Debug logging
+  // Debug logging - only log significant changes
   useEffect(() => {
-    if (Array.isArray(currentMessages)) {
-      logger.debug("🖼️ MessageList render", {
-        count: currentMessages.length,
-        firstRole: currentMessages[0]?.role,
-      });
+    if (Array.isArray(currentMessages) && import.meta.env.DEV) {
+      // Only log when message count actually changes
+      const prevCount = previousMessagesLengthRef.current;
+      if (prevCount !== currentMessages.length) {
+        logger.debug("🖼️ MessageList updated", {
+          prevCount,
+          newCount: currentMessages.length,
+          firstRole: currentMessages[0]?.role,
+        });
+      }
     }
-  }, [currentMessages]);
+  }, [currentMessages.length]); // Only depend on length, not the array itself
 
   // Detect when user scrolls manually
   useEffect(() => {
@@ -385,7 +419,8 @@ export const MessageList = React.memo(function MessageList({
           </span>
 
           {/* Load More Button at the top for loading older messages */}
-          {hasMore && onLoadMore && !loadError && (
+          {/* Only show if we have 50+ messages to avoid clutter with small chats */}
+          {hasMore && onLoadMore && !loadError && messagesLength >= 50 && (
             <LoadMoreButton
               onClick={handleLoadMore}
               isLoading={isLoadingMore}
@@ -406,7 +441,7 @@ export const MessageList = React.memo(function MessageList({
               estimatedItemHeight={150}
               renderItem={(message, index) => (
                 <MessageItem
-                  key={message._id ?? getEphemeralKey(message)}
+                  key={message._id ?? getEphemeralKey(message, index)}
                   message={message}
                   index={index}
                   collapsedById={collapsedById}
@@ -421,19 +456,34 @@ export const MessageList = React.memo(function MessageList({
           ) : (
             currentMessages
               .filter((message) => !shouldFilterMessage(message))
-              .map((message, index) => (
-                <MessageItem
-                  key={message._id ?? getEphemeralKey(message)}
-                  message={message}
-                  index={index}
-                  collapsedById={collapsedById}
-                  hoveredSourceUrl={hoveredSourceUrl}
-                  onToggleCollapsed={toggleCollapsed}
-                  onDeleteMessage={handleDeleteMessage}
-                  onSourceHover={setHoveredSourceUrl}
-                  onCitationHover={setHoveredCitationUrl}
-                />
-              ))
+              .map((message, index) => {
+                const messageKey = message._id ?? getEphemeralKey(message, index);
+                // Safety check - key should NEVER be undefined
+                const safeKey = messageKey || `fallback-${index}-${Date.now().toString(36)}`;
+                
+                if (!messageKey && import.meta.env.DEV) {
+                  console.error("[KEY] WARNING: Message has no key!", {
+                    message,
+                    index,
+                    _id: message._id,
+                    generatedKey: getEphemeralKey(message, index)
+                  });
+                }
+                
+                return (
+                  <MessageItem
+                    key={safeKey}
+                    message={message}
+                    index={index}
+                    collapsedById={collapsedById}
+                    hoveredSourceUrl={hoveredSourceUrl}
+                    onToggleCollapsed={toggleCollapsed}
+                    onDeleteMessage={handleDeleteMessage}
+                    onSourceHover={setHoveredSourceUrl}
+                    onCitationHover={setHoveredCitationUrl}
+                  />
+                );
+              })
           )}
 
           {/* Show search progress ONLY if we don't have a streaming message showing it */}

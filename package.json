@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "validate:quick": "oxlint && tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false && npm run -s test",
+    "validate:quick": "oxlint && tsc -p . --noEmit && tsc -p convex --noEmit && npm run -s test",
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "dev:frontend": "vite --open",
     "dev:backend": "convex dev",
@@ -12,7 +12,7 @@
     "preview": "vite preview --strictPort --port 4173",
     "lint": "oxlint --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin",
     "lint:fix": "oxlint --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin --fix",
-    "typecheck": "tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false",
+    "typecheck": "tsc -p . --noEmit && tsc -p convex --noEmit",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
     "validate": "npm-run-all --parallel lint typecheck format:check lint:convex-imports lint:convex-types --sequential test:single build",

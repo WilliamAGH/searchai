@@ -46,28 +46,33 @@ export function getSafeTimestamp(): number {
 
 /**
  * Runtime type guard for Convex chat ID validation
- * Convex IDs are 32-character base32 strings (lowercase alphanumeric)
+ * Convex IDs contain a pipe character '|' separator
+ * Format: [timestamp]|[unique_id] (e.g., "jh7abc123|456def789")
  */
 export function isConvexChatId(id: string): id is Id<"chats"> {
-  return /^[0-9a-z]{32}$/.test(id);
+  // Convex IDs always contain a pipe character
+  return typeof id === "string" && id.includes("|");
 }
 
 /**
  * Runtime type guard for Convex message ID validation
- * Convex IDs are 32-character base32 strings (lowercase alphanumeric)
+ * Convex IDs contain a pipe character '|' separator
+ * Format: [timestamp]|[unique_id] (e.g., "jh7abc123|456def789")
  */
 export function isConvexMessageId(id: string): id is Id<"messages"> {
-  return /^[0-9a-z]{32}$/.test(id);
+  // Convex IDs always contain a pipe character
+  return typeof id === "string" && id.includes("|");
 }
 
 /**
  * Generic runtime type guard for any Convex ID validation
- * Convex IDs are 32-character base32 strings (lowercase alphanumeric)
+ * Convex IDs contain a pipe character '|' separator
  * @param id - The string to validate
  * @returns True if the string is a valid Convex ID format
  */
 export function isConvexId(id: string): boolean {
-  return /^[0-9a-z]{32}$/.test(id);
+  // Convex IDs always contain a pipe character
+  return typeof id === "string" && id.includes("|");
 }
 
 /**

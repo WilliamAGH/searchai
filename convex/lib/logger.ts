@@ -22,7 +22,7 @@ export const logger = {
     // In production, this will be a no-op
     // In development, this provides useful debugging info
     if (isDev) {
-      console.info(...args);
+      console.debug(...args);
     }
   },
 

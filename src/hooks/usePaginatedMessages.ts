@@ -40,10 +40,11 @@ export function usePaginatedMessages({
 }: UsePaginatedMessagesOptions): PaginatedMessagesState {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
   const [cursor, setCursor] = useState<string | undefined>();
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
   const loadingRef = useRef(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout>();
   // Session guard to avoid applying stale results after chat/navigation changes
@@ -73,10 +74,26 @@ export function usePaginatedMessages({
   }, [enabled, chatId]);
 
   // Pre-map initial messages for immediate render to avoid UI flicker in tests/SSR
+  // Use a stable reference by checking content equality, not reference equality
+  const initialMessagesRef = useRef<typeof initialMessages>();
+  const initialUnifiedMessagesRef = useRef<UnifiedMessage[]>([]);
+  
+  // Only update if content actually changed
   const initialUnifiedMessages = useMemo<UnifiedMessage[]>(() => {
-    if (!initialMessages) return [];
+    if (!initialMessages) return initialUnifiedMessagesRef.current;
+    
+    // Check if the actual message content changed
+    const hasChanged = initialMessagesRef.current?.messages?.length !== initialMessages.messages?.length ||
+      initialMessagesRef.current?.nextCursor !== initialMessages.nextCursor;
+    
+    if (!hasChanged && initialUnifiedMessagesRef.current.length > 0) {
+      return initialUnifiedMessagesRef.current;
+    }
+    
+    initialMessagesRef.current = initialMessages;
     const convexMessages = initialMessages.messages || [];
-    return convexMessages.map((msg) => ({
+    const unified = convexMessages.map((msg) => ({
+      _id: msg._id, // Preserve _id for delete functionality
       id: msg._id,
       chatId:
         chatId ?? String((msg as unknown as { chatId?: string }).chatId ?? ""),
@@ -92,31 +109,33 @@ export function usePaginatedMessages({
       synced: true,
       source: "convex" as const,
     }));
+    
+    initialUnifiedMessagesRef.current = unified;
+    return unified;
   }, [initialMessages, chatId]);
 
   // Load initial messages when they arrive (stateful for subsequent appends)
   useEffect(() => {
-    if (initialMessages) {
-      const unifiedMessages = initialUnifiedMessages;
-
+    if (initialMessages && !hasLoadedInitial) {
       // Log initial load performance
       if (initialLoadStartRef.current) {
         const loadTime = performance.now() - initialLoadStartRef.current;
         logger.info("Initial messages loaded", {
           chatId,
-          messagesLoaded: unifiedMessages.length,
+          messagesLoaded: initialUnifiedMessages.length,
           loadTime: Math.round(loadTime),
           hasMore: initialMessages.hasMore,
         });
         initialLoadStartRef.current = undefined;
       }
 
-      setMessages(unifiedMessages);
+      setMessages(initialUnifiedMessages);
       setCursor(initialMessages.nextCursor);
       setHasMore(initialMessages.hasMore);
       setError(null);
+      setHasLoadedInitial(true);
     }
-  }, [initialMessages, chatId, initialUnifiedMessages]);
+  }, [initialMessages, chatId, initialUnifiedMessages, hasLoadedInitial]);
 
   // Load more messages with retry logic
   const loadMore = useCallback(async () => {
@@ -128,6 +147,7 @@ export function usePaginatedMessages({
 
     const currentSession = sessionRef.current;
     const loadStartTime = performance.now();
+    let hasError = false;
 
     const attemptLoad = async (attempt = 1): Promise<void> => {
       const attemptStartTime = performance.now();
@@ -154,6 +174,7 @@ export function usePaginatedMessages({
         if (moreMessages) {
           const newUnifiedMessages: UnifiedMessage[] =
             moreMessages.messages.map((msg) => ({
+              _id: msg._id, // Preserve _id for delete functionality
               id: msg._id,
               chatId: chatId,
               role: msg.role,
@@ -228,13 +249,14 @@ export function usePaginatedMessages({
           setRetryCount(0);
           setIsLoadingMore(false);
           loadingRef.current = false;
+          hasError = true;
         }
       }
     };
 
     await attemptLoad();
 
-    if (!error) {
+    if (!hasError) {
       const totalTime = performance.now() - loadStartTime;
       logger.info("Pagination operation completed", {
         chatId,
@@ -245,7 +267,7 @@ export function usePaginatedMessages({
       setIsLoadingMore(false);
       loadingRef.current = false;
     }
-  }, [chatId, cursor, hasMore, initialLimit, loadMoreAction, error]);
+  }, [chatId, cursor, hasMore, initialLimit, loadMoreAction]);
 
   // Refresh messages (reload from beginning)
   const refresh = useCallback(async () => {
@@ -274,6 +296,7 @@ export function usePaginatedMessages({
     setHasMore(true);
     setError(null);
     setRetryCount(0);
+    setHasLoadedInitial(false);
 
     // Clear any pending retry timeouts
     if (retryTimeoutRef.current) {
@@ -290,10 +313,12 @@ export function usePaginatedMessages({
     };
   }, []);
 
+  // Return stable messages - use stateful messages once loaded, otherwise initial
+  const effectiveMessages = hasLoadedInitial ? messages : initialUnifiedMessages;
   const effectiveHasMore = initialMessages ? initialMessages.hasMore : hasMore;
 
   return {
-    messages: messages.length > 0 ? messages : initialUnifiedMessages,
+    messages: effectiveMessages,
     isLoading: !initialMessages && enabled && !!chatId,
     isLoadingMore,
     hasMore: effectiveHasMore,

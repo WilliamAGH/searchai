@@ -44,6 +44,7 @@ import type * as http_utils from "../http/utils.js";
 import type * as http from "../http.js";
 import type * as lib_logger from "../lib/logger.js";
 import type * as lib_security_patterns from "../lib/security/patterns.js";
+import type * as lib_security_rateLimit from "../lib/security/rateLimit.js";
 import type * as lib_security_sanitization from "../lib/security/sanitization.js";
 import type * as lib_security_webContent from "../lib/security/webContent.js";
 import type * as lib_url from "../lib/url.js";
@@ -106,6 +107,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/logger": typeof lib_logger;
   "lib/security/patterns": typeof lib_security_patterns;
+  "lib/security/rateLimit": typeof lib_security_rateLimit;
   "lib/security/sanitization": typeof lib_security_sanitization;
   "lib/security/webContent": typeof lib_security_webContent;
   "lib/url": typeof lib_url;

@@ -18,7 +18,7 @@ interface StreamingIndicatorProps {
 export const StreamingIndicator: React.FC<StreamingIndicatorProps> = ({
   isStreaming,
   thinking,
-  message = "AI is thinking and generating response...",
+  message = "AI is thinking and generating response",
   className = "",
 }) => {
   if (!isStreaming) return null;

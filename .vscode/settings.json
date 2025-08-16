@@ -33,7 +33,12 @@
     "MD032": false,
     "MD026": false
   },
-  "vitest.enable": true,
+  "git.enabled": true,
+  "git.path": "git",
+  "terminal.integrated.env.osx": {
+    "IS_REACT_ACT_ENVIRONMENT": "true"
+  },
+  "terminal.integrated.inheritEnv": true,
   "vitest.commandLine": "npm run test:precommit",
   "vitest.include": [
     "tests/**/*.test.{ts,tsx}",
@@ -46,6 +51,5 @@
     "tests/integration/search-api.test.ts"
   ],
   "testing.automaticallyOpenPeekView": "never",
-  "testing.followRunningTest": false,
-  "webhint.enable": false
+  "testing.followRunningTest": false
 }

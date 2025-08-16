@@ -340,6 +340,38 @@ async function handleNoOpenRouter(
 }
 
 /**
+ * Format search results with scraped content for AI context
+ */
+function formatSearchResultsForContext(searchResults: SearchResult[]): string {
+  if (!searchResults || searchResults.length === 0) {
+    return "";
+  }
+  
+  const formattedResults = searchResults.map((result, index) => {
+    let resultStr = `[${index + 1}] ${result.fullTitle || result.title}\n`;
+    resultStr += `URL: ${result.url}\n`;
+    
+    // Include scraped content if available
+    if (result.content) {
+      // Limit content to prevent context overflow
+      const maxContentLength = 1000;
+      const truncatedContent = result.content.length > maxContentLength 
+        ? result.content.slice(0, maxContentLength) + "..."
+        : result.content;
+      resultStr += `Content: ${truncatedContent}\n`;
+    } else if (result.summary) {
+      resultStr += `Summary: ${result.summary}\n`;
+    } else {
+      resultStr += `Snippet: ${result.snippet}\n`;
+    }
+    
+    return resultStr;
+  }).join("\n---\n\n");
+  
+  return `\n\nSearch Results with Content:\n${formattedResults}`;
+}
+
+/**
  * Handle OpenRouter streaming response
  */
 async function handleOpenRouterStreaming(
@@ -356,13 +388,17 @@ async function handleOpenRouterStreaming(
   dlog("🔄 Attempting OpenRouter API call with streaming...");
 
   // Build message history including system prompt and chat history
+  // Include search results with scraped content in the user message
+  const searchContext = formatSearchResultsForContext(searchResults);
+  const enhancedMessage = searchContext ? `${message}${searchContext}` : message;
+  
   const messages = [
     {
       role: "system",
       content: `${effectiveSystemPrompt}\n\nIMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.\n\nBe direct, comprehensive, and authoritative in your responses. Focus on providing value and actionable information rather than hedging or expressing uncertainty unless truly warranted.`,
     },
     ...(chatHistory || []),
-    { role: "user", content: message },
+    { role: "user", content: enhancedMessage },
   ];
 
   const openRouterBody = {

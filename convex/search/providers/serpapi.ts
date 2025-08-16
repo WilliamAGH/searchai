@@ -10,6 +10,10 @@ export interface SearchResult {
   url: string;
   snippet: string;
   relevanceScore: number;
+  // Optional scraped content fields
+  content?: string; // Full scraped content
+  fullTitle?: string; // Title from scraped page
+  summary?: string; // Summary from scraped content
 }
 
 interface SerpApiResponse {
@@ -31,10 +35,16 @@ interface SerpApiResponse {
  * @param maxResults - Max results to return
  * @returns Array of search results
  */
-export async function searchWithSerpApiDuckDuckGo(
+export async function searchWithSerpApi(
   query: string,
   maxResults: number,
 ): Promise<SearchResult[]> {
+  // Validate API key exists
+  if (!process.env.SERP_API_KEY) {
+    logger.error("❌ SERP_API_KEY not configured");
+    throw new Error("SERP_API_KEY is not configured on the server");
+  }
+
   const apiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${process.env.SERP_API_KEY}&hl=en&gl=us&num=${maxResults}`;
   const requestLog = {
     queryLength: query.length,
@@ -48,6 +58,7 @@ export async function searchWithSerpApiDuckDuckGo(
       headers: {
         "User-Agent": "SearchChat/1.0 (Web Search Assistant)",
       },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
     });
 
     const safeLog = {

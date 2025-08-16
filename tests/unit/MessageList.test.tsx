@@ -196,10 +196,20 @@ describe("MessageList", () => {
     expect(progress?.textContent).toBe("Searching for information...");
   });
 
-  test("should show load more button when hasMore is true", () => {
+  test("should show load more button when hasMore is true and 50+ messages", () => {
+    // Create 50+ messages to meet the minimum threshold
+    const manyMessages = Array.from({ length: 50 }, (_, i) => ({
+      id: `msg${i}`,
+      chatId: "chat1",
+      role: i % 2 === 0 ? "user" : "assistant" as "user" | "assistant",
+      content: `Message ${i}`,
+      createdAt: new Date(`2024-01-01T10:${String(i).padStart(2, "0")}:00`),
+      isLocal: false,
+    }));
+
     const { container } = render(
       <MessageList
-        messages={mockMessages}
+        messages={manyMessages}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
         hasMore={true}
@@ -214,12 +224,39 @@ describe("MessageList", () => {
     expect(loadMoreButton?.disabled).toBe(false);
   });
 
-  test("should handle load more click", async () => {
-    mockOnLoadMore.mockResolvedValue();
-
+  test("should NOT show load more button when less than 50 messages", () => {
     const { container } = render(
       <MessageList
         messages={mockMessages}
+        isGenerating={false}
+        onToggleSidebar={mockOnToggleSidebar}
+        hasMore={true}
+        onLoadMore={mockOnLoadMore}
+      />,
+    );
+
+    const loadMoreButton = container.querySelector(
+      '[data-testid="load-more-button"]',
+    ) as HTMLButtonElement;
+    expect(loadMoreButton).toBeFalsy();
+  });
+
+  test("should handle load more click", async () => {
+    mockOnLoadMore.mockResolvedValue();
+
+    // Create 50+ messages to meet the minimum threshold
+    const manyMessages = Array.from({ length: 50 }, (_, i) => ({
+      id: `msg${i}`,
+      chatId: "chat1",
+      role: i % 2 === 0 ? "user" : "assistant" as "user" | "assistant",
+      content: `Message ${i}`,
+      createdAt: new Date(`2024-01-01T10:${String(i).padStart(2, "0")}:00`),
+      isLocal: false,
+    }));
+
+    const { container } = render(
+      <MessageList
+        messages={manyMessages}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
         hasMore={true}
@@ -240,9 +277,19 @@ describe("MessageList", () => {
   });
 
   test("should disable load more button when loading", () => {
+    // Create 50+ messages to meet the minimum threshold
+    const manyMessages = Array.from({ length: 50 }, (_, i) => ({
+      id: `msg${i}`,
+      chatId: "chat1",
+      role: i % 2 === 0 ? "user" : "assistant" as "user" | "assistant",
+      content: `Message ${i}`,
+      createdAt: new Date(`2024-01-01T10:${String(i).padStart(2, "0")}:00`),
+      isLocal: false,
+    }));
+
     const { container } = render(
       <MessageList
-        messages={mockMessages}
+        messages={manyMessages}
         isGenerating={false}
         onToggleSidebar={mockOnToggleSidebar}
         hasMore={true}
@@ -380,7 +427,7 @@ describe("MessageList", () => {
   });
 
   test("should handle multiple messages with pagination", () => {
-    const manyMessages: Message[] = Array.from({ length: 20 }, (_, i) => ({
+    const manyMessages: Message[] = Array.from({ length: 50 }, (_, i) => ({
       id: `msg${i}`,
       chatId: "chat1",
       role: i % 2 === 0 ? "user" : "assistant",

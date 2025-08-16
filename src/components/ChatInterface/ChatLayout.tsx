@@ -122,7 +122,13 @@ export function ChatLayout({
         {...swipeHandlers}
       >
         <div className="flex-1 flex flex-col min-h-0">
-          <MessageList key={String(currentChatId)} {...messageListProps} />
+          <MessageList 
+            key={String(currentChatId)} 
+            {...messageListProps}
+            currentChatId={currentChatId}
+            chatTitle={currentChat?.title}
+            onShareChat={_openShareModal}
+          />
         </div>
         <div
           className={`flex-shrink-0 relative ${
@@ -138,7 +144,6 @@ export function ChatLayout({
             hintConfidence={plannerHint?.confidence}
           />
 
-          {/* Remove share button - now using icon in MessageInput */}
           {undoBanner && (
             <UndoBanner
               type={undoBanner.message.includes("Chat") ? "chat" : "message"}

@@ -42,32 +42,39 @@ export function useUrlStateSync({
   // Select chat based on deep-link params if present and resolvable from local state
   useEffect(() => {
     if (!localChats || !selectChat) return;
+    
+    // Track if we're already selecting to prevent loops
+    let shouldSelect = false;
+    let targetId: string | null = null;
 
     // If deep-link via /s/:shareId
     if (propShareId) {
       const found = localChats.find((c) => c.shareId === propShareId);
       if (found && found.id !== currentChatId) {
-        void selectChat(found.id);
+        shouldSelect = true;
+        targetId = found.id;
       }
-      return; // keep /s route stable
     }
-
     // If deep-link via /p/:publicId
-    if (propPublicId) {
+    else if (propPublicId) {
       const found = localChats.find((c) => c.publicId === propPublicId);
       if (found && found.id !== currentChatId) {
-        void selectChat(found.id);
+        shouldSelect = true;
+        targetId = found.id;
       }
-      return; // keep /p route stable
     }
-
     // If deep-link via /chat/:chatId
-    if (propChatId) {
+    else if (propChatId) {
       const found = localChats.find((c) => c.id === propChatId);
       if (found && found.id !== currentChatId) {
-        void selectChat(found.id);
+        shouldSelect = true;
+        targetId = found.id;
       }
-      // keep /chat route stable; no navigation needed here
+    }
+    
+    // Only select once and prevent rapid re-selections
+    if (shouldSelect && targetId) {
+      void selectChat(targetId);
     }
   }, [
     propShareId,
@@ -76,7 +83,7 @@ export function useUrlStateSync({
     localChats,
     selectChat,
     currentChatId,
-    location.pathname,
+    // Remove location.pathname to prevent loops when URL changes
   ]);
 
   useEffect(() => {

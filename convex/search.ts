@@ -6,12 +6,13 @@
 import { v } from "convex/values";
 import { action, internalAction, internalMutation } from "./_generated/server";
 import { vSearchResult } from "./lib/validators";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import type { SearchResult } from "./search/providers/serpapi";
 
 // Import search providers
 import {
   searchWithOpenRouter,
-  searchWithSerpApiDuckDuckGo,
+  searchWithSerpApi,
   searchWithDuckDuckGo,
 } from "./search/providers";
 
@@ -71,11 +72,13 @@ interface LLMPlan {
 /**
  * Perform web search using available providers
  * Tries: SERP API -> OpenRouter -> DuckDuckGo -> Fallback
+ * Automatically enriches results with scraped content
  */
 export const searchWeb = action({
   args: {
     query: v.string(),
     maxResults: v.optional(v.number()),
+    enrichWithContent: v.optional(v.boolean()), // Option to scrape content
   },
   returns: v.object({
     results: v.array(vSearchResult),
@@ -87,9 +90,10 @@ export const searchWeb = action({
     ),
     hasRealResults: v.boolean(),
   }),
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
     const maxResults = args.maxResults || 5;
     const trimmedQuery = args.query.trim();
+    const enrichWithContent = args.enrichWithContent !== false; // Default to true
 
     if (trimmedQuery.length === 0) {
       return {
@@ -110,13 +114,15 @@ export const searchWeb = action({
     // Try SERP API for DuckDuckGo first if available
     if (process.env.SERP_API_KEY) {
       try {
-        const serpResults = await searchWithSerpApiDuckDuckGo(
-          args.query,
-          maxResults,
-        );
+        const serpResults = await searchWithSerpApi(args.query, maxResults);
         if (serpResults.length > 0) {
+          // Enrich with scraped content if enabled
+          const enrichedResults = enrichWithContent
+            ? await enrichSearchResults(ctx, serpResults)
+            : serpResults;
+
           const result = {
-            results: serpResults,
+            results: enrichedResults,
             searchMethod: "serp" as const,
             hasRealResults: true,
           };
@@ -137,8 +143,13 @@ export const searchWeb = action({
           maxResults,
         );
         if (openRouterResults.length > 0) {
+          // Enrich with scraped content if enabled
+          const enrichedResults = enrichWithContent
+            ? await enrichSearchResults(ctx, openRouterResults)
+            : openRouterResults;
+
           return {
-            results: openRouterResults,
+            results: enrichedResults,
             searchMethod: "openrouter" as const,
             hasRealResults: true,
           };
@@ -152,10 +163,15 @@ export const searchWeb = action({
     try {
       const ddgResults = await searchWithDuckDuckGo(args.query, maxResults);
       if (ddgResults.length > 0) {
+        // Enrich with scraped content if enabled
+        const enrichedResults = enrichWithContent
+          ? await enrichSearchResults(ctx, ddgResults)
+          : ddgResults;
+
         return {
-          results: ddgResults,
+          results: enrichedResults,
           searchMethod: "duckduckgo" as const,
-          hasRealResults: ddgResults.some((r) => r.relevanceScore > 0.6),
+          hasRealResults: enrichedResults.some((r) => r.relevanceScore > 0.6),
         };
       }
     } catch (error) {
@@ -180,6 +196,70 @@ export const searchWeb = action({
     };
   },
 });
+
+/**
+ * Enrich search results with scraped content
+ * @param ctx - Action context
+ * @param results - Search results to enrich
+ * @returns Enriched search results with scraped content
+ */
+async function enrichSearchResults(
+  ctx: any, // ActionCtx type
+  results: SearchResult[],
+): Promise<SearchResult[]> {
+  const maxUrlsToScrape = 3; // Limit for performance
+  const urlsToScrape = results.slice(0, maxUrlsToScrape);
+
+  console.log(
+    `🔍 Enriching ${urlsToScrape.length} search results with scraped content`,
+  );
+
+  // Scrape content in parallel with error handling
+  const enrichmentPromises = urlsToScrape.map(async (result) => {
+    try {
+      const scrapedContent = await ctx.runAction(internal.search.scrapeUrl, {
+        url: result.url,
+      });
+
+      // Return enriched result with all fields properly defined
+      return {
+        ...result,
+        content: scrapedContent.content || undefined,
+        fullTitle: scrapedContent.title || result.title,
+        summary: scrapedContent.summary || undefined,
+      };
+    } catch (error) {
+      console.warn(`⚠️ Failed to scrape ${result.url}:`, error);
+      // Return original result ensuring optional fields are undefined not null
+      return {
+        ...result,
+        content: result.content || undefined,
+        fullTitle: result.fullTitle || undefined,
+        summary: result.summary || undefined,
+      };
+    }
+  });
+
+  const enrichedResults = await Promise.all(enrichmentPromises);
+
+  // Combine enriched results with remaining un-scraped results
+  // Ensure all results have proper undefined values for optional fields
+  const remainingResults = results.slice(maxUrlsToScrape).map((r) => ({
+    ...r,
+    content: r.content || undefined,
+    fullTitle: r.fullTitle || undefined,
+    summary: r.summary || undefined,
+  }));
+
+  const finalResults = [...enrichedResults, ...remainingResults];
+
+  const successCount = enrichedResults.filter((r) => r.content).length;
+  console.log(
+    `✅ Successfully enriched ${successCount}/${urlsToScrape.length} results`,
+  );
+
+  return finalResults;
+}
 
 /**
  * Plan context-aware web search with LLM assistance

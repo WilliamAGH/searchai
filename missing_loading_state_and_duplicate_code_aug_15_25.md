@@ -203,11 +203,21 @@ This document outlines surgical fixes to consolidate duplicate loading indicator
 
 ## Success Metrics
 
-- [ ] Bundle size reduced by at least 5KB
-- [ ] No visual regressions in any loading states
-- [ ] All existing tests still pass
+- [x] Bundle size reduced by at least 5KB
+- [x] No visual regressions in any loading states
+- [x] All existing tests still pass
 - [ ] Loading components have 100% test coverage
-- [ ] Accessibility audit passes for all loading states
+- [x] Accessibility audit passes for all loading states
+
+## Completed Fixes
+
+### Duplicate Loading Animations Resolved
+
+- [x] Removed duplicate "Generating response..." in input placeholder
+- [x] Fixed duplicate three dots animations in MessageItem and StreamingIndicator
+- [x] Created DeprecatedDotMessage.tsx with proper deprecation warnings
+- [x] Implemented shouldFilterMessage to filter out dot-only placeholder messages
+- [x] Messages with only dots ("•••", "...", "…") are now completely hidden
 
 ## Notes
 

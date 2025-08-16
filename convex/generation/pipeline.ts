@@ -711,7 +711,7 @@ export const generationStep = internalAction({
 
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
-        thinking: "Planning search...",
+        thinking: "Planning search",
         reasoning: accumulatedReasoning,
       });
 
@@ -731,8 +731,8 @@ export const generationStep = internalAction({
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
         thinking: plan.shouldSearch
-          ? `Searching the web (queries: ${plan.queries.length})...`
-          : "Analyzing without search...",
+          ? `Searching the web (queries: ${plan.queries.length})`
+          : "Analyzing without search",
         reasoning: accumulatedReasoning,
       });
 
@@ -870,10 +870,10 @@ export const generationStep = internalAction({
       // 6. Start streaming generation
       await ctx.runMutation(internal.messages.updateMessage, {
         messageId: args.assistantMessageId,
-        thinking: "Generating response...",
+        thinking: "Generating response",
         reasoning: isDevelopment
           ? accumulatedReasoning +
-            "\nGenerating response based on search results and context..."
+            "\nGenerating response based on search results and context"
           : accumulatedReasoning, // In production, reasoning is empty until LLM starts
       });
 
@@ -1037,7 +1037,7 @@ async function streamResponseToMessage(args: {
 
         // Add to reasoning to show we're processing the response
         if (chunkCount === 1 && !chunk.choices?.[0]?.delta?.reasoning) {
-          accumulatedReasoning += "\n\n[Composing response...]\n";
+          accumulatedReasoning += `\n[Composing response]\n`;
         }
         accumulatedContent += newContent;
 
@@ -1064,7 +1064,7 @@ async function streamResponseToMessage(args: {
               content: accumulatedContent,
               streamedContent: newContent, // Send just the new chunk for streaming
               isStreaming: true,
-              thinking: "Composing response...",
+              thinking: "Composing response",
               // Stream the accumulated reasoning
               reasoning: accumulatedReasoning,
             },
