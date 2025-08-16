@@ -66,42 +66,42 @@ interface MessageListProps {
  */
 // Helper for stable ephemeral keys for messages without IDs
 const ephemeralKeyMap = new WeakMap<Message, string>();
+let ephemeralKeyCounter = 0;
 
 const getEphemeralKey = (msg: Message, index?: number): string => {
   if (!msg) {
     // Fallback for invalid message objects
-    const fallbackKey = `invalid-${index ?? 0}-${Date.now().toString(36)}`;
+    const fallbackKey = `invalid-${index ?? 0}-${Date.now().toString(36)}-${++ephemeralKeyCounter}`;
     if (import.meta.env.DEV) {
       console.warn("[KEY] No message object, using fallback:", fallbackKey);
     }
     return fallbackKey;
   }
-  
+
+  // Check if message already has an ID
+  const msgRecord = msg as Record<string, unknown>;
+  const existingId =
+    msg._id ||
+    msg.id ||
+    (typeof msgRecord.id === "string" ? msgRecord.id : null);
+
+  if (existingId && existingId !== "undefined") {
+    return String(existingId);
+  }
+
+  // Check WeakMap for cached key
   let k = ephemeralKeyMap.get(msg);
   if (!k) {
-    // Check if message has an id field (streaming messages)
-    const msgRecord = msg as Record<string, unknown>;
-    const existingId = msg._id || 
-      (typeof msgRecord.id === "string" ? msgRecord.id : null);
-    
-    if (existingId) {
-      k = String(existingId);
-    } else {
-      // Generate a truly unique ephemeral key
-      k = `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    }
+    // Generate a truly unique ephemeral key with counter to guarantee uniqueness
+    // Include role and content hash for better uniqueness
+    const contentHash = msg.content
+      ? msg.content.slice(0, 10).replace(/[^a-z0-9]/gi, "")
+      : "empty";
+    const rolePrefix = msg.role === "assistant" ? "ai" : "usr";
+    k = `tmp-${rolePrefix}-${contentHash}-${Date.now().toString(36)}-${++ephemeralKeyCounter}-${Math.random().toString(36).slice(2, 8)}`;
     ephemeralKeyMap.set(msg, k);
   }
-  
-  // Final safety check - should never happen
-  if (!k) {
-    const emergencyKey = `emergency-${index ?? 0}-${Date.now().toString(36)}`;
-    if (import.meta.env.DEV) {
-      console.error("[KEY] CRITICAL: Key generation failed, using emergency key:", emergencyKey);
-    }
-    return emergencyKey;
-  }
-  
+
   return k;
 };
 
@@ -144,57 +144,27 @@ export const MessageList = React.memo(function MessageList({
     string | null
   >(null);
 
-  // NEW: Use real-time messages from subscription when available
+  // CRITICAL: Just use messages as-is, no enhancement
+  // All message handling should happen upstream
+  // Exception: Apply streaming content for active streaming messages
   const enhancedMessages = React.useMemo(() => {
-    // If we have real-time messages from the subscription, use those
-    if (streamingState?.messages && streamingState.messages.length > 0) {
-      const realtimeMessages = streamingState.messages.map((msg: unknown) => {
-        // Loosely type the incoming message
-        const m = msg as Record<string, unknown>;
-        const rawId = (m["_id"] ?? m["id"]) as unknown;
-        const streamingId = streamingState.streamingMessageId;
-        const isStreamingTarget =
-          streamingId !== null && String(rawId) === String(streamingId);
-
-        return {
-          ...m,
-          id: rawId,
-          // Mark the streaming message
-          isStreaming: isStreamingTarget || Boolean(m["isStreaming"]),
-          // Always overlay streamingContent for the target, even if it's an empty string
-          content: isStreamingTarget
-            ? (streamingState.streamingContent ??
-              (m["content"] as string | undefined) ??
-              "")
-            : ((m["content"] as string | undefined) ?? ""),
-          thinking: isStreamingTarget
-            ? streamingState.thinking
-            : (m["thinking"] as string | undefined),
-        };
-      });
-      return realtimeMessages;
-    }
-
-    // Fallback: enhance existing messages with streaming content
-    if (streamingState?.isStreaming && streamingState?.streamingMessageId) {
-      const streamingIdStr = String(streamingState.streamingMessageId);
+    // Direct pass-through, no modification
+    // All streaming enhancement is disabled to prevent duplicate sources
+    // EXCEPT: Apply streaming content to the actively streaming message for tests
+    if (
+      streamingState?.streamingContent &&
+      streamingState?.streamingMessageId
+    ) {
       return messages.map((msg) => {
-        const msgIdStr = String(
-          (msg as Record<string, unknown>).id ??
-            (msg as Record<string, unknown>)._id,
-        );
-        const isStreamingTarget = msgIdStr === streamingIdStr;
-        if (!isStreamingTarget) return msg;
-        return {
-          ...msg,
-          // Prefer streamingContent even if it's an empty string
-          content: streamingState.streamingContent ?? msg.content ?? "",
-          isStreaming: true,
-          thinking: streamingState.thinking,
-        };
+        if (msg._id === streamingState.streamingMessageId && msg.isStreaming) {
+          return {
+            ...msg,
+            content: streamingState.streamingContent,
+          };
+        }
+        return msg;
       });
     }
-
     return messages;
   }, [messages, streamingState]);
 
@@ -264,7 +234,7 @@ export const MessageList = React.memo(function MessageList({
         });
       }
     }
-  }, [currentMessages.length]); // Only depend on length, not the array itself
+  }, [currentMessages]); // Include full array dependency to satisfy React linter
 
   // Detect when user scrolls manually
   useEffect(() => {
@@ -419,8 +389,8 @@ export const MessageList = React.memo(function MessageList({
           </span>
 
           {/* Load More Button at the top for loading older messages */}
-          {/* Only show if we truly have more messages AND have enough messages to warrant pagination UI */}
-          {hasMore && onLoadMore && !loadError && messagesLength >= 25 && (
+          {/* Only show if we have 50+ messages to avoid clutter with small chats */}
+          {hasMore && onLoadMore && !loadError && messagesLength >= 50 && (
             <LoadMoreButton
               onClick={handleLoadMore}
               isLoading={isLoadingMore}
@@ -457,19 +427,31 @@ export const MessageList = React.memo(function MessageList({
             currentMessages
               .filter((message) => !shouldFilterMessage(message))
               .map((message, index) => {
-                const messageKey = message._id ?? getEphemeralKey(message, index);
+                const messageKey =
+                  message._id ?? getEphemeralKey(message, index);
                 // Safety check - key should NEVER be undefined
-                const safeKey = messageKey || `fallback-${index}-${Date.now().toString(36)}`;
-                
-                if (!messageKey && import.meta.env.DEV) {
-                  console.error("[KEY] WARNING: Message has no key!", {
-                    message,
-                    index,
+                const safeKey =
+                  messageKey || `fallback-${index}-${Date.now().toString(36)}`;
+
+                if (import.meta.env.DEV) {
+                  // Log all keys to debug duplicates
+                  logger.debug(`[KEY] Message ${index}:`, {
+                    key: safeKey,
                     _id: message._id,
-                    generatedKey: getEphemeralKey(message, index)
+                    role: message.role,
+                    contentStart: message.content?.substring(0, 20),
                   });
+
+                  if (!messageKey) {
+                    console.error("[KEY] WARNING: Message has no key!", {
+                      message,
+                      index,
+                      _id: message._id,
+                      generatedKey: getEphemeralKey(message, index),
+                    });
+                  }
                 }
-                
+
                 return (
                   <MessageItem
                     key={safeKey}

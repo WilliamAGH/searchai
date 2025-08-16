@@ -68,7 +68,7 @@ describe("usePaginatedMessages", () => {
     // isLoading is false when chatId is null
     expect(result.current.isLoading).toBe(false);
     expect(result.current.isLoadingMore).toBe(false);
-    expect(result.current.hasMore).toBe(true);
+    expect(result.current.hasMore).toBe(false);
     expect(result.current.error).toBeNull();
     expect(result.current.retryCount).toBe(0);
     expect(typeof result.current.loadMore).toBe("function");

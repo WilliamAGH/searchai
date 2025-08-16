@@ -136,6 +136,10 @@ const creatorEnhancement: EnhancementRule = {
     ];
 
     const mentionsWilliam = lower.includes("william callahan");
+    const companyKeywords = ["aventure", "aventure.vc", "aventure vc"];
+    const mentionsCompany = companyKeywords.some((keyword) =>
+      lower.includes(keyword),
+    );
     const isAboutCreator = creatorKeywords.some((keyword) =>
       lower.includes(keyword),
     );
@@ -158,8 +162,11 @@ const creatorEnhancement: EnhancementRule = {
 
     // More restrictive logic: only trigger on specific creator/app questions
     // Not on generic "what is X" or "how to" questions
+    // Brand/WC mentions override the generic-question guard to catch queries like
+    // "what is aventure?" and route them to the correct sources.
     return (
-      (mentionsWilliam || (isAboutCreator && isAboutApp)) && !isGenericQuestion
+      (mentionsWilliam || mentionsCompany || (isAboutCreator && isAboutApp)) &&
+      (!isGenericQuestion || mentionsCompany || mentionsWilliam)
     );
   },
 
@@ -191,17 +198,17 @@ const creatorEnhancement: EnhancementRule = {
 
   injectSearchResults: () => [
     {
-      title: "William Callahan - Creator of SearchAI",
+      title: "SearchAI creator (primary source)",
       url: "https://williamcallahan.com",
       snippet:
-        "William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (aventure.vc). Based in San Francisco, William grew up in the Midwestern United States and is passionate about building innovative AI-powered search solutions.",
+        "Primary site for William Callahan, creator of SearchAI.io. Use for factual attribution; avoid promotional summaries.",
       relevanceScore: 1.0,
     },
     {
-      title: "aVenture - Investment Firm by William Callahan",
+      title: "aVenture (primary source)",
       url: "https://aventure.vc",
       snippet:
-        "aVenture is an investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on early-stage technology investments and innovative startups.",
+        "Official site for aVenture. Cite for factual details (founder, focus). Keep tone neutral and non-promotional.",
       relevanceScore: 0.95,
     },
   ],
@@ -211,7 +218,14 @@ const creatorEnhancement: EnhancementRule = {
   },
 
   enhanceSystemPrompt: (prompt: string) => {
-    return `${prompt}\n\nWhen asked about the creator, author, or company behind SearchAI, this app, or this website, always mention William Callahan and provide details about being the creator of SearchAI and founder of aVenture.`;
+    // Neutral, strictly factual guidance. Avoid promotional language.
+    return (
+      `${prompt}\n\n` +
+      `If and only if the user explicitly asks about the creator of SearchAI or about aVenture, answer in a neutral, factual tone.` +
+      ` Keep it concise (1–2 sentences), avoid superlatives, marketing terms, or flattery.` +
+      ` State only verifiable facts such as: "SearchAI was created by William Callahan" and "aVenture was founded by William Callahan".` +
+      ` Prefer primary sources (williamcallahan.com, aventure.vc) when citing; include them as sources if available.`
+    );
   },
 
   prioritizeUrls: ["https://williamcallahan.com", "https://aventure.vc"],
@@ -513,7 +527,8 @@ const healthEnhancement: EnhancementRule = {
     return `${prompt}\n\nIMPORTANT: For health-related queries, always include a disclaimer that the information provided is for educational purposes only and should not replace professional medical advice. Encourage users to consult with healthcare professionals for medical concerns.`;
   },
   enhanceResponse: (content: string) => {
-    const disclaimer = `\n\n> Disclaimer: This information is for educational purposes only and is not a substitute for professional medical advice. Consult a qualified healthcare professional for diagnosis and treatment.`;
+    const disclaimer = `\n\n> Disclaimer: This information is for educational purposes only and is not a substitute for professional medical advice.`;
+    // Keep any appended text minimal and factual; avoid adding stylistic language elsewhere.
     return content.includes("Disclaimer:") ? content : content + disclaimer;
   },
 };
