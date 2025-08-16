@@ -484,11 +484,11 @@ export class ConvexChatRepository extends BaseRepository {
 
           if (completedMessage && completedMessage.content) {
             // Yield any remaining content
-            if (completedMessage.content !== lastContent) {
+            if (completedMessage.content.length > lastContent.length) {
               const finalContent = completedMessage.content.substring(
                 lastContent.length,
               );
-              if (finalContent) {
+              if (finalContent.length > 0) {
                 yield { type: "content", content: finalContent };
               }
             }
@@ -554,12 +554,12 @@ export class ConvexChatRepository extends BaseRepository {
           // Yield new content as it arrives
           if (
             streamingMessage.content &&
-            streamingMessage.content !== lastContent
+            streamingMessage.content.length > lastContent.length
           ) {
             const newContent = streamingMessage.content.substring(
               lastContent.length,
             );
-            if (newContent) {
+            if (newContent.length > 0) {
               yield { type: "content", content: newContent };
               lastContent = streamingMessage.content;
             }
@@ -568,6 +568,7 @@ export class ConvexChatRepository extends BaseRepository {
           // Yield thinking updates if available (only when it changes)
           if (
             typeof streamingMessage.thinking === "string" &&
+            streamingMessage.thinking.length > 0 &&
             streamingMessage.thinking !== lastThinking
           ) {
             yield {
@@ -584,11 +585,11 @@ export class ConvexChatRepository extends BaseRepository {
 
           if (completedMessage && completedMessage.content) {
             // Yield any remaining content
-            if (completedMessage.content !== lastContent) {
+            if (completedMessage.content.length > lastContent.length) {
               const finalContent = completedMessage.content.substring(
                 lastContent.length,
               );
-              if (finalContent) {
+              if (finalContent.length > 0) {
                 yield { type: "content", content: finalContent };
               }
             }

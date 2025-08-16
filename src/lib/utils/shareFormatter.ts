@@ -8,7 +8,7 @@ interface MessageWithSources {
   role: "user" | "assistant" | "system";
   content: string;
   searchResults?: SearchResult[];
-  sources?: Array<{ title: string; url: string }>;
+  sources?: string[];
 }
 
 /**
@@ -30,8 +30,8 @@ export function formatConversationWithSources(
         });
       } else if (msg.sources && msg.sources.length > 0) {
         formatted += "\n\nSources:";
-        msg.sources.forEach((source, index) => {
-          formatted += `\n${index + 1}. ${source.title} - ${source.url}`;
+        msg.sources.forEach((sourceUrl, index) => {
+          formatted += `\n${index + 1}. ${sourceUrl}`;
         });
       }
 
@@ -58,7 +58,7 @@ export function extractSourceUrls(message: MessageWithSources): string[] {
   }
 
   if (message.sources) {
-    urls.push(...message.sources.map((s) => s.url));
+    urls.push(...message.sources);
   }
 
   return [...new Set(urls)]; // Remove duplicates

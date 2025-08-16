@@ -4,13 +4,12 @@
  */
 
 import { httpAction } from "../../_generated/server";
-import { api } from "../../_generated/api";
+import { api, internal } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
 import { normalizeUrlForKey } from "../../lib/url";
 import {
-  checkRateLimit,
   getClientIP,
   createRateLimitedResponse,
 } from "../../lib/security/rateLimit";
@@ -45,12 +44,19 @@ export function registerSearchRoutes(http: HttpRouter) {
     handler: httpAction(async (ctx, request) => {
       // Rate limiting
       const clientIP = getClientIP(request);
-      const rateLimitKey = `${clientIP}:search`;
-      const rateLimitResult = await checkRateLimit(ctx, rateLimitKey, {
+      const rateLimitKey = `rate_limit:${clientIP}:search`;
+      // Type assertion to avoid TS2589 deep instantiation error
+      // This is a known Convex limitation with deeply nested types
+      // @ts-expect-error - TS2589: Type instantiation is excessively deep
+      const rateLimitMutation = internal.rateLimits.bumpAndCheck as any;
+      const rateLimitResult = (await ctx.runMutation(rateLimitMutation, {
+        key: rateLimitKey,
         maxRequests: 10,
         windowMs: 60000, // 1 minute
-        keyPrefix: "rate_limit",
-      });
+      })) as {
+        isRateLimited: boolean;
+        rateLimitHeaders: Record<string, string>;
+      };
 
       if (rateLimitResult.isRateLimited) {
         return createRateLimitedResponse(

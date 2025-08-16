@@ -54,6 +54,7 @@ import type * as lib_validators from "../lib/validators.js";
 import type * as messages from "../messages.js";
 import type * as migrations_remove_system_role from "../migrations/remove_system_role.js";
 import type * as preferences from "../preferences.js";
+import type * as rateLimits from "../rateLimits.js";
 import type * as search_cache from "../search/cache.js";
 import type * as search_executor from "../search/executor.js";
 import type * as search_index from "../search/index.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   "migrations/remove_system_role": typeof migrations_remove_system_role;
   preferences: typeof preferences;
+  rateLimits: typeof rateLimits;
   "search/cache": typeof search_cache;
   "search/executor": typeof search_executor;
   "search/index": typeof search_index;
