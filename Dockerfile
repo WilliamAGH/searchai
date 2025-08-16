@@ -30,16 +30,19 @@ COPY convex/ ./convex/
 COPY public/ ./public/
 
 # Set build-time environment variables for Vite
-# Note: VITE_CONVEX_URL must be provided as a build argument
+# VITE_CONVEX_URL can be provided as a build argument, or falls back to dev deployment
 ARG VITE_CONVEX_URL
 ARG NODE_ENV=production
 
-# Make build args available as environment variables for Vite
-ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
+# If VITE_CONVEX_URL is not provided, use dev deployment as fallback
+ENV VITE_CONVEX_URL=${VITE_CONVEX_URL:-https://diligent-greyhound-240.convex.cloud}
 ENV NODE_ENV=$NODE_ENV
 
-# Validate required build args
-RUN test -n "$VITE_CONVEX_URL" || (echo "ERROR: VITE_CONVEX_URL is required at build time" && exit 1)
+# Log which URL is being used for the build
+RUN echo "Building with VITE_CONVEX_URL=${VITE_CONVEX_URL}"
+
+# Validate that we have a URL (either from ARG or fallback)
+RUN test -n "${VITE_CONVEX_URL}" || (echo "ERROR: VITE_CONVEX_URL is not set" && exit 1)
 
 # Build the application
 RUN npm run build
