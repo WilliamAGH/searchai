@@ -1100,6 +1100,9 @@ async function streamResponseToMessage(args: {
     top_p: 0.95, // Slightly wider nucleus sampling for more variety
     frequency_penalty: -0.2, // Negative value encourages some repetition (more verbose)
     presence_penalty: 0.1, // Slight penalty for new topics to stay focused
+    // For thinking models, control reasoning verbosity
+    // NOTE: OpenRouter only accepts ONE of reasoning.effort or max_tokens, not both
+    // Currently using max_tokens for google/gemini-2.5-flash (non-thinking model)
   };
 
   let accumulatedContent = "";

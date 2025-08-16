@@ -170,75 +170,37 @@ export function MessageInput({
     ],
   );
 
-  // Auto-resize height with performance optimizations
+  // Auto-resize height - simplified without RAF
   const adjustTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
 
-    // Batch DOM operations
-    requestAnimationFrame(() => {
-      ta.style.height = "auto";
-      const style = window.getComputedStyle(ta);
-      const minH = parseFloat(style.minHeight) || 0;
-      const scrollH = ta.scrollHeight;
-      const target = Math.min(Math.max(scrollH, minH), MAX_TEXTAREA_HEIGHT);
-      ta.style.height = target + "px";
-    });
+    // Direct DOM operations without RAF
+    ta.style.height = "auto";
+    const scrollH = ta.scrollHeight;
+    const target = Math.min(scrollH, MAX_TEXTAREA_HEIGHT);
+    ta.style.height = target + "px";
   }, []);
 
-  // Skip autofocus on iOS to prevent keyboard issues
-  useEffect(() => {
-    // Detect iOS Safari
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS || disabled) return;
-
-    const el = textareaRef.current;
-    if (!el) return;
-
-    // Delay focus to avoid conflicts
-    const timer = setTimeout(() => {
-      try {
-        el.focus({ preventScroll: true });
-      } catch {
-        // Silently fail on mobile
-      }
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [disabled]);
+  // REMOVED: First focus management block - consolidating to single focus handler
 
   // Consolidated adjustTextarea triggers: content changes, env changes, and viewport changes
   useEffect(() => {
     adjustTextarea();
   }, [message, placeholder, disabled, adjustTextarea]);
-  // Throttle resize handlers for better performance
+  // Simple resize handler
   useEffect(() => {
-    let rafId: number | null = null;
-    let lastCall = 0;
-    const THROTTLE_MS = 100;
-
-    const handler: EventListener = () => {
-      const now = Date.now();
-      if (now - lastCall < THROTTLE_MS) return;
-
-      lastCall = now;
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(adjustTextarea);
-    };
-
+    const handler = () => adjustTextarea();
     window.addEventListener("resize", handler, { passive: true });
     window.addEventListener("orientationchange", handler, { passive: true });
 
     return () => {
       window.removeEventListener("resize", handler);
       window.removeEventListener("orientationchange", handler);
-      if (rafId) cancelAnimationFrame(rafId);
     };
   }, [adjustTextarea]);
 
-  // Throttle draft changes for better performance
-  const draftChangeTimerRef = useRef<NodeJS.Timeout>();
-
+  // Simple change handler without throttling
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const val = e.target.value;
@@ -248,67 +210,33 @@ export function MessageInput({
         setDraftBeforeHistory(null);
       }
 
-      // Throttle draft change callbacks
-      if (onDraftChange) {
-        if (draftChangeTimerRef.current) {
-          clearTimeout(draftChangeTimerRef.current);
-        }
-        draftChangeTimerRef.current = setTimeout(() => {
-          onDraftChange(val);
-        }, 150); // Throttle to 150ms
-      }
+      // Direct callback without throttling
+      onDraftChange?.(val);
     },
     [historyIndex, onDraftChange],
   );
 
-  // Cleanup draft change timer on unmount
+  // Single focus management - simplified for Safari
   useEffect(() => {
-    return () => {
-      if (draftChangeTimerRef.current) {
-        clearTimeout(draftChangeTimerRef.current);
-      }
-    };
-  }, []);
-
-  // Skip auto-focus on mobile devices completely
-  const hasAutoFocusedRef = useRef(false);
-  useEffect(() => {
-    // Detect mobile/touch devices more reliably
-    const isMobile =
-      /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) ||
-      (typeof window !== "undefined" &&
-        typeof window.matchMedia === "function" &&
-        window.matchMedia("(pointer: coarse)").matches);
-
+    // Skip focus on all mobile devices to prevent keyboard issues
+    const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
     if (isMobile || disabled) return;
 
     const el = textareaRef.current;
-    if (!el || hasAutoFocusedRef.current) return;
+    if (!el) return;
 
-    // Avoid stealing focus if something else is active or a modal is open
-    const hasModalOpen = !!document.querySelector(
-      '[role="dialog"][aria-modal="true"]',
-    );
-    const canStealFocus =
-      document.activeElement === document.body &&
-      document.visibilityState === "visible" &&
-      !hasModalOpen;
-
-    // Only focus if the element is visible and enabled
-    const isVisible = el.offsetParent !== null && !el.disabled;
-    if (!canStealFocus || !isVisible) return;
-
-    // Use setTimeout instead of RAF for more predictable behavior
-    const timer = setTimeout(() => {
-      try {
-        el.focus({ preventScroll: true });
-      } catch {
-        // Silently fail
-      }
-    }, 250);
-
-    hasAutoFocusedRef.current = true;
-    return () => clearTimeout(timer);
+    // Only focus on desktop if nothing else is focused
+    if (document.activeElement === document.body) {
+      // Simple delayed focus without complex checks
+      const timer = setTimeout(() => {
+        try {
+          el.focus({ preventScroll: true });
+        } catch {
+          // Ignore errors
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
   }, [disabled]);
 
   return (
