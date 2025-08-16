@@ -34,15 +34,13 @@ COPY public/ ./public/
 ARG VITE_CONVEX_URL
 ARG NODE_ENV=production
 
-# If VITE_CONVEX_URL is not provided, use dev deployment as fallback
-ENV VITE_CONVEX_URL=${VITE_CONVEX_URL:-https://diligent-greyhound-240.convex.cloud}
+# Require explicit VITE_CONVEX_URL; avoid baking dev endpoints into prod images
+ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
 ENV NODE_ENV=$NODE_ENV
 
-# Log which URL is being used for the build
-RUN echo "Building with VITE_CONVEX_URL=${VITE_CONVEX_URL}"
-
-# Validate that we have a URL (either from ARG or fallback)
-RUN test -n "${VITE_CONVEX_URL}" || (echo "ERROR: VITE_CONVEX_URL is not set" && exit 1)
+# Log and validate we have a URL
+RUN echo "Building with VITE_CONVEX_URL=${VITE_CONVEX_URL}" && \
+    test -n "${VITE_CONVEX_URL}" || (echo "ERROR: VITE_CONVEX_URL is not set" && exit 1)
 
 # Build the application
 RUN npm run build
@@ -72,5 +70,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
 
 # Serve the built application with API proxy
+ENV NODE_ENV=production
 ENV CONVEX_SITE_URL=""
 CMD ["node", "server.mjs"]
