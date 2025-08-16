@@ -156,16 +156,13 @@ function ChatInterfaceComponent({
     return baseChats;
   }, [isAuthenticated, chats]);
 
-  const {
-    navigateWithVerification,
-    buildChatPath,
-    handleSelectChat: navHandleSelectChat,
-  } = useChatNavigation({
-    currentChatId,
-    allChats,
-    isAuthenticated,
-    onSelectChat: chatActions.selectChat,
-  });
+  const { buildChatPath, handleSelectChat: navHandleSelectChat } =
+    useChatNavigation({
+      currentChatId,
+      allChats,
+      isAuthenticated,
+      onSelectChat: chatActions.selectChat,
+    });
   const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
   const generateResponse = useAction(api.ai.generateStreamingResponse);
   const planSearch = useAction(api.search.planSearch);
@@ -290,8 +287,8 @@ function ChatInterfaceComponent({
         // Simply use the createChat action from useUnifiedChat
         const chat = await chatActions.createChat("New Chat");
         if (chat?.id) {
-          // Navigate to the new chat (pass chatId, not a path)
-          await navigateWithVerification(chat.id);
+          // Navigate to the new chat using navHandleSelectChat
+          await navHandleSelectChat(chat.id);
           setIsCreatingChat(false);
           return chat.id;
         }
@@ -301,7 +298,7 @@ function ChatInterfaceComponent({
       setIsCreatingChat(false);
       return null;
     },
-    [isServiceAvailable, chatActions, navigateWithVerification],
+    [isServiceAvailable, chatActions, navHandleSelectChat],
   );
 
   useEffect(() => {
@@ -526,7 +523,6 @@ function ChatInterfaceComponent({
       chatState={chatState}
       chatActions={chatActions}
       updateChatPrivacy={updateChatPrivacy}
-      navigateWithVerification={navigateWithVerification}
       buildChatPath={buildChatPath}
       fetchJsonWithRetry={fetchJsonWithRetry}
       resolveApi={resolveApi}

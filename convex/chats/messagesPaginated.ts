@@ -182,7 +182,18 @@ export const getRecentChatMessages = query({
       .order("desc")
       .take(limit);
 
-    // Reverse to get chronological order
-    return messages.reverse();
+    // Reverse to get chronological order and map to return only validated fields
+    return messages.reverse().map((m) => ({
+      _id: m._id,
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp,
+      isStreaming: m.isStreaming,
+      streamedContent: m.streamedContent,
+      thinking: m.thinking,
+      searchResults: m.searchResults,
+      sources: m.sources,
+      reasoning: m.reasoning,
+    }));
   },
 });

@@ -67,7 +67,6 @@ interface ChatLayoutProps {
     chatId: string;
     privacy: "private" | "shared" | "public";
   }) => Promise<void>;
-  navigateWithVerification: (path: string) => Promise<void>;
   buildChatPath: (chatId: string) => string;
   fetchJsonWithRetry: <T>(url: string, init?: RequestInit) => Promise<T>;
   resolveApi: (path: string) => string;
@@ -98,7 +97,6 @@ export function ChatLayout({
   chatState: _chatState,
   chatActions,
   updateChatPrivacy: _updateChatPrivacy,
-  navigateWithVerification: _navigateWithVerification,
   buildChatPath: _buildChatPath,
   fetchJsonWithRetry: _fetchJsonWithRetry,
   resolveApi,
