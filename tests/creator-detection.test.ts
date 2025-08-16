@@ -95,7 +95,7 @@ describe("creator detection", () => {
     for (const query of testQueries) {
       const isCreator = detectCreatorQuery(query);
       if (isCreator) {
-        const enhanced = `${query} William Callahan williamcallahan.com aVenture aventure.vc`;
+        const enhanced = `${query} William Callahan williamcallahan.com aVenture aventure.vc founder SearchAI`;
         expect(enhanced.includes("williamcallahan.com")).toBe(true);
         expect(enhanced.includes("aventure.vc")).toBe(true);
       }

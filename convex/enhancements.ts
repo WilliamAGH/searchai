@@ -179,11 +179,16 @@ const creatorEnhancement: EnhancementRule = {
 
     const enhanced = `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
 
-    // Log when this enhancement is applied for debugging
-    console.info("🔧 Creator enhancement applied to query:", {
-      original: query,
-      enhanced,
-    });
+    // Dev-only log (no spam in production!)
+    if (
+      typeof process !== "undefined" &&
+      process.env.NODE_ENV === "development"
+    ) {
+      console.info("🔧 Creator enhancement applied to query:", {
+        original: query,
+        enhanced,
+      });
+    }
 
     return enhanced;
   },

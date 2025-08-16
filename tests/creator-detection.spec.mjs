@@ -154,7 +154,7 @@ async function testQueryEnhancement() {
   for (const query of testQueries) {
     const isCreator = detectCreatorQuery(query);
     if (isCreator) {
-      const enhanced = `${query} William Callahan williamcallahan.com aVenture aventure.vc`;
+      const enhanced = `${query} William Callahan williamcallahan.com aVenture aventure.vc founder SearchAI`;
       const includesInfo =
         enhanced.includes("williamcallahan.com") &&
         enhanced.includes("aventure.vc");

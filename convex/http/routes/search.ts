@@ -3,6 +3,7 @@
  * - OPTIONS and POST /api/search endpoints
  */
 
+"use node";
 import { httpAction } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
