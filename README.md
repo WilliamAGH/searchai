@@ -172,11 +172,14 @@ You MUST deploy Convex functions when:
 ### Development Deployment
 
 ```bash
-# Start dev server (auto-deploys on file changes)
+# Start dev server (auto-deploys on file changes to YOUR dev deployment)
 npx convex dev
 
-# Or deploy once without watching
+# Deploy once to dev without watching (useful for CI/testing)
 npx convex dev --once
+
+# Run with local backend (for testing without using cloud resources)
+npx convex dev --local --once
 ```
 
 ### Production Deployment

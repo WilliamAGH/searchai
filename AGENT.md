@@ -28,6 +28,13 @@ CONVEX_DEV_URL: https://diligent-greyhound-240.convex.cloud
 CONVEX_PROD_DEPLOYMENT: vivid-boar-858
 CONVEX_PROD_URL: https://vivid-boar-858.convex.cloud
 
+# CRITICAL: Convex Deployment Commands
+# Development: npx convex dev (syncs continuously to your dev deployment)
+# Production: npx convex deploy (pushes to production, asks for confirmation)
+# Local Testing: npx convex dev --local --once (runs backend locally for tests)
+# View Prod Logs: npx convex logs --prod
+# Run Prod Function: npx convex run <functionName> --prod
+
 # Commands
 BUILD_COMMAND: npm run build
 DEV_COMMAND: npm run dev
