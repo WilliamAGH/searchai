@@ -858,6 +858,15 @@ export const generationStep = internalAction({
           }
         }
 
+        // Add injected results from enhancement system (e.g., creator info)
+        if (
+          enhancements.injectedResults &&
+          enhancements.injectedResults.length > 0
+        ) {
+          // Add injected results at the beginning for higher priority
+          aggregated.unshift(...enhancements.injectedResults);
+        }
+
         // Fallback: if no results from enhanced queries, try original queries
         if (aggregated.length === 0 && plan.queries.length > 0) {
           console.warn(
