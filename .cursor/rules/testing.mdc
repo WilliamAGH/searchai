@@ -84,9 +84,9 @@ export default defineConfig({
 ```
 
 References:
-- Vitest CLI: https://vitest.dev/guide/cli.html
-- Vitest Common Errors: https://vitest.dev/guide/common-errors.html
-- Vitest Config: https://vitest.dev/config/
+- Vitest CLI: <https://vitest.dev/guide/cli.html>
+- Vitest Common Errors: <https://vitest.dev/guide/common-errors.html>
+- Vitest Config: <https://vitest.dev/config/>
 
 Note: This repository standardizes on Vitest, not Jest. For teams migrating from Jest, consult Vitest docs for compatibility notes; do not mix frameworks in this repo.
 
