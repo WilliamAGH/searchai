@@ -3,7 +3,7 @@
  * Refactored to use sub-components for better organization
  */
 
-import { useAction, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import React, {
   useCallback,
   useEffect,
@@ -12,7 +12,7 @@ import React, {
   useState,
 } from "react";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { isConvexChatId } from "../../lib/utils/id";
 import { useUnifiedChat } from "../../hooks/useUnifiedChat";
 import { useNavigate } from "react-router-dom";
@@ -105,6 +105,10 @@ function ChatInterfaceComponent({
   const deleteChat = useMutation(api.chats.deleteChat);
   const deleteMessage = useMutation(api.messages.deleteMessage);
 
+  // Get current user for ownership checks
+  const currentUser = useQuery(api.auth.loggedInUser);
+  const currentUserId = currentUser?._id;
+
   // Get all chats (either from Convex or local storage)
   const allChats = useMemo(() => {
     let baseChats: Chat[] = [];
@@ -154,8 +158,37 @@ function ChatInterfaceComponent({
       );
     }
 
+    // Add public/shared chats accessed via URL to the list if not already present
+    const publicOrSharedChat = chatByPublicId || chatByShareId;
+    if (publicOrSharedChat) {
+      const tempChat = publicOrSharedChat as Doc<"chats">;
+      const existingChat = baseChats.find((c) => c.id === tempChat._id);
+
+      if (!existingChat && tempChat.title) {
+        logger.info(
+          "[CHAT_INTERFACE] Adding public/shared chat to display list",
+        );
+        const tempChatForDisplay = createChatFromData(
+          {
+            _id: tempChat._id,
+            id: tempChat._id,
+            title: tempChat.title,
+            createdAt: tempChat._creationTime,
+            updatedAt: tempChat.updatedAt || tempChat._creationTime,
+            privacy: tempChat.privacy || "public",
+            shareId: tempChat.shareId,
+            publicId: tempChat.publicId,
+            userId: tempChat.userId,
+            _creationTime: tempChat._creationTime,
+          },
+          isAuthenticated,
+        );
+        baseChats = [...baseChats, tempChatForDisplay];
+      }
+    }
+
     return baseChats;
-  }, [isAuthenticated, chats]);
+  }, [isAuthenticated, chats, chatByPublicId, chatByShareId]);
 
   const { buildChatPath, handleSelectChat: navHandleSelectChat } =
     useChatNavigation({
@@ -300,10 +333,10 @@ function ChatInterfaceComponent({
       const loadedChat = chatByPublicId || chatByShareId;
       if (!loadedChat) return true; // Default to read-only if chat not loaded
 
-      const chat = loadedChat as { userId?: string | Id<"users"> };
+      const chat = loadedChat as Doc<"chats">;
 
       // For unauthenticated users, public/shared chats are always read-only
-      if (!isAuthenticated) {
+      if (!isAuthenticated || !currentUserId) {
         logger.debug(
           "[CHAT_INTERFACE] Read-only: unauthenticated user viewing public/shared chat",
         );
@@ -311,24 +344,20 @@ function ChatInterfaceComponent({
       }
 
       // For authenticated users, check if they own the chat
-      // Since we don't have the current user ID readily available,
-      // we'll check if the chat exists in their chat list
-      const userOwnsChat = chatState.chats.some((c) => {
-        const chatId =
-          typeof chat.userId === "string"
-            ? chat.userId
-            : (chat.userId as unknown as { _id?: string })?._id;
-        return (
-          c.id === chatId ||
-          c.id === (loadedChat as unknown as { _id: string })._id
-        );
-      });
+      // Compare the chat's userId with the current user's ID
+      const userOwnsChat = chat.userId === currentUserId;
 
       if (!userOwnsChat) {
         logger.debug(
           "[CHAT_INTERFACE] Read-only: authenticated user viewing non-owned public/shared chat",
+          { chatUserId: chat.userId, currentUserId },
         );
         return true;
+      } else {
+        logger.debug(
+          "[CHAT_INTERFACE] Not read-only: user owns this public/shared chat",
+          { chatUserId: chat.userId, currentUserId },
+        );
       }
     }
 
@@ -339,7 +368,7 @@ function ChatInterfaceComponent({
     chatByPublicId,
     chatByShareId,
     isAuthenticated,
-    chatState.chats,
+    currentUserId,
   ]);
 
   // Use deletion handlers hook for all deletion operations
@@ -441,7 +470,21 @@ function ChatInterfaceComponent({
     _localChats: chatState.chats,
     _selectChat: chatActions.selectChat,
   });
-  useMetaTags({ currentChatId, allChats });
+
+  // Set page title based on current chat
+  const pageTitle = useMemo(() => {
+    if (currentChat?.title) {
+      return `${currentChat.title} - SearchAI`;
+    }
+    return "SearchAI - AI-Powered Search";
+  }, [currentChat]);
+
+  useMetaTags({
+    title: pageTitle,
+    description: currentChat?.title
+      ? `Chat conversation: ${currentChat.title}`
+      : "AI-powered search and conversation platform",
+  });
 
   const handleNewChat = useCallback(
     async (_opts?: { userInitiated?: boolean }): Promise<string | null> => {
