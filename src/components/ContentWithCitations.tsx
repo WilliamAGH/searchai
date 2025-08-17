@@ -63,12 +63,25 @@ export function ContentWithCitations({
   // Convert [domain] or [URL] to markdown links where domain is known
   const processedContent = React.useMemo(() => {
     const citationRegex = /\[([^\]]+)\]/g;
+
     return content.replace(citationRegex, (match, citedText) => {
       let domain = citedText;
       let url: string | undefined;
 
+      // Check if it's a numeric citation like [1] or [2]
+      if (/^\d+$/.test(citedText)) {
+        const index = parseInt(citedText) - 1; // Convert to 0-based index
+        if (index >= 0 && index < searchResults.length) {
+          const result = searchResults[index];
+          domain = getDomainFromUrl(result.url);
+          url = result.url;
+        }
+      }
       // Check if cited text is a full URL
-      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
+      else if (
+        citedText.startsWith("http://") ||
+        citedText.startsWith("https://")
+      ) {
         // Extract domain from the full URL citation
         domain = getDomainFromUrl(citedText);
         // Try to find exact URL match first

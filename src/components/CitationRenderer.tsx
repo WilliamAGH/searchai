@@ -154,8 +154,20 @@ export function CitationRenderer({
       let citedDomain = citedText;
       let matchedUrl: string | undefined;
 
+      // Check if it's a numeric citation like [1] or [2]
+      if (/^\d+$/.test(citedText)) {
+        const index = parseInt(citedText) - 1; // Convert to 0-based index
+        if (index >= 0 && index < searchResults.length) {
+          const result = searchResults[index];
+          citedDomain = getDomainFromUrl(result.url);
+          matchedUrl = result.url;
+        }
+      }
       // Check if cited text is a full URL
-      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
+      else if (
+        citedText.startsWith("http://") ||
+        citedText.startsWith("https://")
+      ) {
         // Extract domain from the full URL citation
         citedDomain = getDomainFromUrl(citedText);
         // Try to find exact URL match first
