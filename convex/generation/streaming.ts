@@ -57,10 +57,8 @@ export async function* streamOpenRouter(
 
   try {
     if (debug)
-      console.info("🔑 OpenRouter API Key check:", {
-        hasKey: !!apiKey,
-        keyLength: apiKey ? apiKey.length : 0,
-        keyPrefix: apiKey ? apiKey.substring(0, 10) + "..." : "missing",
+      console.info("🔑 OpenRouter API Key present:", {
+        hasKey: Boolean(apiKey),
       });
 
     if (!apiKey) {
@@ -96,7 +94,18 @@ export async function* streamOpenRouter(
         status: response.status,
         statusText: response.statusText,
         errorDetails: errorText,
-        requestBody: body,
+        requestSummary: {
+          model: body?.model,
+          messageCount: Array.isArray(body?.messages)
+            ? body.messages.length
+            : 0,
+          hasSystem: Array.isArray(body?.messages)
+            ? body.messages.some((m) => m?.role === "system")
+            : false,
+          temperature: body?.temperature,
+          max_tokens: body?.max_tokens,
+          hasReasoning: Boolean(body?.reasoning),
+        },
       });
       throw new Error(errorMessage);
     }
