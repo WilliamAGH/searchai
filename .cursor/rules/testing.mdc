@@ -56,7 +56,7 @@ vitest run --pool=forks
 vitest run --pool=threads
 
 # Debug single-threaded
-vitest --inspect-brk --pool threads --poolOptions.threads.singleThread
+vitest --inspect-brk --pool=threads --poolOptions.threads.singleThread
 ```
 
 In CI we standardize on `vmForks` with a single worker to avoid tinypool recursion/stack issues in constrained runners:
@@ -84,9 +84,9 @@ export default defineConfig({
 ```
 
 References:
-- Vitest CLI options (pool, poolOptions.*)
-- Vitest Common Errors: switch to forks/vmForks to avoid worker termination issues
-- Vitest Config: threads/forks/vmThreads/vmForks options
+- Vitest CLI: https://vitest.dev/guide/cli.html
+- Vitest Common Errors: https://vitest.dev/guide/common-errors.html
+- Vitest Config: https://vitest.dev/config/
 
 Note: This repository standardizes on Vitest, not Jest. For teams migrating from Jest, consult Vitest docs for compatibility notes; do not mix frameworks in this repo.
 
@@ -112,13 +112,11 @@ export default defineConfig({
     globals: true,
     
     // Setup
-    setupFiles: ['./src/test/setup.ts'],
+    setupFiles: ['./tests/setup.ts'],
     
-    // Worker pool selection (verified via Vitest docs 2025)
-    // - Default pool is 'forks'
-    // - Use 'forks' to avoid tinypool worker termination/segfault issues
-    //   See: Vitest docs -> common-errors, config, cli-generated (pool, poolOptions)
-    pool: 'forks',
+    // Worker pool selection
+    // Local: forks | CI: vmForks (singleFork) to avoid worker termination in constrained runners
+    pool: process.env.CI ? 'vmForks' : 'forks',
     
     // Coverage with V8 (faster than Istanbul)
     coverage: {
@@ -158,9 +156,8 @@ export default defineConfig({
     
     // CI optimizations
     ...(process.env.CI && {
-      pool: 'forks' as const,
-      minWorkers: 1,
-      maxWorkers: 2,
+      poolOptions: { vmForks: { singleFork: true } },
+      maxConcurrency: 1,
     }),
   },
 })
@@ -169,7 +166,7 @@ export default defineConfig({
 ### Test Setup File
 
 ```typescript
-// src/test/setup.ts
+// src/test/setup.ts (use tests/setup.ts in this repo)
 import { expect, afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import * as matchers from '@testing-library/jest-dom/matchers'
@@ -201,21 +198,25 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // Mock IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
+const MockIntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
   takeRecords() { return [] }
 }
+;(globalThis as any).IntersectionObserver = MockIntersectionObserver
+;(window as any).IntersectionObserver = MockIntersectionObserver
 
 // Mock ResizeObserver
-global.ResizeObserver = class ResizeObserver {
+const MockResizeObserver = class ResizeObserver {
   constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
 }
+;(globalThis as any).ResizeObserver = MockResizeObserver
+;(window as any).ResizeObserver = MockResizeObserver
 ```
 
 ## 🧪 React Testing Patterns (React 19)
@@ -226,6 +227,7 @@ global.ResizeObserver = class ResizeObserver {
 // React 19 Test Setup - CRITICAL for compatibility
 // tests/setup.ts
 import * as React from 'react'
+import { vi } from 'vitest'
 
 // React 19 exports act directly - DO NOT redefine
 // React Testing Library v16+ automatically handles act
@@ -300,7 +302,7 @@ describe('ChatInterface', () => {
 ### Testing Custom Hooks
 
 ```typescript
-import { renderHook, act } from '@testing-library/react'
+import { renderHook } from '@testing-library/react'
 import { useChat } from '../hooks/useChat'
 
 describe('useChat', () => {
@@ -312,9 +314,7 @@ describe('useChat', () => {
     expect(result.current.isLoading).toBe(false)
     
     // Test actions
-    await act(async () => {
-      await result.current.sendMessage('Hello')
-    })
+    await result.current.sendMessage('Hello')
     
     expect(result.current.messages).toHaveLength(1)
     expect(result.current.messages[0].content).toBe('Hello')
@@ -473,7 +473,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 1 : undefined,
   reporter: [
     ['html'],
     ['json', { outputFile: 'test-results.json' }],
@@ -523,7 +523,7 @@ export default defineConfig({
 
 ```typescript
 // tests/e2e/pages/ChatPage.ts
-import { Page, Locator } from '@playwright/test'
+import { Page, Locator, expect } from '@playwright/test'
 
 export class ChatPage {
   readonly page: Page
@@ -585,16 +585,15 @@ test.describe('Chat Functionality', () => {
   })
 
   test('handles network errors gracefully', async ({ page, context }) => {
-    // Simulate offline mode
-    await context.setOffline(true)
-    
     const chatPage = new ChatPage(page)
     await chatPage.goto()
+    await context.setOffline(true)
     
     await chatPage.sendMessage('Test message')
     
     // Should show error message
     await expect(page.getByRole('alert')).toContainText(/connection error/i)
+    await context.setOffline(false) // cleanup
   })
 })
 ```
@@ -621,10 +620,13 @@ export const SEARCH_TEST_SCENARIOS = {
   CURRENT_EVENTS: 'current_events',
 } as const
 
-// Control test behavior
-setSearchTestScenario(SEARCH_TEST_SCENARIOS.ERROR)
-setResponseDelay(500) // Simulate network latency
-setErrorRate(0.3)     // 30% random errors
+// Control test behavior (set per-test in beforeEach, not at module top)
+// Example usage in tests:
+// beforeEach(() => {
+//   setSearchTestScenario(SEARCH_TEST_SCENARIOS.STANDARD)
+//   setResponseDelay(0)
+//   setErrorRate(0)
+// })
 
 // Mock handlers for all search providers
 export const searchHandlers = [
@@ -670,6 +672,7 @@ setupFiles: ["./tests/setup.ts", "./tests/mocks/setup-msw.ts"]
 
 ```typescript
 // Test provider fallback chain
+// import { mockSearchResponse, searchTestHelper } from '../mocks/search-api-mocks'
 it('should fallback through providers', async () => {
   mockSearchResponse('serp', null, 500) // Make SERP fail
   
@@ -1558,9 +1561,9 @@ npm run check:convex-watch
 
 ### Type Error Reference
 
-| Error | Cause | Solution |
+| Error | Cause | Preferred Solution |
 |-------|-------|----------|
-| `Type 'string' is not assignable to type 'Id<"table">'` | Using plain string for ID | Cast with `as Id<"table">` or get from database |
+| `Type 'string' is not assignable to type 'Id<"table">'` | Using plain string for ID | Create records to get real typed IDs (avoid casts where possible) |
 | `Property does not exist on type 'Doc<"table">'` | Accessing non-existent field | Check schema definition |
 | `Expected 2 arguments, but got 1` | Missing required args | Add all required arguments |
 | `Type instantiation is excessively deep` | Complex nested types | Simplify or increase TypeScript depth limit |
