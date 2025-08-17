@@ -39,7 +39,12 @@ export { normalizeUrlForKey } from "../lib/url";
  */
 export async function* streamOpenRouter(
   body: OpenRouterBody,
-  opts: { apiKey: string; siteUrl?: string; siteTitle?: string; debug?: boolean },
+  opts: {
+    apiKey: string;
+    siteUrl?: string;
+    siteTitle?: string;
+    debug?: boolean;
+  },
 ) {
   const { apiKey, siteUrl, siteTitle, debug } = opts;
   if (debug)
@@ -123,7 +128,8 @@ export async function* streamOpenRouter(
               }
               try {
                 const parsedData = JSON.parse(data);
-                if (debug) console.info("📦 Final chunk from buffer:", parsedData);
+                if (debug)
+                  console.info("📦 Final chunk from buffer:", parsedData);
                 yield parsedData;
               } catch (parseError) {
                 console.error(

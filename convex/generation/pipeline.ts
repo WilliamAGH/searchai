@@ -918,7 +918,7 @@ export const generationStep = internalAction({
       // Add search results info to reasoning only in development mode
       if (isDevelopment && aggregated.length > 0) {
         accumulatedReasoning += `\nFound ${aggregated.length} search results. Using top ${Math.min(TOP_RESULTS, aggregated.length)} for context.\n\nProcessing search results:\n`;
-        
+
         // Show scraping progress for each result
         for (let i = 0; i < Math.min(TOP_RESULTS, aggregated.length); i++) {
           const result = aggregated[i];
@@ -1035,9 +1035,9 @@ export const watchdogEnsureGeneration = internalAction({
  */
 function buildSystemPrompt(args: {
   context: string;
-  searchResults: Array<{ 
-    title: string; 
-    url: string; 
+  searchResults: Array<{
+    title: string;
+    url: string;
     snippet: string;
     content?: string;
     fullTitle?: string;
@@ -1067,17 +1067,18 @@ function buildSystemPrompt(args: {
         const match = result.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
         domain = match ? match[1] : "source";
       }
-      
+
       prompt += `${i + 1}. **${result.fullTitle || result.title}** [${domain}]\n`;
       prompt += `   URL: ${result.url}\n`;
-      
+
       // CRITICAL FIX: Include scraped content when available
       if (result.content) {
         // Limit content to prevent context overflow (2000 chars per result)
         const maxContentLength = 2000;
-        const truncatedContent = result.content.length > maxContentLength
-          ? result.content.slice(0, maxContentLength) + "..."
-          : result.content;
+        const truncatedContent =
+          result.content.length > maxContentLength
+            ? result.content.slice(0, maxContentLength) + "..."
+            : result.content;
         prompt += `   Full Content: ${truncatedContent}\n\n`;
       } else if (result.summary) {
         prompt += `   Summary: ${result.summary}\n\n`;
