@@ -177,6 +177,72 @@ function ChatInterfaceComponent({
     currentChatId,
   });
 
+  // Handle public/shared chat selection when loaded from URL
+  useEffect(() => {
+    logger.debug("[CHAT_INTERFACE] URL chat selection effect:", {
+      hasPublicChat: !!chatByPublicId,
+      hasSharedChat: !!chatByShareId,
+      hasOpaqueChat: !!chatByOpaqueId,
+      currentChatId,
+      publicId: propPublicId,
+      shareId: propShareId,
+    });
+
+    // If we have a public chat loaded but it's not selected, select it
+    if (chatByPublicId && !currentChatId) {
+      logger.info(
+        "[CHAT_INTERFACE] Public chat loaded, selecting:",
+        chatByPublicId,
+      );
+      const publicChat = chatByPublicId as { _id: string };
+      if (publicChat._id) {
+        logger.info(
+          "[CHAT_INTERFACE] Selecting public chat with ID:",
+          publicChat._id,
+        );
+        chatActions.selectChat(publicChat._id);
+      }
+    }
+    // Similarly for shared chats
+    else if (chatByShareId && !currentChatId) {
+      logger.info(
+        "[CHAT_INTERFACE] Shared chat loaded, selecting:",
+        chatByShareId,
+      );
+      const sharedChat = chatByShareId as { _id: string };
+      if (sharedChat._id) {
+        logger.info(
+          "[CHAT_INTERFACE] Selecting shared chat with ID:",
+          sharedChat._id,
+        );
+        chatActions.selectChat(sharedChat._id);
+      }
+    }
+    // Handle regular chat ID from URL
+    else if (chatByOpaqueId && !currentChatId) {
+      logger.info(
+        "[CHAT_INTERFACE] Opaque chat loaded, selecting:",
+        chatByOpaqueId,
+      );
+      const opaqueChat = chatByOpaqueId as { _id: string };
+      if (opaqueChat._id) {
+        logger.info(
+          "[CHAT_INTERFACE] Selecting opaque chat with ID:",
+          opaqueChat._id,
+        );
+        chatActions.selectChat(opaqueChat._id);
+      }
+    }
+  }, [
+    chatByPublicId,
+    chatByShareId,
+    chatByOpaqueId,
+    currentChatId,
+    chatActions,
+    propPublicId,
+    propShareId,
+  ]);
+
   // Use deletion handlers hook for all deletion operations
   const {
     handleDeleteLocalChat,
