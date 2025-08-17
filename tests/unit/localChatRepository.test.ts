@@ -141,7 +141,10 @@ describe("LocalChatRepository (basic operations)", () => {
     vi.spyOn(global, "fetch").mockRejectedValue(new Error("Network down"));
     const res = await repo.shareChat(chatId, "shared");
     expect(res.shareId).toBeTruthy();
-    expect(res.shareId?.startsWith("s_")).toBe(true);
+    // UUID v7 format validation (8-4-4-4-12 hex characters)
+    expect(res.shareId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
 
     const raw = readJSON<any[]>(KEYS.CHATS);
     expect(raw).toBeDefined();
