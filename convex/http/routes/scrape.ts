@@ -27,6 +27,7 @@ import { httpAction } from "../../_generated/server";
 const { internal } = require("../../_generated/api") as any;
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
+import { isDevAction } from "../../lib/environment";
 
 /**
  * Register scrape routes on the HTTP router
@@ -86,9 +87,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
         const hostname = urlObj.hostname.toLowerCase();
 
         // Allow localhost in development mode for testing
-        const isDevelopment =
-          process.env.NODE_ENV === "development" ||
-          ((process.env.CONVEX_DEPLOYMENT || "").includes("dev") ?? false);
+        const isDevelopment = isDevAction();
 
         // Block localhost and loopback (except in development)
         if (
