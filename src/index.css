@@ -685,11 +685,11 @@ html.dark .message-textarea {
   .message-textarea {
     /* Prevent font boosting on iOS */
     -webkit-text-size-adjust: 100%;
-    /* Hardware acceleration */
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
-    /* Reduce repaints */
-    will-change: height;
+    /* REMOVED hardware acceleration - causes iOS Safari focus issues */
+    /* -webkit-transform: translateZ(0); */
+    /* transform: translateZ(0); */
+    /* REMOVED will-change - causes iOS Safari keyboard issues */
+    /* will-change: height; */
     /* Prevent rubber-band scrolling conflicts */
     -webkit-overflow-scrolling: touch;
   }

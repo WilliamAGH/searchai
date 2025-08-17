@@ -1,9 +1,21 @@
 /**
  * Message input textarea component
+ *
+ * CRITICAL iOS SAFARI REQUIREMENTS:
+ * - DO NOT use React key prop based on dynamic IDs (causes complete remount & keyboard loss)
+ * - DO NOT use setTimeout for focus operations (use requestAnimationFrame instead)
+ * - DO NOT apply hardware acceleration CSS (translateZ, will-change) to input elements
+ * - DO NOT auto-focus on iOS Safari (let users tap to focus)
+ *
+ * FEATURES:
  * - Auto-resizing textarea up to 200px
  * - Enter to send, Shift+Enter for newline
- * - Mobile-optimized with proper font sizing
+ * - Mobile-optimized with proper font sizing (16px+ to prevent zoom)
  * - Disabled state during generation
+ * - History navigation with arrow keys
+ *
+ * @see https://bugs.webkit.org/show_bug.cgi?id=195884 - iOS Safari focus issues
+ * @see https://developer.apple.com/forums/thread/128331 - Virtual keyboard management
  */
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -25,9 +37,16 @@ interface MessageInputProps {
 
 /**
  * Message input with auto-resize and keyboard shortcuts
+ *
+ * WARNING: This component is carefully tuned for iOS Safari compatibility.
+ * Before making changes, review the iOS Safari requirements above.
+ *
  * @param onSendMessage - Handler for message submission
- * @param disabled - Prevent input when true
+ * @param disabled - Prevent input when true (blocks all input)
+ * @param isGenerating - AI is generating (only affects submit button)
  * @param placeholder - Input placeholder text
+ * @param onDraftChange - Optional draft change callback
+ * @param history - Previous user messages for navigation
  */
 export function MessageInput({
   onSendMessage,
@@ -114,14 +133,15 @@ export function MessageInput({
           setMessage(next);
           onDraftChange?.(next);
         }
-        // Move caret to end after setting message (throttled)
-        setTimeout(() => {
+        // Move caret to end after setting message
+        // CRITICAL: Use requestAnimationFrame, NOT setTimeout for iOS Safari
+        requestAnimationFrame(() => {
           const el = textareaRef.current;
           if (el) {
             const len = el.value.length;
             el.setSelectionRange(len, len);
           }
-        }, 0);
+        });
         return;
       }
 
@@ -135,13 +155,13 @@ export function MessageInput({
           const next = history[idx] || "";
           setMessage(next);
           onDraftChange?.(next);
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             const el = textareaRef.current;
             if (el) {
               const len = el.value.length;
               el.setSelectionRange(len, len);
             }
-          }, 0);
+          });
         } else {
           // Exiting history mode -> restore draft
           const restore = draftBeforeHistory ?? "";
@@ -149,13 +169,13 @@ export function MessageInput({
           setDraftBeforeHistory(null);
           setMessage(restore);
           onDraftChange?.(restore);
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             const el = textareaRef.current;
             if (el) {
               const len = el.value.length;
               el.setSelectionRange(len, len);
             }
-          }, 0);
+          });
         }
         return;
       }
@@ -216,11 +236,26 @@ export function MessageInput({
     [historyIndex, onDraftChange],
   );
 
-  // Auto-focus management - focus when component mounts or becomes enabled
+  /**
+   * Auto-focus management
+   *
+   * CRITICAL iOS SAFARI HANDLING:
+   * - iOS Safari has strict focus policies for virtual keyboards
+   * - Auto-focus can cause keyboard to appear/disappear unexpectedly
+   * - We skip auto-focus on iOS Safari to prevent keyboard issues
+   * - Users must tap the input to focus on iOS devices
+   *
+   * Desktop browsers get auto-focus for better UX
+   */
   useEffect(() => {
-    // Skip focus on all mobile devices to prevent keyboard issues
-    const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile || disabled) return;
+    // Detect iOS Safari specifically (not Chrome/Firefox on iOS)
+    const isIOSSafari =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+      /WebKit/.test(navigator.userAgent) &&
+      !/CriOS|FxiOS|OPiOS|mercury/.test(navigator.userAgent);
+
+    // Skip focus if disabled
+    if (disabled) return;
 
     const el = textareaRef.current;
     if (!el) return;
@@ -238,15 +273,23 @@ export function MessageInput({
     };
 
     if (shouldFocus()) {
-      // Simple delayed focus to allow DOM to settle
-      const timer = setTimeout(() => {
-        try {
-          el.focus({ preventScroll: true });
-        } catch {
-          // Ignore errors
-        }
-      }, 100);
-      return () => clearTimeout(timer);
+      // Desktop browsers: Use requestAnimationFrame for smooth focus
+      // NEVER use setTimeout - causes race conditions on iOS
+      if (!isIOSSafari) {
+        const rafId = requestAnimationFrame(() => {
+          try {
+            el.focus({ preventScroll: true });
+          } catch {
+            // Silently ignore focus errors (user may have clicked elsewhere)
+          }
+        });
+        return () => cancelAnimationFrame(rafId);
+      }
+
+      // iOS Safari: Skip auto-focus completely
+      // Virtual keyboard management is handled by user taps only
+      // This prevents keyboard appearing/disappearing unexpectedly
+      return;
     }
   }, [disabled]);
 

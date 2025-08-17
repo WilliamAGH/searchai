@@ -164,7 +164,7 @@ export function ChatLayout({
               }}
             />
           )}
-          <MessageInput key={currentChatId} {...messageInputProps} />
+          <MessageInput {...messageInputProps} />
         </div>
       </div>
 
