@@ -8,8 +8,6 @@ import type { IChatRepository } from "./ChatRepository";
 import type {
   UnifiedChat,
   UnifiedMessage,
-  LocalChat,
-  LocalMessage,
   ChatResponse,
 } from "../types/unified";
 import type { StreamChunk } from "../types/stream";
@@ -140,7 +138,7 @@ export class LocalChatRepository implements IChatRepository {
   }
 
   // Message operations
-  async getMessages(chatId: string): Promise<LocalMessage[]> {
+  async getMessages(chatId: string): Promise<UnifiedMessage[]> {
     const stored = localStorage.getItem(MESSAGES_KEY);
     if (!stored) return [];
     const parsed = parseLocalMessages(stored) || [];
@@ -150,33 +148,47 @@ export class LocalChatRepository implements IChatRepository {
       .filter((m) => m.chatId === chatId)
       .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
-    // Map stored _id -> returned id shape expected by callers/tests
+    // Map stored _id -> UnifiedMessage.id and preserve provenance fields
     return filtered.map((m) => {
-      const { _id, ...rest } = m as unknown as {
+      const { _id, timestamp, ...rest } = m as unknown as {
         _id: string;
+        timestamp?: number;
         [key: string]: unknown;
       };
-      return { id: _id, ...rest } as unknown as LocalMessage;
+      return {
+        id: _id,
+        ...(rest as Omit<UnifiedMessage, "id">),
+        timestamp: timestamp ?? Date.now(),
+        source: "local",
+        synced: false,
+      } as UnifiedMessage;
     });
   }
 
-  private async getAllMessages(): Promise<LocalMessage[]> {
+  private async getAllMessages(): Promise<UnifiedMessage[]> {
     const stored = localStorage.getItem(MESSAGES_KEY);
     if (!stored) return [];
     const parsed = parseLocalMessages(stored) || [];
     return parsed.map((m) => {
-      const { _id, ...rest } = m as unknown as {
+      const { _id, timestamp, ...rest } = m as unknown as {
         _id: string;
+        timestamp?: number;
         [key: string]: unknown;
       };
-      return { id: _id, ...rest } as unknown as LocalMessage;
+      return {
+        id: _id,
+        ...(rest as Omit<UnifiedMessage, "id">),
+        timestamp: timestamp ?? Date.now(),
+        source: "local",
+        synced: false,
+      } as UnifiedMessage;
     });
   }
 
   async addMessage(
     chatId: string,
-    message: Partial<LocalMessage>,
-  ): Promise<LocalMessage> {
+    message: Partial<UnifiedMessage>,
+  ): Promise<UnifiedMessage> {
     const stored = localStorage.getItem(MESSAGES_KEY);
     const allRaw = stored ? parseLocalMessages(stored) || [] : [];
 
@@ -218,8 +230,17 @@ export class LocalChatRepository implements IChatRepository {
     }
 
     // Return API shape with id (mapped from _id)
-    const { _id, ...rest } = raw;
-    return { id: _id, ...rest } as unknown as LocalMessage;
+    const { _id, timestamp, ...rest } = raw as {
+      _id: string;
+      [k: string]: unknown;
+    };
+    return {
+      id: _id,
+      ...(rest as Omit<UnifiedMessage, "id">),
+      timestamp: (timestamp as number) ?? now,
+      source: "local",
+      synced: false,
+    } as UnifiedMessage;
   }
 
   async deleteMessage(id: string): Promise<void> {
@@ -234,7 +255,7 @@ export class LocalChatRepository implements IChatRepository {
 
   async updateMessage(
     id: string,
-    updates: Partial<LocalMessage>,
+    updates: Partial<UnifiedMessage>,
   ): Promise<void> {
     const stored = localStorage.getItem(MESSAGES_KEY);
     if (!stored) return;
@@ -242,7 +263,14 @@ export class LocalChatRepository implements IChatRepository {
     let changed = false;
     for (const msg of all) {
       if (msg._id === id) {
-        Object.assign(msg as unknown as Record<string, unknown>, updates);
+        const {
+          id: _ignoreId,
+          _id: _ignoreLegacyId,
+          chatId: _ignoreChatId,
+          _creationTime: _ignoreCreation,
+          ...safe
+        } = (updates || {}) as Record<string, unknown>;
+        Object.assign(msg as Record<string, unknown>, safe);
         changed = true;
         break;
       }
@@ -455,29 +483,143 @@ export class LocalChatRepository implements IChatRepository {
     return { shareId, publicId };
   }
 
-  // Helper methods for unified interface
-  toUnifiedChat(chat: LocalChat): UnifiedChat {
+  // Missing IChatRepository methods
+  async getChatByShareId(shareId: string): Promise<UnifiedChat | null> {
+    const stored = localStorage.getItem(CHATS_KEY);
+    if (!stored) return null;
+    const parsed = parseLocalChats(stored) || [];
+    const chat = parsed.find((c) => c.shareId === shareId);
+    if (!chat) return null;
+
     return {
-      ...chat,
-      _id: chat.id,
-      _creationTime: chat.createdAt,
-      userId: "local",
-      metadata: {},
+      id: chat._id,
+      title: chat.title,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      privacy: chat.privacy,
+      shareId: chat.shareId,
+      publicId: chat.publicId,
       source: "local",
       synced: false,
     };
   }
 
-  toUnifiedMessage(message: LocalMessage): UnifiedMessage {
+  async getChatByPublicId(publicId: string): Promise<UnifiedChat | null> {
+    const stored = localStorage.getItem(CHATS_KEY);
+    if (!stored) return null;
+    const parsed = parseLocalChats(stored) || [];
+    const chat = parsed.find((c) => c.publicId === publicId);
+    if (!chat) return null;
+
     return {
-      ...message,
-      _id: message.id,
-      _creationTime: message.timestamp,
-      userId: "local",
-      metadata: {},
+      id: chat._id,
+      title: chat.title,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      privacy: chat.privacy,
+      shareId: chat.shareId,
+      publicId: chat.publicId,
       source: "local",
       synced: false,
     };
+  }
+
+  async updateChatPrivacy(
+    id: string,
+    privacy: "private" | "shared" | "public",
+  ): Promise<void> {
+    const stored = localStorage.getItem(CHATS_KEY);
+    if (!stored) return;
+    const chats = parseLocalChats(stored) || [];
+    const chat = chats.find((c) => c._id === id);
+    if (chat) {
+      chat.privacy = privacy;
+      chat.updatedAt = Date.now();
+
+      // Generate share/public IDs if needed
+      if (privacy === "shared" && !chat.shareId) {
+        chat.shareId = `share_${nanoid()}`;
+      }
+      if (privacy === "public" && !chat.publicId) {
+        chat.publicId = `public_${nanoid()}`;
+      }
+
+      localStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+    }
+  }
+
+  async exportData(): Promise<{
+    chats: UnifiedChat[];
+    messages: UnifiedMessage[];
+  }> {
+    const chats = await this.getChats();
+    const messages = await this.getAllMessages();
+    return { chats, messages };
+  }
+
+  async importData(data: {
+    chats: UnifiedChat[];
+    messages: UnifiedMessage[];
+  }): Promise<void> {
+    // Convert UnifiedChat to LocalChat format for storage
+    const localChats = data.chats.map((chat) => ({
+      _id: chat.id,
+      title: chat.title || "Imported Chat",
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      privacy: chat.privacy,
+      shareId: chat.shareId,
+      publicId: chat.publicId,
+    }));
+
+    // Convert UnifiedMessage to local storage format
+    const localMessages = data.messages.map((msg) => ({
+      _id: msg.id,
+      chatId: msg.chatId,
+      role: msg.role,
+      content: msg.content,
+      timestamp: msg.timestamp || Date.now(),
+      searchResults: msg.searchResults,
+      sources: msg.sources,
+      reasoning: msg.reasoning,
+      searchMethod: msg.searchMethod,
+      hasRealResults: msg.hasRealResults,
+    }));
+
+    // Merge with existing data
+    const existingChatsStr = localStorage.getItem(CHATS_KEY);
+    const existingChats = existingChatsStr
+      ? parseLocalChats(existingChatsStr) || []
+      : [];
+    const existingMessagesStr = localStorage.getItem(MESSAGES_KEY);
+    const existingMessages = existingMessagesStr
+      ? parseLocalMessages(existingMessagesStr) || []
+      : [];
+
+    // Deduplicate by ID
+    const chatIds = new Set(existingChats.map((c) => c._id));
+    const newChats = localChats.filter((c) => !chatIds.has(c._id));
+
+    const messageIds = new Set(existingMessages.map((m) => m._id));
+    const newMessages = localMessages.filter((m) => !messageIds.has(m._id));
+
+    // Save merged data
+    localStorage.setItem(
+      CHATS_KEY,
+      JSON.stringify([...existingChats, ...newChats]),
+    );
+    localStorage.setItem(
+      MESSAGES_KEY,
+      JSON.stringify([...existingMessages, ...newMessages]),
+    );
+  }
+
+  isAvailable(): boolean {
+    return this.isStorageAvailable();
+  }
+
+  getStorageType(): "local" | "convex" | "hybrid" {
+    return "local";
   }
 
   // Implement abstract methods
