@@ -27,7 +27,7 @@ interface Props {
   /** Don't crash parent components */
   isolate?: boolean;
   /** Error boundary level for logging and display */
-  level?: 'page' | 'section' | 'component';
+  level?: "page" | "section" | "component";
 }
 
 /**
@@ -67,9 +67,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
-    this.state = { 
-      hasError: false, 
-      error: null, 
+    this.state = {
+      hasError: false,
+      error: null,
       errorInfo: null,
       errorCount: 0,
       retryCount: 0,
@@ -96,10 +96,10 @@ export class ErrorBoundary extends Component<Props, State> {
    * @param {React.ErrorInfo} errorInfo - React error information
    */
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    const { onError, level = 'component' } = this.props;
-    
+    const { onError, level = "component" } = this.props;
+
     // Track error count for circuit breaker pattern
-    this.setState(prev => ({
+    this.setState((prev) => ({
       errorInfo,
       errorCount: prev.errorCount + 1,
     }));
@@ -118,10 +118,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
     // Auto-retry logic for first 3 errors
     if (this.state.errorCount < 3 && !this.props.isolate) {
-      logger.info(`🔄 Auto-retrying in 5 seconds (attempt ${this.state.retryCount + 1}/3)`);
-      
+      logger.info(
+        `🔄 Auto-retrying in 5 seconds (attempt ${this.state.retryCount + 1}/3)`,
+      );
+
       this.retryTimeoutId = window.setTimeout(() => {
-        this.setState(prev => ({
+        this.setState((prev) => ({
           hasError: false,
           error: null,
           errorInfo: null,
@@ -131,11 +133,11 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     // Send to error tracking service (if configured)
-    if (typeof window !== 'undefined' && 'gtag' in window) {
+    if (typeof window !== "undefined" && "gtag" in window) {
       const w = window as unknown as { gtag: (...args: unknown[]) => void };
-      w.gtag('event', 'exception', {
+      w.gtag("event", "exception", {
         description: error.message,
-        fatal: level === 'page',
+        fatal: level === "page",
         error_count: this.state.errorCount + 1,
       });
     }
@@ -143,7 +145,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidUpdate(prevProps: Props) {
     const { resetKeys, resetOnPropsChange } = this.props;
-    
+
     // Reset on prop changes if requested
     if (resetOnPropsChange && prevProps.children !== this.props.children) {
       this.resetErrorBoundary();
@@ -215,8 +217,8 @@ export class ErrorBoundary extends Component<Props, State> {
                 Too many errors occurred
               </h3>
               <p className="text-red-700 dark:text-red-300 mb-4">
-                The application encountered multiple errors and cannot recover automatically.
-                Please refresh the page to try again.
+                The application encountered multiple errors and cannot recover
+                automatically. Please refresh the page to try again.
               </p>
               <button
                 onClick={() => window.location.reload()}

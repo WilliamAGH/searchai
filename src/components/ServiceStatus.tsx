@@ -3,10 +3,10 @@
  * Displays the current health status of all services
  */
 
-import React, { useEffect, useState } from 'react';
-import { serviceRegistry } from '../lib/services/ServiceConfig';
-import { healthCheckManager } from '../lib/services/HealthCheck';
-import { logger } from '../lib/logger';
+import React, { useEffect, useState } from "react";
+import { serviceRegistry } from "../lib/services/ServiceConfig";
+import { healthCheckManager } from "../lib/services/HealthCheck";
+import { logger } from "../lib/logger";
 
 interface ServiceStatusProps {
   /** Show detailed status information */
@@ -23,7 +23,7 @@ export const ServiceStatus: React.FC<ServiceStatusProps> = ({
   compact = false,
 }) => {
   const [systemHealth, setSystemHealth] = useState<{
-    status: 'healthy' | 'degraded' | 'critical';
+    status: "healthy" | "degraded" | "critical";
     services: Array<{
       name: string;
       status: string;
@@ -59,8 +59,8 @@ export const ServiceStatus: React.FC<ServiceStatusProps> = ({
       const status = healthCheckManager.getSystemStatus();
       setSystemHealth(status);
     } catch (error) {
-      logger.error('Failed to update service status', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      logger.error("Failed to update service status", {
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     } finally {
       setIsRefreshing(false);
@@ -77,29 +77,29 @@ export const ServiceStatus: React.FC<ServiceStatusProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy':
-        return 'text-green-500';
-      case 'degraded':
-        return 'text-yellow-500';
-      case 'unhealthy':
-      case 'critical':
-        return 'text-red-500';
+      case "healthy":
+        return "text-green-500";
+      case "degraded":
+        return "text-yellow-500";
+      case "unhealthy":
+      case "critical":
+        return "text-red-500";
       default:
-        return 'text-gray-500';
+        return "text-gray-500";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'healthy':
-        return '✓';
-      case 'degraded':
-        return '⚠';
-      case 'unhealthy':
-      case 'critical':
-        return '✗';
+      case "healthy":
+        return "✓";
+      case "degraded":
+        return "⚠";
+      case "unhealthy":
+      case "critical":
+        return "✗";
       default:
-        return '?';
+        return "?";
     }
   };
 
@@ -123,9 +123,7 @@ export const ServiceStatus: React.FC<ServiceStatusProps> = ({
         <span className="text-gray-600 dark:text-gray-400">
           System: {systemHealth.status}
         </span>
-        {isRefreshing && (
-          <span className="animate-spin">⟳</span>
-        )}
+        {isRefreshing && <span className="animate-spin">⟳</span>}
       </div>
     );
   }
@@ -142,7 +140,7 @@ export const ServiceStatus: React.FC<ServiceStatusProps> = ({
           className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           aria-label="Refresh status"
         >
-          <span className={isRefreshing ? 'animate-spin' : ''}>⟳</span>
+          <span className={isRefreshing ? "animate-spin" : ""}>⟳</span>
         </button>
       </div>
 
@@ -182,12 +180,13 @@ export const ServiceStatus: React.FC<ServiceStatusProps> = ({
             </div>
           ))}
           <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-            Last checked: {new Date(systemHealth.services[0]?.lastCheck).toLocaleTimeString()}
+            Last checked:{" "}
+            {new Date(systemHealth.services[0]?.lastCheck).toLocaleTimeString()}
           </div>
         </div>
       )}
 
-      {systemHealth.status !== 'healthy' && !detailed && (
+      {systemHealth.status !== "healthy" && !detailed && (
         <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
           <button
             onClick={() => window.location.reload()}
@@ -195,7 +194,7 @@ export const ServiceStatus: React.FC<ServiceStatusProps> = ({
           >
             Try refreshing the page
           </button>
-          {' if you experience issues.'}
+          {" if you experience issues."}
         </div>
       )}
     </div>
@@ -207,7 +206,9 @@ export const ServiceStatus: React.FC<ServiceStatusProps> = ({
  * Small indicator for displaying in headers/footers
  */
 export const ServiceStatusIndicator: React.FC = () => {
-  const [status, setStatus] = useState<'healthy' | 'degraded' | 'critical' | 'unknown'>('unknown');
+  const [status, setStatus] = useState<
+    "healthy" | "degraded" | "critical" | "unknown"
+  >("unknown");
 
   useEffect(() => {
     const updateStatus = () => {
@@ -226,22 +227,24 @@ export const ServiceStatusIndicator: React.FC = () => {
 
   const getIndicatorColor = () => {
     switch (status) {
-      case 'healthy':
-        return 'bg-green-500';
-      case 'degraded':
-        return 'bg-yellow-500';
-      case 'critical':
-        return 'bg-red-500';
+      case "healthy":
+        return "bg-green-500";
+      case "degraded":
+        return "bg-yellow-500";
+      case "critical":
+        return "bg-red-500";
       default:
-        return 'bg-gray-500';
+        return "bg-gray-500";
     }
   };
 
   return (
     <div className="flex items-center space-x-1">
-      <div className={`w-2 h-2 rounded-full ${getIndicatorColor()} animate-pulse`} />
+      <div
+        className={`w-2 h-2 rounded-full ${getIndicatorColor()} animate-pulse`}
+      />
       <span className="text-xs text-gray-600 dark:text-gray-400 capitalize">
-        {status === 'unknown' ? 'Checking...' : status}
+        {status === "unknown" ? "Checking..." : status}
       </span>
     </div>
   );
