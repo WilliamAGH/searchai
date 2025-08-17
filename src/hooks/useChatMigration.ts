@@ -21,8 +21,16 @@ export function useChatMigration(
   useEffect(() => {
     if (!repository || !isAuthenticated || hasMigratedRef.current) return;
 
+    /**
+     * IMPORTANT: Check storage type using the getStorageType() METHOD, not a property
+     * The IChatRepository interface defines getStorageType() as a method that returns
+     * "local" | "convex" | "hybrid". Direct property access (repository.storageType)
+     * will cause a TypeScript compilation error.
+     *
+     * @see IChatRepository.getStorageType() in src/lib/repositories/ChatRepository.ts:63
+     */
     // Only migrate if we're using Convex repository
-    if (repository.storageType !== "convex") return;
+    if (repository.getStorageType() !== "convex") return;
 
     const migrate = async () => {
       try {
