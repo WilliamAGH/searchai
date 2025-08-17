@@ -916,7 +916,25 @@ export const generationStep = internalAction({
 
       // Add search results info to reasoning only in development mode
       if (isDevelopment && aggregated.length > 0) {
-        accumulatedReasoning += `\nFound ${aggregated.length} search results. Using top ${Math.min(TOP_RESULTS, aggregated.length)} for context.\n`;
+        accumulatedReasoning += `\nFound ${aggregated.length} search results. Using top ${Math.min(TOP_RESULTS, aggregated.length)} for context.\n\nProcessing search results:\n`;
+        
+        // Show scraping progress for each result
+        for (let i = 0; i < Math.min(TOP_RESULTS, aggregated.length); i++) {
+          const result = aggregated[i];
+          // Extract domain for display
+          let domain = "";
+          try {
+            const url = new URL(result.url);
+            domain = url.hostname.replace("www.", "");
+          } catch {
+            domain = "source";
+          }
+          accumulatedReasoning += `  ${i + 1}. [${domain}] ${result.title}\n`;
+          if (result.snippet) {
+            accumulatedReasoning += `     → Extracting: "${result.snippet.substring(0, 80)}..."\n`;
+          }
+        }
+        accumulatedReasoning += `\nContext synthesis complete. Building response...\n`;
       }
 
       // 6. Start streaming generation
@@ -1016,7 +1034,14 @@ export const watchdogEnsureGeneration = internalAction({
  */
 function buildSystemPrompt(args: {
   context: string;
-  searchResults: Array<{ title: string; url: string; snippet: string }>;
+  searchResults: Array<{ 
+    title: string; 
+    url: string; 
+    snippet: string;
+    content?: string;
+    fullTitle?: string;
+    summary?: string;
+  }>;
   enhancedInstructions: string;
 }): string {
   const { context, searchResults, enhancedInstructions } = args;
@@ -1028,13 +1053,36 @@ function buildSystemPrompt(args: {
     prompt += `## Conversation Context\n${context}\n\n`;
   }
 
-  // Add search results if available
+  // Add search results if available - INCLUDING SCRAPED CONTENT
   if (searchResults && searchResults.length > 0) {
-    prompt += `## Search Results\n`;
+    prompt += `## Search Results with Full Content\n`;
     searchResults.forEach((result, i) => {
-      prompt += `${i + 1}. **${result.title}**\n`;
+      // Extract domain for citation reference
+      let domain = "";
+      try {
+        const url = new URL(result.url);
+        domain = url.hostname.replace("www.", "");
+      } catch {
+        const match = result.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
+        domain = match ? match[1] : "source";
+      }
+      
+      prompt += `${i + 1}. **${result.fullTitle || result.title}** [${domain}]\n`;
       prompt += `   URL: ${result.url}\n`;
-      prompt += `   ${result.snippet}\n\n`;
+      
+      // CRITICAL FIX: Include scraped content when available
+      if (result.content) {
+        // Limit content to prevent context overflow (2000 chars per result)
+        const maxContentLength = 2000;
+        const truncatedContent = result.content.length > maxContentLength
+          ? result.content.slice(0, maxContentLength) + "..."
+          : result.content;
+        prompt += `   Full Content: ${truncatedContent}\n\n`;
+      } else if (result.summary) {
+        prompt += `   Summary: ${result.summary}\n\n`;
+      } else {
+        prompt += `   Snippet: ${result.snippet}\n\n`;
+      }
     });
   }
 
@@ -1061,6 +1109,9 @@ async function streamResponseToMessage(args: {
     url: string;
     snippet: string;
     relevanceScore: number;
+    content?: string;
+    fullTitle?: string;
+    summary?: string;
   }>;
   model: string;
   existingReasoning?: string;
@@ -1130,10 +1181,8 @@ async function streamResponseToMessage(args: {
       if (chunk.choices?.[0]?.delta?.content) {
         const newContent = chunk.choices[0].delta.content;
 
-        // Add to reasoning to show we're processing the response
-        if (chunkCount === 1 && !chunk.choices?.[0]?.delta?.reasoning) {
-          accumulatedReasoning += `\n[Composing response]\n`;
-        }
+        // Don't add any text to reasoning when starting content streaming
+        // The UI handles the thinking/streaming status display
         accumulatedContent += newContent;
 
         // Log first few chunks for debugging
