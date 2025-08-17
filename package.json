@@ -44,12 +44,7 @@
     "prepare": "husky",
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
     "lint:convex-types": "node scripts/lint-convex-types.mjs",
-    "lint:convex-strict": "oxlint -c .oxlintrc.convex.json convex/**/*.ts",
-    "lint:clean": "node scripts/lint-clean.js",
-    "check:convex-types": "node scripts/check-convex-types.mjs",
-    "check:env-vars": "node scripts/check-env-usage.mjs",
-    "check:convex-watch": "nodemon --watch convex --watch src --ext ts,tsx --exec 'npm run check:convex-types'",
-    "validate:convex": "npm-run-all --parallel lint:convex-strict check:convex-types typecheck"
+    "check:env-vars": "node scripts/check-env-vars.js"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.7",
