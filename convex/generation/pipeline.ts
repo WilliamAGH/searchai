@@ -907,9 +907,13 @@ export const generationStep = internalAction({
             deduped.push(item);
           }
         }
-        aggregated = deduped.sort(
-          (a, b) => b.relevanceScore - a.relevanceScore,
-        );
+        aggregated = deduped.sort((a, b) => {
+          const score = (r: { relevanceScore?: number }) =>
+            Number.isFinite(r?.relevanceScore)
+              ? (r!.relevanceScore as number)
+              : 1_000_000;
+          return score(b) - score(a);
+        });
       }
 
       // 5. Build system prompt with context and search results
