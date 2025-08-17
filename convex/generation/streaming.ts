@@ -37,8 +37,12 @@ export { normalizeUrlForKey } from "../lib/url";
  * @param body - OpenRouter API request body
  * @yields Parsed JSON chunks from stream
  */
-export async function* streamOpenRouter(body: OpenRouterBody) {
-  if (process.env.DEBUG_OPENROUTER)
+export async function* streamOpenRouter(
+  body: OpenRouterBody,
+  opts: { apiKey: string; siteUrl?: string; siteTitle?: string; debug?: boolean },
+) {
+  const { apiKey, siteUrl, siteTitle, debug } = opts;
+  if (debug)
     console.info("🔄 OpenRouter streaming request initiated:", {
       model: body.model,
       messageCount: body.messages.length,
@@ -47,12 +51,12 @@ export async function* streamOpenRouter(body: OpenRouterBody) {
     });
 
   try {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    console.info("🔑 OpenRouter API Key check:", {
-      hasKey: !!apiKey,
-      keyLength: apiKey ? apiKey.length : 0,
-      keyPrefix: apiKey ? apiKey.substring(0, 10) + "..." : "missing",
-    });
+    if (debug)
+      console.info("🔑 OpenRouter API Key check:", {
+        hasKey: !!apiKey,
+        keyLength: apiKey ? apiKey.length : 0,
+        keyPrefix: apiKey ? apiKey.substring(0, 10) + "..." : "missing",
+      });
 
     if (!apiKey) {
       throw new Error("Missing OPENROUTER_API_KEY; cannot call OpenRouter.");
@@ -65,18 +69,14 @@ export async function* streamOpenRouter(body: OpenRouterBody) {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
           Accept: "text/event-stream",
-          ...(process.env.SITE_URL
-            ? { "HTTP-Referer": process.env.SITE_URL }
-            : {}),
-          ...(process.env.SITE_TITLE
-            ? { "X-Title": process.env.SITE_TITLE }
-            : {}),
+          ...(siteUrl ? { "HTTP-Referer": siteUrl } : {}),
+          ...(siteTitle ? { "X-Title": siteTitle } : {}),
         },
         body: JSON.stringify({ ...body, stream: true }),
       },
     );
 
-    if (process.env.DEBUG_OPENROUTER)
+    if (debug)
       console.info("🌐 OpenRouter response status:", {
         status: response.status,
         statusText: response.statusText,
@@ -118,14 +118,12 @@ export async function* streamOpenRouter(body: OpenRouterBody) {
             if (line.startsWith("data: ")) {
               const data = line.slice(6);
               if (data === "[DONE]") {
-                if (process.env.DEBUG_OPENROUTER)
-                  console.info("✅ OpenRouter stream completed");
+                if (debug) console.info("✅ OpenRouter stream completed");
                 return;
               }
               try {
                 const parsedData = JSON.parse(data);
-                if (process.env.DEBUG_OPENROUTER)
-                  console.info("📦 Final chunk from buffer:", parsedData);
+                if (debug) console.info("📦 Final chunk from buffer:", parsedData);
                 yield parsedData;
               } catch (parseError) {
                 console.error(
@@ -152,16 +150,12 @@ export async function* streamOpenRouter(body: OpenRouterBody) {
           if (line.startsWith("data: ")) {
             const data = line.slice(6);
             if (data === "[DONE]") {
-              if (process.env.DEBUG_OPENROUTER)
-                console.info("✅ OpenRouter stream completed");
+              if (debug) console.info("✅ OpenRouter stream completed");
               return;
             }
             try {
               const parsedData = JSON.parse(data);
-              if (
-                process.env.DEBUG_OPENROUTER &&
-                parsedData.choices?.[0]?.delta?.content
-              ) {
+              if (debug && parsedData.choices?.[0]?.delta?.content) {
                 console.info(
                   "📦 Chunk content:",
                   parsedData.choices[0].delta.content,

@@ -1169,7 +1169,12 @@ async function streamResponseToMessage(args: {
     console.info("📡 Starting OpenRouter stream...");
 
     // Stream from OpenRouter
-    for await (const chunk of streamOpenRouter(body)) {
+    for await (const chunk of streamOpenRouter(body, {
+      apiKey: process.env.OPENROUTER_API_KEY || "",
+      siteUrl: process.env.SITE_URL || undefined,
+      siteTitle: process.env.SITE_TITLE || undefined,
+      debug: process.env.DEBUG_OPENROUTER === "1",
+    })) {
       chunkCount++;
 
       // Handle reasoning/thinking content from models that support it
