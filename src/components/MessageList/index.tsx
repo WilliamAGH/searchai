@@ -59,6 +59,7 @@ interface MessageListProps {
     // Real-time messages from subscription (loosely typed on purpose)
     messages?: ReadonlyArray<unknown>;
   };
+  isReadOnly?: boolean;
 }
 
 /**
@@ -128,6 +129,7 @@ export const MessageList = React.memo(function MessageList({
   onClearError,
   // NEW: Add streaming state
   streamingState,
+  isReadOnly = false,
 }: MessageListProps) {
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -420,6 +422,7 @@ export const MessageList = React.memo(function MessageList({
                   onDeleteMessage={handleDeleteMessage}
                   onSourceHover={setHoveredSourceUrl}
                   onCitationHover={setHoveredCitationUrl}
+                  isReadOnly={isReadOnly}
                 />
               )}
             />
@@ -463,6 +466,7 @@ export const MessageList = React.memo(function MessageList({
                     onDeleteMessage={handleDeleteMessage}
                     onSourceHover={setHoveredSourceUrl}
                     onCitationHover={setHoveredCitationUrl}
+                    isReadOnly={isReadOnly}
                   />
                 );
               })

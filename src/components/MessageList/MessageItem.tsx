@@ -22,6 +22,7 @@ interface MessageItemProps {
   onDeleteMessage: (messageId: Id<"messages"> | string | undefined) => void;
   onSourceHover: (url: string | null) => void;
   onCitationHover: (url: string | null) => void;
+  isReadOnly?: boolean;
 }
 
 // Memoized MessageItem to prevent unnecessary re-renders during streaming
@@ -36,6 +37,7 @@ export const MessageItem = React.memo(
     onDeleteMessage,
     onSourceHover,
     onCitationHover,
+    isReadOnly = false,
   }: MessageItemProps) {
     const mountTimeRef = React.useRef<number>(Date.now());
     const safeTimestamp =
@@ -196,7 +198,7 @@ export const MessageItem = React.memo(
                 title="Copy message"
                 ariaLabel="Copy message to clipboard"
               />
-              {message._id && (
+              {message._id && !isReadOnly && (
                 <button
                   type="button"
                   onClick={handleDeleteClick}
