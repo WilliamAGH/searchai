@@ -153,9 +153,11 @@ export function safeFocus(
 
   // Skip focus on iOS Safari unless explicitly allowed
   if (!options?.skipIOSSafari && isIOSSafari()) {
-    console.warn(
-      "[iOS Safari] Focus operation skipped to prevent keyboard crash",
-    );
+    if (import.meta.env.DEV) {
+      console.warn(
+        "[iOS Safari] Focus operation skipped to prevent keyboard crash",
+      );
+    }
     return false;
   }
 
@@ -164,7 +166,9 @@ export function safeFocus(
       element.focus({ preventScroll: options?.preventScroll });
       return true;
     } catch (e) {
-      console.error("[Focus] Error focusing element:", e);
+      if (import.meta.env.DEV) {
+        console.error("[Focus] Error focusing element:", e);
+      }
       return false;
     }
   };
@@ -214,9 +218,11 @@ export function safeSelect(
 
   // Skip select on iOS Safari to prevent keyboard issues
   if (isIOSSafari()) {
-    console.warn(
-      "[iOS Safari] Select operation skipped to prevent keyboard crash",
-    );
+    if (import.meta.env.DEV) {
+      console.warn(
+        "[iOS Safari] Select operation skipped to prevent keyboard crash",
+      );
+    }
     return false;
   }
 
@@ -224,7 +230,9 @@ export function safeSelect(
     element.select();
     return true;
   } catch (e) {
-    console.error("[Select] Error selecting element:", e);
+    if (import.meta.env.DEV) {
+      console.error("[Select] Error selecting element:", e);
+    }
     return false;
   }
 }

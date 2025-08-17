@@ -53,6 +53,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { isIOSSafari } from "../lib/utils/ios";
 
 interface MessageInputProps {
   /** Callback when message is sent */
@@ -93,7 +94,9 @@ export function MessageInput({
   const MAX_TEXTAREA_HEIGHT = 200;
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // (padding centering cache removed; no longer needed)
+  // Track IME composition state for Japanese/Chinese keyboards
+  const [isComposing, setIsComposing] = useState(false);
+  const compositionTimeoutRef = useRef<number | null>(null);
   // Track navigation through history (index into `history`), null when not navigating
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   // Preserve current draft when entering history navigation so it can be restored
@@ -105,17 +108,63 @@ export function MessageInput({
    * Handle form submission
    * - Trims whitespace
    * - Clears input after send
+   * - iOS Safari: Uses blur → clear → refocus pattern to prevent keyboard crash
    */
   const sendCurrentMessage = React.useCallback(() => {
+    // Don't send if IME composition is in progress
+    if (isComposing) return;
+
     const trimmed = message.trim();
     if (trimmed && !disabled && !isGenerating) {
       onSendMessage(trimmed);
-      setMessage("");
-      onDraftChange?.("");
-      setHistoryIndex(null);
-      setDraftBeforeHistory(null);
+
+      // CRITICAL iOS Safari Fix: Implement blur → clear → refocus pattern
+      // This prevents React bug #26805 which causes keyboard corruption
+      const textarea = textareaRef.current;
+      const needsSafeClearing =
+        isIOSSafari() && textarea && document.activeElement === textarea;
+
+      if (needsSafeClearing) {
+        // Step 1: Blur the textarea to dismiss keyboard cleanly
+        textarea.blur();
+
+        // Step 2: Clear the value after a brief delay
+        // Using double RAF for maximum stability (more reliable than setTimeout)
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setMessage("");
+            onDraftChange?.("");
+            setHistoryIndex(null);
+            setDraftBeforeHistory(null);
+
+            // Step 3: Optionally refocus after clearing (disabled for iOS Safari)
+            // Refocusing can still cause issues, so we let the user tap to focus
+            // If you want to try refocusing, uncomment the following:
+            /*
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                safeFocus(textarea, { preventScroll: true, skipIOSSafari: false });
+              });
+            });
+            */
+          });
+        });
+      } else {
+        // Non-iOS Safari: Clear immediately as normal
+        setMessage("");
+        onDraftChange?.("");
+        setHistoryIndex(null);
+        setDraftBeforeHistory(null);
+      }
     }
-  }, [message, disabled, isGenerating, onSendMessage, onDraftChange]);
+  }, [
+    message,
+    disabled,
+    isGenerating,
+    isComposing,
+    onSendMessage,
+    onDraftChange,
+  ]);
 
   const handleSubmit = React.useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -126,13 +175,39 @@ export function MessageInput({
   );
 
   /**
+   * Handle composition start for IME (Input Method Editor) inputs
+   * Used for Japanese, Chinese, Korean, and other complex input methods
+   */
+  const handleCompositionStart = React.useCallback(() => {
+    setIsComposing(true);
+    // Clear any previous timeout to prevent race conditions
+    if (compositionTimeoutRef.current !== null) {
+      clearTimeout(compositionTimeoutRef.current);
+      compositionTimeoutRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Handle composition end for IME inputs
+   * Includes a safety timeout for iOS Safari which sometimes doesn't fire compositionend
+   */
+  const handleCompositionEnd = React.useCallback(() => {
+    // Use a timeout as iOS Safari sometimes has delayed composition events
+    compositionTimeoutRef.current = window.setTimeout(() => {
+      setIsComposing(false);
+      compositionTimeoutRef.current = null;
+    }, 100);
+  }, []);
+
+  /**
    * Handle keyboard shortcuts
    * - Enter: send message
    * - Shift+Enter: newline
    */
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.isComposing) return; // avoid sending mid-IME composition
+      // Check both React's isComposing and our state for maximum compatibility
+      if (e.isComposing || isComposing) return; // avoid sending mid-IME composition
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         sendCurrentMessage();
@@ -221,6 +296,7 @@ export function MessageInput({
       message,
       onDraftChange,
       draftBeforeHistory,
+      isComposing,
     ],
   );
 
@@ -231,10 +307,7 @@ export function MessageInput({
     if (!ta) return;
 
     // iOS Safari fix: Prevent excessive reflows during keyboard interaction
-    const isIOSSafari =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-      /WebKit/.test(navigator.userAgent) &&
-      !/CriOS|FxiOS|OPiOS|mercury/.test(navigator.userAgent);
+    const isiOS = isIOSSafari();
 
     // Direct DOM operations without RAF
     ta.style.height = "auto";
@@ -247,7 +320,7 @@ export function MessageInput({
     }
 
     // iOS Safari specific optimization: Avoid height adjustments when keyboard is likely active
-    if (isIOSSafari) {
+    if (isiOS) {
       // On iOS, viewport height changes when keyboard is opened, so we skip
       // height adjustments if the viewport is smaller than expected
       const expectedHeight = window.screen.height;
@@ -263,6 +336,15 @@ export function MessageInput({
 
   // REMOVED: First focus management block - consolidating to single focus handler
 
+  // Cleanup composition timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (compositionTimeoutRef.current !== null) {
+        clearTimeout(compositionTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // iOS Safari fix: Enhanced textarea adjustment with mobile-specific handling
   useEffect(() => {
     adjustTextarea();
@@ -273,13 +355,10 @@ export function MessageInput({
     let timeoutId: number | null = null;
 
     // Skip resize handling on mobile iOS Safari to prevent keyboard conflicts
-    const isIOSSafari =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-      /WebKit/.test(navigator.userAgent) &&
-      !/CriOS|FxiOS|OPiOS|mercury/.test(navigator.userAgent);
+    const isiOS = isIOSSafari();
 
     const handler = () => {
-      if (isIOSSafari) {
+      if (isiOS) {
         // On iOS Safari, delay resize handling to avoid conflicts with virtual keyboard
         if (timeoutId) clearTimeout(timeoutId);
         timeoutId = window.setTimeout(() => {
@@ -338,10 +417,7 @@ export function MessageInput({
    */
   useEffect(() => {
     // Detect iOS Safari specifically (not Chrome/Firefox on iOS)
-    const isIOSSafari =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-      /WebKit/.test(navigator.userAgent) &&
-      !/CriOS|FxiOS|OPiOS|mercury/.test(navigator.userAgent);
+    const isiOS = isIOSSafari();
 
     // Skip focus if disabled
     if (disabled) return;
@@ -364,7 +440,7 @@ export function MessageInput({
     if (shouldFocus()) {
       // Desktop browsers: Use requestAnimationFrame for smooth focus
       // NEVER use setTimeout - causes race conditions on iOS
-      if (!isIOSSafari) {
+      if (!isiOS) {
         const rafId = requestAnimationFrame(() => {
           try {
             el.focus({ preventScroll: true });
@@ -392,6 +468,8 @@ export function MessageInput({
               value={message}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
               placeholder={placeholder}
               aria-label="Message input"
               disabled={disabled}
