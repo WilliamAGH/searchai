@@ -120,7 +120,7 @@ export const MessageItem = React.memo(
               <div className="mb-3">
                 <span className="text-sm text-gray-500 dark:text-gray-400 italic">
                   {message.thinking || "Processing"}
-                  <span className="inline-flex ml-0.5">
+                  <span className="inline-flex ml-1">
                     <span className="animate-ellipsis-dot">.</span>
                     <span className="animate-ellipsis-dot animation-delay-200">
                       .

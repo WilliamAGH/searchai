@@ -216,7 +216,7 @@ export function MessageInput({
     [historyIndex, onDraftChange],
   );
 
-  // Single focus management - simplified for Safari
+  // Auto-focus management - focus when component mounts or becomes enabled
   useEffect(() => {
     // Skip focus on all mobile devices to prevent keyboard issues
     const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
@@ -225,9 +225,20 @@ export function MessageInput({
     const el = textareaRef.current;
     if (!el) return;
 
-    // Only focus on desktop if nothing else is focused
-    if (document.activeElement === document.body) {
-      // Simple delayed focus without complex checks
+    // Focus if nothing else has focus, or if focus is on body/non-input element
+    const shouldFocus = () => {
+      const active = document.activeElement;
+      if (!active || active === document.body) return true;
+
+      // Don't steal focus from other inputs or textareas
+      const tagName = active.tagName.toLowerCase();
+      return (
+        tagName !== "input" && tagName !== "textarea" && tagName !== "select"
+      );
+    };
+
+    if (shouldFocus()) {
+      // Simple delayed focus to allow DOM to settle
       const timer = setTimeout(() => {
         try {
           el.focus({ preventScroll: true });
