@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { logger } from "../lib/logger";
 import type { Id } from "../../convex/_generated/dataModel";
-import { isConvexId } from "../lib/utils/id";
+import { isConvexId, isConvexMessageId } from "../lib/utils/id";
 
 interface UseDeletionHandlersProps {
   chatState: {
@@ -204,8 +204,7 @@ export function useDeletionHandlers({
         // Validate the message ID before casting
         let convexMessageId: Id<"messages">;
         if (typeof messageId === "string") {
-          // Import isConvexMessageId for validation
-          const { isConvexMessageId } = await import("../lib/utils/id");
+          // Use statically imported isConvexMessageId for validation
           if (!isConvexMessageId(messageId)) {
             logger.warn("Invalid message ID for deletion:", { messageId });
             setUndoBanner({
