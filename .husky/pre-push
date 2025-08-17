@@ -130,7 +130,20 @@ if ! PLAYWRIGHT_RUNTIME=proxy npm run test:playwright:headless > "$PLAYWRIGHT_LO
   exit 1
 fi
 
-# 6. Check for common issues
+# 6. Check environment variable usage patterns
+echo "🔍 Checking environment variable usage patterns..."
+ENV_CHECK_LOG="$(mktemp -t env-check.XXXXXX.log)"
+if ! npm run check:env-vars > "$ENV_CHECK_LOG" 2>&1; then
+  echo "❌ Environment variable usage validation failed!"
+  echo "📄 Full log: $ENV_CHECK_LOG"
+  echo ""
+  cat "$ENV_CHECK_LOG"
+  echo ""
+  echo "💡 Fix these issues before pushing"
+  exit 1
+fi
+
+# 7. Check for common issues
 echo "🔍 Checking for common issues..."
 
 # Check for console.logs in production code (ignore comments/tests/generated)
@@ -151,4 +164,4 @@ fi
 echo "✅ All pre-push checks passed! Safe to push."
 
 # Clean up temp files
-rm -f "$FULL_BUILD_LOG" "$MAIN_TSC_LOG" "$CONVEX_TSC_LOG" "$CONVEX_LOG" "$VITEST_LOG" "$PLAYWRIGHT_LOG"
+rm -f "$FULL_BUILD_LOG" "$MAIN_TSC_LOG" "$CONVEX_TSC_LOG" "$CONVEX_LOG" "$VITEST_LOG" "$PLAYWRIGHT_LOG" "$ENV_CHECK_LOG"

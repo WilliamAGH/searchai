@@ -98,10 +98,17 @@ if [ $CONVEX_TSC -ne 0 ]; then
   exit 1
 fi
 
-# Warn (do not fail) on process.env mentions in Convex source (Convex prefers ctx.env.get)
-if grep -R -nE '\bprocess\.env\b' --include='*.ts' convex/ >/dev/null 2>&1; then
-  echo "⚠️  Note: Found process.env usage in convex/ (prefer ctx.env.get('KEY'))."
-  grep -R -nE '\bprocess\.env\b' --include='*.ts' convex/ | head -5
+# Check environment variable usage patterns
+echo "🔍 Checking environment variable usage patterns..."
+set +e
+npm run check:env-vars > /tmp/env-check.log 2>&1
+ENV_CHECK=$?
+set -e
+if [ $ENV_CHECK -ne 0 ]; then
+  echo "⚠️  Environment variable usage issues detected:"
+  cat /tmp/env-check.log
+  # Don't fail on pre-commit, just warn
+  echo "💡 Note: Fix these patterns for better code consistency"
 fi
 
 # 4. Lint staged files (auto-fix issues)
