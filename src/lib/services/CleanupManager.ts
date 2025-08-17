@@ -2,9 +2,14 @@
  * Cleanup Manager
  * Manages resource cleanup and memory management
  * Prevents memory leaks by tracking and cleaning up resources
+ *
+ * @note Works in both Node.js and browser environments. Uses ReturnType<typeof setInterval>
+ * for timer typing to ensure compatibility across environments, as NodeJS.Timeout
+ * type is not available in browsers.
  */
 
 import { logger } from "../logger";
+import React from "react";
 
 type CleanupFunction = () => void | Promise<void>;
 type ResourceType =
@@ -34,7 +39,7 @@ export class CleanupManager {
   private resourceCounters: Map<ResourceType, number> = new Map();
   private cleanupQueue: Set<string> = new Set();
   private isCleaningUp: boolean = false;
-  private memoryMonitorInterval: NodeJS.Timeout | null = null;
+  private memoryMonitorInterval: ReturnType<typeof setInterval> | null = null;
 
   private constructor() {
     this.initializeMemoryMonitoring();
@@ -177,6 +182,8 @@ export class CleanupManager {
 
   /**
    * Cleanup all tracked resources
+   * @note Uses try/finally to ensure isCleaningUp flag is always reset,
+   * preventing the cleanup from getting stuck if an error occurs
    */
   async cleanupAll(): Promise<void> {
     if (this.isCleaningUp) {
@@ -185,47 +192,49 @@ export class CleanupManager {
     }
 
     this.isCleaningUp = true;
-    const totalResources = this.resources.size;
+    try {
+      const totalResources = this.resources.size;
 
-    if (totalResources === 0) {
-      logger.info("No resources to cleanup");
-      this.isCleaningUp = false;
-      return;
-    }
-
-    logger.info(`Starting cleanup of ${totalResources} resources`);
-
-    // Create array of all resources
-    const allResources = Array.from(this.resources.values());
-
-    // Group by type for organized cleanup
-    const byType = new Map<ResourceType, TrackedResource[]>();
-    for (const resource of allResources) {
-      const typeResources = byType.get(resource.type) || [];
-      typeResources.push(resource);
-      byType.set(resource.type, typeResources);
-    }
-
-    // Cleanup in order of priority
-    const cleanupOrder: ResourceType[] = [
-      "stream",
-      "worker",
-      "subscription",
-      "eventListener",
-      "timer",
-      "other",
-    ];
-
-    for (const type of cleanupOrder) {
-      const resources = byType.get(type) || [];
-      if (resources.length > 0) {
-        logger.info(`Cleaning up ${resources.length} ${type} resources`);
-        await Promise.all(resources.map((r) => this.unregister(r.id)));
+      if (totalResources === 0) {
+        logger.info("No resources to cleanup");
+        return;
       }
-    }
 
-    logger.info(`Cleanup completed. Cleaned up ${totalResources} resources`);
-    this.isCleaningUp = false;
+      logger.info(`Starting cleanup of ${totalResources} resources`);
+
+      // Create array of all resources
+      const allResources = Array.from(this.resources.values());
+
+      // Group by type for organized cleanup
+      const byType = new Map<ResourceType, TrackedResource[]>();
+      for (const resource of allResources) {
+        const typeResources = byType.get(resource.type) || [];
+        typeResources.push(resource);
+        byType.set(resource.type, typeResources);
+      }
+
+      // Cleanup in order of priority
+      const cleanupOrder: ResourceType[] = [
+        "stream",
+        "worker",
+        "subscription",
+        "eventListener",
+        "timer",
+        "other",
+      ];
+
+      for (const type of cleanupOrder) {
+        const resources = byType.get(type) || [];
+        if (resources.length > 0) {
+          logger.info(`Cleaning up ${resources.length} ${type} resources`);
+          await Promise.all(resources.map((r) => this.unregister(r.id)));
+        }
+      }
+
+      logger.info(`Cleanup completed. Cleaned up ${totalResources} resources`);
+    } finally {
+      this.isCleaningUp = false;
+    }
   }
 
   /**
@@ -398,6 +407,8 @@ export const cleanupManager = CleanupManager.getInstance();
 
 /**
  * React hook for automatic cleanup
+ * @note Properly handles async cleanup by catching errors to prevent
+ * unhandled rejections during component unmount
  */
 export function useCleanup(component: string) {
   const scope = React.useRef<CleanupScope | null>(null);
@@ -407,7 +418,11 @@ export function useCleanup(component: string) {
 
     return () => {
       if (scope.current) {
-        scope.current.cleanup();
+        void scope.current.cleanup().catch((err) => {
+          logger.error("Cleanup scope failed during unmount", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
       }
     };
   }, []);
@@ -428,6 +443,3 @@ export function useCleanup(component: string) {
     },
   };
 }
-
-// Import React for the hook
-import React from "react";
