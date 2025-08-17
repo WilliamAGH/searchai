@@ -2,12 +2,14 @@ import React, { useRef, useEffect, useMemo } from "react";
 import type { Message } from "../../lib/types/message";
 import { getMessageKey } from "../../lib/utils/messageKeys";
 
+// Group size constant for chunking messages
+const GROUP_SIZE = 10;
+
 export interface VirtualizedMessageListProps {
   messages: Message[];
   renderItem: (message: Message, index: number) => React.ReactNode;
   className?: string;
   estimatedItemHeight?: number;
-  overscan?: number;
 }
 
 /**
@@ -25,10 +27,9 @@ export function VirtualizedMessageList({
   // Group messages for better performance
   const messageGroups = useMemo(() => {
     const groups: Message[][] = [];
-    const groupSize = 10; // Render in chunks of 10
 
-    for (let i = 0; i < messages.length; i += groupSize) {
-      groups.push(messages.slice(i, i + groupSize));
+    for (let i = 0; i < messages.length; i += GROUP_SIZE) {
+      groups.push(messages.slice(i, i + GROUP_SIZE));
     }
 
     return groups;
@@ -69,23 +70,12 @@ export function VirtualizedMessageList({
           }}
         >
           {group.map((message, index) => {
-            const actualIndex = groupIndex * 10 + index;
+            const actualIndex = groupIndex * GROUP_SIZE + index;
             const messageKey = getMessageKey(message, actualIndex);
-            const safeKey =
-              messageKey ||
-              `fallback-${actualIndex}-${Date.now().toString(36)}`;
-
-            if (!messageKey && import.meta.env.DEV) {
-              console.error("[KEY] VirtualizedList: Message has no key!", {
-                message,
-                actualIndex,
-                _id: message._id,
-              });
-            }
 
             return (
               <div
-                key={safeKey}
+                key={messageKey}
                 className="message-item"
                 data-message-index={actualIndex}
               >
@@ -105,7 +95,13 @@ export function VirtualizedMessageList({
 export function useSupportsContentVisibility(): boolean {
   return useMemo(() => {
     if (typeof window === "undefined") return false;
-    return CSS.supports("content-visibility", "auto");
+    // Guard CSS existence for older/quirky browsers
+    const supports = (
+      window as unknown as {
+        CSS?: { supports?: (prop: string, value: string) => boolean };
+      }
+    ).CSS?.supports?.("content-visibility", "auto");
+    return Boolean(supports);
   }, []);
 }
 

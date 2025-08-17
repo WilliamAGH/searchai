@@ -394,7 +394,8 @@ export const MessageList = React.memo(function MessageList({
                 const messageKey = getMessageKey(message, index);
                 // Safety check - key should NEVER be undefined
                 const safeKey =
-                  messageKey || `fallback-${index}-${Date.now().toString(36)}`;
+                  messageKey ||
+                  `fallback-${index}-${message.role}-${message.content?.slice(0, 20).replace(/\s/g, "") || "empty"}`;
 
                 if (import.meta.env.DEV) {
                   // Log all keys to debug duplicates

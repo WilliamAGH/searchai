@@ -50,9 +50,13 @@ export function getMessageKey(
   const msgRecord = msg as Record<string, unknown>;
   const existingId =
     msg._id ||
-    (typeof msgRecord.id === "string" && msgRecord.id !== "undefined"
+    (typeof msgRecord.id === "string" &&
+    msgRecord.id !== "undefined" &&
+    msgRecord.id.trim().length > 0
       ? msgRecord.id
-      : null);
+      : typeof msgRecord.id === "number"
+        ? String(msgRecord.id)
+        : null);
 
   // If message has a valid ID, use it directly
   if (existingId) {
@@ -73,8 +77,9 @@ export function getMessageKey(
   const timestamp = Date.now().toString(36);
   const counter = ++ephemeralKeyCounter;
   const random = Math.random().toString(36).slice(2, 8);
+  const indexTag = index !== null ? `-i${index}` : "";
 
-  const newKey = `tmp-${rolePrefix}-${contentHash}-${timestamp}-${counter}-${random}`;
+  const newKey = `tmp-${rolePrefix}-${contentHash}-${timestamp}-${counter}-${random}${indexTag}`;
 
   // Cache the key for this message object
   ephemeralKeyMap.set(msg, newKey);

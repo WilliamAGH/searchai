@@ -130,7 +130,12 @@ export function formatConversationWithSources(
 
   messages.forEach((message, index) => {
     // Add role prefix and content
-    const rolePrefix = message.role === "user" ? "User" : "Assistant";
+    const rolePrefix =
+      message.role === "user"
+        ? "User"
+        : message.role === "system"
+          ? "System"
+          : "Assistant";
     formatted.push(`${rolePrefix}: ${extractPlainText(message.content)}`);
 
     // If this is an assistant message with sources, add them after
