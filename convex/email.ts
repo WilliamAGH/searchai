@@ -1,6 +1,15 @@
 "use node";
+/**
+ * Email service using MailPit for development
+ *
+ * @requires "use node" - This file uses Node.js-specific Buffer API for base64
+ * encoding. In Convex, the "use node" pragma is required for actions that need
+ * Node.js APIs not available in the default V8 runtime (e.g., Buffer, crypto).
+ * Files with "use node" cannot contain queries/mutations, only actions.
+ */
 import { v } from "convex/values";
 import { action } from "./_generated/server";
+import { Buffer } from "node:buffer";
 
 // Helper function to send emails via MailPit
 async function sendEmailToMailPit(
@@ -60,7 +69,7 @@ async function sendEmailToMailPit(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${btoa(apiAuth)}`,
+        Authorization: `Basic ${Buffer.from(apiAuth).toString("base64")}`,
       },
       body: JSON.stringify(mailpitBody),
     });
