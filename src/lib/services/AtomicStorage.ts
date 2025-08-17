@@ -1,7 +1,23 @@
 /**
- * Atomic Storage
+ * Atomic Storage Service
  * Thread-safe localStorage wrapper with atomic operations
  * Prevents data corruption from concurrent access
+ *
+ * CRITICAL iOS SAFARI MEMORY MANAGEMENT:
+ *
+ * This service includes automatic cleanup to prevent memory issues on iOS Safari:
+ * - Hourly cleanup of expired items via managed interval
+ * - Proper interval cleanup on destroy() to prevent memory leaks
+ * - Cache eviction for items older than 7 days
+ * - Quota exceeded handling with automatic cleanup retry
+ *
+ * MEMORY LEAK PREVENTION:
+ * - The cleanup interval MUST be properly cleared in destroy()
+ * - Always call destroy() when the app unmounts (if using singleton)
+ * - Intervals not cleared will continue running and consume memory
+ * - iOS Safari is particularly sensitive to memory pressure
+ *
+ * @see https://bugs.webkit.org/show_bug.cgi?id=195325 - iOS Safari memory limits
  */
 
 import { logger } from "../logger";
@@ -21,8 +37,11 @@ interface StorageItem<T> {
 }
 
 /**
- * Atomic Storage
- * Provides atomic operations for localStorage
+ * Atomic Storage Implementation
+ *
+ * Singleton pattern with managed lifecycle for memory efficiency.
+ * IMPORTANT: The cleanupInterval property tracks the hourly cleanup timer
+ * and MUST be cleared when the instance is destroyed.
  */
 export class AtomicStorage {
   private static instance: AtomicStorage;
@@ -30,6 +49,7 @@ export class AtomicStorage {
   private readonly locks: Map<string, Promise<void>> = new Map();
   private readonly cache: Map<string, unknown> = new Map();
   private readonly version = 1;
+  /** Cleanup interval handle - MUST be cleared on destroy to prevent memory leaks */
   private cleanupInterval: NodeJS.Timeout | null = null;
 
   private constructor(options: StorageOptions = {}) {
@@ -372,14 +392,21 @@ export class AtomicStorage {
 
   /**
    * Initialize periodic cleanup
+   *
+   * CRITICAL: This creates an interval that MUST be cleared to prevent memory leaks.
+   * iOS Safari is particularly sensitive to uncleaned intervals which can:
+   * - Accumulate over time causing memory pressure
+   * - Trigger aggressive garbage collection
+   * - Lead to app performance degradation
+   * - Cause input lag and focus issues
    */
   private initializeCleanup(): void {
-    // Clear any existing interval
+    // Clear any existing interval to prevent multiple timers
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
 
-    // Run cleanup every hour
+    // Run cleanup every hour - this interval MUST be cleared on destroy
     this.cleanupInterval = setInterval(
       () => {
         this.cleanup();
@@ -393,13 +420,24 @@ export class AtomicStorage {
 
   /**
    * Destroy the storage instance and cleanup resources
+   *
+   * CRITICAL: Must be called when the app unmounts or during cleanup.
+   * Failing to call this method will result in memory leaks from:
+   * - Uncleaned interval continuing to run
+   * - Cache entries not being cleared
+   * - Lock promises remaining in memory
+   *
+   * This is especially important for iOS Safari which has strict memory limits.
    */
   public destroy(): void {
+    // CRITICAL: Clear the interval to prevent memory leaks
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
+    // Clear all cached data
     this.cache.clear();
+    // Clear all pending locks
     this.locks.clear();
   }
 }

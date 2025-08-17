@@ -152,7 +152,10 @@ export class LocalChatRepository implements IChatRepository {
 
     // Map stored _id -> returned id shape expected by callers/tests
     return filtered.map((m) => {
-      const { _id, ...rest } = m as unknown as { _id: string; [key: string]: unknown };
+      const { _id, ...rest } = m as unknown as {
+        _id: string;
+        [key: string]: unknown;
+      };
       return { id: _id, ...rest } as unknown as LocalMessage;
     });
   }
@@ -162,7 +165,10 @@ export class LocalChatRepository implements IChatRepository {
     if (!stored) return [];
     const parsed = parseLocalMessages(stored) || [];
     return parsed.map((m) => {
-      const { _id, ...rest } = m as unknown as { _id: string; [key: string]: unknown };
+      const { _id, ...rest } = m as unknown as {
+        _id: string;
+        [key: string]: unknown;
+      };
       return { id: _id, ...rest } as unknown as LocalMessage;
     });
   }
@@ -187,7 +193,15 @@ export class LocalChatRepository implements IChatRepository {
       isLocal: true as const,
       source: "local" as const,
       ...(message as object),
-    } as unknown as { _id: string; chatId: string; role: string; content: string; timestamp: number; isLocal: boolean; source: string };
+    } as unknown as {
+      _id: string;
+      chatId: string;
+      role: string;
+      content: string;
+      timestamp: number;
+      isLocal: boolean;
+      source: string;
+    };
 
     allRaw.push(raw);
     localStorage.setItem(MESSAGES_KEY, JSON.stringify(allRaw));
@@ -406,8 +420,7 @@ export class LocalChatRepository implements IChatRepository {
   async shareChat(
     id: string,
     privacy: "shared" | "public",
-  ): Promise<{ shareId?: string; publicId?: string }>
-  {
+  ): Promise<{ shareId?: string; publicId?: string }> {
     const chat = await this.getChatById(id);
     if (!chat) throw new Error(`Chat ${id} not found`);
 
