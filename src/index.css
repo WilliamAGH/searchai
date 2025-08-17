@@ -674,6 +674,11 @@ html.dark .message-textarea {
   letter-spacing: 0.01em;
 }
 
+/* Re-assert dark-mode tracking so it's not overridden by the generic rule above */
+html.dark .message-textarea {
+  letter-spacing: -0.005em;
+}
+
 /* Apply Firefox-specific scrollbar suppression only when supported */
 @supports (scrollbar-width: none) {
   .message-textarea {
