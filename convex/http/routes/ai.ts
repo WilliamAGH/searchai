@@ -236,11 +236,17 @@ async function handleNoOpenRouter(
   // Try Convex OpenAI fallback
   if (CONVEX_OPENAI_API_KEY && CONVEX_OPENAI_BASE_URL) {
     try {
+      // Include search results in the message context
+      const searchContext = formatSearchResultsForContext(searchResults);
+      const enhancedMessage = searchContext
+        ? `${message}${searchContext}`
+        : message;
+
       const convexOpenAIBody = {
         model: "gpt-4.1-nano",
         messages: [
           { role: "system", content: effectiveSystemPrompt },
-          { role: "user", content: message },
+          { role: "user", content: enhancedMessage },
         ],
         temperature: 0.7,
         max_tokens: 2000,
@@ -311,14 +317,22 @@ async function handleNoOpenRouter(
     }
   }
 
-  // Final fallback - create response from search results
+  // Final fallback - create response from search results using domain format
   const fallbackResponse =
     searchResults && searchResults.length > 0
       ? `Based on the search results I found:\n\n${searchResults
-          .map(
-            (r: SearchResult) =>
-              `**${r.title}**\n${r.snippet}\nSource: ${r.url}`,
-          )
+          .map((r: SearchResult) => {
+            // Extract domain for citation format
+            let domain = "";
+            try {
+              const url = new URL(r.url);
+              domain = url.hostname.replace("www.", "");
+            } catch {
+              const match = r.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
+              domain = match ? match[1] : "source";
+            }
+            return `**${r.title}** [${domain}]\n${r.snippet}`;
+          })
           .join("\n\n")
           .substring(
             0,
@@ -350,8 +364,19 @@ function formatSearchResultsForContext(searchResults: SearchResult[]): string {
   }
 
   const formattedResults = searchResults
-    .map((result, index) => {
-      let resultStr = `[${index + 1}] ${result.fullTitle || result.title}\n`;
+    .map((result) => {
+      // Extract domain from URL for citation format
+      let domain = "";
+      try {
+        const url = new URL(result.url);
+        domain = url.hostname.replace("www.", "");
+      } catch {
+        // Fallback: try to extract domain from URL string
+        const match = result.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
+        domain = match ? match[1] : "source";
+      }
+
+      let resultStr = `[${domain}] ${result.fullTitle || result.title}\n`;
       resultStr += `URL: ${result.url}\n`;
 
       // Include scraped content if available
@@ -402,7 +427,7 @@ async function handleOpenRouterStreaming(
   const messages = [
     {
       role: "system",
-      content: `${effectiveSystemPrompt}\n\nIMPORTANT: When citing sources inline, use the domain name in brackets like [example.com] immediately after the relevant claim.\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.\n\nBe direct, comprehensive, and authoritative in your responses. Focus on providing value and actionable information rather than hedging or expressing uncertainty unless truly warranted.`,
+      content: `${effectiveSystemPrompt}\n\nCRITICAL CITATION FORMAT: When citing sources inline, you MUST use the exact domain name from the search results in brackets like [domain.com] immediately after the relevant claim. DO NOT use numeric citations like [1] or (1). Always use the domain format that matches the search results provided. For example: "The Earth orbits the Sun [nasa.gov]" not "The Earth orbits the Sun [1]".\n\nAlways respond using GitHub-Flavored Markdown (GFM): headings, lists, tables, bold (**), italics (* or _), underline (use markdown where supported; if not, you may use <u>...</u>), and fenced code blocks with language. Avoid arbitrary HTML beyond <u>.\n\nBe direct, comprehensive, and authoritative in your responses. Focus on providing value and actionable information rather than hedging or expressing uncertainty unless truly warranted.`,
     },
     ...(chatHistory || []),
     { role: "user", content: enhancedMessage },
@@ -690,11 +715,17 @@ async function handleOpenRouterFailure(
   if (CONVEX_OPENAI_API_KEY && CONVEX_OPENAI_BASE_URL) {
     try {
       dlog("🤖 Trying Convex OpenAI fallback...");
+      // Include search results in the message context for fallback
+      const searchContext = formatSearchResultsForContext(searchResults);
+      const enhancedMessage = searchContext
+        ? `${message}${searchContext}`
+        : message;
+
       const convexOpenAIBody = {
         model: "gpt-4.1-nano",
         messages: [
           { role: "system", content: effectiveSystemPrompt },
-          { role: "user", content: message },
+          { role: "user", content: enhancedMessage },
         ],
         temperature: 0.7,
         max_tokens: 2000,
@@ -764,15 +795,23 @@ async function handleOpenRouterFailure(
     }
   }
 
-  // Final fallback response with detailed error info
+  // Final fallback response with detailed error info using domain format
   const errorMessage = "AI processing failed";
   const fallbackResponse =
     searchResults && searchResults.length > 0
       ? `Based on the search results I found:\n\n${searchResults
-          .map(
-            (r: SearchResult) =>
-              `**${r.title}**\n${r.snippet}\nSource: ${r.url}`,
-          )
+          .map((r: SearchResult) => {
+            // Extract domain for citation format
+            let domain = "";
+            try {
+              const url = new URL(r.url);
+              domain = url.hostname.replace("www.", "");
+            } catch {
+              const match = r.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
+              domain = match ? match[1] : "source";
+            }
+            return `**${r.title}** [${domain}]\n${r.snippet}`;
+          })
           .join("\n\n")
           .substring(
             0,
