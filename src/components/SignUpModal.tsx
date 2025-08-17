@@ -33,13 +33,6 @@ export function SignUpModal({
   const emailInputRef = React.useRef<HTMLInputElement>(null);
   const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
 
-  const handleOverlayKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (e.key === "Escape" || e.key === "Enter") onClose();
-    },
-    [onClose],
-  );
-
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -141,7 +134,10 @@ export function SignUpModal({
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm no-backdrop-blur"
         onClick={onClose}
-        onKeyDown={handleOverlayKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+        }}
+        tabIndex={0}
         aria-label="Close modal"
       />
 

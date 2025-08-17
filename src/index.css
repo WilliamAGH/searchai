@@ -763,6 +763,7 @@ html.dark .message-textarea {
   .message-textarea {
     /* Prevent font boosting on iOS */
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%; /* Add unprefixed version for spec compliance */
     /* CRITICAL: Hardware acceleration removed - DO NOT RE-ADD */
     /* -webkit-transform: translateZ(0); */ /* BREAKS iOS SAFARI */
     /* transform: translateZ(0); */ /* BREAKS iOS SAFARI */
@@ -794,18 +795,28 @@ textarea,
   user-select: text !important;
 }
 
-/* iOS Safari input fix: Disable all transitions on input elements */
+/* iOS Safari input fix: Disable transitions on input elements only */
 @supports (-webkit-touch-callout: none) {
   input,
-  textarea,
-  button {
+  textarea {
     transition: none !important;
   }
 
-  /* iOS Safari input fix: Disable backdrop filters on elements near inputs */
+  /* Button transitions are safe to keep unless they're in input containers */
+  .input-container button,
+  form button[type="submit"] {
+    transition: none !important;
+  }
+
+  /* iOS Safari input fix: Disable ALL backdrop filters near inputs */
   .backdrop-blur,
+  .backdrop-blur-none,
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
   .backdrop-blur-xl,
-  .backdrop-blur-2xl {
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
   }
@@ -819,6 +830,41 @@ textarea,
   .no-backdrop-blur {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
+  }
+
+  /* Enhanced transform restrictions on interactive elements */
+  input,
+  textarea,
+  .message-textarea,
+  .message-input-textarea,
+  .input-container,
+  form:has(input),
+  form:has(textarea) {
+    transform: none !important;
+    will-change: auto !important;
+    -webkit-transform: none !important;
+  }
+
+  /* Enhanced user-select protection for text inputs */
+  input,
+  textarea,
+  .message-textarea,
+  .message-input-textarea,
+  [contenteditable="true"],
+  [contenteditable=""] {
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+  }
+
+  /* Universal text-size-adjust for all inputs */
+  input,
+  textarea,
+  select {
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
   }
 }
 

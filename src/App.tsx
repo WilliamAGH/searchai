@@ -225,7 +225,7 @@ export default function App() {
 
     const handleResize = () => {
       // Clear previous timeout to debounce resize events
-      if (resizeTimeout) {
+      if (resizeTimeout !== null) {
         clearTimeout(resizeTimeout);
       }
 
@@ -254,7 +254,7 @@ export default function App() {
     window.addEventListener("resize", handleResize);
     return () => {
       window.removeEventListener("resize", handleResize);
-      if (resizeTimeout) {
+      if (resizeTimeout !== null) {
         clearTimeout(resizeTimeout);
       }
     };
