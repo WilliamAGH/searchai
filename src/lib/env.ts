@@ -11,19 +11,19 @@ interface EnvConfig {
   DEV: boolean;
   PROD: boolean;
   MODE: "development" | "production" | "test";
-  
+
   // Optional services
   VITE_OPENROUTER_API_KEY?: string;
   VITE_SERP_API_KEY?: string;
   VITE_RESEND_API_KEY?: string;
   VITE_OPENAI_API_KEY?: string;
   VITE_OPENAI_BASE_URL?: string;
-  
+
   // Feature flags
   VITE_ENABLE_ANALYTICS?: boolean;
   VITE_ENABLE_DEBUG?: boolean;
   VITE_ENABLE_TELEMETRY?: boolean;
-  
+
   // URLs
   VITE_SITE_URL?: string;
   VITE_SITE_TITLE?: string;
@@ -62,10 +62,12 @@ function validateEnv(): EnvConfig {
     try {
       new URL(env.VITE_OPENAI_BASE_URL);
     } catch {
-      logger.warn(`Invalid VITE_OPENAI_BASE_URL format: ${env.VITE_OPENAI_BASE_URL}`);
+      logger.warn(
+        `Invalid VITE_OPENAI_BASE_URL format: ${env.VITE_OPENAI_BASE_URL}`,
+      );
     }
   }
-  
+
   if (env.VITE_SITE_URL) {
     try {
       new URL(env.VITE_SITE_URL);
@@ -73,48 +75,71 @@ function validateEnv(): EnvConfig {
       logger.warn(`Invalid VITE_SITE_URL format: ${env.VITE_SITE_URL}`);
     }
   }
-  
+
   // Check for API key security
   const apiKeys = [
-    { name: 'VITE_OPENROUTER_API_KEY', value: env.VITE_OPENROUTER_API_KEY },
-    { name: 'VITE_SERP_API_KEY', value: env.VITE_SERP_API_KEY },
-    { name: 'VITE_RESEND_API_KEY', value: env.VITE_RESEND_API_KEY },
-    { name: 'VITE_OPENAI_API_KEY', value: env.VITE_OPENAI_API_KEY },
+    { name: "VITE_OPENROUTER_API_KEY", value: env.VITE_OPENROUTER_API_KEY },
+    { name: "VITE_SERP_API_KEY", value: env.VITE_SERP_API_KEY },
+    { name: "VITE_RESEND_API_KEY", value: env.VITE_RESEND_API_KEY },
+    { name: "VITE_OPENAI_API_KEY", value: env.VITE_OPENAI_API_KEY },
   ];
-  
+
   for (const { name, value } of apiKeys) {
     if (value && value.length < 10) {
       logger.warn(`${name} appears to be invalid (too short)`);
     }
-    if (value && value.includes(' ')) {
+    if (value && value.includes(" ")) {
       logger.warn(`${name} contains spaces, which is likely invalid`);
     }
+    // Optional prefix hints (non-fatal)
+    if (name === "VITE_OPENAI_API_KEY" && value && !value.startsWith("sk-")) {
+      logger.warn(
+        'VITE_OPENAI_API_KEY does not start with "sk-"; double-check the key format',
+      );
+    }
+    if (
+      name === "VITE_OPENROUTER_API_KEY" &&
+      value &&
+      !value.toLowerCase().startsWith("sk-or-")
+    ) {
+      logger.warn(
+        'VITE_OPENROUTER_API_KEY does not start with "sk-or-"; double-check the key format',
+      );
+    }
   }
-  
+
   return {
     // Required
     VITE_CONVEX_URL: env.VITE_CONVEX_URL,
     DEV: env.DEV === true,
     PROD: env.PROD === true,
     MODE: env.MODE as "development" | "production" | "test",
-    
+
     // Optional services
     VITE_OPENROUTER_API_KEY: env.VITE_OPENROUTER_API_KEY,
     VITE_SERP_API_KEY: env.VITE_SERP_API_KEY,
     VITE_RESEND_API_KEY: env.VITE_RESEND_API_KEY,
     VITE_OPENAI_API_KEY: env.VITE_OPENAI_API_KEY,
     VITE_OPENAI_BASE_URL: env.VITE_OPENAI_BASE_URL,
-    
+
     // Feature flags
-    VITE_ENABLE_ANALYTICS: env.VITE_ENABLE_ANALYTICS === 'true',
-    VITE_ENABLE_DEBUG: env.VITE_ENABLE_DEBUG === 'true',
-    VITE_ENABLE_TELEMETRY: env.VITE_ENABLE_TELEMETRY === 'true',
-    
+    VITE_ENABLE_ANALYTICS: toBool(env.VITE_ENABLE_ANALYTICS),
+    VITE_ENABLE_DEBUG: toBool(env.VITE_ENABLE_DEBUG),
+    VITE_ENABLE_TELEMETRY: toBool(env.VITE_ENABLE_TELEMETRY),
+
     // URLs
     VITE_SITE_URL: env.VITE_SITE_URL,
-    VITE_SITE_TITLE: env.VITE_SITE_TITLE || 'SearchAI',
+    VITE_SITE_TITLE: env.VITE_SITE_TITLE,
   };
 }
+
+// Helper: flexible boolean parsing for env flags
+const toBool = (v: unknown): boolean =>
+  typeof v === "boolean"
+    ? v
+    : typeof v === "string"
+      ? /^(true|1)$/i.test(v.trim())
+      : false;
 
 /**
  * Cached environment configuration
@@ -167,44 +192,44 @@ export const env = {
   get mode(): string {
     return import.meta.env.MODE || "development";
   },
-  
+
   // Optional service getters
   get openRouterApiKey(): string | undefined {
     return getEnv().VITE_OPENROUTER_API_KEY;
   },
-  
+
   get serpApiKey(): string | undefined {
     return getEnv().VITE_SERP_API_KEY;
   },
-  
+
   get openAiApiKey(): string | undefined {
     return getEnv().VITE_OPENAI_API_KEY;
   },
-  
+
   get openAiBaseUrl(): string | undefined {
     return getEnv().VITE_OPENAI_BASE_URL;
   },
-  
+
   // Feature flags
   get enableAnalytics(): boolean {
     return getEnv().VITE_ENABLE_ANALYTICS || false;
   },
-  
+
   get enableDebug(): boolean {
     return getEnv().VITE_ENABLE_DEBUG || false;
   },
-  
+
   get enableTelemetry(): boolean {
     return getEnv().VITE_ENABLE_TELEMETRY || false;
   },
-  
+
   // Site configuration
   get siteUrl(): string | undefined {
     return getEnv().VITE_SITE_URL;
   },
-  
+
   get siteTitle(): string {
-    return getEnv().VITE_SITE_TITLE || 'SearchAI';
+    return getEnv().VITE_SITE_TITLE || "SearchAI";
   },
 
   /**
@@ -240,29 +265,34 @@ export const env = {
     } catch {
       errors.push("VITE_CONVEX_URL is not a valid URL");
     }
-    
+
     // Check for at least one AI service
-    const hasAI = import.meta.env.VITE_OPENROUTER_API_KEY || 
-                  import.meta.env.VITE_OPENAI_API_KEY;
+    const hasAI =
+      import.meta.env.VITE_OPENROUTER_API_KEY ||
+      import.meta.env.VITE_OPENAI_API_KEY;
     if (!hasAI) {
-      warnings.push("No AI service API key configured (VITE_OPENROUTER_API_KEY or VITE_OPENAI_API_KEY)");
+      warnings.push(
+        "No AI service API key configured (VITE_OPENROUTER_API_KEY or VITE_OPENAI_API_KEY)",
+      );
     }
-    
+
     // Check for search service
     const hasSearch = import.meta.env.VITE_SERP_API_KEY;
     if (!hasSearch) {
-      warnings.push("No search API key configured (VITE_SERP_API_KEY) - falling back to limited search");
+      warnings.push(
+        "No search API key configured (VITE_SERP_API_KEY) - falling back to limited search",
+      );
     }
-    
+
     // Log warnings
     if (warnings.length > 0) {
       logger.warn("Environment configuration warnings:");
-      warnings.forEach(w => logger.warn(`  ⚠ ${w}`));
+      warnings.forEach((w) => logger.warn(`  ⚠ ${w}`));
     }
 
     return errors;
   },
-  
+
   /**
    * Get service availability
    */
@@ -297,7 +327,7 @@ export function initializeEnv(): void {
   if (errors.length > 0) {
     logger.error("Environment configuration errors:");
     errors.forEach((err) => logger.error(`  ✗ ${err}`));
-    
+
     // Permit local preview/test to proceed with fallbacks even in production builds
     const isLocalHost = (() => {
       try {
@@ -321,18 +351,20 @@ export function initializeEnv(): void {
     );
   } else {
     logger.info("✅ Environment configuration validated");
-    
+
     // Log configured services
     const configuredServices = [];
-    if (availability.openrouter) configuredServices.push('OpenRouter');
-    if (availability.openai) configuredServices.push('OpenAI');
-    if (availability.serpapi) configuredServices.push('SERP API');
-    if (availability.email) configuredServices.push('Email (Resend)');
-    
+    if (availability.openrouter) configuredServices.push("OpenRouter");
+    if (availability.openai) configuredServices.push("OpenAI");
+    if (availability.serpapi) configuredServices.push("SERP API");
+    if (availability.email) configuredServices.push("Email (Resend)");
+
     if (configuredServices.length > 0) {
-      logger.info(`✅ Configured services: ${configuredServices.join(', ')}`);
+      logger.info(`✅ Configured services: ${configuredServices.join(", ")}`);
     } else {
-      logger.warn('⚠ No optional services configured - running with limited functionality');
+      logger.warn(
+        "⚠ No optional services configured - running with limited functionality",
+      );
     }
   }
 }
@@ -341,14 +373,20 @@ export function initializeEnv(): void {
  * Export environment details for debugging
  * Redacts sensitive values
  */
-export function getEnvironmentInfo(): Record<string, any> {
+export function getEnvironmentInfo(): Record<string, unknown> {
   const availability = env.getServiceAvailability();
-  
+
   return {
     mode: env.mode,
     isDev: env.isDev,
     isProd: env.isProd,
-    convexUrl: env.convexUrl,
+    convexUrl: (() => {
+      try {
+        return env.convexUrl;
+      } catch {
+        return "N/A";
+      }
+    })(),
     services: availability,
     features: {
       analytics: env.enableAnalytics,
@@ -361,10 +399,10 @@ export function getEnvironmentInfo(): Record<string, any> {
     },
     // Redacted API keys (show only if configured)
     apiKeys: {
-      openrouter: availability.openrouter ? '[REDACTED]' : 'not configured',
-      openai: availability.openai ? '[REDACTED]' : 'not configured',
-      serpapi: availability.serpapi ? '[REDACTED]' : 'not configured',
-      email: availability.email ? '[REDACTED]' : 'not configured',
+      openrouter: availability.openrouter ? "[REDACTED]" : "not configured",
+      openai: availability.openai ? "[REDACTED]" : "not configured",
+      serpapi: availability.serpapi ? "[REDACTED]" : "not configured",
+      email: availability.email ? "[REDACTED]" : "not configured",
     },
   };
 }
