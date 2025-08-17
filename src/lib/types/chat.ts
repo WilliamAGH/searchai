@@ -5,6 +5,7 @@
  * Complies with AGENT.md: NO redundant type definitions for Convex entities
  */
 
+import { uuidv7 } from "uuidv7";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 
 /**
@@ -83,8 +84,8 @@ export const createLocalChat = (title: string = "New Chat"): LocalChat => {
     createdAt: now,
     updatedAt: now,
     privacy: "private",
-    shareId: `share_${now}_${randomId}`,
-    publicId: `public_${now}_${randomId}`,
+    shareId: uuidv7(), // Use UUID v7 to match Convex backend format
+    publicId: uuidv7(), // Use UUID v7 to match Convex backend format
     isLocal: true,
     source: "local",
   };
