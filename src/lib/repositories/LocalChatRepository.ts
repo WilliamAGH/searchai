@@ -5,8 +5,6 @@
 
 import { nanoid } from "nanoid";
 import { uuidv7 } from "uuidv7";
-import { ConvexClient } from "convex/browser";
-import { api } from "../../../convex/_generated/api";
 import type { IChatRepository } from "./ChatRepository";
 import type {
   UnifiedChat,
@@ -29,7 +27,6 @@ const MESSAGES_KEY = "searchai_messages_v2";
 export class LocalChatRepository implements IChatRepository {
   protected storageType = "local" as const;
   private aiService: UnauthenticatedAIService;
-  private convexClient: ConvexClient;
 
   constructor(convexUrl?: string) {
     if (!this.isStorageAvailable()) {
@@ -40,9 +37,6 @@ export class LocalChatRepository implements IChatRepository {
 
     // Initialize AI service with convex URL
     this.aiService = new UnauthenticatedAIService(url);
-
-    // Initialize Convex client for querying public/shared chats
-    this.convexClient = new ConvexClient(url);
   }
 
   private isStorageAvailable(): boolean {
@@ -177,43 +171,8 @@ export class LocalChatRepository implements IChatRepository {
       }
     }
 
-    // If no local messages, check if this chat exists in Convex (public/shared chat)
-    // This allows viewing messages for public/shared chats
-    try {
-      const messages = await this.convexClient.query(
-        api.chats.getChatMessages,
-        { chatId },
-      );
-
-      if (messages && messages.length > 0) {
-        // Convert Convex messages to UnifiedMessage format
-        return messages.map((msg) => ({
-          id: msg._id,
-          chatId: msg.chatId,
-          role: msg.role as "user" | "assistant" | "system",
-          content: msg.content || "",
-          timestamp: msg.timestamp || msg._creationTime,
-          searchResults: msg.searchResults,
-          sources: msg.sources,
-          reasoning: msg.reasoning,
-          searchMethod: msg.searchMethod,
-          hasRealResults: msg.hasRealResults,
-          isStreaming: msg.isStreaming,
-          streamedContent: msg.streamedContent,
-          thinking: msg.thinking,
-          source: "convex",
-          synced: true,
-          _id: msg._id,
-          _creationTime: msg._creationTime,
-        }));
-      }
-    } catch (error) {
-      logger.debug(
-        "Failed to query Convex for messages (expected for local chats):",
-        error,
-      );
-    }
-
+    // LocalChatRepository only handles local storage
+    // Public/shared chats should be accessed through ConvexChatRepository
     return [];
   }
 
@@ -548,34 +507,8 @@ export class LocalChatRepository implements IChatRepository {
       }
     }
 
-    // If not found locally, query Convex for shared chats
-    // This allows unauthenticated users to view shared chats
-    try {
-      const convexChat = await this.convexClient.query(
-        api.chats.getChatByShareId,
-        { shareId },
-      );
-
-      if (convexChat) {
-        // Convert Convex chat to UnifiedChat format
-        return {
-          id: convexChat._id,
-          title: convexChat.title || "Untitled Chat",
-          createdAt: convexChat.createdAt || convexChat._creationTime,
-          updatedAt: convexChat.updatedAt || convexChat._creationTime,
-          privacy: convexChat.privacy || "shared",
-          shareId: convexChat.shareId,
-          publicId: convexChat.publicId,
-          source: "convex",
-          synced: true,
-          _id: convexChat._id,
-          _creationTime: convexChat._creationTime,
-        };
-      }
-    } catch (error) {
-      logger.error("Failed to query Convex for shared chat:", error);
-    }
-
+    // LocalChatRepository only handles local storage
+    // Public/shared chats should be accessed through ConvexChatRepository
     return null;
   }
 
@@ -600,34 +533,8 @@ export class LocalChatRepository implements IChatRepository {
       }
     }
 
-    // If not found locally, query Convex for public chats
-    // This allows unauthenticated users to view public chats
-    try {
-      const convexChat = await this.convexClient.query(
-        api.chats.getChatByPublicId,
-        { publicId },
-      );
-
-      if (convexChat) {
-        // Convert Convex chat to UnifiedChat format
-        return {
-          id: convexChat._id,
-          title: convexChat.title || "Untitled Chat",
-          createdAt: convexChat.createdAt || convexChat._creationTime,
-          updatedAt: convexChat.updatedAt || convexChat._creationTime,
-          privacy: convexChat.privacy || "public",
-          shareId: convexChat.shareId,
-          publicId: convexChat.publicId,
-          source: "convex",
-          synced: true,
-          _id: convexChat._id,
-          _creationTime: convexChat._creationTime,
-        };
-      }
-    } catch (error) {
-      logger.error("Failed to query Convex for public chat:", error);
-    }
-
+    // LocalChatRepository only handles local storage
+    // Public/shared chats should be accessed through ConvexChatRepository
     return null;
   }
 

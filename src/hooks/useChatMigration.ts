@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import type { ChatState } from "./useChatState";
 import { MigrationService } from "../lib/services/MigrationService";
+import { LocalChatRepository } from "../lib/repositories/LocalChatRepository";
 import { logger } from "../lib/logger";
 
 export function useChatMigration(
@@ -26,9 +27,6 @@ export function useChatMigration(
     const migrate = async () => {
       try {
         // Create LocalChatRepository for migration source
-        const { LocalChatRepository } = await import(
-          "../lib/repositories/LocalChatRepository"
-        );
         const localRepo = new LocalChatRepository();
 
         // Create MigrationService with both repositories
