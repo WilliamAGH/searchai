@@ -139,9 +139,9 @@ npx --no-install lint-staged
 
 # 5. Quick test run (ensure tests pass)
 echo "🧪 Running tests..."
-# Run Vitest directly to avoid npm resolution issues; preserve symlinks only for this process
-NODE_ENV=test NODE_OPTIONS="${NODE_OPTIONS:-} --preserve-symlinks --preserve-symlinks-main" \
-  vitest run --no-cache --watch=false --config vitest.config.ts > /tmp/node-tests-precommit.log 2>&1 || TEST_EXIT=$?
+# Run Vitest via Node to avoid npm and symlink resolution issues in VS Code Git env
+NODE_ENV=test node ./node_modules/vitest/vitest.mjs run --no-cache --watch=false --config vitest.config.ts \
+  > /tmp/node-tests-precommit.log 2>&1 || TEST_EXIT=$?
 TEST_EXIT=${TEST_EXIT:-0}
 if [ $TEST_EXIT -ne 0 ]; then
   echo "❌ Tests failed! Fix tests before committing."
