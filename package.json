@@ -9,6 +9,7 @@
     "dev:frontend": "vite --open --clearScreen=false",
     "dev:backend": "convex dev",
     "build": "vite build",
+    "build:prod": "NODE_ENV=production vite build --mode production",
     "preview": "vite preview --strictPort --port 4173",
     "lint": "oxlint --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin",
     "lint:fix": "oxlint --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin --fix",
