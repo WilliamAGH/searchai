@@ -74,6 +74,7 @@ function ChatInterfaceComponent({
   );
 
   const [localIsGenerating, setIsGenerating] = useState(false);
+  const [publicChatCheckComplete, setPublicChatCheckComplete] = useState(false);
   // aiService removed - no longer needed with unified flow
 
   const unified = useUnifiedChat();
@@ -186,7 +187,25 @@ function ChatInterfaceComponent({
       currentChatId,
       publicId: propPublicId,
       shareId: propShareId,
+      publicChatCheckComplete,
     });
+
+    // Mark check as complete after queries have had time to run
+    if ((propPublicId || propShareId) && !publicChatCheckComplete) {
+      const timer = setTimeout(() => {
+        // If we still don't have a chat after checking, it doesn't exist
+        if (!chatByPublicId && !chatByShareId) {
+          logger.error("[CHAT_INTERFACE] Public/shared chat not found");
+          toast.error(
+            propPublicId
+              ? "This public chat could not be found. It may have been deleted or made private."
+              : "This shared chat could not be found. It may have been deleted or the link may be invalid.",
+          );
+        }
+        setPublicChatCheckComplete(true);
+      }, 2000); // Give queries 2 seconds to complete
+      return () => clearTimeout(timer);
+    }
 
     // If we have a public chat loaded but it's not selected, select it
     if (chatByPublicId && !currentChatId) {
@@ -267,6 +286,7 @@ function ChatInterfaceComponent({
     chatState.chats,
     propPublicId,
     propShareId,
+    publicChatCheckComplete,
   ]);
 
   // Determine if the current chat is read-only
