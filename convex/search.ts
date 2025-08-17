@@ -1,6 +1,11 @@
 /**
  * Search functions - V8 runtime only
  * Provides web search via multiple providers and intelligent query planning
+ *
+ * @note This file runs in Convex's optimized V8 runtime (no "use node" pragma).
+ * The default runtime has faster cold starts and can be defined alongside
+ * queries/mutations. It supports browser-like APIs but not Node.js-specific
+ * modules. Use process.env for environment variables in both runtimes.
  */
 
 import { v } from "convex/values";

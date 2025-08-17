@@ -2,6 +2,11 @@
 /**
  * Main generation pipeline orchestration
  * Coordinates search, context building, and streaming response generation
+ *
+ * @requires "use node" - Required for OpenRouter API integration and advanced
+ * streaming capabilities. Actions in this file run in Node.js 18 runtime
+ * with 512MB memory limit (vs 64MB in default Convex runtime). This enables
+ * use of Node.js-specific APIs and npm packages not supported in V8 runtime.
  */
 
 import { v } from "convex/values";
