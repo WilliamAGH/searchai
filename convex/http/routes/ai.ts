@@ -31,6 +31,17 @@ function sanitizeText(input: unknown, maxLen: number): string {
   return out;
 }
 
+// Helper to extract domain from URL string
+function extractDomain(urlStr: string): string {
+  try {
+    const url = new URL(urlStr);
+    return url.hostname.replace("www.", "");
+  } catch {
+    const match = urlStr.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
+    return match ? match[1] : "source";
+  }
+}
+
 /**
  * Register AI routes on the HTTP router
  */
@@ -331,15 +342,7 @@ async function handleNoOpenRouter(
     searchResults && searchResults.length > 0
       ? `Based on the search results I found:\n\n${searchResults
           .map((r: SearchResult) => {
-            // Extract domain for citation format
-            let domain = "";
-            try {
-              const url = new URL(r.url);
-              domain = url.hostname.replace("www.", "");
-            } catch {
-              const match = r.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
-              domain = match ? match[1] : "source";
-            }
+            const domain = extractDomain(r.url);
             return `**${sanitizeText(r.title, 200)}** [${domain}]\n${sanitizeText(r.snippet, 300)}`;
           })
           .join("\n\n")
@@ -374,19 +377,12 @@ function formatSearchResultsForContext(searchResults: SearchResult[]): string {
 
   const formattedResults = searchResults
     .map((result) => {
-      // Extract domain from URL for citation format
-      let domain = "";
-      try {
-        const url = new URL(result.url);
-        domain = url.hostname.replace("www.", "");
-      } catch {
-        // Fallback: try to extract domain from URL string
-        const match = result.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
-        domain = match ? match[1] : "source";
-      }
+      const domain = extractDomain(result.url);
+      const safeTitle = sanitizeText(result.fullTitle ?? result.title, 200);
+      const safeUrl = sanitizeText(result.url, 2048);
 
-      let resultStr = `[${domain}] ${result.fullTitle || result.title}\n`;
-      resultStr += `URL: ${result.url}\n`;
+      let resultStr = `[${domain}] ${safeTitle}\n`;
+      resultStr += `URL: ${safeUrl}\n`;
 
       // Include scraped content if available
       if (result.content) {
@@ -535,8 +531,8 @@ function createStreamingResponse(
 
       // Periodic keepalive pings and adaptive timeout for streaming
       const pingIntervalMs = 15000;
-      let pingIntervalId: NodeJS.Timeout | null = null;
-      let streamTimeoutId: NodeJS.Timeout | null = null;
+      let pingIntervalId: ReturnType<typeof setInterval> | null = null;
+      let streamTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
       // Setup keepalive pings
       pingIntervalId = setInterval(() => {
@@ -842,15 +838,7 @@ async function handleOpenRouterFailure(
     searchResults && searchResults.length > 0
       ? `Based on the search results I found:\n\n${searchResults
           .map((r: SearchResult) => {
-            // Extract domain for citation format
-            let domain = "";
-            try {
-              const url = new URL(r.url);
-              domain = url.hostname.replace("www.", "");
-            } catch {
-              const match = r.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
-              domain = match ? match[1] : "source";
-            }
+            const domain = extractDomain(r.url);
             return `**${sanitizeText(r.title, 200)}** [${domain}]\n${sanitizeText(r.snippet, 300)}`;
           })
           .join("\n\n")

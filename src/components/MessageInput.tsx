@@ -52,7 +52,13 @@
  * @criticalBugFix iOS Safari keyboard crash - 9th attempt (successful)
  */
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  startTransition,
+} from "react";
 import { isIOSSafari } from "../lib/utils/ios";
 
 interface MessageInputProps {
@@ -97,6 +103,8 @@ export function MessageInput({
   // Track IME composition state for Japanese/Chinese keyboards
   const [isComposing, setIsComposing] = useState(false);
   const compositionTimeoutRef = useRef<number | null>(null);
+  // Track draft change timeout for debouncing on iOS
+  const draftChangeTimeoutRef = useRef<number | null>(null);
   // Track navigation through history (index into `history`), null when not navigating
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   // Preserve current draft when entering history navigation so it can be restored
@@ -300,54 +308,72 @@ export function MessageInput({
     ],
   );
 
-  // Auto-resize height - simplified without RAF
-  // iOS Safari fix: Add additional checks for mobile environment
+  // Track the last height to avoid unnecessary DOM updates
+  const lastHeightRef = useRef<number>(0);
+
+  // Auto-resize height - optimized to prevent rapid reflows
+  // CRITICAL: This function was causing keyboard crashes due to rapid DOM reflows
   const adjustTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
 
-    // iOS Safari fix: Prevent excessive reflows during keyboard interaction
-    const isiOS = isIOSSafari();
-
-    // Direct DOM operations without RAF
-    ta.style.height = "auto";
-    const scrollH = ta.scrollHeight;
-    const target = Math.min(scrollH, MAX_TEXTAREA_HEIGHT);
-
-    // Only update height if it actually changed to prevent unnecessary reflows
-    if (parseInt(ta.style.height) !== target) {
-      ta.style.height = target + "px";
-    }
-
-    // iOS Safari specific optimization: Avoid height adjustments when keyboard is likely active
-    if (isiOS) {
-      // On iOS, viewport height changes when keyboard is opened, so we skip
-      // height adjustments if the viewport is smaller than expected
+    // iOS Safari: if keyboard likely open, skip ALL height adjustments
+    if (isIOSSafari()) {
       const expectedHeight = window.screen.height;
       const currentHeight = window.innerHeight;
-
-      // If viewport is significantly smaller, keyboard is probably open
-      // Skip height adjustments to prevent conflicts
       if (currentHeight < expectedHeight * 0.7) {
-        return;
+        return; // Keyboard is open, don't touch the DOM
       }
+    }
+
+    // OPTIMIZATION: Clone the textarea to measure height without reflows
+    // This prevents the 3x reflow per keystroke issue
+    const clone = ta.cloneNode(false) as HTMLTextAreaElement;
+    clone.style.cssText = ta.style.cssText;
+    clone.style.height = "auto";
+    clone.style.position = "absolute";
+    clone.style.visibility = "hidden";
+    clone.style.pointerEvents = "none";
+    clone.value = ta.value;
+
+    // Add clone to DOM briefly to measure
+    ta.parentNode?.appendChild(clone);
+    const targetHeight = Math.min(clone.scrollHeight, MAX_TEXTAREA_HEIGHT);
+    ta.parentNode?.removeChild(clone);
+
+    // Only update if height actually changed
+    if (lastHeightRef.current !== targetHeight) {
+      lastHeightRef.current = targetHeight;
+      ta.style.height = `${targetHeight}px`;
     }
   }, []);
 
   // REMOVED: First focus management block - consolidating to single focus handler
 
-  // Cleanup composition timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (compositionTimeoutRef.current !== null) {
         clearTimeout(compositionTimeoutRef.current);
       }
+      if (draftChangeTimeoutRef.current !== null) {
+        clearTimeout(draftChangeTimeoutRef.current);
+      }
     };
   }, []);
 
-  // iOS Safari fix: Enhanced textarea adjustment with mobile-specific handling
+  // iOS Safari fix: Debounced textarea adjustment to prevent rapid reflows
   useEffect(() => {
-    adjustTextarea();
+    // For iOS Safari, debounce height adjustments to prevent keyboard issues
+    if (isIOSSafari()) {
+      const timeoutId = setTimeout(() => {
+        adjustTextarea();
+      }, 50); // Small delay to batch rapid changes
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Non-iOS: Adjust immediately
+      adjustTextarea();
+    }
   }, [message, placeholder, disabled, adjustTextarea]);
 
   // iOS Safari fix: Improved resize handler with mobile-specific logic
@@ -388,18 +414,40 @@ export function MessageInput({
     };
   }, [adjustTextarea]);
 
-  // Simple change handler without throttling
+  // Optimized change handler to prevent excessive re-renders
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const val = e.target.value;
-      setMessage(val);
-      if (historyIndex !== null) {
-        setHistoryIndex(null);
-        setDraftBeforeHistory(null);
-      }
 
-      // Direct callback without throttling
-      onDraftChange?.(val);
+      // CRITICAL: On iOS Safari, batch state updates to prevent keyboard issues
+      if (isIOSSafari()) {
+        // Use React 18+ automatic batching
+        startTransition(() => {
+          setMessage(val);
+          if (historyIndex !== null) {
+            setHistoryIndex(null);
+            setDraftBeforeHistory(null);
+          }
+        });
+        // Debounce draft callback on iOS to reduce re-renders
+        if (onDraftChange) {
+          if (draftChangeTimeoutRef.current) {
+            clearTimeout(draftChangeTimeoutRef.current);
+          }
+          draftChangeTimeoutRef.current = window.setTimeout(() => {
+            onDraftChange(val);
+            draftChangeTimeoutRef.current = null;
+          }, 100);
+        }
+      } else {
+        // Non-iOS: Update immediately as before
+        setMessage(val);
+        if (historyIndex !== null) {
+          setHistoryIndex(null);
+          setDraftBeforeHistory(null);
+        }
+        onDraftChange?.(val);
+      }
     },
     [historyIndex, onDraftChange],
   );

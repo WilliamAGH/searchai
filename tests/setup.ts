@@ -11,15 +11,21 @@ import * as React from "react";
 import { vi } from "vitest";
 
 // Ensure NODE_ENV is set for consistent test behavior
-if (!process.env.NODE_ENV) {
+if (
+  typeof process !== "undefined" &&
+  (process as any).env &&
+  !process.env.NODE_ENV
+) {
   process.env.NODE_ENV = "test";
 }
 
 // Minimal one-time debug to trace React environment under hooks
-// eslint-disable-next-line no-console
-console.log(
-  `[TestSetup] React ${React.version}; act=${typeof (React as any).act}`,
-);
+if (typeof process !== "undefined" && process.env?.VERBOSE_TEST_SETUP === "1") {
+  // eslint-disable-next-line no-console
+  console.log(
+    `[TestSetup] React ${React.version}; act=${typeof (React as any).act}`,
+  );
+}
 
 // Ensure global React is available for Testing Library
 if (typeof globalThis !== "undefined" && !globalThis.React) {

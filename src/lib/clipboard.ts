@@ -37,10 +37,27 @@ import { isIOSSafari, safeFocus, safeSelect } from "./utils/ios";
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
-    // Prefer modern Clipboard API when available
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
+    // SSR/non-browser guard
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      logger.warn("[Clipboard] Non-browser environment: copy not supported");
+      return false;
+    }
+
+    // Prefer modern Clipboard API when available; gracefully fall back if it throws
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      window.isSecureContext
+    ) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        logger.warn(
+          "[Clipboard] navigator.clipboard.writeText failed; falling back to execCommand",
+          err,
+        );
+      }
     }
 
     // Fallback for older browsers or non-secure contexts
@@ -49,6 +66,8 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     textArea.style.position = "fixed";
     textArea.style.left = "-999999px";
     textArea.style.top = "-999999px";
+    // Prevent virtual keyboards from showing up
+    textArea.setAttribute("readonly", "");
     document.body.appendChild(textArea);
 
     /**
@@ -65,7 +84,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       // On iOS Safari, try to select without focus
       // This sometimes works and avoids the keyboard crash
       try {
-        textArea.setSelectionRange(0, text.length);
+        textArea.setSelectionRange(0, textArea.value.length);
       } catch {
         // If selection fails, continue anyway
         logger.warn(
@@ -166,7 +185,9 @@ export function formatConversationWithSources(
 
       // Add sources section if we have any
       if (sources.length > 0) {
-        formatted.push("\nSources:");
+        // Add an empty line, then the Sources header for readability
+        formatted.push("");
+        formatted.push("Sources:");
         formatted.push(...sources);
       }
     }

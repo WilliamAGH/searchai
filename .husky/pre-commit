@@ -4,7 +4,9 @@
 set -eu
 
 # Ensure local binaries and consistent Node in non-login shells (e.g., VS Code)
-export PATH="$PWD/node_modules/.bin:$PATH"
+# Use git root to be robust to odd CWDs
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+export PATH="$REPO_ROOT/node_modules/.bin:$PATH"
 
 # Try to load Node via NVM/FNM/Volta if not already available
 if ! command -v node >/dev/null 2>&1; then
@@ -76,10 +78,15 @@ fi
 echo "🚀 Validating Convex deployment..."
 # Use documented --typecheck=enable flag for strict checking
 set +e
-# Scope CONVEX_DEPLOYMENT only to this command to avoid leaking into tests
-CONVEX_DEPLOYMENT="${CONVEX_DEPLOYMENT:-diligent-greyhound-240}" \
-  npx --no-install convex dev --once --typecheck=enable > /tmp/convex-check.log 2>&1
-CONVEX_EXIT_CODE=$?
+if git diff --name-only --cached | grep -q '^convex/'; then
+  # Scope CONVEX_DEPLOYMENT only to this command to avoid leaking into tests
+  CONVEX_DEPLOYMENT="${CONVEX_DEPLOYMENT:-diligent-greyhound-240}" \
+    npx --no-install convex dev --once --typecheck=enable > /tmp/convex-check.log 2>&1
+  CONVEX_EXIT_CODE=$?
+else
+  echo "ℹ️  Skipping Convex validation (no staged changes under convex/)."
+  CONVEX_EXIT_CODE=0
+fi
 set -e
 if [ $CONVEX_EXIT_CODE -ne 0 ]; then
   echo "❌ Convex deployment validation failed!"
@@ -123,8 +130,13 @@ fi
 # Check environment variable usage patterns
 echo "🔍 Checking environment variable usage patterns..."
 set +e
-npm run check:env-vars > /tmp/env-check.log 2>&1
-ENV_CHECK=$?
+if npm run -s | grep -q 'check:env-vars'; then
+  npm run check:env-vars > /tmp/env-check.log 2>&1
+  ENV_CHECK=$?
+else
+  echo "ℹ️  Skipping env var usage check (no check:env-vars script)."
+  ENV_CHECK=0
+fi
 set -e
 if [ $ENV_CHECK -ne 0 ]; then
   echo "⚠️  Environment variable usage issues detected:"
@@ -140,8 +152,14 @@ npx --no-install lint-staged
 # 5. Quick test run (ensure tests pass)
 echo "🧪 Running tests..."
 # Run Vitest via Node to avoid npm and symlink resolution issues in VS Code Git env
-NODE_ENV=test node ./node_modules/vitest/vitest.mjs run --no-cache --watch=false --config vitest.config.ts \
-  > /tmp/node-tests-precommit.log 2>&1 || TEST_EXIT=$?
+if [ -f ./node_modules/vitest/vitest.mjs ]; then
+  NODE_ENV=test node ./node_modules/vitest/vitest.mjs run --no-cache --watch=false --config vitest.config.ts \
+    > /tmp/node-tests-precommit.log 2>&1 || TEST_EXIT=$?
+else
+  # Fallback to npx if direct file is missing (no install to avoid network)
+  NODE_ENV=test npx --no-install vitest run --no-cache --watch=false --config vitest.config.ts \
+    > /tmp/node-tests-precommit.log 2>&1 || TEST_EXIT=$?
+fi
 TEST_EXIT=${TEST_EXIT:-0}
 if [ $TEST_EXIT -ne 0 ]; then
   echo "❌ Tests failed! Fix tests before committing."

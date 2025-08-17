@@ -57,15 +57,28 @@ export function isIOSSafari(): boolean {
     return false;
   }
 
-  // Check for iOS devices
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const ua = navigator.userAgent;
+
+  // Traditional iOS detection
+  const isTraditionalIOS = /iPad|iPhone|iPod/.test(ua);
+
+  // iPadOS 13+ detection (reports as desktop Safari)
+  // These iPads report platform as "MacIntel" with touch support
+  const isIPadOS13Plus =
+    navigator.platform === "MacIntel" &&
+    navigator.maxTouchPoints > 1 &&
+    !ua.includes("Chrome") &&
+    !ua.includes("Firefox") &&
+    !ua.includes("Edg");
+
+  // Check if it's iOS (traditional or new iPadOS)
+  const isIOS = isTraditionalIOS || isIPadOS13Plus;
+
   if (!isIOS) return false;
 
   // Check for Safari WebKit (not Chrome, Firefox, or Opera on iOS)
-  const isWebKit = /WebKit/.test(navigator.userAgent);
-  const isNotOtherBrowser = !/CriOS|FxiOS|OPiOS|mercury/.test(
-    navigator.userAgent,
-  );
+  const isWebKit = /WebKit/.test(ua);
+  const isNotOtherBrowser = !/CriOS|FxiOS|OPiOS|mercury/.test(ua);
 
   return isWebKit && isNotOtherBrowser;
 }

@@ -101,12 +101,12 @@ export function SignUpModal({
           // Reverse tab
           if (active === first || !container.contains(active)) {
             e.preventDefault();
-            last.focus();
+            safeFocus(last, { preventScroll: true });
           }
         } else if (active === last) {
           // Forward tab
           e.preventDefault();
-          first.focus();
+          safeFocus(first, { preventScroll: true });
         }
       }
     };
@@ -117,7 +117,7 @@ export function SignUpModal({
     return () => {
       node?.removeEventListener("keydown", handleKeyDown);
       // Restore focus to the element that was focused before opening
-      previouslyFocusedRef.current?.focus?.();
+      safeFocus(previouslyFocusedRef.current, { preventScroll: true });
     };
   }, [isOpen, onClose]);
 
