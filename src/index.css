@@ -370,7 +370,8 @@ body {
 /* Auth styles for compatibility */
 .auth-input-field {
   @apply w-full px-4 py-3 rounded-lg bg-background border border-input focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-shadow;
-  font-size: 16px !important; /* Mobile fix */
+  /* CRITICAL: iOS Safari requires 16px+ font size to prevent zoom on focus */
+  font-size: 16px !important;
 }
 
 .auth-button {
@@ -680,17 +681,34 @@ html.dark .message-textarea {
   }
 }
 
-/* Safari-specific performance optimizations */
+/**
+ * Safari-specific optimizations for message textarea
+ * 
+ * CRITICAL iOS SAFARI REQUIREMENTS:
+ * 
+ * DO NOT ADD these CSS properties to input/textarea elements:
+ * - transform: translateZ(0) or translate3d() - Causes focus loss & keyboard dismissal
+ * - will-change: height/transform - Triggers compositing issues with virtual keyboard
+ * - -webkit-transform: translateZ(0) - Hardware acceleration breaks input focus
+ * 
+ * These properties were historically used for performance but cause severe
+ * input issues on iOS Safari, including:
+ * - Keyboard disappearing after a few seconds of typing
+ * - Cursor disappearing while keyboard remains visible
+ * - Complete loss of input focus requiring page reload
+ * 
+ * @see https://bugs.webkit.org/show_bug.cgi?id=176896 - Transform focus issues
+ * @see https://stackoverflow.com/q/57710542 - iOS Safari input compositing bugs
+ */
 @supports (-webkit-touch-callout: none) {
   .message-textarea {
     /* Prevent font boosting on iOS */
     -webkit-text-size-adjust: 100%;
-    /* REMOVED hardware acceleration - causes iOS Safari focus issues */
-    /* -webkit-transform: translateZ(0); */
-    /* transform: translateZ(0); */
-    /* REMOVED will-change - causes iOS Safari keyboard issues */
-    /* will-change: height; */
-    /* Prevent rubber-band scrolling conflicts */
+    /* CRITICAL: Hardware acceleration removed - DO NOT RE-ADD */
+    /* -webkit-transform: translateZ(0); */ /* BREAKS iOS SAFARI */
+    /* transform: translateZ(0); */ /* BREAKS iOS SAFARI */
+    /* will-change: height; */ /* BREAKS iOS SAFARI */
+    /* Safe scrolling optimization */
     -webkit-overflow-scrolling: touch;
   }
 

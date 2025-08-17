@@ -5,6 +5,27 @@
     <!-- Favicons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/site.webmanifest" />
+    <!-- 
+      CRITICAL iOS SAFARI VIEWPORT CONFIGURATION:
+      
+      DO NOT add unsupported viewport properties like:
+      - interactive-widget=resizes-content (NOT supported by Safari/WebKit)
+      - interactive-widget=resizes-visual (NOT supported by Safari/WebKit)
+      - interactive-widget=overlays-content (NOT supported by Safari/WebKit)
+      
+      These properties are Chrome-only (as of 2024) and cause iOS Safari to:
+      - Mishandle virtual keyboard appearance/dismissal
+      - Lose input focus unexpectedly
+      - Create unpredictable viewport behavior
+      
+      Only use well-supported viewport properties:
+      - width=device-width (responsive width)
+      - initial-scale=1 (no zoom on load)
+      - viewport-fit=cover (for notched devices)
+      
+      @see https://developer.mozilla.org/en-US/docs/Web/HTML/Viewport_meta_tag
+      @see https://webkit.org/blog/7929/designing-websites-for-iphone-x/
+    -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <title>SearchAI - AI-Powered Web Search</title>
