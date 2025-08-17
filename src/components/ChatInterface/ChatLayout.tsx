@@ -1,6 +1,21 @@
 /**
  * Chat layout component
  * Handles the layout structure and conditional rendering
+ *
+ * CRITICAL iOS SAFARI REQUIREMENT:
+ * DO NOT add React key prop to MessageInput based on currentChatId or any dynamic value!
+ *
+ * Using key={currentChatId} causes the component to completely unmount and remount
+ * when the chat changes, which leads to:
+ * - Complete loss of keyboard focus on iOS Safari
+ * - Virtual keyboard dismissal
+ * - Loss of any text being typed
+ * - Failed focus recovery attempts
+ *
+ * The MessageInput component manages its own state internally and should persist
+ * across chat changes. Props updates are sufficient for state changes.
+ *
+ * @see https://github.com/facebook/react/issues/3226 - React key prop remounting
  */
 
 import React from "react";
@@ -164,6 +179,7 @@ export function ChatLayout({
               }}
             />
           )}
+          {/* CRITICAL: Never add key prop here! See component JSDoc for iOS Safari issues */}
           <MessageInput {...messageInputProps} />
         </div>
       </div>
