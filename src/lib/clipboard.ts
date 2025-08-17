@@ -1,16 +1,43 @@
 /**
  * Clipboard utilities for copying text
+ *
+ * @module clipboard
+ * @description Safe clipboard operations with iOS Safari protection
  */
 
 import { logger } from "./logger";
+import { isIOSSafari, safeFocus, safeSelect } from "./utils/ios";
 
 /**
- * Copy text to clipboard with fallback support
- * @param text - Text to copy to clipboard
- * @returns Promise resolving to success status
+ * Copy text to clipboard with fallback support and iOS Safari protection
+ *
+ * @description Safely copies text to clipboard with multiple fallback mechanisms.
+ * Includes special handling for iOS Safari to prevent keyboard crashes during
+ * the copy operation.
+ *
+ * @param {string} text - Text to copy to clipboard
+ *
+ * @returns {Promise<boolean>} Promise resolving to true if copy was successful, false otherwise
+ *
+ * @remarks
+ * - Prefers modern Clipboard API when available
+ * - Falls back to execCommand for older browsers
+ * - Skips focus/select operations on iOS Safari to prevent crashes
+ * - Handles both secure and non-secure contexts
+ *
+ * @example
+ * ```typescript
+ * const success = await copyToClipboard('Hello, world!');
+ * if (success) {
+ *   toast.success('Copied to clipboard!');
+ * } else {
+ *   toast.error('Failed to copy');
+ * }
+ * ```
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
+    // Prefer modern Clipboard API when available
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text);
       return true;
@@ -23,8 +50,29 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     textArea.style.left = "-999999px";
     textArea.style.top = "-999999px";
     document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
+
+    /**
+     * CRITICAL iOS Safari Fix: We must be very careful with focus and select
+     * operations on iOS Safari as they can trigger keyboard crashes.
+     * On iOS Safari, we skip these operations and rely on the execCommand
+     * to work without them (which it often does).
+     */
+    if (!isIOSSafari()) {
+      // Only focus and select on non-iOS Safari browsers
+      safeFocus(textArea, { preventScroll: true });
+      safeSelect(textArea);
+    } else {
+      // On iOS Safari, try to select without focus
+      // This sometimes works and avoids the keyboard crash
+      try {
+        textArea.setSelectionRange(0, text.length);
+      } catch {
+        // If selection fails, continue anyway
+        logger.warn(
+          "[Clipboard] iOS Safari: Selection skipped to prevent crash",
+        );
+      }
+    }
 
     try {
       const successful = document.execCommand("copy");

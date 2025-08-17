@@ -689,21 +689,75 @@ html.dark .message-textarea {
 /**
  * Safari-specific optimizations for message textarea
  * 
- * CRITICAL iOS SAFARI REQUIREMENTS:
+ * ⚠️⚠️⚠️ CRITICAL iOS SAFARI KEYBOARD BUG - CSS REQUIREMENTS ⚠️⚠️⚠️
  * 
- * DO NOT ADD these CSS properties to input/textarea elements:
- * - transform: translateZ(0) or translate3d() - Causes focus loss & keyboard dismissal
- * - will-change: height/transform - Triggers compositing issues with virtual keyboard
- * - -webkit-transform: translateZ(0) - Hardware acceleration breaks input focus
+ * THIS SECTION CONTAINS CRITICAL FIXES FOR iOS SAFARI KEYBOARD CRASHES.
+ * VIOLATING THESE RULES WILL CAUSE THE KEYBOARD TO DISAPPEAR/CRASH.
  * 
- * These properties were historically used for performance but cause severe
- * input issues on iOS Safari, including:
- * - Keyboard disappearing after a few seconds of typing
- * - Cursor disappearing while keyboard remains visible
- * - Complete loss of input focus requiring page reload
+ * THE PROBLEM:
+ * iOS Safari virtual keyboard crashes when certain CSS properties are applied
+ * to input/textarea elements. This has been confirmed through 9+ fix attempts.
+ * 
+ * ⛔ FORBIDDEN CSS PROPERTIES - DO NOT ADD TO INPUT/TEXTAREA:
+ * 
+ * 1. transform: translateZ(0) or translate3d()
+ *    - Triggers hardware acceleration
+ *    - Causes immediate focus loss
+ *    - Keyboard dismisses and cannot recover
+ *    
+ * 2. will-change: transform, height, or any value
+ *    - Creates compositing layers
+ *    - Conflicts with virtual keyboard rendering
+ *    - Causes keyboard to disappear after 1-2 seconds
+ *    
+ * 3. -webkit-transform: translateZ(0)
+ *    - WebKit-specific hardware acceleration
+ *    - Breaks focus management completely
+ *    - Requires page reload to fix
+ *    
+ * 4. position: fixed on input containers (use with caution)
+ *    - Can cause viewport calculation issues
+ *    - Keyboard may cover the input
+ *    - Input may jump around when keyboard opens
+ *    
+ * 5. transition on height or transform properties
+ *    - Interferes with keyboard animation
+ *    - Can cause input to become unresponsive
+ *    - Creates race conditions with focus events
+ * 
+ * SYMPTOMS WHEN RULES ARE VIOLATED:
+ * - Keyboard disappears instantly when typing
+ * - Keyboard appears but no text can be entered
+ * - Cursor disappears while keyboard remains visible
+ * - Input becomes completely unresponsive
+ * - Page requires reload to restore functionality
+ * 
+ * SAFE ALTERNATIVES:
+ * - Use opacity for fade effects (not transform)
+ * - Use padding/margin for positioning (not translate)
+ * - Use JavaScript for dynamic height (not CSS transitions)
+ * - Use -webkit-overflow-scrolling: touch for smooth scrolling
+ * 
+ * TESTING REQUIREMENTS:
+ * - Test on REAL iOS devices (iPad/iPhone)
+ * - Test with Safari (not Chrome/Firefox on iOS)
+ * - Test rapid typing and focus changes
+ * - Test with different keyboard types (default, numeric, email)
+ * 
+ * HISTORY:
+ * These properties were commonly used for performance optimization
+ * but cause catastrophic failures on iOS Safari 14+ with virtual keyboards.
+ * The issues are related to how Safari handles compositing layers and
+ * the interaction between hardware acceleration and the virtual keyboard.
  * 
  * @see https://bugs.webkit.org/show_bug.cgi?id=176896 - Transform focus issues
+ * @see https://bugs.webkit.org/show_bug.cgi?id=195884 - iOS Safari focus issues  
  * @see https://stackoverflow.com/q/57710542 - iOS Safari input compositing bugs
+ * @see https://github.com/facebook/react/issues/26805 - React iOS textarea bug
+ * 
+ * @author William Callahan
+ * @lastModified 2025-08-17
+ * @criticalBugFix Prevents iOS Safari keyboard crash via CSS constraints
  */
 @supports (-webkit-touch-callout: none) {
   .message-textarea {
@@ -738,4 +792,50 @@ textarea,
   -moz-user-select: text !important;
   -ms-user-select: text !important;
   user-select: text !important;
+}
+
+/* iOS Safari input fix: Disable all transitions on input elements */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  button {
+    transition: none !important;
+  }
+
+  /* iOS Safari input fix: Disable backdrop filters on elements near inputs */
+  .backdrop-blur,
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Explicit class to disable transitions */
+  .no-transition {
+    transition: none !important;
+  }
+
+  /* Explicit class to disable backdrop blur */
+  .no-backdrop-blur {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .smooth-transition {
+    transition:
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
 }
