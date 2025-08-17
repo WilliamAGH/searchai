@@ -164,6 +164,8 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       onClearError,
       // NEW: Add streaming state for real-time updates
       streamingState,
+      // Pass read-only state to MessageList
+      isReadOnly: _isReadOnly,
     }),
     [
       currentMessages,
@@ -185,6 +187,7 @@ export function useComponentProps(args: UseComponentPropsArgs) {
       onClearError,
       // NEW: Include streaming state in dependencies
       streamingState,
+      _isReadOnly,
     ],
   );
 
