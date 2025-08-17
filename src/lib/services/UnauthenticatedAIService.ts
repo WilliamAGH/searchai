@@ -68,7 +68,7 @@ export class UnauthenticatedAIService {
     this.abortController = new AbortController();
 
     logger.info("[UnauthenticatedAIService] Starting generateResponse", {
-      message: message.substring(0, 50),
+      messageLength: message.length,
       chatId,
       hasOnChunk: !!onChunk,
       hasOnComplete: !!onComplete,

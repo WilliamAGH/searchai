@@ -3,7 +3,7 @@
  * Handles retry logic with exponential backoff and circuit breaker pattern
  */
 
-import { logger } from '../logger';
+import { logger } from "../logger";
 
 export interface RetryOptions {
   maxAttempts?: number;
@@ -48,7 +48,7 @@ export class RetryManager {
   async retry<T>(
     fn: () => Promise<T>,
     options: RetryOptions = {},
-    key?: string
+    key?: string,
   ): Promise<T> {
     const {
       maxAttempts = 3,
@@ -76,7 +76,7 @@ export class RetryManager {
       try {
         // Update stats
         if (key) {
-          this.updateStats(key, 'attempt');
+          this.updateStats(key, "attempt");
         }
 
         // Execute with optional timeout
@@ -86,7 +86,7 @@ export class RetryManager {
 
         // Success - update stats and reset circuit breaker
         if (key) {
-          this.updateStats(key, 'success');
+          this.updateStats(key, "success");
           this.getCircuitBreaker(key).recordSuccess();
         }
 
@@ -96,13 +96,13 @@ export class RetryManager {
 
         // Update stats
         if (key) {
-          this.updateStats(key, 'failure', lastError);
+          this.updateStats(key, "failure", lastError);
           this.getCircuitBreaker(key).recordFailure();
         }
 
         // Check if we should retry
         if (!shouldRetry(lastError)) {
-          logger.debug('Error is not retryable', {
+          logger.debug("Error is not retryable", {
             error: lastError.message,
             attempt,
           });
@@ -111,7 +111,7 @@ export class RetryManager {
 
         // Check if we have more attempts
         if (attempt >= maxAttempts) {
-          logger.error('Max retry attempts reached', {
+          logger.error("Max retry attempts reached", {
             maxAttempts,
             error: lastError.message,
             key,
@@ -120,9 +120,7 @@ export class RetryManager {
         }
 
         // Calculate delay with optional jitter
-        const actualDelay = jitter
-          ? delay * (0.5 + Math.random())
-          : delay;
+        const actualDelay = jitter ? delay * (0.5 + Math.random()) : delay;
 
         logger.info(`Retry attempt ${attempt}/${maxAttempts}`, {
           delay: actualDelay,
@@ -143,7 +141,7 @@ export class RetryManager {
       }
     }
 
-    throw lastError || new Error('Retry failed');
+    throw lastError || new Error("Retry failed");
   }
 
   /**
@@ -151,14 +149,14 @@ export class RetryManager {
    */
   async retryBatch<T>(
     operations: Array<() => Promise<T>>,
-    options: RetryOptions = {}
+    options: RetryOptions = {},
   ): Promise<Array<{ success: boolean; result?: T; error?: Error }>> {
     const results = await Promise.allSettled(
-      operations.map(op => this.retry(op, options))
+      operations.map((op) => this.retry(op, options)),
     );
 
-    return results.map(result => {
-      if (result.status === 'fulfilled') {
+    return results.map((result) => {
+      if (result.status === "fulfilled") {
         return { success: true, result: result.value };
       } else {
         return { success: false, error: result.reason };
@@ -203,8 +201,8 @@ export class RetryManager {
    */
   private updateStats(
     key: string,
-    type: 'attempt' | 'success' | 'failure',
-    error?: Error
+    type: "attempt" | "success" | "failure",
+    error?: Error,
   ): void {
     const stats = this.stats.get(key) || {
       attempts: 0,
@@ -215,9 +213,9 @@ export class RetryManager {
     stats.attempts++;
     stats.lastAttempt = new Date();
 
-    if (type === 'success') {
+    if (type === "success") {
       stats.successes++;
-    } else if (type === 'failure') {
+    } else if (type === "failure") {
       stats.failures++;
       stats.lastError = error;
     }
@@ -230,12 +228,12 @@ export class RetryManager {
    */
   private defaultShouldRetry(error: Error): boolean {
     // Retry on network errors
-    if (error.message.includes('network') || error.message.includes('fetch')) {
+    if (error.message.includes("network") || error.message.includes("fetch")) {
       return true;
     }
 
     // Retry on timeout errors
-    if (error.message.includes('timeout')) {
+    if (error.message.includes("timeout")) {
       return true;
     }
 
@@ -261,11 +259,11 @@ export class RetryManager {
       }, timeoutMs);
 
       promise
-        .then(result => {
+        .then((result) => {
           clearTimeout(timeoutId);
           resolve(result);
         })
-        .catch(error => {
+        .catch((error) => {
           clearTimeout(timeoutId);
           reject(error);
         });
@@ -276,7 +274,7 @@ export class RetryManager {
    * Sleep for specified milliseconds
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
@@ -286,7 +284,7 @@ export class RetryManager {
  */
 class CircuitBreaker {
   private readonly key: string;
-  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  private state: "closed" | "open" | "half-open" = "closed";
   private failures: number = 0;
   private lastFailureTime?: Date;
   private readonly threshold: number = 5;
@@ -297,16 +295,16 @@ class CircuitBreaker {
   }
 
   canAttempt(): boolean {
-    if (this.state === 'closed') {
+    if (this.state === "closed") {
       return true;
     }
 
-    if (this.state === 'open') {
+    if (this.state === "open") {
       // Check if timeout has passed
       if (this.lastFailureTime) {
         const elapsed = Date.now() - this.lastFailureTime.getTime();
         if (elapsed > this.timeout) {
-          this.state = 'half-open';
+          this.state = "half-open";
           logger.info(`Circuit breaker half-open for: ${this.key}`);
           return true;
         }
@@ -319,10 +317,10 @@ class CircuitBreaker {
   }
 
   recordSuccess(): void {
-    if (this.state === 'half-open') {
+    if (this.state === "half-open") {
       logger.info(`Circuit breaker closed for: ${this.key}`);
     }
-    this.state = 'closed';
+    this.state = "closed";
     this.failures = 0;
     this.lastFailureTime = undefined;
   }
@@ -331,11 +329,11 @@ class CircuitBreaker {
     this.failures++;
     this.lastFailureTime = new Date();
 
-    if (this.state === 'half-open') {
-      this.state = 'open';
+    if (this.state === "half-open") {
+      this.state = "open";
       logger.warn(`Circuit breaker reopened for: ${this.key}`);
     } else if (this.failures >= this.threshold) {
-      this.state = 'open';
+      this.state = "open";
       logger.warn(`Circuit breaker opened for: ${this.key}`, {
         failures: this.failures,
         threshold: this.threshold,
@@ -352,18 +350,18 @@ export const retryManager = RetryManager.getInstance();
  */
 export function withRetry(options: RetryOptions = {}) {
   return function (
-    target: any,
+    target: object,
     propertyKey: string,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       const key = `${target.constructor.name}.${propertyKey}`;
       return retryManager.retry(
         () => originalMethod.apply(this, args),
         options,
-        key
+        key,
       );
     };
 

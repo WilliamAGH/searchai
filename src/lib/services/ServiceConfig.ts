@@ -3,7 +3,7 @@
  * Centralized service configuration with health status tracking
  */
 
-import { logger } from '../logger';
+import { logger } from "../logger";
 
 export interface ServiceConfig {
   name: string;
@@ -18,12 +18,12 @@ export interface ServiceConfig {
 
 export interface ServiceHealth {
   service: string;
-  status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  status: "healthy" | "degraded" | "unhealthy" | "unknown";
   lastCheck: Date;
   responseTime?: number;
   errorCount: number;
   consecutiveFailures: number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 /**
@@ -52,44 +52,44 @@ export class ServiceRegistry {
   private initializeDefaultServices() {
     // Convex Backend
     this.registerService({
-      name: 'convex',
-      baseUrl: import.meta.env.VITE_CONVEX_URL || '',
+      name: "convex",
+      baseUrl: import.meta.env.VITE_CONVEX_URL || "",
       timeout: 30000,
       retryCount: 3,
       retryDelay: 1000,
       required: true,
-      healthCheckEndpoint: '/api/health',
+      healthCheckEndpoint: "/api/health",
       healthCheckInterval: 60000, // 1 minute
     });
 
     // AI Service (OpenRouter)
     this.registerService({
-      name: 'openrouter',
-      baseUrl: 'https://openrouter.ai',
+      name: "openrouter",
+      baseUrl: "https://openrouter.ai",
       timeout: 90000,
       retryCount: 2,
       retryDelay: 2000,
       required: false,
-      healthCheckEndpoint: '/api/v1/models',
+      healthCheckEndpoint: "/api/v1/models",
       healthCheckInterval: 300000, // 5 minutes
     });
 
     // Search Service (SERP API)
     this.registerService({
-      name: 'serpapi',
-      baseUrl: 'https://serpapi.com',
+      name: "serpapi",
+      baseUrl: "https://serpapi.com",
       timeout: 15000,
       retryCount: 2,
       retryDelay: 1000,
       required: false,
-      healthCheckEndpoint: '/account',
+      healthCheckEndpoint: "/account",
       healthCheckInterval: 300000, // 5 minutes
     });
 
     // DuckDuckGo Search
     this.registerService({
-      name: 'duckduckgo',
-      baseUrl: 'https://api.duckduckgo.com',
+      name: "duckduckgo",
+      baseUrl: "https://api.duckduckgo.com",
       timeout: 10000,
       retryCount: 3,
       retryDelay: 500,
@@ -103,11 +103,11 @@ export class ServiceRegistry {
    */
   registerService(config: ServiceConfig) {
     this.services.set(config.name, config);
-    
+
     // Initialize health status
     this.healthStatus.set(config.name, {
       service: config.name,
-      status: 'unknown',
+      status: "unknown",
       lastCheck: new Date(),
       errorCount: 0,
       consecutiveFailures: 0,
@@ -156,32 +156,32 @@ export class ServiceRegistry {
    * Get overall system health
    */
   getSystemHealth(): {
-    status: 'healthy' | 'degraded' | 'critical';
+    status: "healthy" | "degraded" | "critical";
     healthy: number;
     degraded: number;
     unhealthy: number;
     requiredServicesHealthy: boolean;
   } {
     const statuses = this.getAllServiceHealth();
-    const healthy = statuses.filter(s => s.status === 'healthy').length;
-    const degraded = statuses.filter(s => s.status === 'degraded').length;
-    const unhealthy = statuses.filter(s => s.status === 'unhealthy').length;
+    const healthy = statuses.filter((s) => s.status === "healthy").length;
+    const degraded = statuses.filter((s) => s.status === "degraded").length;
+    const unhealthy = statuses.filter((s) => s.status === "unhealthy").length;
 
     // Check if all required services are healthy
     const requiredServicesHealthy = Array.from(this.services.entries())
       .filter(([_, config]) => config.required)
       .every(([name, _]) => {
         const health = this.healthStatus.get(name);
-        return health && health.status === 'healthy';
+        return health && health.status === "healthy";
       });
 
-    let status: 'healthy' | 'degraded' | 'critical';
+    let status: "healthy" | "degraded" | "critical";
     if (!requiredServicesHealthy || unhealthy > 0) {
-      status = 'critical';
+      status = "critical";
     } else if (degraded > 0) {
-      status = 'degraded';
+      status = "degraded";
     } else {
-      status = 'healthy';
+      status = "healthy";
     }
 
     return {
@@ -198,14 +198,14 @@ export class ServiceRegistry {
    */
   updateServiceHealth(
     name: string,
-    status: 'healthy' | 'degraded' | 'unhealthy',
+    status: "healthy" | "degraded" | "unhealthy",
     responseTime?: number,
-    details?: Record<string, any>
+    details?: Record<string, unknown>,
   ) {
     const current = this.healthStatus.get(name);
     if (!current) return;
 
-    const isFailure = status === 'unhealthy';
+    const isFailure = status === "unhealthy";
     const consecutiveFailures = isFailure
       ? (current.consecutiveFailures || 0) + 1
       : 0;
@@ -222,7 +222,12 @@ export class ServiceRegistry {
 
     // Log significant status changes
     if (current.status !== status) {
-      const level = status === 'unhealthy' ? 'error' : status === 'degraded' ? 'warn' : 'info';
+      const level =
+        status === "unhealthy"
+          ? "error"
+          : status === "degraded"
+            ? "warn"
+            : "info";
       logger[level](`Service health changed: ${name}`, {
         previousStatus: current.status,
         newStatus: status,
@@ -280,7 +285,7 @@ export class ServiceRegistry {
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         const response = await fetch(url, {
-          method: 'GET',
+          method: "GET",
           signal: controller.signal,
         });
 
@@ -288,11 +293,11 @@ export class ServiceRegistry {
         const responseTime = Date.now() - startTime;
 
         if (response.ok) {
-          this.updateServiceHealth(name, 'healthy', responseTime, {
+          this.updateServiceHealth(name, "healthy", responseTime, {
             statusCode: response.status,
           });
         } else {
-          const status = response.status >= 500 ? 'unhealthy' : 'degraded';
+          const status = response.status >= 500 ? "unhealthy" : "degraded";
           this.updateServiceHealth(name, status, responseTime, {
             statusCode: response.status,
             statusText: response.statusText,
@@ -300,12 +305,12 @@ export class ServiceRegistry {
         }
       } else {
         // For services without health endpoints, mark as healthy if configured
-        this.updateServiceHealth(name, 'healthy', Date.now() - startTime);
+        this.updateServiceHealth(name, "healthy", Date.now() - startTime);
       }
     } catch (error) {
       const responseTime = Date.now() - startTime;
-      this.updateServiceHealth(name, 'unhealthy', responseTime, {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      this.updateServiceHealth(name, "unhealthy", responseTime, {
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
@@ -337,7 +342,7 @@ export class ServiceRegistry {
     if (health.consecutiveFailures >= 5) return false;
 
     // Use healthy and degraded services
-    return health.status === 'healthy' || health.status === 'degraded';
+    return health.status === "healthy" || health.status === "degraded";
   }
 
   /**
@@ -350,7 +355,7 @@ export class ServiceRegistry {
     if (!config) return 30000; // Default 30s
 
     // Increase timeout for degraded services
-    if (health && health.status === 'degraded') {
+    if (health && health.status === "degraded") {
       return config.timeout * 1.5;
     }
 

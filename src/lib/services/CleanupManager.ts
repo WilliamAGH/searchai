@@ -4,10 +4,16 @@
  * Prevents memory leaks by tracking and cleaning up resources
  */
 
-import { logger } from '../logger';
+import { logger } from "../logger";
 
 type CleanupFunction = () => void | Promise<void>;
-type ResourceType = 'subscription' | 'timer' | 'eventListener' | 'stream' | 'worker' | 'other';
+type ResourceType =
+  | "subscription"
+  | "timer"
+  | "eventListener"
+  | "stream"
+  | "worker"
+  | "other";
 
 interface TrackedResource {
   id: string;
@@ -50,10 +56,10 @@ export class CleanupManager {
     options?: {
       component?: string;
       description?: string;
-    }
+    },
   ): string {
     const id = this.generateResourceId(type);
-    
+
     const resource: TrackedResource = {
       id,
       type,
@@ -64,7 +70,7 @@ export class CleanupManager {
     };
 
     this.resources.set(id, resource);
-    
+
     // Update counters
     const currentCount = this.resourceCounters.get(type) || 0;
     this.resourceCounters.set(type, currentCount + 1);
@@ -78,7 +84,7 @@ export class CleanupManager {
 
     // Warn if too many resources
     if (this.resources.size > 100) {
-      logger.warn('High number of tracked resources', {
+      logger.warn("High number of tracked resources", {
         count: this.resources.size,
         byType: Object.fromEntries(this.resourceCounters),
       });
@@ -100,7 +106,7 @@ export class CleanupManager {
     try {
       await resource.cleanup();
       this.resources.delete(id);
-      
+
       // Update counters
       const currentCount = this.resourceCounters.get(resource.type) || 0;
       if (currentCount > 0) {
@@ -114,7 +120,7 @@ export class CleanupManager {
       });
     } catch (error) {
       logger.error(`Failed to cleanup resource: ${id}`, {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
         type: resource.type,
         component: resource.component,
       });
@@ -125,18 +131,21 @@ export class CleanupManager {
    * Cleanup all resources for a specific component
    */
   async cleanupComponent(component: string): Promise<void> {
-    const componentResources = Array.from(this.resources.values())
-      .filter(r => r.component === component);
+    const componentResources = Array.from(this.resources.values()).filter(
+      (r) => r.component === component,
+    );
 
     if (componentResources.length === 0) {
       logger.debug(`No resources to cleanup for component: ${component}`);
       return;
     }
 
-    logger.info(`Cleaning up ${componentResources.length} resources for component: ${component}`);
+    logger.info(
+      `Cleaning up ${componentResources.length} resources for component: ${component}`,
+    );
 
-    const cleanupPromises = componentResources.map(resource =>
-      this.unregister(resource.id)
+    const cleanupPromises = componentResources.map((resource) =>
+      this.unregister(resource.id),
     );
 
     await Promise.all(cleanupPromises);
@@ -146,18 +155,21 @@ export class CleanupManager {
    * Cleanup all resources of a specific type
    */
   async cleanupByType(type: ResourceType): Promise<void> {
-    const typeResources = Array.from(this.resources.values())
-      .filter(r => r.type === type);
+    const typeResources = Array.from(this.resources.values()).filter(
+      (r) => r.type === type,
+    );
 
     if (typeResources.length === 0) {
       logger.debug(`No resources to cleanup for type: ${type}`);
       return;
     }
 
-    logger.info(`Cleaning up ${typeResources.length} resources of type: ${type}`);
+    logger.info(
+      `Cleaning up ${typeResources.length} resources of type: ${type}`,
+    );
 
-    const cleanupPromises = typeResources.map(resource =>
-      this.unregister(resource.id)
+    const cleanupPromises = typeResources.map((resource) =>
+      this.unregister(resource.id),
     );
 
     await Promise.all(cleanupPromises);
@@ -168,7 +180,7 @@ export class CleanupManager {
    */
   async cleanupAll(): Promise<void> {
     if (this.isCleaningUp) {
-      logger.warn('Cleanup already in progress');
+      logger.warn("Cleanup already in progress");
       return;
     }
 
@@ -176,7 +188,7 @@ export class CleanupManager {
     const totalResources = this.resources.size;
 
     if (totalResources === 0) {
-      logger.info('No resources to cleanup');
+      logger.info("No resources to cleanup");
       this.isCleaningUp = false;
       return;
     }
@@ -196,19 +208,19 @@ export class CleanupManager {
 
     // Cleanup in order of priority
     const cleanupOrder: ResourceType[] = [
-      'stream',
-      'worker',
-      'subscription',
-      'eventListener',
-      'timer',
-      'other',
+      "stream",
+      "worker",
+      "subscription",
+      "eventListener",
+      "timer",
+      "other",
     ];
 
     for (const type of cleanupOrder) {
       const resources = byType.get(type) || [];
       if (resources.length > 0) {
         logger.info(`Cleaning up ${resources.length} ${type} resources`);
-        await Promise.all(resources.map(r => this.unregister(r.id)));
+        await Promise.all(resources.map((r) => this.unregister(r.id)));
       }
     }
 
@@ -276,25 +288,30 @@ export class CleanupManager {
    * Check memory usage and trigger cleanup if needed
    */
   private checkMemoryUsage(): void {
-    if (typeof performance === 'undefined' || !('memory' in performance)) {
+    if (typeof performance === "undefined" || !("memory" in performance)) {
       return;
     }
 
-    const memory = (performance as any).memory;
+    const memory = (
+      performance as unknown as {
+        memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number };
+      }
+    ).memory;
+    if (!memory) return;
     const usedJSHeapSize = memory.usedJSHeapSize;
     const jsHeapSizeLimit = memory.jsHeapSizeLimit;
     const usage = (usedJSHeapSize / jsHeapSizeLimit) * 100;
 
-    logger.debug('Memory usage', {
-      used: Math.round(usedJSHeapSize / 1024 / 1024) + ' MB',
-      limit: Math.round(jsHeapSizeLimit / 1024 / 1024) + ' MB',
-      percentage: usage.toFixed(2) + '%',
+    logger.debug("Memory usage", {
+      used: Math.round(usedJSHeapSize / 1024 / 1024) + " MB",
+      limit: Math.round(jsHeapSizeLimit / 1024 / 1024) + " MB",
+      percentage: usage.toFixed(2) + "%",
     });
 
     // Trigger cleanup if memory usage is high
     if (usage > 80) {
-      logger.warn('High memory usage detected', {
-        percentage: usage.toFixed(2) + '%',
+      logger.warn("High memory usage detected", {
+        percentage: usage.toFixed(2) + "%",
         resources: this.resources.size,
       });
 
@@ -308,12 +325,13 @@ export class CleanupManager {
    */
   private cleanupOldResources(maxAgeMs: number = 5 * 60 * 1000): void {
     const now = Date.now();
-    const oldResources = Array.from(this.resources.values())
-      .filter(r => now - r.createdAt.getTime() > maxAgeMs);
+    const oldResources = Array.from(this.resources.values()).filter(
+      (r) => now - r.createdAt.getTime() > maxAgeMs,
+    );
 
     if (oldResources.length > 0) {
       logger.info(`Cleaning up ${oldResources.length} old resources`);
-      oldResources.forEach(r => this.unregister(r.id));
+      oldResources.forEach((r) => this.unregister(r.id));
     }
   }
 
@@ -356,7 +374,7 @@ export class CleanupScope {
     options?: {
       component?: string;
       description?: string;
-    }
+    },
   ): string {
     const id = this.manager.register(type, cleanup, options);
     this.scopeResources.add(id);
@@ -367,8 +385,8 @@ export class CleanupScope {
    * Cleanup all resources in this scope
    */
   async cleanup(): Promise<void> {
-    const promises = Array.from(this.scopeResources).map(id =>
-      this.manager.unregister(id)
+    const promises = Array.from(this.scopeResources).map((id) =>
+      this.manager.unregister(id),
     );
     await Promise.all(promises);
     this.scopeResources.clear();
@@ -395,14 +413,21 @@ export function useCleanup(component: string) {
   }, []);
 
   return {
-    register: (type: ResourceType, cleanup: CleanupFunction, description?: string) => {
+    register: (
+      type: ResourceType,
+      cleanup: CleanupFunction,
+      description?: string,
+    ) => {
       if (scope.current) {
-        return scope.current.register(type, cleanup, { component, description });
+        return scope.current.register(type, cleanup, {
+          component,
+          description,
+        });
       }
-      return '';
+      return "";
     },
   };
 }
 
 // Import React for the hook
-import React from 'react';
+import React from "react";

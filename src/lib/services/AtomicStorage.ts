@@ -4,7 +4,7 @@
  * Prevents data corruption from concurrent access
  */
 
-import { logger } from '../logger';
+import { logger } from "../logger";
 
 interface StorageOptions {
   prefix?: string;
@@ -28,11 +28,12 @@ export class AtomicStorage {
   private static instance: AtomicStorage;
   private readonly prefix: string;
   private readonly locks: Map<string, Promise<void>> = new Map();
-  private readonly cache: Map<string, any> = new Map();
+  private readonly cache: Map<string, unknown> = new Map();
   private readonly version = 1;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   private constructor(options: StorageOptions = {}) {
-    this.prefix = options.prefix || 'atomic_';
+    this.prefix = options.prefix || "atomic_";
     this.initializeCleanup();
   }
 
@@ -48,10 +49,10 @@ export class AtomicStorage {
    */
   async get<T>(key: string): Promise<T | null> {
     const fullKey = this.getFullKey(key);
-    
+
     // Check cache first
     if (this.cache.has(fullKey)) {
-      return this.cache.get(fullKey);
+      return this.cache.get(fullKey) as T;
     }
 
     return this.withLock(fullKey, () => {
@@ -60,7 +61,7 @@ export class AtomicStorage {
         if (!raw) return null;
 
         const item: StorageItem<T> = JSON.parse(raw);
-        
+
         // Check TTL
         if (item.ttl) {
           const expired = Date.now() - item.timestamp > item.ttl;
@@ -76,7 +77,7 @@ export class AtomicStorage {
         return item.value;
       } catch (error) {
         logger.error(`Failed to get item from storage: ${key}`, {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         });
         return null;
       }
@@ -99,25 +100,25 @@ export class AtomicStorage {
         };
 
         const serialized = JSON.stringify(item);
-        
+
         // Check storage quota
         if (this.isQuotaExceeded(serialized)) {
           this.cleanup();
-          
+
           // Try again after cleanup
           if (this.isQuotaExceeded(serialized)) {
-            logger.error('Storage quota exceeded even after cleanup');
+            logger.error("Storage quota exceeded even after cleanup");
             return false;
           }
         }
 
         localStorage.setItem(fullKey, serialized);
         this.cache.set(fullKey, value);
-        
+
         return true;
       } catch (error) {
         logger.error(`Failed to set item in storage: ${key}`, {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         });
         return false;
       }
@@ -137,7 +138,7 @@ export class AtomicStorage {
         return true;
       } catch (error) {
         logger.error(`Failed to remove item from storage: ${key}`, {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         });
         return false;
       }
@@ -150,7 +151,7 @@ export class AtomicStorage {
   async update<T>(
     key: string,
     updater: (current: T | null) => T,
-    ttl?: number
+    ttl?: number,
   ): Promise<boolean> {
     const fullKey = this.getFullKey(key);
 
@@ -161,7 +162,7 @@ export class AtomicStorage {
         return await this.set(key, updated, ttl);
       } catch (error) {
         logger.error(`Failed to update item in storage: ${key}`, {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         });
         return false;
       }
@@ -173,11 +174,11 @@ export class AtomicStorage {
    */
   async clear(): Promise<void> {
     const keys = this.getAllKeys();
-    
+
     for (const key of keys) {
-      await this.remove(key.replace(this.prefix, ''));
+      await this.remove(key.replace(this.prefix, ""));
     }
-    
+
     this.cache.clear();
     logger.info(`Cleared ${keys.length} items from storage`);
   }
@@ -187,14 +188,14 @@ export class AtomicStorage {
    */
   getAllKeys(): string[] {
     const keys: string[] = [];
-    
+
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith(this.prefix)) {
         keys.push(key);
       }
     }
-    
+
     return keys;
   }
 
@@ -203,14 +204,14 @@ export class AtomicStorage {
    */
   getSize(): number {
     let size = 0;
-    
+
     for (const key of this.getAllKeys()) {
       const value = localStorage.getItem(key);
       if (value) {
         size += key.length + value.length;
       }
     }
-    
+
     return size;
   }
 
@@ -235,7 +236,7 @@ export class AtomicStorage {
         const raw = localStorage.getItem(key);
         if (raw) {
           totalSize += key.length + raw.length;
-          
+
           const item = JSON.parse(raw);
           if (item.timestamp) {
             if (!oldestTimestamp || item.timestamp < oldestTimestamp) {
@@ -266,7 +267,7 @@ export class AtomicStorage {
    */
   private async withLock<T>(
     key: string,
-    operation: () => T | Promise<T>
+    operation: () => T | Promise<T>,
   ): Promise<T> {
     // Wait for any existing lock
     const existingLock = this.locks.get(key);
@@ -275,11 +276,11 @@ export class AtomicStorage {
     }
 
     // Create new lock
-    let releaseLock: () => void;
-    const lock = new Promise<void>(resolve => {
+    let releaseLock: (() => void) | null = null;
+    const lock = new Promise<void>((resolve) => {
       releaseLock = resolve;
     });
-    
+
     this.locks.set(key, lock);
 
     try {
@@ -287,7 +288,9 @@ export class AtomicStorage {
       return result;
     } finally {
       this.locks.delete(key);
-      releaseLock!();
+      if (releaseLock) {
+        releaseLock();
+      }
     }
   }
 
@@ -312,9 +315,9 @@ export class AtomicStorage {
       if (error instanceof Error) {
         // Check for quota exceeded errors
         if (
-          error.name === 'QuotaExceededError' ||
-          error.message.includes('quota') ||
-          error.message.includes('storage')
+          error.name === "QuotaExceededError" ||
+          error.message.includes("quota") ||
+          error.message.includes("storage")
         ) {
           return true;
         }
@@ -335,7 +338,7 @@ export class AtomicStorage {
         const raw = localStorage.getItem(key);
         if (raw) {
           const item = JSON.parse(raw);
-          
+
           // Remove expired items
           if (item.ttl) {
             const expired = Date.now() - item.timestamp > item.ttl;
@@ -345,7 +348,7 @@ export class AtomicStorage {
               removed++;
             }
           }
-          
+
           // Remove old items (>7 days)
           const age = Date.now() - item.timestamp;
           if (age > 7 * 24 * 60 * 60 * 1000) {
@@ -371,13 +374,33 @@ export class AtomicStorage {
    * Initialize periodic cleanup
    */
   private initializeCleanup(): void {
+    // Clear any existing interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+
     // Run cleanup every hour
-    setInterval(() => {
-      this.cleanup();
-    }, 60 * 60 * 1000);
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanup();
+      },
+      60 * 60 * 1000,
+    );
 
     // Initial cleanup
     this.cleanup();
+  }
+
+  /**
+   * Destroy the storage instance and cleanup resources
+   */
+  public destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.cache.clear();
+    this.locks.clear();
   }
 }
 
@@ -389,21 +412,22 @@ export const atomicStorage = AtomicStorage.getInstance();
  */
 export function useAtomicStorage<T>(
   key: string,
-  initialValue?: T
-): [
-  T | null,
-  (value: T) => Promise<void>,
-  () => Promise<void>
-] {
+  initialValue?: T,
+): [T | null, (value: T) => Promise<void>, () => Promise<void>] {
   const [value, setValue] = React.useState<T | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     // Load initial value
-    atomicStorage.get<T>(key).then(stored => {
-      setValue(stored ?? initialValue ?? null);
-      setLoading(false);
-    });
+    atomicStorage
+      .get<T>(key)
+      .then((stored) => {
+        setValue(stored ?? initialValue ?? null);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
   }, [key, initialValue]);
 
   const updateValue = React.useCallback(
@@ -411,7 +435,7 @@ export function useAtomicStorage<T>(
       await atomicStorage.set(key, newValue);
       setValue(newValue);
     },
-    [key]
+    [key],
   );
 
   const removeValue = React.useCallback(async () => {
@@ -419,8 +443,8 @@ export function useAtomicStorage<T>(
     setValue(null);
   }, [key]);
 
-  return [loading ? initialValue ?? null : value, updateValue, removeValue];
+  return [loading ? (initialValue ?? null) : value, updateValue, removeValue];
 }
 
 // Import React for the hook
-import React from 'react';
+import React from "react";
