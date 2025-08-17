@@ -1,6 +1,14 @@
+"use node";
+
 /**
  * Scrape route handlers
  * - OPTIONS and POST /api/scrape endpoints
+ *
+ * CRITICAL: The "use node" directive at the top of this file is REQUIRED
+ * This file uses Node.js modules (require) and httpAction functions that need
+ * to run in a Node.js environment. Removing or moving the "use node" directive
+ * will cause runtime errors with messages like "require is not defined".
+ * @see https://docs.convex.dev/functions/actions#use-node-directive
  *
  * IMPORTANT TS2589 WORKAROUND:
  * This file uses require() instead of import for the internal API to work around

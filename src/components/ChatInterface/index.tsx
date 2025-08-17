@@ -108,6 +108,15 @@ function ChatInterfaceComponent({
   const currentUser = useQuery(api.auth.loggedInUser);
   const currentUserId = currentUser?._id;
 
+  // Query for public/shared chats - MUST be before allChats useMemo
+  const { chatByOpaqueId, chatByShareId, chatByPublicId } = useConvexQueries({
+    isAuthenticated,
+    propChatId,
+    propShareId,
+    propPublicId,
+    currentChatId,
+  });
+
   // Get all chats (either from Convex or local storage)
   const allChats = useMemo(() => {
     let baseChats: Chat[] = [];
@@ -201,14 +210,6 @@ function ChatInterfaceComponent({
   const planSearch = useAction(api.search.planSearch);
   const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
-
-  const { chatByOpaqueId, chatByShareId, chatByPublicId } = useConvexQueries({
-    isAuthenticated,
-    propChatId,
-    propShareId,
-    propPublicId,
-    currentChatId,
-  });
 
   // Handle public/shared chat selection when loaded from URL
   useEffect(() => {

@@ -241,11 +241,24 @@ if (typeof globalThis !== 'undefined' && !globalThis.React) {
   (globalThis as any).React = React
 }
 
-// Mock react-dom/test-utils for backward compatibility
-vi.mock('react-dom/test-utils', () => ({
-  act: React.act,
-  unstable_act: React.act,
-}))
+/**
+ * Mock react-dom/test-utils while preserving other exports
+ * CRITICAL: This mock must preserve all existing exports from the module
+ * to avoid breaking tests that rely on other utilities like Simulate.
+ * 
+ * The async import ensures we get the actual module's exports and only
+ * override the specific functions we need to mock (act and unstable_act).
+ * 
+ * @regression-prevention Always use async import with spread to preserve exports
+ */
+vi.mock('react-dom/test-utils', async () => {
+  const actual = await vi.importActual<any>('react-dom/test-utils')
+  return {
+    ...actual,
+    act: React.act,
+    unstable_act: React.act,
+  }
+})
 ```
 
 ### Component Testing Best Practices
@@ -672,7 +685,8 @@ setupFiles: ["./tests/setup.ts", "./tests/mocks/setup-msw.ts"]
 
 ```typescript
 // Test provider fallback chain
-// import { mockSearchResponse, searchTestHelper } from '../mocks/search-api-mocks'
+import { mockSearchResponse, searchTestHelper } from '../mocks/search-api-mocks'
+
 it('should fallback through providers', async () => {
   mockSearchResponse('serp', null, 500) // Make SERP fail
   
