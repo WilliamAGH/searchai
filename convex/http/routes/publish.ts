@@ -2,6 +2,10 @@
  * Publish and export route handlers
  * - POST /api/publishChat
  * - GET /api/exportChat and /api/chatTextMarkdown
+ *
+ * @note httpAction functions run in Node.js environment by default and have
+ * access to process.env without requiring "use node" pragma. The pragma is
+ * only needed for regular actions that require Node.js APIs.
  */
 
 import { httpAction } from "../../_generated/server";
@@ -86,7 +90,7 @@ export function registerPublishRoutes(http: HttpRouter) {
       const messages = Array.isArray(payload.messages)
         ? payload.messages.slice(0, 100).map((m: any) => ({
             role:
-              m.role === "user" || m.role === "assistant"
+              m.role === "user" || m.role === "assistant" || m.role === "system"
                 ? m.role
                 : "assistant",
             content: m.content ? String(m.content).slice(0, 50000) : undefined,
