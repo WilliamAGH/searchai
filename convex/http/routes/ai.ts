@@ -131,15 +131,15 @@ export function registerAIRoutes(http: HttpRouter) {
       dlog("Environment Variables Available:");
       dlog(
         "- OPENROUTER_API_KEY:",
-        (ctx as any)?.env?.get?.("OPENROUTER_API_KEY") ? "SET" : "NOT SET",
+        process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET",
       );
       dlog(
         "- CONVEX_OPENAI_API_KEY:",
-        (ctx as any)?.env?.get?.("CONVEX_OPENAI_API_KEY") ? "SET" : "NOT SET",
+        process.env.CONVEX_OPENAI_API_KEY ? "SET" : "NOT SET",
       );
       dlog(
         "- CONVEX_OPENAI_BASE_URL:",
-        (ctx as any)?.env?.get?.("CONVEX_OPENAI_BASE_URL") ? "SET" : "NOT SET",
+        process.env.CONVEX_OPENAI_BASE_URL ? "SET" : "NOT SET",
       );
 
       // Apply universal enhancements to anonymous AI generation as well
@@ -171,14 +171,11 @@ export function registerAIRoutes(http: HttpRouter) {
       }
 
       // Check if OpenRouter API key is available
-      const envGet =
-        (ctx as any)?.env?.get?.bind((ctx as any).env) ||
-        ((_key: string) => null);
-      const OPENROUTER_API_KEY = envGet("OPENROUTER_API_KEY");
-      const CONVEX_OPENAI_API_KEY = envGet("CONVEX_OPENAI_API_KEY");
-      const CONVEX_OPENAI_BASE_URL = envGet("CONVEX_OPENAI_BASE_URL");
-      const SITE_URL = envGet("SITE_URL");
-      const SITE_TITLE = envGet("SITE_TITLE");
+      const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+      const CONVEX_OPENAI_API_KEY = process.env.CONVEX_OPENAI_API_KEY;
+      const CONVEX_OPENAI_BASE_URL = process.env.CONVEX_OPENAI_BASE_URL;
+      const SITE_URL = process.env.SITE_URL;
+      const SITE_TITLE = process.env.SITE_TITLE;
 
       if (!OPENROUTER_API_KEY) {
         return handleNoOpenRouter(
@@ -527,9 +524,16 @@ function createStreamingResponse(
 
       // Periodic keepalive pings and adaptive timeout for streaming
       const pingIntervalMs = 15000;
-      const pingIntervalId = setInterval(() => {
+      let pingIntervalId: NodeJS.Timeout | null = null;
+      let streamTimeoutId: NodeJS.Timeout | null = null;
+
+      // Setup keepalive pings
+      pingIntervalId = setInterval(() => {
         if (!isStreamActive) {
-          clearInterval(pingIntervalId);
+          if (pingIntervalId) {
+            clearInterval(pingIntervalId);
+            pingIntervalId = null;
+          }
           return;
         }
         // SSE comment line; ignored by client parser but keeps connections alive
@@ -537,14 +541,19 @@ function createStreamingResponse(
           controller.enqueue(encoder.encode(`: keepalive ${Date.now()}\n\n`));
         } catch {
           // Controller might be closed, stop pinging
-          clearInterval(pingIntervalId);
+          if (pingIntervalId) {
+            clearInterval(pingIntervalId);
+            pingIntervalId = null;
+          }
         }
       }, pingIntervalMs);
 
-      let streamTimeoutId = setTimeout(() => {
+      // Setup initial timeout
+      streamTimeoutId = setTimeout(() => {
         if (!isStreamActive) return;
         console.error("⏰ OpenRouter stream timeout after 120 seconds");
         isStreamActive = false;
+        cleanup(); // Use cleanup function to ensure proper resource cleanup
         try {
           controller.error(
             new Error("OpenRouter stream timeout after 120 seconds"),
@@ -554,11 +563,17 @@ function createStreamingResponse(
         }
       }, 120000);
 
-      // Cleanup function
+      // Cleanup function - properly clear all resources
       const cleanup = () => {
         isStreamActive = false;
-        clearTimeout(streamTimeoutId);
-        clearInterval(pingIntervalId);
+        if (streamTimeoutId) {
+          clearTimeout(streamTimeoutId);
+          streamTimeoutId = null;
+        }
+        if (pingIntervalId) {
+          clearInterval(pingIntervalId);
+          pingIntervalId = null;
+        }
         try {
           reader.releaseLock();
         } catch {
@@ -580,11 +595,15 @@ function createStreamingResponse(
 
           lastChunkTime = Date.now();
           // Refresh timeout upon activity
-          clearTimeout(streamTimeoutId);
+          if (streamTimeoutId) {
+            clearTimeout(streamTimeoutId);
+            streamTimeoutId = null;
+          }
           streamTimeoutId = setTimeout(() => {
             if (!isStreamActive) return;
             console.error("⏰ OpenRouter stream timeout after 120 seconds");
             isStreamActive = false;
+            cleanup(); // Use cleanup function to ensure proper resource cleanup
             try {
               controller.error(
                 new Error("OpenRouter stream timeout after 120 seconds"),
@@ -604,8 +623,12 @@ function createStreamingResponse(
               if (data === "[DONE]") {
                 dlog("✅ OpenRouter streaming finished with [DONE]");
                 isStreamActive = false;
-                controller.close();
-                cleanup();
+                cleanup(); // Cleanup first before closing controller
+                try {
+                  controller.close();
+                } catch {
+                  // Controller might already be closed
+                }
                 return;
               }
               try {
@@ -667,20 +690,24 @@ function createStreamingResponse(
           }
         }
         // Normal completion
-        controller.close();
+        cleanup(); // Always cleanup before closing
+        try {
+          controller.close();
+        } catch {
+          // Controller might already be closed
+        }
       } catch (error) {
         console.error("💥 Stream reading error:", {
           error:
             error instanceof Error ? error.message : "Unknown streaming error",
           timestamp: new Date().toISOString(),
         });
+        cleanup(); // Cleanup on error
         try {
           controller.error(error);
         } catch {
           // Controller might already be closed
         }
-      } finally {
-        cleanup();
       }
     },
   });

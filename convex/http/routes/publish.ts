@@ -18,11 +18,8 @@ import { escapeHtml, formatConversationMarkdown } from "../utils";
  */
 export function registerPublishRoutes(http: HttpRouter) {
   // Helper: determine allowed origin (env-driven; defaults to *)
-  const getAllowedOrigin = (origin: string | null, ctx: any): string => {
-    const envGet =
-      (ctx as any)?.env?.get?.bind((ctx as any).env) ||
-      ((_key: string) => null);
-    const allowed = envGet("CONVEX_ALLOWED_ORIGINS");
+  const getAllowedOrigin = (origin: string | null): string => {
+    const allowed = process.env.CONVEX_ALLOWED_ORIGINS;
     if (!allowed || allowed === "*") return "*";
     const list = allowed
       .split(",")
@@ -39,7 +36,7 @@ export function registerPublishRoutes(http: HttpRouter) {
     handler: httpAction(async (ctx, request) => {
       const requested = request.headers.get("Access-Control-Request-Headers");
       const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin, ctx);
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(null, {
         status: 204,
         headers: {
@@ -63,7 +60,7 @@ export function registerPublishRoutes(http: HttpRouter) {
         rawPayload = await request.json();
       } catch {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
           status: 400,
           headers: {
@@ -129,7 +126,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           messages,
         });
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         const baseUrl = origin || process.env.SITE_URL || "";
         const shareUrl = `${baseUrl}/s/${result.shareId}`;
         const publicUrl = `${baseUrl}/p/${result.publicId}`;
@@ -154,7 +151,7 @@ export function registerPublishRoutes(http: HttpRouter) {
         );
       } catch (e: any) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: String(e?.message || e) }),
           {
@@ -176,7 +173,7 @@ export function registerPublishRoutes(http: HttpRouter) {
     handler: httpAction(async (ctx, request) => {
       const requested = request.headers.get("Access-Control-Request-Headers");
       const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin, ctx);
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(null, {
         status: 204,
         headers: {
@@ -211,7 +208,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (!shareId && !publicId) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: "Missing shareId or publicId" }),
           {
@@ -244,7 +241,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (!chat) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: "Chat not found or not accessible" }),
           {
@@ -306,7 +303,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           messages: exportedMessages,
         });
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(body, {
           status: 200,
           headers: {
@@ -329,7 +326,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (fmt === "txt") {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(md, {
           status: 200,
           headers: {
@@ -347,7 +344,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (fmt === "markdown") {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(md, {
           status: 200,
           headers: {
@@ -388,7 +385,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 </html>`;
 
       const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin, ctx);
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(html, {
         status: 200,
         headers: {
@@ -443,7 +440,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (!shareId && !publicId) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: "Missing shareId or publicId" }),
           {
@@ -462,7 +459,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           });
       if (!chat) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin, ctx);
+        const allowOrigin = getAllowedOrigin(origin);
         return new Response(
           JSON.stringify({ error: "Chat not found or not accessible" }),
           {
@@ -499,7 +496,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           ? "index, follow"
           : "noindex, nofollow";
       const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin, ctx);
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(md, {
         status: 200,
         headers: {
