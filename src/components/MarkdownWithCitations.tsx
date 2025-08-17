@@ -68,8 +68,20 @@ export function MarkdownWithCitations({
       let domain = citedText;
       let url: string | undefined;
 
+      // Check if it's a numeric citation like [1] or [2]
+      if (/^\d+$/.test(citedText)) {
+        const index = parseInt(citedText) - 1; // Convert to 0-based index
+        if (index >= 0 && index < searchResults.length) {
+          const result = searchResults[index];
+          domain = getDomainFromUrl(result.url);
+          url = result.url;
+        }
+      }
       // Check if cited text is a full URL
-      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
+      else if (
+        citedText.startsWith("http://") ||
+        citedText.startsWith("https://")
+      ) {
         // Extract domain from the full URL citation
         try {
           domain = new URL(citedText).hostname.replace("www.", "");

@@ -33,7 +33,7 @@ export function useConvexQueries({
 
   // Query for public chat
   const chatByPublicId = useQuery(
-    api.chats.getPublicChatById,
+    api.chats.getChatByPublicId,
     propPublicId ? { publicId: propPublicId } : "skip",
   );
 
