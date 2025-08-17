@@ -3,12 +3,15 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 
 // Helper function to send emails via MailPit
-async function sendEmailToMailPit(args: {
-  to: string;
-  subject: string;
-  html: string;
-  from?: string;
-}, opts: { mailpitHost: string; apiAuth: string }): Promise<{ success: boolean; messageId?: string }> {
+async function sendEmailToMailPit(
+  args: {
+    to: string;
+    subject: string;
+    html: string;
+    from?: string;
+  },
+  opts: { mailpitHost: string; apiAuth: string },
+): Promise<{ success: boolean; messageId?: string }> {
   const { mailpitHost, apiAuth } = opts;
 
   if (!mailpitHost || !apiAuth) {
