@@ -1219,24 +1219,28 @@ async function streamResponseToMessage(args: {
         const now = Date.now();
         if (!updateInFlight && now - lastUpdateTime >= updateInterval) {
           updateInFlight = true;
-          // FIXED: Proper streaming implementation
-          // - content: accumulated content (for final display)
-          // - streamedContent: new chunk (for incremental updates)
-          // - isStreaming: true (to indicate streaming state)
-          const _ret: null = await ctx.runMutation(
-            internal.messages.updateMessage,
-            {
-              messageId,
-              content: accumulatedContent,
-              streamedContent: newContent, // Send just the new chunk for streaming
-              isStreaming: true,
-              thinking: "Composing response",
-              // Stream the accumulated reasoning
-              reasoning: accumulatedReasoning,
-            },
-          );
-          lastUpdateTime = now;
-          updateInFlight = false;
+          try {
+            // Proper streaming implementation
+            // - content: accumulated content (for final display)
+            // - streamedContent: new chunk (for incremental updates)
+            // - isStreaming: true (to indicate streaming state)
+            const _ret: null = await ctx.runMutation(
+              internal.messages.updateMessage,
+              {
+                messageId,
+                content: accumulatedContent,
+                streamedContent: newContent, // Send just the new chunk for streaming
+                isStreaming: true,
+                thinking: "Composing response",
+                // Stream the accumulated reasoning
+                reasoning: accumulatedReasoning,
+              },
+            );
+          } finally {
+            // Always release the lock and advance the clock to prevent tight retry loops
+            lastUpdateTime = now;
+            updateInFlight = false;
+          }
         }
       }
     }
