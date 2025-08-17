@@ -389,23 +389,16 @@ function ChatInterfaceComponent({
   // Use paginated messages when available, fallback to regular messages
   // CRITICAL: Only use ONE source of messages to prevent duplicate keys
   const effectiveMessages = useMemo(() => {
-    // For authenticated users with valid Convex chats, use paginated messages
+    // For users with valid Convex chats (including public/shared), use paginated messages
     if (
-      isAuthenticated &&
-      isValidConvexChatId &&
+      shouldLoadMessages &&
       (paginatedMessages.length > 0 || isLoadingMessages)
     ) {
       return paginatedMessages;
     }
     // For everyone else (anonymous, invalid IDs), use regular messages
     return messages;
-  }, [
-    isAuthenticated,
-    isValidConvexChatId,
-    paginatedMessages,
-    messages,
-    isLoadingMessages,
-  ]);
+  }, [shouldLoadMessages, paginatedMessages, messages, isLoadingMessages]);
 
   const currentMessages = useMemo(
     () => mapMessagesToLocal(effectiveMessages, isAuthenticated),
