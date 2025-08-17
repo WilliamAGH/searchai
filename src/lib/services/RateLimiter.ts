@@ -3,7 +3,7 @@
  * Manages API request rates to prevent throttling
  */
 
-import { logger } from '../logger';
+import { logger } from "../logger";
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -51,31 +51,31 @@ export class RateLimiter {
    */
   private initializeDefaultLimits() {
     // OpenRouter API limits
-    this.setLimit('openrouter', {
+    this.setLimit("openrouter", {
       maxRequests: 60,
       windowMs: 60000, // 60 requests per minute
     });
 
     // SERP API limits
-    this.setLimit('serpapi', {
+    this.setLimit("serpapi", {
       maxRequests: 100,
       windowMs: 60000, // 100 requests per minute
     });
 
     // Search planner limits
-    this.setLimit('search-planner', {
+    this.setLimit("search-planner", {
       maxRequests: 10,
       windowMs: 60000, // 10 requests per minute
     });
 
     // AI generation limits
-    this.setLimit('ai-generation', {
+    this.setLimit("ai-generation", {
       maxRequests: 20,
       windowMs: 60000, // 20 requests per minute
     });
 
     // Web scraping limits
-    this.setLimit('scraping', {
+    this.setLimit("scraping", {
       maxRequests: 30,
       windowMs: 60000, // 30 requests per minute
     });
@@ -122,7 +122,7 @@ export class RateLimiter {
       state.requests = 0;
       state.windowStart = now;
       state.isThrottled = false;
-      
+
       // Process queued requests
       this.processQueue(key);
     }
@@ -130,13 +130,13 @@ export class RateLimiter {
     // Check if under limit
     if (state.requests < config.maxRequests) {
       state.requests++;
-      this.updateStats(key, 'allowed');
+      this.updateStats(key, "allowed");
       return true;
     }
 
     // Over limit - throttle
     state.isThrottled = true;
-    this.updateStats(key, 'throttled');
+    this.updateStats(key, "throttled");
 
     logger.warn(`Rate limit exceeded for: ${key}`, {
       requests: state.requests,
@@ -173,26 +173,30 @@ export class RateLimiter {
 
     // Check timeout
     if (timeout && remainingTime > timeout) {
-      throw new Error(`Rate limit wait time (${remainingTime}ms) exceeds timeout (${timeout}ms)`);
+      throw new Error(
+        `Rate limit wait time (${remainingTime}ms) exceeds timeout (${timeout}ms)`,
+      );
     }
 
     // Add to queue and wait
     return new Promise<void>((resolve, reject) => {
       const queueEntry = () => {
-        this.checkLimit(key).then(allowed => {
-          if (allowed) {
-            resolve();
-          } else {
-            // Should not happen, but handle it
-            reject(new Error('Rate limit check failed after waiting'));
-          }
-        }).catch(error => {
-          reject(error);
-        });
+        this.checkLimit(key)
+          .then((allowed) => {
+            if (allowed) {
+              resolve();
+            } else {
+              // Should not happen, but handle it
+              reject(new Error("Rate limit check failed after waiting"));
+            }
+          })
+          .catch((error) => {
+            reject(error);
+          });
       };
 
       state.queue.push(queueEntry);
-      this.updateStats(key, 'queued');
+      this.updateStats(key, "queued");
 
       logger.info(`Request queued for rate limit: ${key}`, {
         queuePosition: state.queue.length,
@@ -218,7 +222,7 @@ export class RateLimiter {
   async execute<T>(
     key: string,
     fn: () => Promise<T>,
-    options: { timeout?: number; priority?: number } = {}
+    options: { timeout?: number; priority?: number } = {},
   ): Promise<T> {
     await this.waitForLimit(key, options.timeout);
     return fn();
@@ -230,16 +234,16 @@ export class RateLimiter {
   async executeBatch<T>(
     key: string,
     fns: Array<() => Promise<T>>,
-    options: { timeout?: number; concurrency?: number } = {}
+    options: { timeout?: number; concurrency?: number } = {},
   ): Promise<T[]> {
     const { concurrency = 1 } = options;
     const results: T[] = [];
-    
+
     // Process in batches
     for (let i = 0; i < fns.length; i += concurrency) {
       const batch = fns.slice(i, i + concurrency);
       const batchResults = await Promise.all(
-        batch.map(fn => this.execute(key, fn, options))
+        batch.map((fn) => this.execute(key, fn, options)),
       );
       results.push(...batchResults);
     }
@@ -292,7 +296,7 @@ export class RateLimiter {
       state.requests = 0;
       state.windowStart = Date.now();
       state.isThrottled = false;
-      
+
       // Process any queued requests
       this.processQueue(key);
     }
@@ -304,10 +308,10 @@ export class RateLimiter {
   clearAll(): void {
     for (const [_key, state] of this.states.entries()) {
       // Reject all queued requests
-      state.queue.forEach(resolve => resolve());
+      state.queue.forEach((resolve) => resolve());
       state.queue = [];
     }
-    
+
     this.limits.clear();
     this.states.clear();
     this.stats.clear();
@@ -328,7 +332,7 @@ export class RateLimiter {
 
     logger.info(`Processing ${queue.length} queued requests for: ${key}`);
 
-    queue.forEach(resolve => resolve());
+    queue.forEach((resolve) => resolve());
   }
 
   /**
@@ -336,16 +340,16 @@ export class RateLimiter {
    */
   private updateStats(
     key: string,
-    type: 'allowed' | 'throttled' | 'queued'
+    type: "allowed" | "throttled" | "queued",
   ): void {
     const stats = this.stats.get(key);
     if (!stats) return;
 
     stats.totalRequests++;
 
-    if (type === 'throttled') {
+    if (type === "throttled") {
       stats.throttledRequests++;
-    } else if (type === 'queued') {
+    } else if (type === "queued") {
       stats.queuedRequests++;
     }
   }
@@ -386,10 +390,10 @@ export function useRateLimit(key: string) {
   }, [key]);
 
   const execute = React.useCallback(
-    async <T,>(fn: () => Promise<T>): Promise<T> => {
+    async <T>(fn: () => Promise<T>): Promise<T> => {
       return rateLimiter.execute(key, fn);
     },
-    [key]
+    [key],
   );
 
   return {
@@ -401,4 +405,4 @@ export function useRateLimit(key: string) {
 }
 
 // Import React for the hook
-import React from 'react';
+import React from "react";

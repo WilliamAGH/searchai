@@ -3,8 +3,8 @@
  * Provides health checking functionality for services
  */
 
-import { serviceRegistry } from './ServiceConfig';
-import { logger } from '../logger';
+import { serviceRegistry } from "./ServiceConfig";
+import { logger } from "../logger";
 
 export interface HealthCheckResult {
   service: string;
@@ -38,12 +38,12 @@ export class HealthCheckManager {
    */
   startMonitoring(intervalMs: number = 60000) {
     if (this.isMonitoring) {
-      logger.warn('Health monitoring already started');
+      logger.warn("Health monitoring already started");
       return;
     }
 
     this.isMonitoring = true;
-    logger.info('Starting health monitoring', { intervalMs });
+    logger.info("Starting health monitoring", { intervalMs });
 
     // Perform immediate check
     this.checkAllServices();
@@ -67,7 +67,7 @@ export class HealthCheckManager {
     }
 
     serviceRegistry.stopAllHealthChecks();
-    logger.info('Health monitoring stopped');
+    logger.info("Health monitoring stopped");
   }
 
   /**
@@ -87,7 +87,7 @@ export class HealthCheckManager {
           service: service.name,
           healthy: false,
           responseTime: 0,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
           timestamp: new Date(),
         };
         results.push(errorResult);
@@ -99,7 +99,7 @@ export class HealthCheckManager {
 
     // Log system health summary
     const systemHealth = serviceRegistry.getSystemHealth();
-    logger.info('System health check completed', systemHealth);
+    logger.info("System health check completed", systemHealth);
 
     return results;
   }
@@ -124,16 +124,16 @@ export class HealthCheckManager {
     try {
       // Special handling for different services
       switch (serviceName) {
-        case 'convex':
+        case "convex":
           result.healthy = await this.checkConvex(config.baseUrl);
           break;
-        case 'openrouter':
+        case "openrouter":
           result.healthy = await this.checkOpenRouter();
           break;
-        case 'serpapi':
+        case "serpapi":
           result.healthy = await this.checkSerpApi();
           break;
-        case 'duckduckgo':
+        case "duckduckgo":
           result.healthy = await this.checkDuckDuckGo();
           break;
         default:
@@ -141,7 +141,7 @@ export class HealthCheckManager {
           if (config.healthCheckEndpoint) {
             const response = await this.performHttpCheck(
               `${config.baseUrl}${config.healthCheckEndpoint}`,
-              config.timeout
+              config.timeout,
             );
             result.healthy = response.ok;
             result.statusCode = response.status;
@@ -155,22 +155,22 @@ export class HealthCheckManager {
       // Update service health in registry
       serviceRegistry.updateServiceHealth(
         serviceName,
-        result.healthy ? 'healthy' : 'unhealthy',
+        result.healthy ? "healthy" : "unhealthy",
         result.responseTime,
-        { statusCode: result.statusCode }
+        { statusCode: result.statusCode },
       );
 
       return result;
     } catch (error) {
       result.responseTime = Date.now() - startTime;
-      result.error = error instanceof Error ? error.message : 'Unknown error';
+      result.error = error instanceof Error ? error.message : "Unknown error";
       result.healthy = false;
 
       serviceRegistry.updateServiceHealth(
         serviceName,
-        'unhealthy',
+        "unhealthy",
         result.responseTime,
-        { error: result.error }
+        { error: result.error },
       );
 
       return result;
@@ -182,19 +182,19 @@ export class HealthCheckManager {
    */
   private async checkConvex(baseUrl: string): Promise<boolean> {
     if (!baseUrl) {
-      logger.error('Convex URL not configured');
+      logger.error("Convex URL not configured");
       return false;
     }
 
     try {
       const response = await this.performHttpCheck(
         `${baseUrl}/api/health`,
-        5000
+        5000,
       );
       return response.ok;
     } catch (error) {
-      logger.error('Convex health check failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      logger.error("Convex health check failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       return false;
     }
@@ -207,20 +207,20 @@ export class HealthCheckManager {
     // Check if API key is configured
     const hasApiKey = !!import.meta.env.VITE_OPENROUTER_API_KEY;
     if (!hasApiKey) {
-      logger.debug('OpenRouter API key not configured');
+      logger.debug("OpenRouter API key not configured");
       return false;
     }
 
     try {
       // Just check if the API is reachable
       const response = await this.performHttpCheck(
-        'https://openrouter.ai/api/v1/models',
-        10000
+        "https://openrouter.ai/api/v1/models",
+        10000,
       );
       return response.status === 200 || response.status === 401; // 401 is ok, means API is up
     } catch (error) {
-      logger.error('OpenRouter health check failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      logger.error("OpenRouter health check failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       return false;
     }
@@ -233,19 +233,19 @@ export class HealthCheckManager {
     // Check if API key is configured
     const hasApiKey = !!import.meta.env.VITE_SERP_API_KEY;
     if (!hasApiKey) {
-      logger.debug('SERP API key not configured');
+      logger.debug("SERP API key not configured");
       return false;
     }
 
     try {
       const response = await this.performHttpCheck(
-        'https://serpapi.com/account',
-        5000
+        "https://serpapi.com/account",
+        5000,
       );
       return response.status === 200 || response.status === 401; // 401 is ok, means API is up
     } catch (error) {
-      logger.error('SERP API health check failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      logger.error("SERP API health check failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       return false;
     }
@@ -257,13 +257,13 @@ export class HealthCheckManager {
   private async checkDuckDuckGo(): Promise<boolean> {
     try {
       const response = await this.performHttpCheck(
-        'https://api.duckduckgo.com/?q=test&format=json&no_html=1',
-        5000
+        "https://api.duckduckgo.com/?q=test&format=json&no_html=1",
+        5000,
       );
       return response.ok;
     } catch (error) {
-      logger.error('DuckDuckGo health check failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      logger.error("DuckDuckGo health check failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       return false;
     }
@@ -274,14 +274,14 @@ export class HealthCheckManager {
    */
   private async performHttpCheck(
     url: string,
-    timeout: number
+    timeout: number,
   ): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -296,7 +296,7 @@ export class HealthCheckManager {
    * Get current system health status
    */
   getSystemStatus(): {
-    status: 'healthy' | 'degraded' | 'critical';
+    status: "healthy" | "degraded" | "critical";
     services: Array<{
       name: string;
       status: string;
@@ -310,22 +310,22 @@ export class HealthCheckManager {
 
     let message: string;
     switch (systemHealth.status) {
-      case 'healthy':
-        message = 'All services are operational';
+      case "healthy":
+        message = "All services are operational";
         break;
-      case 'degraded':
-        message = 'Some services are experiencing issues';
+      case "degraded":
+        message = "Some services are experiencing issues";
         break;
-      case 'critical':
-        message = 'Critical services are unavailable';
+      case "critical":
+        message = "Critical services are unavailable";
         break;
       default:
-        message = 'System status unknown';
+        message = "System status unknown";
     }
 
     return {
       status: systemHealth.status,
-      services: services.map(s => ({
+      services: services.map((s) => ({
         name: s.service,
         status: s.status,
         responseTime: s.responseTime,
@@ -338,9 +338,7 @@ export class HealthCheckManager {
   /**
    * Wait for critical services to be healthy
    */
-  async waitForCriticalServices(
-    maxWaitMs: number = 30000
-  ): Promise<boolean> {
+  async waitForCriticalServices(maxWaitMs: number = 30000): Promise<boolean> {
     const startTime = Date.now();
     const checkInterval = 1000; // Check every second
 
@@ -349,19 +347,19 @@ export class HealthCheckManager {
       const systemHealth = serviceRegistry.getSystemHealth();
 
       if (systemHealth.requiredServicesHealthy) {
-        logger.info('All critical services are healthy');
+        logger.info("All critical services are healthy");
         return true;
       }
 
-      logger.info('Waiting for critical services...', {
+      logger.info("Waiting for critical services...", {
         elapsed: Date.now() - startTime,
         maxWait: maxWaitMs,
       });
 
-      await new Promise(resolve => setTimeout(resolve, checkInterval));
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
     }
 
-    logger.error('Critical services did not become healthy in time', {
+    logger.error("Critical services did not become healthy in time", {
       timeoutMs: maxWaitMs,
     });
     return false;
