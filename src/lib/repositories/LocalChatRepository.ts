@@ -73,17 +73,19 @@ export class LocalChatRepository implements IChatRepository {
     chats.unshift(localChat);
     localStorage.setItem(CHATS_KEY, JSON.stringify(chats));
 
-    // Convert to UnifiedChat for response (id maps from _id)
+    // Convert to UnifiedChat for response (preserve privacy/share/public IDs)
     const unifiedChat: UnifiedChat = {
       id: localChat._id,
       title: localChat.title,
       createdAt: localChat.createdAt,
       updatedAt: localChat.updatedAt,
-      privacy: "private",
+      privacy: localChat.privacy,
+      shareId: localChat.shareId,
+      publicId: localChat.publicId,
       source: "local",
       synced: false,
-      isLocal: true,
-      messages: [],
+      _id: localChat._id,
+      _creationTime: localChat.createdAt,
     };
 
     return { chat: unifiedChat, isNew: true };
@@ -95,17 +97,19 @@ export class LocalChatRepository implements IChatRepository {
     const parsed = parseLocalChats(stored);
     if (!parsed) return [];
 
-    // Convert LocalChat[] to UnifiedChat[] (map _id -> id)
+    // Convert LocalChat[] to UnifiedChat[] (map _id -> id and preserve fields)
     return parsed.map((chat) => ({
       id: chat._id,
       title: chat.title,
       createdAt: chat.createdAt,
       updatedAt: chat.updatedAt,
-      privacy: "private" as const,
+      privacy: chat.privacy,
+      shareId: chat.shareId,
+      publicId: chat.publicId,
       source: "local" as const,
       synced: false,
-      isLocal: true,
-      messages: [],
+      _id: chat._id,
+      _creationTime: chat.createdAt,
     }));
   }
 
@@ -342,7 +346,11 @@ export class LocalChatRepository implements IChatRepository {
       // Get messages for context
       const localMessages = await this.getAllMessages();
       const chatHistory = localMessages
-        .filter((m) => m.chatId === chatId)
+        .filter(
+          (m) =>
+            m.chatId === chatId &&
+            (m.role === "user" || m.role === "assistant"),
+        )
         .sort((a, b) => a.timestamp - b.timestamp)
         .map((msg) => ({
           role: msg.role as "user" | "assistant",
