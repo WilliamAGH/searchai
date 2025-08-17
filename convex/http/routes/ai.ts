@@ -13,12 +13,19 @@ import { applyEnhancements } from "../../enhancements";
 import { normalizeSearchResults } from "../../lib/security/sanitization";
 
 // Helper to remove control characters and limit length (avoids control-char regex)
+// Preserves newlines (10), tabs (9), and carriage returns (13)
 function sanitizeText(input: unknown, maxLen: number): string {
   const s = String(input ?? "");
   let out = "";
   for (const ch of s) {
     const code = ch.codePointAt(0)!;
-    if (code >= 32 && code !== 127) out += ch;
+    if (
+      (code >= 32 && code !== 127) ||
+      code === 9 ||
+      code === 10 ||
+      code === 13
+    )
+      out += ch;
     if (out.length >= maxLen) break;
   }
   return out;
@@ -102,10 +109,12 @@ export function registerAIRoutes(http: HttpRouter) {
             const msg = m as { role?: unknown; content?: unknown };
             return {
               role:
-                msg.role === "user" || msg.role === "assistant"
+                msg.role === "user" ||
+                msg.role === "assistant" ||
+                msg.role === "system"
                   ? msg.role
                   : ("assistant" as const),
-              content: String(msg.content || "").slice(0, 10000),
+              content: sanitizeText(msg.content, 10000),
             };
           })
         : undefined;
@@ -331,14 +340,14 @@ async function handleNoOpenRouter(
               const match = r.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
               domain = match ? match[1] : "source";
             }
-            return `**${r.title}** [${domain}]\n${r.snippet}`;
+            return `**${sanitizeText(r.title, 200)}** [${domain}]\n${sanitizeText(r.snippet, 300)}`;
           })
           .join("\n\n")
           .substring(
             0,
             1500,
           )}...\n\n*Note: AI processing is currently unavailable, but the above search results should help answer your question.*`
-      : `I'm unable to process your question with AI right now due to missing API configuration. However, I can suggest searching for "${message}" on:\n\n- [Google](https://www.google.com/search?q=${encodeURIComponent(message)})\n- [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(message)})\n- [Wikipedia](https://en.wikipedia.org/wiki/Special:Search/${encodeURIComponent(message)})`;
+      : `I'm unable to process your question with AI right now due to missing API configuration. However, I can suggest searching for "${sanitizeText(message, 100)}" on:\n\n- [Google](https://www.google.com/search?q=${encodeURIComponent(message)})\n- [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(message)})\n- [Wikipedia](https://en.wikipedia.org/wiki/Special:Search/${encodeURIComponent(message)})`;
 
   const fallbackResponseObj = {
     response: fallbackResponse,
@@ -383,15 +392,16 @@ function formatSearchResultsForContext(searchResults: SearchResult[]): string {
       if (result.content) {
         // Limit content to prevent context overflow
         const maxContentLength = 1000;
+        const sanitizedContent = sanitizeText(result.content, maxContentLength);
         const truncatedContent =
-          result.content.length > maxContentLength
-            ? result.content.slice(0, maxContentLength) + "..."
-            : result.content;
+          sanitizedContent.length > maxContentLength
+            ? sanitizedContent.slice(0, maxContentLength) + "..."
+            : sanitizedContent;
         resultStr += `Content: ${truncatedContent}\n`;
       } else if (result.summary) {
-        resultStr += `Summary: ${result.summary}\n`;
+        resultStr += `Summary: ${sanitizeText(result.summary, 500)}\n`;
       } else {
-        resultStr += `Snippet: ${result.snippet}\n`;
+        resultStr += `Snippet: ${sanitizeText(result.snippet, 300)}\n`;
       }
 
       return resultStr;
@@ -467,6 +477,7 @@ async function handleOpenRouterStreaming(
       headers: {
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
+        Accept: "text/event-stream",
         ...(SITE_URL ? { "HTTP-Referer": SITE_URL } : {}),
         ...(SITE_TITLE ? { "X-Title": SITE_TITLE } : {}),
       },
@@ -840,14 +851,14 @@ async function handleOpenRouterFailure(
               const match = r.url.match(/(?:https?:\/\/)?(?:www\.)?([^/:]+)/i);
               domain = match ? match[1] : "source";
             }
-            return `**${r.title}** [${domain}]\n${r.snippet}`;
+            return `**${sanitizeText(r.title, 200)}** [${domain}]\n${sanitizeText(r.snippet, 300)}`;
           })
           .join("\n\n")
           .substring(
             0,
             1500,
           )}...\n\n*Note: AI processing is currently unavailable, but the above search results should help answer your question.*`
-      : `I'm having trouble generating a response right now.\n\nPlease try again later, or search manually for "${message}" on:\n- [Google](https://www.google.com/search?q=${encodeURIComponent(message)})\n- [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(message)})`;
+      : `I'm having trouble generating a response right now.\n\nPlease try again later, or search manually for "${sanitizeText(message, 100)}" on:\n- [Google](https://www.google.com/search?q=${encodeURIComponent(message)})\n- [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(message)})`;
 
   const finalErrorResponse = {
     response: fallbackResponse,
