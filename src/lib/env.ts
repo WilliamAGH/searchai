@@ -3,6 +3,7 @@
  * Ensures all required env vars are present and valid
  */
 import { logger } from "./logger";
+import { isDev as checkIsDev, isProduction } from "./environment";
 
 interface EnvConfig {
   // Required
@@ -154,11 +155,13 @@ export const env = {
   },
 
   get isDev(): boolean {
-    return import.meta.env.DEV === true;
+    // Use our unified environment detection
+    return checkIsDev();
   },
 
   get isProd(): boolean {
-    return import.meta.env.PROD === true;
+    // Use our unified environment detection
+    return isProduction();
   },
 
   get mode(): string {

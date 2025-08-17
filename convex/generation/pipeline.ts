@@ -10,6 +10,7 @@ import { api, internal } from "../_generated/api";
 import { buildContextSummary } from "../chats/utils";
 import { applyEnhancements } from "../enhancements";
 import { streamOpenRouter } from "./streaming";
+import { isDevAction } from "../lib/environment";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
@@ -749,7 +750,7 @@ export const generationStep = internalAction({
       // 4. Plan and perform context-aware web search
       // Build up reasoning content to show thinking process
       // Only show detailed search planning in development mode
-      const isDevelopment = process.env.NODE_ENV === "development";
+      const isDevelopment = isDevAction();
       let accumulatedReasoning = isDevelopment ? "Planning search...\n" : "";
 
       await ctx.runMutation(internal.messages.updateMessage, {

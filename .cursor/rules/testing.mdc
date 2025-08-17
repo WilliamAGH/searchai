@@ -1565,6 +1565,273 @@ npm run check:convex-watch
 | `Expected 2 arguments, but got 1` | Missing required args | Add all required arguments |
 | `Type instantiation is excessively deep` | Complex nested types | Simplify or increase TypeScript depth limit |
 
+## 🌍 Environment Detection in Tests
+
+### Unified isDev Detection System
+
+Our codebase uses a unified environment detection system that works across Vite, Convex, and Node.js environments without violating their constraints.
+
+#### Architecture Overview
+
+```typescript
+// Frontend (src/lib/environment.ts)
+import { isDev, environment } from '@/lib/environment';
+
+// Convex Actions (can use process.env)
+import { isDevAction } from '../lib/environment';
+
+// Convex Queries/Mutations (no process.env access)
+import { isDevFromContext } from '../lib/environment';
+```
+
+#### Testing Environment Detection
+
+##### 1. Mock Environment in Unit Tests
+
+```typescript
+// tests/unit/environment.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { isDevelopment } from '@/lib/environment'
+
+describe('Environment Detection', () => {
+  beforeEach(() => {
+    // Reset environment
+    vi.unstubAllEnvs()
+  })
+  
+  it('should detect development from Vite DEV flag', () => {
+    vi.stubEnv('DEV', 'true')
+    expect(isDevelopment()).toBe(true)
+  })
+  
+  it('should detect production deployment', () => {
+    vi.stubEnv('VITE_CONVEX_URL', 'https://vivid-boar-858.convex.cloud')
+    vi.stubEnv('DEV', 'false')
+    expect(isDevelopment()).toBe(false)
+  })
+  
+  it('should detect localhost as development', () => {
+    // Mock window.location
+    Object.defineProperty(window, 'location', {
+      value: { hostname: 'localhost' },
+      writable: true
+    })
+    expect(isDevelopment()).toBe(true)
+  })
+})
+```
+
+##### 2. Test Convex Environment Detection
+
+```typescript
+// convex/lib/environment.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import { isDevDeployment, isDevAction, isDevFromContext } from './environment'
+
+describe('Convex Environment Detection', () => {
+  it('should identify known dev deployments', () => {
+    expect(isDevDeployment('diligent-greyhound-240')).toBe(true)
+    expect(isDevDeployment('vivid-boar-858')).toBe(false)
+  })
+  
+  it('should handle deployment prefixes', () => {
+    expect(isDevDeployment('dev:some-deployment')).toBe(true)
+    expect(isDevDeployment('prod:some-deployment')).toBe(false)
+  })
+  
+  it('should detect action environment', () => {
+    // Mock process.env for actions
+    vi.stubEnv('NODE_ENV', 'development')
+    expect(isDevAction()).toBe(true)
+    
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('CONVEX_DEPLOYMENT', 'prod:vivid-boar-858')
+    expect(isDevAction()).toBe(false)
+  })
+  
+  it('should use context hints in queries/mutations', () => {
+    // Without hint, defaults to production (safe)
+    expect(isDevFromContext()).toBe(false)
+    
+    // With hint
+    expect(isDevFromContext('diligent-greyhound-240')).toBe(true)
+    expect(isDevFromContext('vivid-boar-858')).toBe(false)
+  })
+})
+```
+
+##### 3. E2E Environment Testing
+
+```typescript
+// tests/e2e/environment.spec.ts
+import { test, expect } from '@playwright/test'
+
+test.describe('Environment-specific behavior', () => {
+  test('should show dev features in development', async ({ page }) => {
+    // Set dev environment
+    await page.addInitScript(() => {
+      window.localStorage.setItem('DEBUG_MODE', 'true')
+    })
+    
+    await page.goto('/')
+    
+    // Dev-only features should be visible
+    const devTools = page.locator('[data-testid="dev-tools"]')
+    await expect(devTools).toBeVisible()
+  })
+  
+  test('should hide dev features in production', async ({ page }) => {
+    // Mock production environment
+    await page.route('**/convex/**', route => {
+      route.fulfill({
+        headers: {
+          'X-Convex-Deployment': 'vivid-boar-858'
+        }
+      })
+    })
+    
+    await page.goto('/')
+    
+    // Dev features should be hidden
+    const devTools = page.locator('[data-testid="dev-tools"]')
+    await expect(devTools).not.toBeVisible()
+  })
+})
+```
+
+#### Known Deployments
+
+Update these when deployments change:
+
+```typescript
+// convex/lib/environment.ts
+const DEV_DEPLOYMENTS = [
+  'diligent-greyhound-240',  // Primary dev deployment
+  'localhost',
+  'local',
+];
+
+const PROD_DEPLOYMENTS = [
+  'vivid-boar-858',  // Primary production deployment
+];
+```
+
+#### Environment Detection Flow
+
+```mermaid
+graph TD
+    A[Environment Check] --> B{Context Type?}
+    B -->|Frontend| C[Check Vite DEV]
+    B -->|Convex Action| D[Check process.env]
+    B -->|Query/Mutation| E[Use Hardcoded Values]
+    
+    C --> F{Is DEV true?}
+    F -->|Yes| G[Development]
+    F -->|No| H[Check URL Pattern]
+    H --> I{Localhost?}
+    I -->|Yes| G
+    I -->|No| J[Check Deployment Name]
+    
+    D --> K{NODE_ENV?}
+    K -->|development| G
+    K -->|production| L[Production]
+    K -->|undefined| M[Check CONVEX_DEPLOYMENT]
+    
+    E --> N{Known Deployment?}
+    N -->|greyhound| G
+    N -->|boar| L
+    N -->|Unknown| L
+    
+    J --> O{Match Pattern?}
+    O -->|Dev Pattern| G
+    O -->|Prod Pattern| L
+    O -->|No Match| L
+```
+
+#### Common Patterns
+
+##### Conditional Logging
+
+```typescript
+import { isDev } from '@/lib/environment';
+import { getEnvLogger } from '@/lib/environment';
+
+// Simple check
+if (isDev()) {
+  console.log('Debug information');
+}
+
+// Using logger utility
+const logger = getEnvLogger();
+logger.debug('Only logs in development');
+logger.error('Always logs'); // Errors are always visible
+```
+
+##### Feature Flags
+
+```typescript
+import { environment } from '@/lib/environment';
+
+export const features = {
+  debugPanel: environment.isDev,
+  verboseLogging: environment.isDev,
+  mockData: environment.isDev && !window.location.search.includes('real-data'),
+  analyticsTracking: environment.isProduction,
+};
+```
+
+##### Convex Function Logging
+
+```typescript
+// In a Convex action
+import { action } from './_generated/server';
+import { isDevAction, getEnvLogger } from '../lib/environment';
+
+export const myAction = action(async (ctx, args) => {
+  const logger = getEnvLogger(isDevAction());
+  
+  logger.debug('Action started', args);
+  // Debug logs only in development
+  
+  const result = await performWork();
+  
+  logger.debug('Action completed', result);
+  return result;
+});
+
+// In a query/mutation (no process.env)
+import { query } from './_generated/server';
+import { isDevFromContext } from '../lib/environment';
+
+export const myQuery = query(async (ctx, args) => {
+  const isDev = isDevFromContext();
+  
+  // This will be true in greyhound deployment, false in boar
+  if (isDev) {
+    // Development-only behavior
+  }
+  
+  return data;
+});
+```
+
+#### Testing Guidelines
+
+1. **Always mock environment in tests** - Don't rely on actual environment
+2. **Test both dev and prod paths** - Ensure features work in both
+3. **Use deployment hints sparingly** - Only when frontend needs to pass context
+4. **Update hardcoded deployments** - When deployment names change
+5. **Default to production** - Safer to hide dev features than expose them
+
+#### Troubleshooting
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| `process.env undefined in query` | Queries can't access process.env | Use `isDevFromContext()` instead |
+| `isDev always false` | Deployment not in DEV_DEPLOYMENTS | Add deployment to known list |
+| `Different behavior local vs deployed` | Different detection methods | Test with actual deployment names |
+| `import.meta.env undefined` | Not in Vite context | Use Node.js detection in scripts |
+
 ## 🔗 Resources & Documentation
 
 ### Official Documentation

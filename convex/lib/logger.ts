@@ -6,16 +6,27 @@
  * - Safe for server-side execution
  */
 
-// In Convex, we can't use import.meta.env, so we'll use a different approach
-// We'll create a simple logger that can be easily identified and removed
+import { isDevAction, isDevFromContext, getEnvLogger } from "./environment";
 
-// Safe way to check if we're in a Node.js environment
-const isNode =
-  typeof process !== "undefined" && typeof process.env !== "undefined";
-// Default to no debug/info logs unless explicitly enabled or in development
-const nodeEnv = isNode ? process.env.NODE_ENV : undefined;
-const debugFlag = isNode ? process.env.CONVEX_DEBUG_LOGS : undefined;
-const isDev = nodeEnv === "development" || debugFlag === "1";
+// Determine if we're in development mode
+// This works differently depending on the Convex context:
+// - In actions: Can use process.env directly via isDevAction()
+// - In queries/mutations: Must use context hints or hardcoded values
+const isDev = (() => {
+  // Try action-based detection first (most reliable when available)
+  try {
+    if (typeof process !== "undefined" && typeof process.env !== "undefined") {
+      return isDevAction();
+    }
+  } catch {
+    // Not in an action context
+  }
+  
+  // Fallback to context-based detection
+  // In queries/mutations, we can't access process.env
+  // So we use hardcoded knowledge of our deployment
+  return isDevFromContext();
+})();
 
 export const logger = {
   /**

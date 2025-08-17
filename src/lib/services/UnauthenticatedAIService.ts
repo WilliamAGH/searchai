@@ -3,6 +3,7 @@
  * Handles streaming responses via HTTP endpoints
  */
 import { logger } from "../logger";
+import { isDev as checkIsDev } from "../environment";
 import type { MessageStreamChunk } from "../types/message";
 
 /**
@@ -76,8 +77,7 @@ export class UnauthenticatedAIService {
     try {
       // In development, use the proxied path directly
       // In production, use the full Convex URL
-      const host = window.location.hostname;
-      const isDev = host === "localhost" || host === "127.0.0.1";
+      const isDev = checkIsDev();
       const apiUrl = isDev ? "/api/ai" : `${this.convexUrl}/api/ai`;
 
       logger.debug("[UnauthenticatedAIService] API URL", { apiUrl, isDev });
@@ -194,8 +194,7 @@ export class UnauthenticatedAIService {
   async searchWithAI(query: string): Promise<unknown> {
     // In development, use the proxied path directly
     // In production, use the full Convex URL
-    const host = window.location.hostname;
-    const isDev = host === "localhost" || host === "127.0.0.1";
+    const isDev = checkIsDev();
     const apiUrl = isDev ? "/api/search" : `${this.convexUrl}/api/search`;
 
     const response = await fetch(apiUrl, {

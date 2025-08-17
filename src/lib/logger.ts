@@ -5,7 +5,11 @@
  * - Zero runtime overhead in production
  */
 
-const isDev = import.meta.env.DEV;
+import { isDev as checkIsDev } from "./environment";
+
+// Use our unified environment detection
+// This provides more comprehensive detection than just import.meta.env.DEV
+const isDev = checkIsDev();
 
 export const logger = {
   /**

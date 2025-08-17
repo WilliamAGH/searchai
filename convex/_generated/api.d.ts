@@ -44,6 +44,7 @@ import type * as http_routes_search from "../http/routes/search.js";
 import type * as http_utils from "../http/utils.js";
 import type * as http from "../http.js";
 import type * as lib_debug from "../lib/debug.js";
+import type * as lib_environment from "../lib/environment.js";
 import type * as lib_logger from "../lib/logger.js";
 import type * as lib_security_patterns from "../lib/security/patterns.js";
 import type * as lib_security_rateLimit from "../lib/security/rateLimit.js";
@@ -110,6 +111,7 @@ declare const fullApi: ApiFromModules<{
   "http/utils": typeof http_utils;
   http: typeof http;
   "lib/debug": typeof lib_debug;
+  "lib/environment": typeof lib_environment;
   "lib/logger": typeof lib_logger;
   "lib/security/patterns": typeof lib_security_patterns;
   "lib/security/rateLimit": typeof lib_security_rateLimit;
