@@ -15,7 +15,9 @@ import { escapeHtml, formatConversationMarkdown } from "../utils";
 export function registerPublishRoutes(http: HttpRouter) {
   // Helper: determine allowed origin (env-driven; defaults to *)
   const getAllowedOrigin = (origin: string | null, ctx: any): string => {
-    const envGet = ((ctx as any)?.env?.get?.bind((ctx as any).env)) || ((_key: string) => null);
+    const envGet =
+      (ctx as any)?.env?.get?.bind((ctx as any).env) ||
+      ((_key: string) => null);
     const allowed = envGet("CONVEX_ALLOWED_ORIGINS");
     if (!allowed || allowed === "*") return "*";
     const list = allowed

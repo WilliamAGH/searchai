@@ -171,7 +171,8 @@ export function registerAIRoutes(http: HttpRouter) {
       }
 
       // Check if OpenRouter API key is available
-      const envGet = ((ctx as any)?.env?.get?.bind((ctx as any).env)) ||
+      const envGet =
+        (ctx as any)?.env?.get?.bind((ctx as any).env) ||
         ((_key: string) => null);
       const OPENROUTER_API_KEY = envGet("OPENROUTER_API_KEY");
       const CONVEX_OPENAI_API_KEY = envGet("CONVEX_OPENAI_API_KEY");
