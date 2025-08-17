@@ -8,6 +8,7 @@
 import React, { useCallback, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { toast } from "sonner";
+import { safeFocus, isIOSSafari } from "../lib/utils/ios";
 
 interface SignUpModalProps {
   isOpen: boolean;
@@ -74,9 +75,16 @@ export function SignUpModal({
 
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
 
-    // Focus the email input first if available, otherwise the dialog
-    const toFocus = emailInputRef.current || dialogRef.current;
-    toFocus?.focus();
+    // CRITICAL iOS Safari Fix: Skip auto-focus to prevent keyboard crash
+    // iOS Safari has a known issue where immediate focus can crash the keyboard
+    if (!isIOSSafari()) {
+      // Only focus on non-iOS Safari browsers
+      // Use requestAnimationFrame for smoother focus transition
+      requestAnimationFrame(() => {
+        const toFocus = emailInputRef.current || dialogRef.current;
+        safeFocus(toFocus, { preventScroll: true });
+      });
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -131,7 +139,7 @@ export function SignUpModal({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm no-backdrop-blur"
         onClick={onClose}
         onKeyDown={handleOverlayKeyDown}
         aria-label="Close modal"

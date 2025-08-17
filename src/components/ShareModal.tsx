@@ -11,6 +11,7 @@ import { logger } from "../lib/logger";
 import { Spinner } from "./ui/Spinner";
 import { copyToClipboard } from "../lib/clipboard";
 import { formatConversationMarkdown } from "../lib/utils";
+import { safeFocus, isIOSSafari } from "../lib/utils/ios";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -100,11 +101,29 @@ export function ShareModal({
     }
   }, [isOpen]);
 
-  // Initial focus when opening
+  /**
+   * Initial focus management when modal opens
+   *
+   * @description CRITICAL iOS Safari fix: We skip auto-focus on iOS Safari
+   * to prevent keyboard crashes. iOS Safari has known issues with programmatic
+   * focus operations that can cause the virtual keyboard to crash or freeze.
+   *
+   * @remarks
+   * - Records modal open timestamp for analytics
+   * - Only focuses close button on non-iOS Safari browsers
+   * - Uses requestAnimationFrame for smoother focus transition
+   */
   useEffect(() => {
     if (isOpen) {
       openedAtRef.current = Date.now();
-      closeBtnRef.current?.focus();
+
+      // CRITICAL: Skip auto-focus on iOS Safari to prevent keyboard crash
+      if (!isIOSSafari()) {
+        // Use requestAnimationFrame for smoother focus transition
+        requestAnimationFrame(() => {
+          safeFocus(closeBtnRef.current, { preventScroll: true });
+        });
+      }
     }
   }, [isOpen]);
 
