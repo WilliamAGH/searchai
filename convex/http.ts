@@ -9,14 +9,13 @@
  */
 
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
 import { registerChatRoutes } from "./http/routes/chat";
 import { registerSearchRoutes } from "./http/routes/search";
 import { registerScrapeRoutes } from "./http/routes/scrape";
 import { registerAIRoutes } from "./http/routes/ai";
 import { registerPublishRoutes } from "./http/routes/publish";
-import { corsJsonResponseForRequest } from "./http/utils";
+import { registerHealthRoutes } from "./http/routes/health";
 
 /**
  * HTTP router for unauthenticated endpoints.
@@ -38,22 +37,9 @@ registerSearchRoutes(http);
 registerScrapeRoutes(http);
 registerAIRoutes(http);
 registerPublishRoutes(http);
+registerHealthRoutes(http);
 
 // Register auth routes
 auth.addHttpRoutes(http);
-
-// Lightweight health check endpoint
-http.route({
-  path: "/health",
-  method: "GET",
-  handler: httpAction(async (_ctx, request) => {
-    return corsJsonResponseForRequest(
-      request,
-      JSON.stringify({ status: "ok", timestamp: Date.now() }),
-      200,
-      "GET, OPTIONS",
-    );
-  }),
-});
 
 export default http;

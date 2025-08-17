@@ -88,7 +88,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
         // Allow localhost in development mode for testing
         const isDevelopment =
           process.env.NODE_ENV === "development" ||
-          (process.env.CONVEX_DEPLOYMENT?.includes?.("dev") ?? false);
+          ((process.env.CONVEX_DEPLOYMENT || "").includes("dev") ?? false);
 
         // Block localhost and loopback (except in development)
         if (
