@@ -35,7 +35,7 @@
     "MD026": false
   },
   "git.enabled": true,
-  "git.path": ".vscode/git-with-nvm.sh",
+  "git.path": "${workspaceFolder}/.vscode/git-with-nvm.sh",
   "terminal.integrated.env.osx": {
     "IS_REACT_ACT_ENVIRONMENT": "true",
     "NODE_ENV": "test",

@@ -15,6 +15,12 @@ if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = "test";
 }
 
+// Minimal one-time debug to trace React environment under hooks
+// eslint-disable-next-line no-console
+console.log(
+  `[TestSetup] React ${React.version}; act=${typeof (React as any).act}`,
+);
+
 // Ensure global React is available for Testing Library
 if (typeof globalThis !== "undefined" && !globalThis.React) {
   (globalThis as any).React = React;
