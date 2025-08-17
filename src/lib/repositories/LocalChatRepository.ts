@@ -196,6 +196,17 @@ export class LocalChatRepository implements IChatRepository {
     });
   }
 
+  /**
+   * Add a message to local storage with secure field handling
+   *
+   * SECURITY: This method sanitizes input to prevent identity/provenance spoofing.
+   * Critical fields (_id, chatId, source, isLocal, synced) are protected from
+   * being overwritten by caller-provided values.
+   *
+   * @param chatId - The chat ID to add the message to
+   * @param message - Partial message data (sensitive fields will be filtered)
+   * @returns The created message with guaranteed field integrity
+   */
   async addMessage(
     chatId: string,
     message: Partial<UnifiedMessage>,
@@ -206,25 +217,38 @@ export class LocalChatRepository implements IChatRepository {
     const id = nanoid();
     const now = Date.now();
 
-    // Create raw stored message (with _id)
+    /**
+     * CRITICAL SECURITY FIX: Exclude identity/provenance fields from caller input
+     * This prevents injection attacks where a caller could override:
+     * - _id: Message identifier
+     * - chatId: Chat association
+     * - source: Data provenance
+     * - isLocal/synced: Storage state flags
+     *
+     * @see https://github.com/WilliamAGH/searchai-io/security/code-scanning
+     */
+    const {
+      id: _ignoreId,
+      _id: _ignoreLegacyId,
+      _creationTime: _ignoreCreation,
+      chatId: _ignoreChatId,
+      source: _ignoreSource,
+      synced: _ignoreSynced,
+      isLocal: _ignoreIsLocal,
+      ...safeFields
+    } = (message || {}) as Record<string, unknown>;
+
+    // Create raw stored message with protected fields
     const raw = {
       _id: id,
       chatId,
-      role: message.role || "user",
-      content: message.content || "",
-      timestamp: message.timestamp ?? now,
-      isLocal: true as const,
-      source: "local" as const,
-      ...(message as object),
-    } as unknown as {
-      _id: string;
-      chatId: string;
-      role: string;
-      content: string;
-      timestamp: number;
-      isLocal: boolean;
-      source: string;
-    };
+      role: (message.role as "user" | "assistant" | "system") || "user",
+      content: (message.content as string) || "",
+      timestamp: (message.timestamp as number) ?? now,
+      isLocal: true,
+      source: "local",
+      ...safeFields,
+    } as Record<string, unknown>;
 
     allRaw.push(raw);
     localStorage.setItem(MESSAGES_KEY, JSON.stringify(allRaw));
@@ -251,6 +275,8 @@ export class LocalChatRepository implements IChatRepository {
       timestamp: (timestamp as number) ?? now,
       source: "local",
       synced: false,
+      _id,
+      _creationTime: (timestamp as number) ?? now,
     } as UnifiedMessage;
   }
 
@@ -424,6 +450,29 @@ export class LocalChatRepository implements IChatRepository {
 
       yield { type: "done" };
     } catch (error) {
+      /**
+       * CRITICAL: Finalize assistant message on error to prevent UI deadlock
+       * When streaming fails, the assistant message can remain stuck in
+       * isStreaming=true state, causing the UI to show an infinite loading state.
+       * We must always finalize the message state, even on error.
+       *
+       * @regression-prevention Always update message state on error
+       */
+      try {
+        if (assistantMessageId) {
+          await this.updateMessage(assistantMessageId, {
+            content:
+              fullContent || "An error occurred while generating the response.",
+            isStreaming: false,
+          });
+        }
+      } catch (finalizeErr) {
+        logger.error(
+          "Failed to finalize assistant message after error:",
+          finalizeErr,
+        );
+      }
+
       logger.error("LocalChatRepository.generateResponse error:", error);
       yield {
         type: "error",
@@ -550,12 +599,23 @@ export class LocalChatRepository implements IChatRepository {
       chat.privacy = privacy;
       chat.updatedAt = Date.now();
 
-      // Generate share/public IDs if needed
+      /**
+       * Generate UUIDv7 IDs for consistency with backend
+       * IMPORTANT: Use uuidv7() for all share/public IDs to maintain
+       * consistency with Convex backend and other ID generation in the app.
+       *
+       * UUIDv7 provides:
+       * - Time-ordered generation (sortable)
+       * - Guaranteed uniqueness
+       * - Consistent format across frontend/backend
+       *
+       * @see convex/lib/uuid.ts for backend implementation
+       */
       if (privacy === "shared" && !chat.shareId) {
-        chat.shareId = `share_${nanoid()}`;
+        chat.shareId = uuidv7();
       }
       if (privacy === "public" && !chat.publicId) {
-        chat.publicId = `public_${nanoid()}`;
+        chat.publicId = uuidv7();
       }
 
       localStorage.setItem(CHATS_KEY, JSON.stringify(chats));
@@ -575,7 +635,13 @@ export class LocalChatRepository implements IChatRepository {
     chats: UnifiedChat[];
     messages: UnifiedMessage[];
   }): Promise<void> {
-    // Convert UnifiedChat to LocalChat format for storage
+    /**
+     * Convert UnifiedChat to LocalChat format with required provenance flags
+     * IMPORTANT: Local validation expects isLocal and source fields.
+     * Without these, imported data may be rejected by validateLocalChat.
+     *
+     * @regression-prevention Always include provenance flags in imports
+     */
     const localChats = data.chats.map((chat) => ({
       _id: chat.id,
       title: chat.title || "Imported Chat",
@@ -584,9 +650,17 @@ export class LocalChatRepository implements IChatRepository {
       privacy: chat.privacy,
       shareId: chat.shareId,
       publicId: chat.publicId,
+      isLocal: true,
+      source: "local",
     }));
 
-    // Convert UnifiedMessage to local storage format
+    /**
+     * Convert UnifiedMessage to local storage format with provenance
+     * IMPORTANT: Local validation expects isLocal and source fields.
+     * Without these, imported messages may be rejected by validateLocalMessage.
+     *
+     * @regression-prevention Always include provenance flags in imports
+     */
     const localMessages = data.messages.map((msg) => ({
       _id: msg.id,
       chatId: msg.chatId,
@@ -598,6 +672,8 @@ export class LocalChatRepository implements IChatRepository {
       reasoning: msg.reasoning,
       searchMethod: msg.searchMethod,
       hasRealResults: msg.hasRealResults,
+      isLocal: true,
+      source: "local",
     }));
 
     // Merge with existing data
