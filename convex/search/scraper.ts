@@ -3,6 +3,71 @@
  * Handles URL content extraction and cleaning
  */
 
+/**
+ * TODO: CRITICAL IMPROVEMENTS NEEDED FOR LARGE CONTEXT HANDLING
+ * 
+ * Current limitation: We truncate scraped content to 2000 chars in buildSystemPrompt()
+ * This loses valuable context that could improve response quality.
+ * 
+ * REQUIRED ENHANCEMENTS:
+ * 
+ * a) INTELLIGENT CONTENT EXTRACTION
+ *    - Analyze user query to determine relevance/intent keywords
+ *    - Use query-aware extraction to identify and prioritize relevant sections
+ *    - Remove boilerplate (nav, footers, ads, sidebars) more aggressively
+ *    - Extract based on semantic relevance to the user's question
+ *    - Consider using DOM structure analysis to identify main content areas
+ * 
+ * b) ADVANCED CONTEXT COMPRESSION
+ *    - Implement chunking strategy for documents > 2000 chars
+ *    - Use vector embeddings to identify most relevant chunks
+ *    - Apply semantic compression/summarization per chunk
+ *    - Maintain key facts, data points, and citations
+ *    - Consider using a local embedding model or Convex vector search
+ *    - Preserve technical details, numbers, dates, and proper nouns
+ *    - Could use techniques like:
+ *      * Extractive summarization (key sentence selection)
+ *      * Semantic similarity scoring against query
+ *      * TF-IDF or BM25 for relevance ranking
+ *      * Hierarchical content structuring
+ * 
+ * c) PERSISTENT CACHING LAYER
+ *    - Create new Convex table: "scraped_content" with schema:
+ *      {
+ *        url: string (indexed),
+ *        domain: string,
+ *        title: string,
+ *        rawContent: string,
+ *        processedContent: string,
+ *        summary: string,
+ *        keyPoints: string[],
+ *        embeddings?: float[], // For vector search
+ *        queryRelevance: Map<queryHash, relevanceScore>,
+ *        scrapedAt: number,
+ *        contentHash: string, // For change detection
+ *        contentLength: number,
+ *        language: string,
+ *        contentType: string // article, documentation, forum, etc.
+ *      }
+ *    - Implement TTL-based expiration (e.g., 7 days for news, 30 days for docs)
+ *    - Store both raw and processed versions
+ *    - Enable query-specific caching of relevance scores
+ *    - Support incremental updates when content changes
+ * 
+ * IMPLEMENTATION PRIORITY:
+ * 1. Start with persistent caching to reduce redundant scraping
+ * 2. Add query-aware extraction for better relevance
+ * 3. Implement compression/summarization for large documents
+ * 4. Finally add vector embeddings for semantic search
+ * 
+ * EXPECTED BENEFITS:
+ * - 10x more context available to LLM per source
+ * - Faster responses due to caching
+ * - Better answer quality with relevant content extraction
+ * - Reduced API costs by avoiding redundant scraping
+ * - Support for long-form technical documentation
+ */
+
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 import { logger } from "../lib/logger";

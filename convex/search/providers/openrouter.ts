@@ -36,9 +36,10 @@ interface OpenRouterResponse {
 export async function searchWithOpenRouter(
   query: string,
   maxResults: number,
+  apiKey: string,
 ): Promise<SearchResult[]> {
   // Preflight check for API key
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is not configured on the server");
   }
 
@@ -51,7 +52,7 @@ export async function searchWithOpenRouter(
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

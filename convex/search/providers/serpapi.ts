@@ -28,14 +28,15 @@ interface SerpApiResponse {
 export async function searchWithSerpApi(
   query: string,
   maxResults: number,
+  apiKey: string,
 ): Promise<SearchResult[]> {
   // Validate API key exists
-  if (!process.env.SERP_API_KEY) {
+  if (!apiKey) {
     logger.error("❌ SERP_API_KEY not configured");
     throw new Error("SERP_API_KEY is not configured on the server");
   }
 
-  const apiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${process.env.SERP_API_KEY}&hl=en&gl=us&num=${maxResults}`;
+  const apiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${apiKey}&hl=en&gl=us&num=${maxResults}`;
   const requestLog = {
     queryLength: query.length,
     maxResults,
