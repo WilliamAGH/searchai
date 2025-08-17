@@ -37,6 +37,7 @@ import type * as generation_streaming from "../generation/streaming.js";
 import type * as http_cors from "../http/cors.js";
 import type * as http_routes_ai from "../http/routes/ai.js";
 import type * as http_routes_chat from "../http/routes/chat.js";
+import type * as http_routes_health from "../http/routes/health.js";
 import type * as http_routes_publish from "../http/routes/publish.js";
 import type * as http_routes_scrape from "../http/routes/scrape.js";
 import type * as http_routes_search from "../http/routes/search.js";
@@ -102,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   "http/cors": typeof http_cors;
   "http/routes/ai": typeof http_routes_ai;
   "http/routes/chat": typeof http_routes_chat;
+  "http/routes/health": typeof http_routes_health;
   "http/routes/publish": typeof http_routes_publish;
   "http/routes/scrape": typeof http_routes_scrape;
   "http/routes/search": typeof http_routes_search;
