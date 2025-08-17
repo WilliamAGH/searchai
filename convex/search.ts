@@ -147,7 +147,11 @@ export const searchWeb = action({
     const SERP_API_KEY = process.env.SERP_API_KEY;
     if (SERP_API_KEY) {
       try {
-        const serpResults = await searchWithSerpApi(args.query, maxResults, SERP_API_KEY);
+        const serpResults = await searchWithSerpApi(
+          args.query,
+          maxResults,
+          SERP_API_KEY,
+        );
         if (serpResults.length > 0) {
           // Enrich with scraped content if enabled
           const enrichedResults = enrichWithContent
