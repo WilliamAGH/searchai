@@ -4,6 +4,9 @@
  */
 
 import { nanoid } from "nanoid";
+import { uuidv7 } from "uuidv7";
+import { ConvexClient } from "convex/browser";
+import { api } from "../../../convex/_generated/api";
 import type { IChatRepository } from "./ChatRepository";
 import type {
   UnifiedChat,
@@ -26,17 +29,20 @@ const MESSAGES_KEY = "searchai_messages_v2";
 export class LocalChatRepository implements IChatRepository {
   protected storageType = "local" as const;
   private aiService: UnauthenticatedAIService;
-  private abortController: AbortController | null = null;
+  private convexClient: ConvexClient;
 
   constructor(convexUrl?: string) {
     if (!this.isStorageAvailable()) {
       throw new Error("LocalStorage is not available");
     }
 
+    const url = convexUrl || import.meta.env.VITE_CONVEX_URL || "";
+
     // Initialize AI service with convex URL
-    this.aiService = new UnauthenticatedAIService(
-      convexUrl || import.meta.env.VITE_CONVEX_URL || "",
-    );
+    this.aiService = new UnauthenticatedAIService(url);
+
+    // Initialize Convex client for querying public/shared chats
+    this.convexClient = new ConvexClient(url);
   }
 
   private isStorageAvailable(): boolean {
@@ -139,30 +145,72 @@ export class LocalChatRepository implements IChatRepository {
 
   // Message operations
   async getMessages(chatId: string): Promise<UnifiedMessage[]> {
+    // First check if this is a local chat
     const stored = localStorage.getItem(MESSAGES_KEY);
-    if (!stored) return [];
-    const parsed = parseLocalMessages(stored) || [];
+    if (stored) {
+      const parsed = parseLocalMessages(stored) || [];
+      const localMessages = parsed.filter((m) => m.chatId === chatId);
 
-    // Filter by chat and sort ascending by timestamp
-    const filtered = parsed
-      .filter((m) => m.chatId === chatId)
-      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      if (localMessages.length > 0) {
+        // Return local messages if found
+        const sorted = localMessages.sort(
+          (a, b) => (a.timestamp || 0) - (b.timestamp || 0),
+        );
+        return sorted.map((m) => {
+          const { _id, timestamp, ...rest } = m as unknown as {
+            _id: string;
+            timestamp?: number;
+            [key: string]: unknown;
+          };
+          return {
+            id: _id,
+            ...(rest as Omit<UnifiedMessage, "id">),
+            timestamp: timestamp ?? Date.now(),
+            source: "local",
+            synced: false,
+          } as UnifiedMessage;
+        });
+      }
+    }
 
-    // Map stored _id -> UnifiedMessage.id and preserve provenance fields
-    return filtered.map((m) => {
-      const { _id, timestamp, ...rest } = m as unknown as {
-        _id: string;
-        timestamp?: number;
-        [key: string]: unknown;
-      };
-      return {
-        id: _id,
-        ...(rest as Omit<UnifiedMessage, "id">),
-        timestamp: timestamp ?? Date.now(),
-        source: "local",
-        synced: false,
-      } as UnifiedMessage;
-    });
+    // If no local messages, check if this chat exists in Convex (public/shared chat)
+    // This allows viewing messages for public/shared chats
+    try {
+      const messages = await this.convexClient.query(
+        api.chats.getChatMessages,
+        { chatId },
+      );
+
+      if (messages && messages.length > 0) {
+        // Convert Convex messages to UnifiedMessage format
+        return messages.map((msg) => ({
+          id: msg._id,
+          chatId: msg.chatId,
+          role: msg.role as "user" | "assistant" | "system",
+          content: msg.content || "",
+          timestamp: msg.timestamp || msg._creationTime,
+          searchResults: msg.searchResults,
+          sources: msg.sources,
+          reasoning: msg.reasoning,
+          searchMethod: msg.searchMethod,
+          hasRealResults: msg.hasRealResults,
+          isStreaming: msg.isStreaming,
+          streamedContent: msg.streamedContent,
+          thinking: msg.thinking,
+          source: "convex",
+          synced: true,
+          _id: msg._id,
+          _creationTime: msg._creationTime,
+        }));
+      }
+    } catch (error) {
+      logger.debug(
+        "Failed to query Convex for messages (expected for local chats):",
+        error,
+      );
+    }
+
+    return [];
   }
 
   private async getAllMessages(): Promise<UnifiedMessage[]> {
@@ -308,26 +356,14 @@ export class LocalChatRepository implements IChatRepository {
       let searchResults: unknown[] = [];
       let sources: string[] = [];
 
-      // Find or create assistant message
-      const allMessages = await this.getAllMessages();
-      const assistantMsg = allMessages
-        .filter((m) => m.chatId === chatId && m.role === "assistant")
-        .sort((a, b) => b.timestamp - a.timestamp)[0];
-
-      if (assistantMsg) {
-        assistantMessageId = assistantMsg.id;
-      } else {
-        // Fallback: create one if not found (shouldn't happen)
-        const created = await this.addMessage(chatId, {
-          role: "assistant",
-          content: "",
-          isStreaming: true,
-        });
-        assistantMessageId = created.id;
-      }
-
-      // Keep track of what we've yielded to avoid duplicates
-      let lastYieldedContent = "";
+      // Always create a new assistant message for each response
+      // This prevents overwriting previous responses if multiple streams happen
+      const created = await this.addMessage(chatId, {
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+      });
+      assistantMessageId = created.id;
 
       // Generate response using AI service with proper onChunk handler
       await this.aiService.generateResponse(
@@ -340,10 +376,7 @@ export class LocalChatRepository implements IChatRepository {
             // Content chunk with potential reasoning/thinking
             if (chunk.content) {
               fullContent += chunk.content;
-              // Only yield the new content, not the full accumulated content
-              if (chunk.content !== lastYieldedContent) {
-                lastYieldedContent = chunk.content;
-              }
+              // Incremental UI updates are driven by updateMessage() writes
             }
 
             // Handle reasoning/thinking from the chunk
@@ -351,7 +384,7 @@ export class LocalChatRepository implements IChatRepository {
               currentReasoning += chunk.reasoning;
             }
             if (chunk.thinking) {
-              currentThinking = chunk.thinking;
+              currentThinking += chunk.thinking;
             }
 
             // Update searchResults and sources if provided
@@ -390,7 +423,7 @@ export class LocalChatRepository implements IChatRepository {
             await this.updateMessage(assistantMessageId, {
               content: fullContent,
               reasoning: currentReasoning,
-              thinking: "",
+              thinking: currentThinking,
               isStreaming: false,
             });
           }
@@ -403,11 +436,13 @@ export class LocalChatRepository implements IChatRepository {
         yield { type: "content", content: fullContent };
       }
 
-      // Yield final metadata with reasoning
+      // Yield final metadata with reasoning and thinking
       const finalMetadata: Record<string, unknown> = {};
       if (currentReasoning) {
-        finalMetadata.thinking = currentReasoning;
         finalMetadata.reasoning = currentReasoning;
+      }
+      if (currentThinking) {
+        finalMetadata.thinking = currentThinking;
       }
       if (searchResults && searchResults.length > 0) {
         finalMetadata.searchResults = searchResults;
@@ -454,9 +489,9 @@ export class LocalChatRepository implements IChatRepository {
 
     const messages = await this.getMessages(id);
 
-    // Create share/public IDs with expected prefixes
-    const shareId = privacy === "shared" ? `s_${nanoid()}` : undefined;
-    const publicId = privacy === "public" ? `p_${nanoid()}` : undefined;
+    // Create share/public IDs using UUID v7 (same format as Convex backend)
+    const shareId = privacy === "shared" ? uuidv7() : undefined;
+    const publicId = privacy === "public" ? uuidv7() : undefined;
 
     // Persist privacy + share identifiers back into raw chats storage
     const stored = localStorage.getItem(CHATS_KEY);
@@ -485,43 +520,107 @@ export class LocalChatRepository implements IChatRepository {
 
   // Missing IChatRepository methods
   async getChatByShareId(shareId: string): Promise<UnifiedChat | null> {
+    // First check localStorage
     const stored = localStorage.getItem(CHATS_KEY);
-    if (!stored) return null;
-    const parsed = parseLocalChats(stored) || [];
-    const chat = parsed.find((c) => c.shareId === shareId);
-    if (!chat) return null;
+    if (stored) {
+      const parsed = parseLocalChats(stored) || [];
+      const localChat = parsed.find((c) => c.shareId === shareId);
+      if (localChat) {
+        return {
+          id: localChat._id,
+          title: localChat.title,
+          createdAt: localChat.createdAt,
+          updatedAt: localChat.updatedAt,
+          privacy: localChat.privacy,
+          shareId: localChat.shareId,
+          publicId: localChat.publicId,
+          source: "local",
+          synced: false,
+        };
+      }
+    }
 
-    return {
-      id: chat._id,
-      title: chat.title,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
-      privacy: chat.privacy,
-      shareId: chat.shareId,
-      publicId: chat.publicId,
-      source: "local",
-      synced: false,
-    };
+    // If not found locally, query Convex for shared chats
+    // This allows unauthenticated users to view shared chats
+    try {
+      const convexChat = await this.convexClient.query(
+        api.chats.getChatByShareId,
+        { shareId },
+      );
+
+      if (convexChat) {
+        // Convert Convex chat to UnifiedChat format
+        return {
+          id: convexChat._id,
+          title: convexChat.title || "Untitled Chat",
+          createdAt: convexChat.createdAt || convexChat._creationTime,
+          updatedAt: convexChat.updatedAt || convexChat._creationTime,
+          privacy: convexChat.privacy || "shared",
+          shareId: convexChat.shareId,
+          publicId: convexChat.publicId,
+          source: "convex",
+          synced: true,
+          _id: convexChat._id,
+          _creationTime: convexChat._creationTime,
+        };
+      }
+    } catch (error) {
+      logger.error("Failed to query Convex for shared chat:", error);
+    }
+
+    return null;
   }
 
   async getChatByPublicId(publicId: string): Promise<UnifiedChat | null> {
+    // First check localStorage
     const stored = localStorage.getItem(CHATS_KEY);
-    if (!stored) return null;
-    const parsed = parseLocalChats(stored) || [];
-    const chat = parsed.find((c) => c.publicId === publicId);
-    if (!chat) return null;
+    if (stored) {
+      const parsed = parseLocalChats(stored) || [];
+      const localChat = parsed.find((c) => c.publicId === publicId);
+      if (localChat) {
+        return {
+          id: localChat._id,
+          title: localChat.title,
+          createdAt: localChat.createdAt,
+          updatedAt: localChat.updatedAt,
+          privacy: localChat.privacy,
+          shareId: localChat.shareId,
+          publicId: localChat.publicId,
+          source: "local",
+          synced: false,
+        };
+      }
+    }
 
-    return {
-      id: chat._id,
-      title: chat.title,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
-      privacy: chat.privacy,
-      shareId: chat.shareId,
-      publicId: chat.publicId,
-      source: "local",
-      synced: false,
-    };
+    // If not found locally, query Convex for public chats
+    // This allows unauthenticated users to view public chats
+    try {
+      const convexChat = await this.convexClient.query(
+        api.chats.getChatByPublicId,
+        { publicId },
+      );
+
+      if (convexChat) {
+        // Convert Convex chat to UnifiedChat format
+        return {
+          id: convexChat._id,
+          title: convexChat.title || "Untitled Chat",
+          createdAt: convexChat.createdAt || convexChat._creationTime,
+          updatedAt: convexChat.updatedAt || convexChat._creationTime,
+          privacy: convexChat.privacy || "public",
+          shareId: convexChat.shareId,
+          publicId: convexChat.publicId,
+          source: "convex",
+          synced: true,
+          _id: convexChat._id,
+          _creationTime: convexChat._creationTime,
+        };
+      }
+    } catch (error) {
+      logger.error("Failed to query Convex for public chat:", error);
+    }
+
+    return null;
   }
 
   async updateChatPrivacy(

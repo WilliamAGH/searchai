@@ -19,6 +19,7 @@ interface UseComponentPropsArgs {
   isCreatingChat: boolean;
   showShareModal: boolean;
   isAuthenticated: boolean;
+  isReadOnly?: boolean; // Whether the current chat is read-only (public/shared non-owned)
   handleSelectChat: (chatId: string | Id<"chats">) => void;
   handleToggleSidebar: () => void;
   handleNewChatButton: () => Promise<void>;
@@ -64,6 +65,7 @@ export function useComponentProps(args: UseComponentPropsArgs) {
     searchProgress,
     isCreatingChat,
     isAuthenticated,
+    _isReadOnly = false, // Default to false if not provided
     handleSelectChat,
     handleToggleSidebar,
     handleNewChatButton,
@@ -188,19 +190,22 @@ export function useComponentProps(args: UseComponentPropsArgs) {
 
   const messageInputProps = useMemo(
     () => ({
-      disabled: isGenerating, // Disable input while generating to match expected behavior
+      disabled: isGenerating || _isReadOnly, // Disable input while generating or in read-only mode
       isGenerating, // Pass generation state separately for submit button
-      placeholder: isGenerating
-        ? "AI is generating" // Show generation state
-        : !currentChatId
-          ? "Start a new chat"
-          : "Type your message",
+      placeholder: _isReadOnly
+        ? "This chat is read-only" // Show read-only state
+        : isGenerating
+          ? "AI is generating" // Show generation state
+          : !currentChatId
+            ? "Start a new chat"
+            : "Type your message",
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,
     }),
     [
       isGenerating,
+      _isReadOnly,
       currentChatId,
       handleSendMessage,
       handleDraftChange,
