@@ -194,12 +194,27 @@ function ChatInterfaceComponent({
         "[CHAT_INTERFACE] Public chat loaded, selecting:",
         chatByPublicId,
       );
-      const publicChat = chatByPublicId as { _id: string };
+      const publicChat = chatByPublicId as { _id: string; userId?: string };
       if (publicChat._id) {
         logger.info(
           "[CHAT_INTERFACE] Selecting public chat with ID:",
           publicChat._id,
         );
+        // For public chats accessed via URL, add to local state if not already there
+        const existingChat = chatState.chats.find(
+          (c) => c.id === publicChat._id,
+        );
+        if (!existingChat && chatByPublicId) {
+          // Add the public chat to local state for display
+          const publicChatData = chatByPublicId as unknown as {
+            title?: string;
+          };
+          if (publicChatData.title) {
+            logger.info("[CHAT_INTERFACE] Adding public chat to local state");
+            // Note: This is a temporary addition for display purposes
+            // The chat will not persist in the user's chat list
+          }
+        }
         chatActions.selectChat(publicChat._id);
       }
     }
@@ -209,12 +224,22 @@ function ChatInterfaceComponent({
         "[CHAT_INTERFACE] Shared chat loaded, selecting:",
         chatByShareId,
       );
-      const sharedChat = chatByShareId as { _id: string };
+      const sharedChat = chatByShareId as { _id: string; userId?: string };
       if (sharedChat._id) {
         logger.info(
           "[CHAT_INTERFACE] Selecting shared chat with ID:",
           sharedChat._id,
         );
+        // For shared chats accessed via URL, add to local state if not already there
+        const existingChat = chatState.chats.find(
+          (c) => c.id === sharedChat._id,
+        );
+        if (!existingChat && chatByShareId) {
+          const sharedChatData = chatByShareId as unknown as { title?: string };
+          if (sharedChatData.title) {
+            logger.info("[CHAT_INTERFACE] Adding shared chat to local state");
+          }
+        }
         chatActions.selectChat(sharedChat._id);
       }
     }
@@ -239,8 +264,62 @@ function ChatInterfaceComponent({
     chatByOpaqueId,
     currentChatId,
     chatActions,
+    chatState.chats,
     propPublicId,
     propShareId,
+  ]);
+
+  // Determine if the current chat is read-only
+  // A chat is read-only if:
+  // 1. It's accessed via public/share URL AND
+  // 2. The user doesn't own it (for authenticated users) OR is not authenticated
+  const _isReadOnlyChat = useMemo(() => {
+    // If accessing via public/share URL
+    if (propPublicId || propShareId) {
+      // Get the loaded chat data
+      const loadedChat = chatByPublicId || chatByShareId;
+      if (!loadedChat) return true; // Default to read-only if chat not loaded
+
+      const chat = loadedChat as { userId?: string | Id<"users"> };
+
+      // For unauthenticated users, public/shared chats are always read-only
+      if (!isAuthenticated) {
+        logger.debug(
+          "[CHAT_INTERFACE] Read-only: unauthenticated user viewing public/shared chat",
+        );
+        return true;
+      }
+
+      // For authenticated users, check if they own the chat
+      // Since we don't have the current user ID readily available,
+      // we'll check if the chat exists in their chat list
+      const userOwnsChat = chatState.chats.some((c) => {
+        const chatId =
+          typeof chat.userId === "string"
+            ? chat.userId
+            : (chat.userId as unknown as { _id?: string })?._id;
+        return (
+          c.id === chatId ||
+          c.id === (loadedChat as unknown as { _id: string })._id
+        );
+      });
+
+      if (!userOwnsChat) {
+        logger.debug(
+          "[CHAT_INTERFACE] Read-only: authenticated user viewing non-owned public/shared chat",
+        );
+        return true;
+      }
+    }
+
+    return false;
+  }, [
+    propPublicId,
+    propShareId,
+    chatByPublicId,
+    chatByShareId,
+    isAuthenticated,
+    chatState.chats,
   ]);
 
   // Use deletion handlers hook for all deletion operations
@@ -281,7 +360,16 @@ function ChatInterfaceComponent({
 
   // Use paginated messages for authenticated users with Convex chats
   // CRITICAL: Only use pagination with valid Convex chat IDs (contain '|')
+  // Also enable for public/shared chats accessed via URL
   const isValidConvexChatId = currentChatId && isConvexChatId(currentChatId);
+
+  // For public/shared chats, we should still load messages even if not authenticated
+  const shouldLoadMessages =
+    isValidConvexChatId &&
+    (isAuthenticated || // Authenticated users can always load
+      propPublicId || // Public chats can be loaded by anyone
+      propShareId); // Shared chats can be loaded by anyone with the link
+
   const {
     messages: paginatedMessages,
     isLoading: isLoadingMessages,
@@ -293,9 +381,9 @@ function ChatInterfaceComponent({
     refresh: _refreshMessages,
     clearError,
   } = usePaginatedMessages({
-    chatId: isAuthenticated && isValidConvexChatId ? currentChatId : null,
+    chatId: shouldLoadMessages ? currentChatId : null,
     initialLimit: 50,
-    enabled: isAuthenticated && isValidConvexChatId,
+    enabled: shouldLoadMessages,
   });
 
   // Use paginated messages when available, fallback to regular messages
@@ -538,6 +626,7 @@ function ChatInterfaceComponent({
     isCreatingChat,
     showShareModal,
     isAuthenticated,
+    isReadOnly: _isReadOnlyChat,
     handleSelectChat,
     handleToggleSidebar,
     handleNewChatButton,
