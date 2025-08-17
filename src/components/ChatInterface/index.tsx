@@ -74,7 +74,6 @@ function ChatInterfaceComponent({
   );
 
   const [localIsGenerating, setIsGenerating] = useState(false);
-  const [publicChatCheckComplete, setPublicChatCheckComplete] = useState(false);
   // aiService removed - no longer needed with unified flow
 
   const unified = useUnifiedChat();
@@ -220,24 +219,34 @@ function ChatInterfaceComponent({
       currentChatId,
       publicId: propPublicId,
       shareId: propShareId,
-      publicChatCheckComplete,
     });
 
-    // Mark check as complete after queries have had time to run
-    if ((propPublicId || propShareId) && !publicChatCheckComplete) {
-      const timer = setTimeout(() => {
-        // If we still don't have a chat after checking, it doesn't exist
-        if (!chatByPublicId && !chatByShareId) {
-          logger.error("[CHAT_INTERFACE] Public/shared chat not found");
-          toast.error(
-            propPublicId
-              ? "This public chat could not be found. It may have been deleted or made private."
-              : "This shared chat could not be found. It may have been deleted or the link may be invalid.",
-          );
-        }
-        setPublicChatCheckComplete(true);
-      }, 2000); // Give queries 2 seconds to complete
-      return () => clearTimeout(timer);
+    // Check if queries have completed (not undefined = either data or null)
+    // undefined means still loading, null means not found, object means found
+    const publicQueryComplete = propPublicId
+      ? chatByPublicId !== undefined
+      : true;
+    const shareQueryComplete = propShareId ? chatByShareId !== undefined : true;
+
+    // Show error if query completed but returned null (chat not found)
+    if (propPublicId && publicQueryComplete && chatByPublicId === null) {
+      logger.error("[CHAT_INTERFACE] Public chat not found");
+      // Only show error once per public ID
+      if (!sessionStorage.getItem(`error-shown-${propPublicId}`)) {
+        toast.error(
+          "This public chat could not be found. It may have been deleted or made private.",
+        );
+        sessionStorage.setItem(`error-shown-${propPublicId}`, "true");
+      }
+    } else if (propShareId && shareQueryComplete && chatByShareId === null) {
+      logger.error("[CHAT_INTERFACE] Shared chat not found");
+      // Only show error once per share ID
+      if (!sessionStorage.getItem(`error-shown-${propShareId}`)) {
+        toast.error(
+          "This shared chat could not be found. It may have been deleted or the link may be invalid.",
+        );
+        sessionStorage.setItem(`error-shown-${propShareId}`, "true");
+      }
     }
 
     // If we have a public chat loaded but it's not selected, select it
@@ -319,7 +328,6 @@ function ChatInterfaceComponent({
     chatState.chats,
     propPublicId,
     propShareId,
-    publicChatCheckComplete,
   ]);
 
   // Determine if the current chat is read-only
