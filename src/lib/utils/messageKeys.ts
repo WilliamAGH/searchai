@@ -10,6 +10,8 @@
  * - Unnecessary re-renders
  * - Focus loss issues
  * - State corruption
+ *
+ * Last updated: 2025-08-17 - Fixed Docker build cache issue
  */
 
 import type { Message } from "../types/message";
