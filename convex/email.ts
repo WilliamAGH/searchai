@@ -8,9 +8,8 @@ async function sendEmailToMailPit(args: {
   subject: string;
   html: string;
   from?: string;
-}): Promise<{ success: boolean; messageId?: string }> {
-  const mailpitHost = process.env.MAILPIT_HOST;
-  const apiAuth = process.env.MP_SEND_API_AUTH;
+}, opts: { mailpitHost: string; apiAuth: string }): Promise<{ success: boolean; messageId?: string }> {
+  const { mailpitHost, apiAuth } = opts;
 
   if (!mailpitHost || !apiAuth) {
     throw new Error("MailPit configuration missing");
@@ -87,10 +86,15 @@ export const sendEmail = action({
     from: v.optional(v.string()),
   },
   handler: async (
-    _ctx,
+    ctx,
     args,
   ): Promise<{ success: boolean; messageId?: string }> => {
-    return await sendEmailToMailPit(args);
+    const mailpitHost = process.env.MAILPIT_HOST;
+    const apiAuth = process.env.MP_SEND_API_AUTH;
+    if (!mailpitHost || !apiAuth) {
+      throw new Error("MailPit configuration missing");
+    }
+    return await sendEmailToMailPit(args, { mailpitHost, apiAuth });
   },
 });
 
@@ -100,7 +104,7 @@ export const sendWelcomeEmail = action({
     userName: v.optional(v.string()),
   },
   handler: async (
-    _ctx,
+    ctx,
     args,
   ): Promise<{ success: boolean; messageId?: string; message?: string }> => {
     const welcomeHtml = `
@@ -144,10 +148,18 @@ export const sendWelcomeEmail = action({
     `;
 
     // Use helper function to avoid circular dependency
-    return await sendEmailToMailPit({
-      to: args.userEmail,
-      subject: "Welcome to SearchAI - Start searching with AI!",
-      html: welcomeHtml,
-    });
+    const mailpitHost = process.env.MAILPIT_HOST;
+    const apiAuth = process.env.MP_SEND_API_AUTH;
+    if (!mailpitHost || !apiAuth) {
+      throw new Error("MailPit configuration missing");
+    }
+    return await sendEmailToMailPit(
+      {
+        to: args.userEmail,
+        subject: "Welcome to SearchAI - Start searching with AI!",
+        html: welcomeHtml,
+      },
+      { mailpitHost, apiAuth },
+    );
   },
 });

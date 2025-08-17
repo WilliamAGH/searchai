@@ -9,9 +9,7 @@ import { vSearchResult } from "./lib/validators";
 import { api, internal } from "./_generated/api";
 import type { SearchResult } from "./search/providers/index";
 
-// Check if we're in test mode - skip real API calls
-const IS_TEST_MODE =
-  process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test";
+// NOTE: Test mode is determined using process.env inside handlers
 
 // Import search providers
 import {
@@ -97,10 +95,12 @@ export const searchWeb = action({
   handler: async (ctx, args) => {
     const maxResults = args.maxResults || 5;
     const trimmedQuery = args.query.trim();
-    const enrichWithContent = args.enrichWithContent !== false; // Default to true
+    const enrichWithContent = args.enrichWithContent !== false; // Option to scrape content
 
     // TEST MODE: Return mock results without hitting real APIs
-    if (IS_TEST_MODE) {
+    const isTestMode =
+      process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test";
+    if (isTestMode) {
       console.log(
         "[TEST MODE] Returning mock search results for:",
         trimmedQuery,
@@ -144,9 +144,10 @@ export const searchWeb = action({
     }
 
     // Try SERP API for DuckDuckGo first if available
-    if (process.env.SERP_API_KEY) {
+    const SERP_API_KEY = process.env.SERP_API_KEY;
+    if (SERP_API_KEY) {
       try {
-        const serpResults = await searchWithSerpApi(args.query, maxResults);
+        const serpResults = await searchWithSerpApi(args.query, maxResults, SERP_API_KEY);
         if (serpResults.length > 0) {
           // Enrich with scraped content if enabled
           const enrichedResults = enrichWithContent
@@ -168,11 +169,13 @@ export const searchWeb = action({
     }
 
     // Try OpenRouter web search as fallback
-    if (process.env.OPENROUTER_API_KEY) {
+    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+    if (OPENROUTER_API_KEY) {
       try {
         const openRouterResults = await searchWithOpenRouter(
           args.query,
           maxResults,
+          OPENROUTER_API_KEY,
         );
         if (openRouterResults.length > 0) {
           // Enrich with scraped content if enabled
@@ -320,7 +323,9 @@ export const planSearch = action({
     const now = Date.now();
 
     // TEST MODE: Return mock plan without hitting OpenRouter
-    if (IS_TEST_MODE) {
+    const isTestMode =
+      process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test";
+    if (isTestMode) {
       console.log("[TEST MODE] Returning mock search plan");
       return {
         shouldSearch: true,
