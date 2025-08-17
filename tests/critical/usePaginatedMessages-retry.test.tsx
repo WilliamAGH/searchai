@@ -2,19 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-// TODO: Temporarily disabled due to "React.act is not a function" under React 19 and missing convex/react mock harness.
-// - Action items:
-//   1) Implement `tests/utils/convexReactMock.ts` with stable `useQuery`/`useAction` mocks.
-//   2) Ensure VT/test setup uses a single React instance; align versions of react/react-dom/@testing-library/react.
-//   3) Use `vi.useFakeTimers()` + `advanceTimersByTimeAsync` for retry timing, avoid arbitrary delays.
-//   4) Consider renderHook-based harness to remove extra component wrappers.
-// Local stub until harness is restored
-function setupConvexReactMock(_opts: {
-  queryImpl?: (name: unknown, args: unknown) => unknown;
-  actionImpl?: (name: unknown, args: unknown) => Promise<unknown> | unknown;
-}): void {
-  // no-op
-}
+import { setupConvexReactMock } from "../utils/convexReactMock";
 
 describe.skip("usePaginatedMessages retry behavior", () => {
   it("retries once then succeeds (attempt=2)", { timeout: 10000 }, async () => {

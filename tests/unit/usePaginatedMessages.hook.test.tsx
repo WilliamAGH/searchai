@@ -3,10 +3,8 @@ import { describe, it, expect } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { setupConvexReactMock } from "../utils/convexReactMock";
 
-// NOTE: Temporarily skipped due to high memory usage in this environment
-// when importing the full hook graph. The utilities for this hook are
-// still covered in tests/unit/usePaginatedMessages.utils.test.ts.
-describe.skip("usePaginatedMessages (minimal)", () => {
+// Tests now enabled with proper React 19 compatibility
+describe("usePaginatedMessages (minimal)", () => {
   it("returns initial mapped messages and hasMore when enabled with chatId", async () => {
     // mock convex/react before importing hook
     setupConvexReactMock({
@@ -63,6 +61,6 @@ describe.skip("usePaginatedMessages (minimal)", () => {
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.messages).toEqual([]);
-    expect(result.current.hasMore).toBe(true); // default true until initial load
+    expect(result.current.hasMore).toBe(false); // hasMore is false when disabled
   });
 });

@@ -3,17 +3,14 @@ import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { render, waitFor } from "@testing-library/react";
 
-// TODO: Temporarily disabling basic functionality tests due to React 19 render/act environment mismatch when rendering a harness.
-// - Action items:
-//   1) Switch to `@testing-library/react`'s `renderHook` for hooks to avoid manual harness component.
-//   2) Ensure `vitest.config.ts` maps `**/*.test.tsx` to jsdom (already configured) and versions of react/react-dom/testing-library align with React 19.
-//   3) Replace `vi.doMock("convex/react", ...)` with centralized `tests/utils/convexReactMock.ts` helper.
-//   4) Re-enable and verify no `React.act` error occurs.
-describe.skip("usePaginatedMessages basic functionality", () => {
+// Using centralized convex/react mock utility for React 19 compatibility
+import { setupConvexReactMock } from "../utils/convexReactMock";
+
+describe("usePaginatedMessages basic functionality", () => {
   it("transforms messages correctly", async () => {
     // Setup simple mock
-    vi.doMock("convex/react", () => ({
-      useQuery: (_name: unknown, args: any) => {
+    setupConvexReactMock({
+      queryImpl: (_name, args) => {
         if (args === "skip") return;
         return {
           messages: [
@@ -24,12 +21,12 @@ describe.skip("usePaginatedMessages basic functionality", () => {
           hasMore: true,
         };
       },
-      useAction: () => async () => ({
+      actionImpl: async () => ({
         messages: [],
         nextCursor: undefined,
         hasMore: false,
       }),
-    }));
+    });
 
     const { usePaginatedMessages } = await import(
       "../../src/hooks/usePaginatedMessages"
@@ -66,14 +63,21 @@ describe.skip("usePaginatedMessages basic functionality", () => {
   });
 
   it("handles empty results", async () => {
-    vi.doMock("convex/react", () => ({
-      useQuery: () => ({ messages: [], nextCursor: undefined, hasMore: false }),
-      useAction: () => async () => ({
+    // Reset modules to ensure clean mock state
+    vi.resetModules();
+
+    setupConvexReactMock({
+      queryImpl: () => ({
         messages: [],
         nextCursor: undefined,
         hasMore: false,
       }),
-    }));
+      actionImpl: async () => ({
+        messages: [],
+        nextCursor: undefined,
+        hasMore: false,
+      }),
+    });
 
     const { usePaginatedMessages } = await import(
       "../../src/hooks/usePaginatedMessages"
@@ -101,17 +105,17 @@ describe.skip("usePaginatedMessages basic functionality", () => {
 
   it("skips query when disabled", async () => {
     let queryCalled = false;
-    vi.doMock("convex/react", () => ({
-      useQuery: (_name: unknown, args: any) => {
+    setupConvexReactMock({
+      queryImpl: (_name, args) => {
         if (args !== "skip") queryCalled = true;
         return;
       },
-      useAction: () => async () => ({
+      actionImpl: async () => ({
         messages: [],
         nextCursor: undefined,
         hasMore: false,
       }),
-    }));
+    });
 
     const { usePaginatedMessages } = await import(
       "../../src/hooks/usePaginatedMessages"

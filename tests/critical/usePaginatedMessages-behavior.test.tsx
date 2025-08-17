@@ -2,19 +2,7 @@
 import { describe, it, expect } from "vitest";
 import React, { useEffect, useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
-// TODO: This test is temporarily disabled due to React 19 act compatibility and missing convex/react test harness.
-// - Action items:
-//   1) Create `tests/utils/convexReactMock.ts` (or fix the import path) with a stable mock for `useQuery`/`useAction`.
-//   2) Ensure a single React instance is used by Vitest and Testing Library (avoid duplicate React versions).
-//   3) Verify `@testing-library/react` version supports React 19; rely on render auto-act and remove manual act if any.
-//   4) Consider migrating this to `renderHook` from Testing Library for hooks.
-// Local stub to avoid import errors until the harness exists
-function setupConvexReactMock(_opts: {
-  queryImpl?: (name: unknown, args: unknown) => unknown;
-  actionImpl?: (name: unknown, args: unknown) => Promise<unknown> | unknown;
-}): void {
-  // no-op
-}
+import { setupConvexReactMock } from "../utils/convexReactMock";
 
 // Defer importing the hook until after mocking convex/react
 
@@ -51,7 +39,7 @@ function setupInitialAndLoadMoreMocks() {
   return { initial, page2, getLastActionArgs: () => lastActionArgs };
 }
 
-describe.skip("usePaginatedMessages behavior (jsdom)", () => {
+describe("usePaginatedMessages behavior (jsdom)", () => {
   it(
     "loads initial page and reports hasMore (loadMore covered elsewhere)",
     { timeout: 10000 },
