@@ -2,20 +2,68 @@
  * Chat layout component
  * Handles the layout structure and conditional rendering
  *
- * CRITICAL iOS SAFARI REQUIREMENT:
- * DO NOT add React key prop to MessageInput based on currentChatId or any dynamic value!
+ * ⚠️⚠️⚠️ CRITICAL iOS SAFARI KEYBOARD BUG - MANDATORY READING ⚠️⚠️⚠️
  *
- * Using key={currentChatId} causes the component to completely unmount and remount
- * when the chat changes, which leads to:
- * - Complete loss of keyboard focus on iOS Safari
- * - Virtual keyboard dismissal
- * - Loss of any text being typed
- * - Failed focus recovery attempts
+ * THIS FILE CONTAINS A CRITICAL FIX FOR iOS SAFARI KEYBOARD CRASHES.
+ * MODIFYING THE COMPONENT STRUCTURE CAN BREAK iOS/IPAD TYPING.
  *
- * The MessageInput component manages its own state internally and should persist
- * across chat changes. Props updates are sufficient for state changes.
+ * THE BUG:
+ * iOS Safari virtual keyboard crashes/disappears instantly when typing in the MessageInput.
+ * This bug has caused 9+ failed fix attempts over multiple months.
  *
+ * ROOT CAUSE:
+ * React bug #26805 combined with iOS Safari's virtual keyboard state management.
+ * When a controlled textarea's value is cleared while focused, iOS Safari's keyboard
+ * enters a corrupted state and cannot accept input.
+ *
+ * CRITICAL RULES - VIOLATION WILL BREAK iOS SAFARI:
+ *
+ * 1. ⛔ NEVER add key={currentChatId} or any dynamic key to MessageInput
+ *    - This causes complete component remount
+ *    - Keyboard dismisses and cannot recover
+ *    - Focus state becomes corrupted
+ *    - Example of BROKEN code: <MessageInput key={chatId} />
+ *
+ * 2. ⛔ NEVER add key prop to the div wrapper around MessageInput
+ *    - Same remounting issue applies to parent elements
+ *    - The input must persist across chat changes
+ *
+ * 3. ⚠️ BE CAREFUL with MessageList key prop (line 140)
+ *    - Currently has key={String(currentChatId)} which is acceptable
+ *    - But removing this key can cause stale message display
+ *    - MessageList remounting doesn't affect keyboard (different component tree)
+ *
+ * 4. ⛔ NEVER conditionally render MessageInput based on chatId
+ *    - Don't do: {currentChatId && <MessageInput />}
+ *    - The component must always be present in the DOM
+ *
+ * 5. ⛔ NEVER wrap MessageInput in unnecessary Fragment or div with keys
+ *    - Keep the component hierarchy stable
+ *    - Minimize wrapper elements
+ *
+ * WHY THIS WORKS:
+ * - MessageInput persists across chat changes (no remounting)
+ * - Internal state is managed via props, not remounting
+ * - iOS Safari keyboard state remains stable
+ * - Focus management doesn't conflict with virtual keyboard
+ *
+ * TESTING CHECKLIST:
+ * ✓ Test on REAL iPad/iPhone with Safari (not Chrome/Firefox)
+ * ✓ Type rapidly after switching chats
+ * ✓ Send multiple messages in quick succession
+ * ✓ Switch chats while keyboard is open
+ * ✓ Test with both light and dark themes
+ * ✓ Test in both portrait and landscape orientations
+ *
+ * REFERENCES:
+ * @see https://github.com/facebook/react/issues/26805 - React iOS Safari textarea bug
  * @see https://github.com/facebook/react/issues/3226 - React key prop remounting
+ * @see MessageInput.tsx - Contains additional iOS Safari fixes
+ * @see index.css lines 689-741 - CSS fixes for Safari keyboard
+ *
+ * @author William Callahan
+ * @lastModified 2025-08-17
+ * @criticalBugFix Prevents iOS Safari keyboard crash via stable component hierarchy
  */
 
 import React from "react";

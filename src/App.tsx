@@ -219,20 +219,31 @@ export default function App() {
   useClaimAnonymousChats();
 
   // Handle responsive sidebar behavior
+  // iOS Safari fix: Debounce resize handler to prevent keyboard issues
   useEffect(() => {
+    let resizeTimeout: number | null = null;
+
     const handleResize = () => {
-      const isDesktop = window.innerWidth >= 1024;
-      // Only auto-manage sidebar if user hasn't manually toggled it
-      if (!hasManuallyToggled) {
-        setIsSidebarOpen((current) => {
-          if (isDesktop && !current) {
-            return true;
-          } else if (!isDesktop && current) {
-            return false;
-          }
-          return current;
-        });
+      // Clear previous timeout to debounce resize events
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
       }
+
+      // iOS Safari fix: debounce resize events
+      resizeTimeout = window.setTimeout(() => {
+        const isDesktop = window.innerWidth >= 1024;
+        // Only auto-manage sidebar if user hasn't manually toggled it
+        if (!hasManuallyToggled) {
+          setIsSidebarOpen((current) => {
+            if (isDesktop && !current) {
+              return true;
+            } else if (!isDesktop && current) {
+              return false;
+            }
+            return current;
+          });
+        }
+      }, 100); // 100ms debounce
     };
 
     // Set initial state based on current screen size only if not manually toggled
@@ -241,7 +252,12 @@ export default function App() {
     }
 
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+    };
   }, [hasManuallyToggled]);
 
   const openSignUp = useCallback(() => {
@@ -276,7 +292,7 @@ export default function App() {
       <BrowserRouter>
         <div className="h-dvh overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
           <div className="h-dvh flex flex-col">
-            <header className="flex-shrink-0 sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30">
+            <header className="flex-shrink-0 sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 border-b border-gray-200/30 dark:border-gray-700/30 no-backdrop-blur">
               <div className="h-[3.75rem] sm:h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
                   {/* Mobile menu button */}
