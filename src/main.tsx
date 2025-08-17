@@ -18,7 +18,21 @@ if (!rootEl) {
 }
 
 createRoot(rootEl).render(
-  <ErrorBoundary>
+  <ErrorBoundary 
+    level="page" 
+    onError={(error, errorInfo) => {
+      // Send to analytics/monitoring if configured
+      if (typeof window !== 'undefined' && 'gtag' in window) {
+        const w = window as unknown as { gtag: (...args: unknown[]) => void };
+        w.gtag('event', 'exception', {
+          description: error.message,
+          fatal: true,
+          error_stack: error.stack,
+        });
+      }
+      console.error('Top-level application error:', error, errorInfo);
+    }}
+  >
     <ConvexAuthProvider client={convex}>
       <App />
     </ConvexAuthProvider>
