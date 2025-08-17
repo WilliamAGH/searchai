@@ -17,15 +17,15 @@ export function registerHealthRoutes(http: HttpRouter) {
     handler: httpAction(async (_ctx) => {
       // Check basic Convex connectivity
       const convexHealthy = true; // If we can execute, Convex is healthy
-      
+
       // Check environment variables
       const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
       const hasSerpApi = !!process.env.SERP_API_KEY;
       const hasResend = !!process.env.CONVEX_RESEND_API_KEY;
-      
+
       // Determine overall health
       const status = convexHealthy ? "healthy" : "unhealthy";
-      
+
       return new Response(
         JSON.stringify({
           status,
@@ -48,7 +48,7 @@ export function registerHealthRoutes(http: HttpRouter) {
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Access-Control-Allow-Origin": "*",
           },
-        }
+        },
       );
     }),
   });
@@ -57,9 +57,9 @@ export function registerHealthRoutes(http: HttpRouter) {
   http.route({
     path: "/api/health/detailed",
     method: "GET",
-    handler: httpAction(async (ctx) => {
-      const checks: Record<string, any> = {};
-      
+    handler: httpAction(async (_ctx) => {
+      const checks: Record<string, unknown> = {};
+
       // Check database connectivity
       try {
         // Attempt to query a small collection
@@ -76,7 +76,7 @@ export function registerHealthRoutes(http: HttpRouter) {
           error: error instanceof Error ? error.message : "Unknown error",
         };
       }
-      
+
       // Check API keys
       checks.apiKeys = {
         openrouter: !!process.env.OPENROUTER_API_KEY,
@@ -84,7 +84,7 @@ export function registerHealthRoutes(http: HttpRouter) {
         resend: !!process.env.CONVEX_RESEND_API_KEY,
         openai: !!process.env.CONVEX_OPENAI_API_KEY,
       };
-      
+
       // Check rate limits (simplified)
       checks.rateLimits = {
         searchPlannerWindow: 60000, // 1 minute
@@ -92,7 +92,7 @@ export function registerHealthRoutes(http: HttpRouter) {
         aiGenerationWindow: 60000,
         aiGenerationLimit: 20,
       };
-      
+
       // Memory usage (if available in V8 runtime)
       try {
         if (typeof process !== "undefined" && process.memoryUsage) {
@@ -106,12 +106,17 @@ export function registerHealthRoutes(http: HttpRouter) {
       } catch {
         // Memory info not available
       }
-      
+
       // Determine overall status
-      const hasDatabase = checks.database?.status === "healthy";
-      const hasRequiredKeys = checks.apiKeys?.openrouter || checks.apiKeys?.openai;
-      const overallStatus = hasDatabase && hasRequiredKeys ? "healthy" : "degraded";
-      
+      const database = checks.database as { status?: string } | undefined;
+      const apiKeys = checks.apiKeys as
+        | { openrouter?: boolean; openai?: boolean }
+        | undefined;
+      const hasDatabase = database?.status === "healthy";
+      const hasRequiredKeys = apiKeys?.openrouter || apiKeys?.openai;
+      const overallStatus =
+        hasDatabase && hasRequiredKeys ? "healthy" : "degraded";
+
       return new Response(
         JSON.stringify({
           status: overallStatus,
@@ -129,7 +134,7 @@ export function registerHealthRoutes(http: HttpRouter) {
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Access-Control-Allow-Origin": "*",
           },
-        }
+        },
       );
     }),
   });
@@ -156,9 +161,10 @@ export function registerHealthRoutes(http: HttpRouter) {
     method: "GET",
     handler: httpAction(async (_ctx) => {
       // Check if essential services are configured
-      const hasAI = !!process.env.OPENROUTER_API_KEY || !!process.env.CONVEX_OPENAI_API_KEY;
+      const hasAI =
+        !!process.env.OPENROUTER_API_KEY || !!process.env.CONVEX_OPENAI_API_KEY;
       const isReady = hasAI;
-      
+
       return new Response(
         JSON.stringify({
           ready: isReady,
@@ -171,7 +177,7 @@ export function registerHealthRoutes(http: HttpRouter) {
             "Cache-Control": "no-cache",
             "Access-Control-Allow-Origin": "*",
           },
-        }
+        },
       );
     }),
   });
