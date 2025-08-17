@@ -51,7 +51,7 @@ export function registerAIRoutes(http: HttpRouter) {
   http.route({
     path: "/api/ai",
     method: "POST",
-    handler: httpAction(async (_ctx, request) => {
+    handler: httpAction(async (ctx, request) => {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
@@ -131,15 +131,15 @@ export function registerAIRoutes(http: HttpRouter) {
       dlog("Environment Variables Available:");
       dlog(
         "- OPENROUTER_API_KEY:",
-        process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET",
+        (ctx as any)?.env?.get?.("OPENROUTER_API_KEY") ? "SET" : "NOT SET",
       );
       dlog(
         "- CONVEX_OPENAI_API_KEY:",
-        process.env.CONVEX_OPENAI_API_KEY ? "SET" : "NOT SET",
+        (ctx as any)?.env?.get?.("CONVEX_OPENAI_API_KEY") ? "SET" : "NOT SET",
       );
       dlog(
         "- CONVEX_OPENAI_BASE_URL:",
-        process.env.CONVEX_OPENAI_BASE_URL ? "SET" : "NOT SET",
+        (ctx as any)?.env?.get?.("CONVEX_OPENAI_BASE_URL") ? "SET" : "NOT SET",
       );
 
       // Apply universal enhancements to anonymous AI generation as well
@@ -171,11 +171,13 @@ export function registerAIRoutes(http: HttpRouter) {
       }
 
       // Check if OpenRouter API key is available
-      const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-      const CONVEX_OPENAI_API_KEY = process.env.CONVEX_OPENAI_API_KEY;
-      const CONVEX_OPENAI_BASE_URL = process.env.CONVEX_OPENAI_BASE_URL;
-      const SITE_URL = process.env.SITE_URL;
-      const SITE_TITLE = process.env.SITE_TITLE;
+      const envGet = ((ctx as any)?.env?.get?.bind((ctx as any).env)) ||
+        ((_key: string) => null);
+      const OPENROUTER_API_KEY = envGet("OPENROUTER_API_KEY");
+      const CONVEX_OPENAI_API_KEY = envGet("CONVEX_OPENAI_API_KEY");
+      const CONVEX_OPENAI_BASE_URL = envGet("CONVEX_OPENAI_BASE_URL");
+      const SITE_URL = envGet("SITE_URL");
+      const SITE_TITLE = envGet("SITE_TITLE");
 
       if (!OPENROUTER_API_KEY) {
         return handleNoOpenRouter(

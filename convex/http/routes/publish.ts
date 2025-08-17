@@ -14,12 +14,13 @@ import { escapeHtml, formatConversationMarkdown } from "../utils";
  */
 export function registerPublishRoutes(http: HttpRouter) {
   // Helper: determine allowed origin (env-driven; defaults to *)
-  const getAllowedOrigin = (origin: string | null): string => {
-    const allowed = process.env.CONVEX_ALLOWED_ORIGINS;
+  const getAllowedOrigin = (origin: string | null, ctx: any): string => {
+    const envGet = ((ctx as any)?.env?.get?.bind((ctx as any).env)) || ((_key: string) => null);
+    const allowed = envGet("CONVEX_ALLOWED_ORIGINS");
     if (!allowed || allowed === "*") return "*";
     const list = allowed
       .split(",")
-      .map((s) => s.trim())
+      .map((s: string) => s.trim())
       .filter(Boolean);
     if (!origin) return list[0] || "*";
     return list.includes(origin) ? origin : list[0] || "*";
@@ -29,10 +30,10 @@ export function registerPublishRoutes(http: HttpRouter) {
   http.route({
     path: "/api/publishChat",
     method: "OPTIONS",
-    handler: httpAction(async (_ctx, request): Promise<Response> => {
+    handler: httpAction(async (ctx, request) => {
       const requested = request.headers.get("Access-Control-Request-Headers");
       const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin);
+      const allowOrigin = getAllowedOrigin(origin, ctx);
       return new Response(null, {
         status: 204,
         headers: {
@@ -50,13 +51,13 @@ export function registerPublishRoutes(http: HttpRouter) {
   http.route({
     path: "/api/publishChat",
     method: "POST",
-    handler: httpAction(async (ctx, request): Promise<Response> => {
+    handler: httpAction(async (ctx, request) => {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
       } catch {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
           status: 400,
           headers: {
@@ -122,7 +123,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           messages,
         });
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         const baseUrl = origin || process.env.SITE_URL || "";
         const shareUrl = `${baseUrl}/s/${result.shareId}`;
         const publicUrl = `${baseUrl}/p/${result.publicId}`;
@@ -147,7 +148,7 @@ export function registerPublishRoutes(http: HttpRouter) {
         );
       } catch (e: any) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(
           JSON.stringify({ error: String(e?.message || e) }),
           {
@@ -166,10 +167,10 @@ export function registerPublishRoutes(http: HttpRouter) {
   http.route({
     path: "/api/exportChat",
     method: "OPTIONS",
-    handler: httpAction(async (_ctx, request): Promise<Response> => {
+    handler: httpAction(async (ctx, request) => {
       const requested = request.headers.get("Access-Control-Request-Headers");
       const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin);
+      const allowOrigin = getAllowedOrigin(origin, ctx);
       return new Response(null, {
         status: 204,
         headers: {
@@ -187,7 +188,7 @@ export function registerPublishRoutes(http: HttpRouter) {
   http.route({
     path: "/api/exportChat",
     method: "GET",
-    handler: httpAction(async (ctx, request): Promise<Response> => {
+    handler: httpAction(async (ctx, request) => {
       const url = new URL(request.url);
       const shareIdParam = url.searchParams.get("shareId");
       const publicIdParam = url.searchParams.get("publicId");
@@ -204,7 +205,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (!shareId && !publicId) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(
           JSON.stringify({ error: "Missing shareId or publicId" }),
           {
@@ -237,7 +238,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (!chat) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(
           JSON.stringify({ error: "Chat not found or not accessible" }),
           {
@@ -249,7 +250,6 @@ export function registerPublishRoutes(http: HttpRouter) {
           },
         );
       }
-
       // Load messages
       const messages = await ctx.runQuery(api.chats.getChatMessages, {
         chatId: (chat as any)._id,
@@ -300,7 +300,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           messages: exportedMessages,
         });
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(body, {
           status: 200,
           headers: {
@@ -323,7 +323,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (fmt === "txt") {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(md, {
           status: 200,
           headers: {
@@ -341,7 +341,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (fmt === "markdown") {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(md, {
           status: 200,
           headers: {
@@ -382,7 +382,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 </html>`;
 
       const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin);
+      const allowOrigin = getAllowedOrigin(origin, ctx);
       return new Response(html, {
         status: 200,
         headers: {
@@ -403,7 +403,7 @@ export function registerPublishRoutes(http: HttpRouter) {
   http.route({
     path: "/api/chatTextMarkdown",
     method: "OPTIONS",
-    handler: httpAction(async (_ctx, request): Promise<Response> => {
+    handler: httpAction(async (_ctx, request) => {
       const requested = request.headers.get("Access-Control-Request-Headers");
       return new Response(null, {
         status: 204,
@@ -422,7 +422,7 @@ export function registerPublishRoutes(http: HttpRouter) {
   http.route({
     path: "/api/chatTextMarkdown",
     method: "GET",
-    handler: httpAction(async (ctx, request): Promise<Response> => {
+    handler: httpAction(async (ctx, request) => {
       const url = new URL(request.url);
       const shareIdParam = url.searchParams.get("shareId");
       const publicIdParam = url.searchParams.get("publicId");
@@ -437,7 +437,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       if (!shareId && !publicId) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(
           JSON.stringify({ error: "Missing shareId or publicId" }),
           {
@@ -456,7 +456,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           });
       if (!chat) {
         const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+        const allowOrigin = getAllowedOrigin(origin, ctx);
         return new Response(
           JSON.stringify({ error: "Chat not found or not accessible" }),
           {
@@ -493,7 +493,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           ? "index, follow"
           : "noindex, nofollow";
       const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin);
+      const allowOrigin = getAllowedOrigin(origin, ctx);
       return new Response(md, {
         status: 200,
         headers: {
