@@ -21,10 +21,13 @@ export function ReasoningDisplay({
     onToggle(`reasoning-${id}`);
   }, [id, onToggle]);
 
+  // Only show the component if there's actual reasoning text
   if (!reasoning) return null;
 
-  // Get word count for display
-  const wordCount = reasoning.split(/\s+/).filter(Boolean).length;
+  // Get word count for display (handle empty reasoning)
+  const wordCount = reasoning
+    ? reasoning.split(/\s+/).filter(Boolean).length
+    : 0;
 
   return (
     <div className="mt-1 max-w-full overflow-hidden">
@@ -73,7 +76,7 @@ export function ReasoningDisplay({
           </svg>
         </div>
       </button>
-      {!collapsed && (
+      {!collapsed && reasoning && (
         <div className="mt-1 p-2 rounded bg-blue-50/30 dark:bg-blue-900/10 border border-blue-200/30 dark:border-blue-800/30 max-w-full overflow-hidden">
           <div className="text-[10px] sm:text-xs text-blue-700/90 dark:text-blue-300/90 font-mono leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-y-auto opacity-90">
             {reasoning}

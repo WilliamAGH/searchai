@@ -20,7 +20,8 @@ interface StreamingStatusProps {
 // Animated dots with CSS animation
 function AnimatedDots() {
   return (
-    <span className="inline-flex items-center ml-1">
+    <span className="inline-flex items-center">
+      <span className="mr-1">&nbsp;</span>
       {[0, 1, 2].map((i) => (
         <span
           key={i}
