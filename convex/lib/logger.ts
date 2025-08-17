@@ -6,7 +6,7 @@
  * - Safe for server-side execution
  */
 
-import { isDevAction, isDevFromContext, getEnvLogger } from "./environment";
+import { isDevAction, isDevFromContext } from "./environment";
 
 // Determine if we're in development mode
 // This works differently depending on the Convex context:
@@ -21,7 +21,7 @@ const isDev = (() => {
   } catch {
     // Not in an action context
   }
-  
+
   // Fallback to context-based detection
   // In queries/mutations, we can't access process.env
   // So we use hardcoded knowledge of our deployment

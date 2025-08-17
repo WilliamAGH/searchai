@@ -7,17 +7,13 @@
 
 import { isDev as checkIsDev } from "./environment";
 
-// Use our unified environment detection
-// This provides more comprehensive detection than just import.meta.env.DEV
-const isDev = checkIsDev();
-
 export const logger = {
   /**
    * Debug logging - only active in development
    * @param args - Arguments to log
    */
   debug: (...args: unknown[]) => {
-    if (isDev) {
+    if (import.meta.env.DEV && checkIsDev()) {
       console.info(...args);
     }
   },
@@ -27,7 +23,7 @@ export const logger = {
    * @param args - Arguments to log
    */
   info: (...args: unknown[]) => {
-    if (isDev) {
+    if (import.meta.env.DEV && checkIsDev()) {
       console.info(...args);
     }
   },
