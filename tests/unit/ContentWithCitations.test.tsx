@@ -421,21 +421,37 @@ describe("ContentWithCitations - Edge Cases", () => {
     );
   });
 
-  it("should handle numeric-looking citations without converting", () => {
-    const content = "Old style citations [1] and [2] should not be linked.";
+  it("should convert numeric citations to domain links", () => {
+    const content =
+      "Old style citations [1] and [2] are converted to domain pills.";
 
     const { container } = render(
       <ContentWithCitations
         content={content}
         searchResults={[
-          { title: "Test", url: "https://example.com", snippet: "Test" },
+          {
+            title: "Test 1",
+            url: "https://example.com/page1",
+            snippet: "Test 1",
+          },
+          {
+            title: "Test 2",
+            url: "https://docs.example.org/page2",
+            snippet: "Test 2",
+          },
         ]}
       />,
     );
 
     const links = container.querySelectorAll("a");
-    expect(links).toHaveLength(0);
-    expect(container.textContent).toContain("[1]");
-    expect(container.textContent).toContain("[2]");
+    expect(links).toHaveLength(2);
+
+    // First citation [1] should link to first search result with domain as text
+    expect(links[0]).toHaveAttribute("href", "https://example.com/page1");
+    expect(links[0].textContent).toBe("example.com");
+
+    // Second citation [2] should link to second search result with domain as text
+    expect(links[1]).toHaveAttribute("href", "https://docs.example.org/page2");
+    expect(links[1].textContent).toBe("docs.example.org");
   });
 });
