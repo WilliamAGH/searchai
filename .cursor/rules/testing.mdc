@@ -1,54 +1,46 @@
 ---
-description: "Comprehensive testing guidelines for Node 22, Vite, React 19, Vitest, and Playwright - 2024-2025 best practices"
+description: "Testing: Vitest, Playwright, React 19, Convex - 2025"
 alwaysApply: true
 ---
 
-# Testing Guidelines for SearchAI.io
+# Testing Guidelines
 
-This document provides comprehensive testing guidelines based on the latest 2024-2025 best practices for Vitest, Playwright, and React Testing Library, optimized for Node 22, Vite, and React 19.
+## Contents
+- Stack & Commands
+- Vitest Configuration & Best Practices
+- React Testing Patterns (React 19)
+- Playwright E2E Testing
+- API Mocking with MSW
+- Search API Testing Best Practices
+- Coverage Requirements
+- CI/CD Integration
+- Testing Checklist
+- Debugging Tests
+- Test Naming Conventions
+- Common Pitfalls to Avoid
+- Testing Philosophy
+- Convex Database Type Testing
+- Resources & Documentation
+- Troubleshooting Guide
 
-## 📋 Testing Stack Configuration
+Tip: Use your editor's outline/section navigation to jump to any section. All examples and guidance are preserved; wording is kept concise.
+
+## 🚀 Stack & Commands
 
 ```yaml
-# Testing Tools
-UNIT_TEST_FRAMEWORK: Vitest
-E2E_TEST_FRAMEWORK: Playwright
-COMPONENT_TEST_LIBRARY: React Testing Library
-COVERAGE_PROVIDER: V8
-API_MOCKING: MSW (Mock Service Worker)
-
-# Node & Runtime
-NODE_VERSION: 22 LTS
-VITE_VERSION: 6.x
-REACT_VERSION: 19.1.x
-TYPESCRIPT_VERSION: 5.9.x
-
-# Test Commands
-TEST_COMMAND: npm run test
-TEST_UI_COMMAND: npm run test:ui
-TEST_COVERAGE_COMMAND: npm run test:coverage
-TEST_WATCH_COMMAND: npm run test:watch
-TEST_E2E_COMMAND: npx playwright test
-TEST_SMOKE_COMMAND: npm run test:smoke
+STACK: Vitest + Playwright + RTL v16 + MSW + Convex Test
+RUNTIME: Node 22, Vite 6, React 19.1, TS 5.9
+COVERAGE: V8 80%+ | POOL: forks (local), vmForks (CI)
 ```
 
-## 🚨 CRITICAL TESTING RULES
+```bash
+npm run test[|:ui|:coverage|:watch]  # Unit tests
+npx playwright test                   # E2E
+npm run validate:convex               # Types
+```
 
-### NEVER ALLOWED
-- ❌ **NO** console.log in tests (use debugger or Vitest UI)
-- ❌ **NO** arbitrary timeouts (use waitFor/findBy)
-- ❌ **NO** implementation detail testing
-- ❌ **NO** snapshot tests without review
-- ❌ **NO** skipped tests in main/dev branches
-- ❌ **NO** hardcoded test data that can change
-
-### ALWAYS REQUIRED
-- ✅ **ALWAYS** test user-visible behavior
-- ✅ **ALWAYS** use semantic queries (getByRole, getByLabelText)
-- ✅ **ALWAYS** clean up after tests (afterEach hooks)
-- ✅ **ALWAYS** mock external dependencies
-- ✅ **ALWAYS** test error states and edge cases
-- ✅ **ALWAYS** maintain 80%+ coverage
+**NEVER:** console.log → debugger | timeouts → waitFor | implementation → behavior | hardcoded data → factories | skip in main  
+**ALWAYS:** semantic queries | afterEach cleanup | mock externals | test errors | 80%+ coverage
 
 ## 🎯 Vitest Configuration & Best Practices
 
@@ -1227,6 +1219,352 @@ expect(window.location.pathname).toBe('/home')
 6. **Test accessibility**: Include a11y testing in your workflow
 7. **Performance matters**: Monitor test execution time
 
+## 🗄️ Convex Database Type Testing
+
+### Testing Convex Functions with Type Safety
+
+Convex functions with proper type validation provide excellent test reliability. Here's how to ensure type safety in tests:
+
+#### 1. Mock Convex Functions with Correct Types
+
+```typescript
+// tests/mocks/convex-mocks.ts
+import { vi } from 'vitest'
+import type { Doc, Id } from '../../convex/_generated/dataModel'
+import type { api } from '../../convex/_generated/api'
+
+// Create type-safe mock responses
+export const mockChat: Doc<"chats"> = {
+  _id: 'test-chat-id' as Id<"chats">,
+  _creationTime: Date.now(),
+  title: 'Test Chat',
+  userId: 'test-user-id' as Id<"users">,
+  sessionId: undefined,
+  shareId: 'test-share-id',
+  publicId: 'test-public-id',
+  privacy: 'private',
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  rollingSummary: undefined,
+  rollingSummaryUpdatedAt: undefined,
+}
+
+// Mock Convex client with type preservation
+export const mockConvexClient = {
+  query: vi.fn((func: any, args?: any) => {
+    // Return type-safe mocks based on function
+    if (func === api.chats.getUserChats) {
+      return Promise.resolve([mockChat])
+    }
+    return Promise.resolve(null)
+  }),
+  mutation: vi.fn(),
+  action: vi.fn(),
+}
+```
+
+#### 2. Type Validation in Unit Tests
+
+```typescript
+// convex/chats/core.test.ts
+import { describe, it, expect, beforeEach } from 'vitest'
+import { convexTest } from 'convex-test'
+import schema from '../schema'
+import { api } from '../_generated/api'
+import type { Doc, Id } from '../_generated/dataModel'
+
+describe('Chat Functions Type Safety', () => {
+  let t: ReturnType<typeof convexTest>
+  
+  beforeEach(() => {
+    t = convexTest(schema)
+  })
+  
+  it('should return properly typed chat document', async () => {
+    // Create test data with correct types
+    const chatId = await t.run(api.chats.createChat, {
+      title: 'Test Chat',
+      sessionId: 'test-session'
+    })
+    
+    // TypeScript ensures chatId is Id<"chats">
+    const chat = await t.run(api.chats.getChatById, { 
+      chatId, // Type-safe!
+      sessionId: 'test-session' 
+    })
+    
+    // TypeScript knows chat is Doc<"chats"> | null
+    expect(chat).toBeDefined()
+    expect(chat?.title).toBe('Test Chat')
+    
+    // This would cause a TypeScript error:
+    // expect(chat?.nonExistentField).toBe('something')
+  })
+  
+  it('should validate ID types at compile time', async () => {
+    // This would fail TypeScript compilation:
+    // await t.run(api.chats.getChatById, { 
+    //   chatId: 'invalid-string', // Error: Type 'string' is not assignable to type 'Id<"chats">'
+    //   sessionId: 'test' 
+    // })
+    
+    // Correct usage with proper ID type
+    const validId = 'j97...abc' as Id<"chats">
+    const result = await t.run(api.chats.getChatById, { 
+      chatId: validId,
+      sessionId: 'test' 
+    })
+    
+    expect(result).toBeNull() // Chat doesn't exist
+  })
+})
+```
+
+#### 3. Testing Validator Constraints
+
+```typescript
+describe('Convex Validator Testing', () => {
+  it('should validate function arguments', async () => {
+    const t = convexTest(schema)
+    
+    // Test invalid arguments - should throw
+    await expect(
+      t.run(api.chats.createChat, {
+        title: 123, // Wrong type - should be string
+        sessionId: 'valid-session'
+      } as any)
+    ).rejects.toThrow('Validator error')
+    
+    // Test missing required arguments
+    await expect(
+      t.run(api.chats.createChat, {
+        // Missing required 'title' field
+        sessionId: 'valid-session'
+      } as any)
+    ).rejects.toThrow()
+  })
+  
+  it('should validate return types', async () => {
+    const t = convexTest(schema)
+    
+    // Function with returns validator
+    const chats = await t.run(api.chats.getUserChats, {
+      sessionId: 'test-session'
+    })
+    
+    // TypeScript knows this is an array of chats
+    expect(Array.isArray(chats)).toBe(true)
+    chats.forEach(chat => {
+      expect(chat).toHaveProperty('_id')
+      expect(chat).toHaveProperty('title')
+      expect(typeof chat.title).toBe('string')
+    })
+  })
+})
+```
+
+#### 4. Integration Testing with Type Safety
+
+```typescript
+// tests/integration/chat-with-types.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import { ConvexProvider } from 'convex/react'
+import { ChatInterface } from '../../src/components/ChatInterface'
+import { mockConvexClient } from '../mocks/convex-mocks'
+import type { Doc, Id } from '../../convex/_generated/dataModel'
+
+describe('Chat Interface with Convex Types', () => {
+  it('should handle typed Convex responses', async () => {
+    // Mock with proper types
+    const mockChats: Doc<"chats">[] = [
+      {
+        _id: 'chat1' as Id<"chats">,
+        _creationTime: Date.now(),
+        title: 'Chat 1',
+        userId: 'user1' as Id<"users">,
+        sessionId: undefined,
+        shareId: 'share1',
+        publicId: 'public1',
+        privacy: 'private',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        rollingSummary: undefined,
+        rollingSummaryUpdatedAt: undefined,
+      }
+    ]
+    
+    mockConvexClient.query.mockResolvedValueOnce(mockChats)
+    
+    render(
+      <ConvexProvider client={mockConvexClient as any}>
+        <ChatInterface />
+      </ConvexProvider>
+    )
+    
+    await waitFor(() => {
+      expect(screen.getByText('Chat 1')).toBeInTheDocument()
+    })
+    
+    // Verify type-safe query was called
+    expect(mockConvexClient.query).toHaveBeenCalledWith(
+      expect.anything(), // api.chats.getUserChats
+      expect.objectContaining({
+        sessionId: expect.any(String)
+      })
+    )
+  })
+})
+```
+
+#### 5. Testing Type Errors with Snapshot Testing
+
+```typescript
+// tests/type-checking/convex-types.test.ts
+import { describe, it, expect } from 'vitest'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(exec)
+
+describe('Convex Type Checking', () => {
+  it('should catch type errors in Convex functions', async () => {
+    try {
+      await execAsync('npx tsc -p convex --noEmit')
+      // If no error, types are valid
+      expect(true).toBe(true)
+    } catch (error: any) {
+      // Check for expected type errors
+      const output = error.stdout + error.stderr
+      
+      // Should NOT have these errors
+      expect(output).not.toContain('Cannot find module')
+      expect(output).not.toContain('_generated')
+      
+      // Log unexpected errors for debugging
+      if (output.includes('error TS')) {
+        console.error('TypeScript errors found:', output)
+        throw new Error('Unexpected TypeScript errors in Convex code')
+      }
+    }
+  })
+  
+  it('should validate schema matches usage', async () => {
+    // Run custom type checker
+    const { stdout } = await execAsync('node scripts/check-convex-types.mjs')
+    
+    expect(stdout).toContain('All Convex type checks passed')
+    expect(stdout).not.toContain('error:')
+    expect(stdout).not.toContain('warning:')
+  })
+})
+```
+
+### Best Practices for Convex Type Testing
+
+#### DO's ✅
+
+1. **Use Generated Types Everywhere**
+   ```typescript
+   import type { Doc, Id } from '../convex/_generated/dataModel'
+   // Never create manual type definitions
+   ```
+
+2. **Test Type Constraints**
+   ```typescript
+   // Verify validators reject invalid data
+   await expect(invalidCall).rejects.toThrow()
+   ```
+
+3. **Mock with Correct Types**
+   ```typescript
+   const mockId: Id<"users"> = 'test-id' as Id<"users">
+   // Don't use plain strings
+   ```
+
+4. **Use convex-test Package**
+   ```typescript
+   import { convexTest } from 'convex-test'
+   const t = convexTest(schema)
+   ```
+
+5. **Test Both Success and Failure Cases**
+   ```typescript
+   // Test valid inputs
+   expect(await validCall()).toBeDefined()
+   // Test invalid inputs
+   await expect(invalidCall()).rejects.toThrow()
+   ```
+
+#### DON'Ts ❌
+
+1. **Don't Skip Type Validation**
+   ```typescript
+   // ❌ BAD: Using 'as any' to bypass types
+   await t.run(api.function, { invalid: 'data' } as any)
+   
+   // ✅ GOOD: Fix the types or test the validation
+   await expect(
+     t.run(api.function, { invalid: 'data' })
+   ).rejects.toThrow()
+   ```
+
+2. **Don't Mock _generated Files**
+   ```typescript
+   // ❌ BAD: Mocking generated types
+   vi.mock('../convex/_generated/dataModel')
+   
+   // ✅ GOOD: Use the real types
+   import type { Doc } from '../convex/_generated/dataModel'
+   ```
+
+3. **Don't Test Convex Internals**
+   ```typescript
+   // ❌ BAD: Testing Convex's type generation
+   expect(generatedTypes).toMatchSnapshot()
+   
+   // ✅ GOOD: Test your function behavior
+   expect(await myFunction()).toBe(expectedResult)
+   ```
+
+### Continuous Type Validation
+
+#### Pre-commit Hook
+```json
+// package.json
+"lint-staged": {
+  "convex/**/*.ts": [
+    "npm run check:convex-types",
+    "npm run lint:convex-strict"
+  ]
+}
+```
+
+#### CI Pipeline
+```yaml
+# .github/workflows/ci.yml
+- name: Convex Type Validation
+  run: |
+    npm run typecheck
+    npm run check:convex-types
+    npm run lint:convex-strict
+```
+
+#### Watch Mode for Development
+```bash
+# Run in separate terminal during development
+npm run check:convex-watch
+```
+
+### Type Error Reference
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Type 'string' is not assignable to type 'Id<"table">'` | Using plain string for ID | Cast with `as Id<"table">` or get from database |
+| `Property does not exist on type 'Doc<"table">'` | Accessing non-existent field | Check schema definition |
+| `Expected 2 arguments, but got 1` | Missing required args | Add all required arguments |
+| `Type instantiation is excessively deep` | Complex nested types | Simplify or increase TypeScript depth limit |
+
 ## 🔗 Resources & Documentation
 
 ### Official Documentation
@@ -1234,6 +1572,8 @@ expect(window.location.pathname).toBe('/home')
 - [Playwright Documentation](https://playwright.dev/)
 - [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
 - [MSW Documentation](https://mswjs.io/)
+- [Convex Testing Guide](https://docs.convex.dev/test)
+- [Convex TypeScript Guide](https://docs.convex.dev/using/typescript)
 
 ### Recommended Reading
 - [Common Testing Mistakes](https://kentcdodds.com/blog/common-mistakes-with-react-testing-library)
