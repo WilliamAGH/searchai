@@ -4,11 +4,11 @@
  */
 
 // Set up React act environment for testing (critical for VS Code)
-global.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Import React and expect from vitest
 import * as React from "react";
-import { expect, vi } from "vitest";
+import { vi } from "vitest";
 
 // Ensure NODE_ENV is set for consistent test behavior
 if (!process.env.NODE_ENV) {
@@ -51,35 +51,5 @@ vi.mock("react-dom/test-utils", async () => {
   };
 });
 
-// Custom matchers for tests
-expect.extend({
-  toBeInTheDocument(received: unknown) {
-    const pass =
-      !!received &&
-      received instanceof Node &&
-      (received.ownerDocument?.contains(received) ||
-        (globalThis.document?.body?.contains?.(received as Node) ?? false));
-    return {
-      pass,
-      message: () =>
-        pass
-          ? "expected element not to be in the document"
-          : "expected element to be in the document",
-    };
-  },
-  toBeDisabled(received: unknown) {
-    const el = received as any;
-    const pass =
-      !!el &&
-      (el.hasAttribute?.("disabled") ||
-        el.disabled === true ||
-        el.getAttribute?.("aria-disabled") === "true");
-    return {
-      pass,
-      message: () =>
-        pass
-          ? "expected element to be enabled"
-          : "expected element to be disabled",
-    };
-  },
-} as any);
+// Note: Custom matchers are provided by @testing-library/jest-dom/vitest
+// No need to duplicate them here as they're imported above
