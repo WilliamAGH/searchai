@@ -22,6 +22,7 @@ import { VirtualizedMessageList } from "./VirtualizedMessageList";
 import { shouldFilterMessage } from "./DeprecatedDotMessage";
 import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
+import { getMessageKey } from "../../lib/utils/messageKeys";
 
 /**
  * Public props for `MessageList` UI component.
@@ -65,46 +66,6 @@ interface MessageListProps {
 /**
  * Main message list component
  */
-// Helper for stable ephemeral keys for messages without IDs
-const ephemeralKeyMap = new WeakMap<Message, string>();
-let ephemeralKeyCounter = 0;
-
-const getEphemeralKey = (msg: Message, index?: number): string => {
-  if (!msg) {
-    // Fallback for invalid message objects
-    const fallbackKey = `invalid-${index ?? 0}-${Date.now().toString(36)}-${++ephemeralKeyCounter}`;
-    if (import.meta.env.DEV) {
-      console.warn("[KEY] No message object, using fallback:", fallbackKey);
-    }
-    return fallbackKey;
-  }
-
-  // Check if message already has an ID
-  const msgRecord = msg as Record<string, unknown>;
-  const existingId =
-    msg._id ||
-    msg.id ||
-    (typeof msgRecord.id === "string" ? msgRecord.id : null);
-
-  if (existingId && existingId !== "undefined") {
-    return String(existingId);
-  }
-
-  // Check WeakMap for cached key
-  let k = ephemeralKeyMap.get(msg);
-  if (!k) {
-    // Generate a truly unique ephemeral key with counter to guarantee uniqueness
-    // Include role and content hash for better uniqueness
-    const contentHash = msg.content
-      ? msg.content.slice(0, 10).replace(/[^a-z0-9]/gi, "")
-      : "empty";
-    const rolePrefix = msg.role === "assistant" ? "ai" : "usr";
-    k = `tmp-${rolePrefix}-${contentHash}-${Date.now().toString(36)}-${++ephemeralKeyCounter}-${Math.random().toString(36).slice(2, 8)}`;
-    ephemeralKeyMap.set(msg, k);
-  }
-
-  return k;
-};
 
 /**
  * Render the message list for a chat conversation with pagination support.
@@ -413,7 +374,7 @@ export const MessageList = React.memo(function MessageList({
               estimatedItemHeight={150}
               renderItem={(message, index) => (
                 <MessageItem
-                  key={message._id ?? getEphemeralKey(message, index)}
+                  key={getMessageKey(message, index)}
                   message={message}
                   index={index}
                   collapsedById={collapsedById}
@@ -430,8 +391,7 @@ export const MessageList = React.memo(function MessageList({
             currentMessages
               .filter((message) => !shouldFilterMessage(message))
               .map((message, index) => {
-                const messageKey =
-                  message._id ?? getEphemeralKey(message, index);
+                const messageKey = getMessageKey(message, index);
                 // Safety check - key should NEVER be undefined
                 const safeKey =
                   messageKey || `fallback-${index}-${Date.now().toString(36)}`;
@@ -450,7 +410,7 @@ export const MessageList = React.memo(function MessageList({
                       message,
                       index,
                       _id: message._id,
-                      generatedKey: getEphemeralKey(message, index),
+                      generatedKey: getMessageKey(message, index),
                     });
                   }
                 }
