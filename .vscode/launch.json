@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Vitest Tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vitest", "--run", "${file}"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "env": {
+        "IS_REACT_ACT_ENVIRONMENT": "true",
+        "NODE_ENV": "test",
+        "CONVEX_DEPLOYMENT": "diligent-greyhound-240"
+      }
+    },
+    {
+      "name": "Debug Pre-commit Tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "test:precommit"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "env": {
+        "IS_REACT_ACT_ENVIRONMENT": "true",
+        "NODE_ENV": "test",
+        "CONVEX_DEPLOYMENT": "diligent-greyhound-240"
+      }
+    }
+  ]
+}

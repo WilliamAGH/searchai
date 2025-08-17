@@ -3,6 +3,26 @@
 # Exit on unset and any error
 set -eu
 
+# Ensure local binaries and consistent Node in non-login shells (e.g., VS Code)
+export PATH="$PWD/node_modules/.bin:$PATH"
+
+# Try to load Node via NVM/FNM/Volta if not already available
+if ! command -v node >/dev/null 2>&1; then
+  if [ -s "$HOME/.nvm/nvm.sh" ]; then
+    . "$HOME/.nvm/nvm.sh"
+    nvm use >/dev/null 2>&1 || true
+  fi
+  if command -v fnm >/dev/null 2>&1; then
+    eval "$(fnm env --shell=sh)"
+    fnm use >/dev/null 2>&1 || true
+  fi
+  if [ -d "$HOME/.volta/bin" ]; then
+    export PATH="$HOME/.volta/bin:$PATH"
+  fi
+fi
+
+# Note: Do NOT export CONVEX_DEPLOYMENT globally; it interferes with tests
+
 # Source Husky init script if it exists (for PATH setup)
 if [ -f "$HOME/.config/husky/init.sh" ]; then
   . "$HOME/.config/husky/init.sh"
@@ -67,7 +87,9 @@ fi
 echo "🔧 Testing Convex deployment..."
 CONVEX_LOG="$(mktemp -t convex-deploy.XXXXXX.log)"
 # Use documented --typecheck=enable for strict validation
-if ! npx --no-install convex dev --once --typecheck=enable > "$CONVEX_LOG" 2>&1; then
+# Scope CONVEX_DEPLOYMENT only to this command to avoid leaking into tests
+if ! CONVEX_DEPLOYMENT="${CONVEX_DEPLOYMENT:-diligent-greyhound-240}" \
+  npx --no-install convex dev --once --typecheck=enable > "$CONVEX_LOG" 2>&1; then
   echo "❌ CRITICAL: Convex deployment would fail!"
   echo "📄 Log: $CONVEX_LOG"
   echo "🗂️  Changed files in convex/ (staged):"

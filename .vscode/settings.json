@@ -37,9 +37,18 @@
   "git.enabled": true,
   "git.path": ".vscode/git-with-nvm.sh",
   "terminal.integrated.env.osx": {
-    "IS_REACT_ACT_ENVIRONMENT": "true"
+    "IS_REACT_ACT_ENVIRONMENT": "true",
+    "NODE_ENV": "test",
+    "CONVEX_DEPLOYMENT": "diligent-greyhound-240"
   },
   "terminal.integrated.inheritEnv": true,
+  "terminal.integrated.profiles.osx": {
+    "zsh": {
+      "path": "/bin/zsh",
+      "args": ["-l"]
+    }
+  },
+  "terminal.integrated.defaultProfile.osx": "zsh",
   "vitest.commandLine": "npm run test:precommit",
   "vitest.include": [
     "tests/**/*.test.{ts,tsx}",
