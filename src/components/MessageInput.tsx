@@ -60,6 +60,7 @@ import React, {
   startTransition,
 } from "react";
 import { isIOSSafari } from "../lib/utils/ios";
+import { useInputActivity } from "../contexts/InputActivityContext";
 
 interface MessageInputProps {
   /** Callback when message is sent */
@@ -111,6 +112,9 @@ export function MessageInput({
   const [draftBeforeHistory, setDraftBeforeHistory] = useState<string | null>(
     null,
   );
+
+  // Track input activity for preventing disruptive operations
+  const { setInputActive, setInputInactive } = useInputActivity();
 
   /**
    * Handle form submission
@@ -518,6 +522,8 @@ export function MessageInput({
               onKeyDown={handleKeyDown}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
+              onFocus={() => setInputActive()}
+              onBlur={() => setInputInactive()}
               placeholder={placeholder}
               aria-label="Message input"
               disabled={disabled}
