@@ -5,7 +5,7 @@
 
 import React from "react";
 import {
-  render,
+  render as rtlRender,
   screen,
   waitFor,
   fireEvent,
@@ -13,6 +13,18 @@ import {
 } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MessageInput } from "../../src/components/MessageInput";
+import { TestProviders } from "../helpers/test-providers";
+
+// Custom render function that includes providers
+const render = (ui: React.ReactElement) => {
+  const result = rtlRender(<TestProviders>{ui}</TestProviders>);
+  // Override rerender to include providers
+  const originalRerender = result.rerender;
+  result.rerender = (newUi: React.ReactElement) => {
+    return originalRerender(<TestProviders>{newUi}</TestProviders>);
+  };
+  return result;
+};
 
 // Mock navigator.userAgent for consistent testing
 const originalUserAgent = navigator.userAgent;
