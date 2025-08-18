@@ -5,6 +5,7 @@ import { ConvexReactClient } from "convex/react";
 import "./index.css";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { InputActivityProvider } from "./contexts/InputActivityContext";
 import { env, initializeEnv } from "./lib/env";
 
 // Validate environment variables on startup
@@ -34,7 +35,9 @@ createRoot(rootEl).render(
     }}
   >
     <ConvexAuthProvider client={convex}>
-      <App />
+      <InputActivityProvider>
+        <App />
+      </InputActivityProvider>
     </ConvexAuthProvider>
   </ErrorBoundary>,
 );

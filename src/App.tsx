@@ -7,7 +7,7 @@
  * - Conditional rendering for auth/unauth users
  */
 
-import { Authenticated, Unauthenticated } from "convex/react";
+import { Authenticated, Unauthenticated, useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useState } from "react";
 import {
   BrowserRouter,
@@ -51,6 +51,7 @@ function ChatPage({
 }: ChatPageProps) {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
+  const { isAuthenticated } = useConvexAuth();
   const isLocalPreview =
     typeof window !== "undefined" &&
     (window.location.hostname === "127.0.0.1" ||
@@ -103,41 +104,23 @@ function ChatPage({
     );
   }
 
+  // CRITICAL FIX: Render single ChatInterface to prevent unmounting during auth changes
+  // This fixes iOS Safari keyboard crashes caused by component remounting
   return (
-    <>
-      <Authenticated>
-        <ErrorBoundary>
-          <LoadingBoundary message="Loading chat interface...">
-            <ChatInterface
-              isAuthenticated={true}
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={onToggleSidebar}
-              chatId={chatId}
-              shareId={shareId}
-              publicId={publicId}
-              onRequestSignUp={onRequestSignUp}
-              onRequestSignIn={onRequestSignIn}
-            />
-          </LoadingBoundary>
-        </ErrorBoundary>
-      </Authenticated>
-      <Unauthenticated>
-        <ErrorBoundary>
-          <LoadingBoundary message="Loading chat interface...">
-            <ChatInterface
-              isAuthenticated={false}
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={onToggleSidebar}
-              chatId={chatId}
-              shareId={shareId}
-              publicId={publicId}
-              onRequestSignUp={onRequestSignUp}
-              onRequestSignIn={onRequestSignIn}
-            />
-          </LoadingBoundary>
-        </ErrorBoundary>
-      </Unauthenticated>
-    </>
+    <ErrorBoundary>
+      <LoadingBoundary message="Loading chat interface...">
+        <ChatInterface
+          isAuthenticated={isAuthenticated}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={onToggleSidebar}
+          chatId={chatId}
+          shareId={shareId}
+          publicId={publicId}
+          onRequestSignUp={onRequestSignUp}
+          onRequestSignIn={onRequestSignIn}
+        />
+      </LoadingBoundary>
+    </ErrorBoundary>
   );
 }
 
