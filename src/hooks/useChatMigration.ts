@@ -9,6 +9,7 @@ import type { ChatState } from "./useChatState";
 import { MigrationService } from "../lib/services/MigrationService";
 import { LocalChatRepository } from "../lib/repositories/LocalChatRepository";
 import { logger } from "../lib/logger";
+import { useInputActivity } from "../contexts/InputActivityContext";
 
 export function useChatMigration(
   repository: IChatRepository | null,
@@ -17,6 +18,7 @@ export function useChatMigration(
   refreshChats: () => Promise<void>,
 ) {
   const hasMigratedRef = useRef(false);
+  const { whenInputInactive } = useInputActivity();
 
   useEffect(() => {
     if (!repository || !isAuthenticated || hasMigratedRef.current) return;
@@ -44,20 +46,26 @@ export function useChatMigration(
         const needsMigration = await migrationService.isMigrationNeeded();
 
         if (needsMigration) {
-          logger.info("Starting migration to Convex");
-          const result = await migrationService.migrateUserData();
+          logger.info("Migration needed, deferring until input is inactive");
 
-          if (result.success) {
-            logger.info(
-              `Migration completed: ${result.migratedChats} chats migrated`,
-            );
-            hasMigratedRef.current = true;
+          // CRITICAL: Defer migration until user is not typing
+          // This prevents repository switching during active input
+          whenInputInactive(async () => {
+            logger.info("Input inactive, starting migration to Convex");
+            const result = await migrationService.migrateUserData();
 
-            // Refresh chats after migration
-            await refreshChats();
-          } else if (result.error) {
-            logger.error("Migration failed:", result.error);
-          }
+            if (result.success) {
+              logger.info(
+                `Migration completed: ${result.migratedChats} chats migrated`,
+              );
+              hasMigratedRef.current = true;
+
+              // Refresh chats after migration
+              await refreshChats();
+            } else if (result.error) {
+              logger.error("Migration failed:", result.error);
+            }
+          });
         } else {
           // No migration needed, mark as complete
           hasMigratedRef.current = true;
@@ -68,7 +76,7 @@ export function useChatMigration(
     };
 
     migrate();
-  }, [repository, isAuthenticated, refreshChats]);
+  }, [repository, isAuthenticated, refreshChats, whenInputInactive]);
 
   return hasMigratedRef.current;
 }
