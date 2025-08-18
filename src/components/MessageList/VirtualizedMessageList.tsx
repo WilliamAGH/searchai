@@ -23,6 +23,7 @@ export function VirtualizedMessageList({
   estimatedItemHeight = 100,
 }: VirtualizedMessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const supportsContentVisibility = useSupportsContentVisibility();
 
   // Group messages for better performance
   const messageGroups = useMemo(() => {
@@ -53,21 +54,32 @@ export function VirtualizedMessageList({
     <div
       ref={containerRef}
       className={className}
-      style={{
-        // Enable CSS-based virtualization
-        containIntrinsicSize: `auto ${messages.length * estimatedItemHeight}px`,
-      }}
+      style={
+        supportsContentVisibility
+          ? {
+              // Enable CSS-based virtualization only if supported
+              containIntrinsicSize: `auto ${messages.length * estimatedItemHeight}px`,
+            }
+          : undefined
+      }
     >
       {messageGroups.map((group, groupIndex) => (
         <div
           key={`group-${groupIndex}`}
           className="message-group"
-          style={{
-            // Native browser virtualization
-            contentVisibility: "auto",
-            containIntrinsicSize: `auto ${group.length * estimatedItemHeight}px`,
-            contain: "layout style paint",
-          }}
+          style={
+            supportsContentVisibility
+              ? {
+                  // Native browser virtualization only if supported
+                  contentVisibility: "auto",
+                  containIntrinsicSize: `auto ${group.length * estimatedItemHeight}px`,
+                  contain: "layout style paint",
+                }
+              : {
+                  // Fallback: Just use contain for older browsers
+                  contain: "layout style paint",
+                }
+          }
         >
           {group.map((message, index) => {
             const actualIndex = groupIndex * GROUP_SIZE + index;
