@@ -82,7 +82,7 @@ export function getCachedPlan(
   now: number = Date.now(),
 ): PlanResult | null {
   const hit = planCache.get(cacheKey);
-  if (hit && hit.expires > now) {
+  if (hit && hit.expires >= now) {
     return hit.result;
   }
   return null;
