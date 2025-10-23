@@ -163,19 +163,16 @@ export function useComponentProps({
 
   const messageInputProps = useMemo(
     () => ({
-      disabled: isGenerating,
-      placeholder: isGenerating
-        ? "Generating response..."
-        : !currentChatId
-          ? "Start a new chat..."
-          : "Type your message...",
+      disabled: false, // Never block input - allow sending messages while generating
+      placeholder: !currentChatId
+        ? "Start a new chat..."
+        : "Type your message...",
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,
       onShare: isMobile ? () => setShowShareModal(true) : undefined,
     }),
     [
-      isGenerating,
       currentChatId,
       handleSendMessage,
       handleDraftChange,

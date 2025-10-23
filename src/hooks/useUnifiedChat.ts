@@ -7,7 +7,6 @@
 import { useConvexAuth } from "convex/react";
 import { useChatState } from "./useChatState";
 import { useChatRepository } from "./useChatRepository";
-import { useChatMigration } from "./useChatMigration";
 import { useChatDataLoader } from "./useChatDataLoader";
 import { createChatActions } from "./useChatActions";
 import type { ChatState, ChatActions } from "./types";
@@ -29,9 +28,6 @@ export function useUnifiedChat() {
 
   // Handle data loading
   useChatDataLoader(repository, setState);
-
-  // Handle migration when user authenticates
-  useChatMigration(repository, isAuthenticated, state, actions.refreshChats);
 
   return {
     // State

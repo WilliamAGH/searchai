@@ -160,15 +160,8 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
           });
         }
 
-        // Update chat title if needed (only for first user message)
-        const userMessageCount = deps.chatState.messages.filter(
-          (m) => m.role === "user",
-        ).length;
-        if (userMessageCount === 0) {
-          const title =
-            message.length > 50 ? `${message.substring(0, 50)}...` : message;
-          await deps.chatActions.updateChat(activeChatId, { title });
-        }
+        // Title update now handled by backend in runAgentWorkflowAndPersist
+        // This ensures title persists to Convex and survives page refresh
 
         deps.maybeShowFollowUpPrompt();
       } catch (error) {

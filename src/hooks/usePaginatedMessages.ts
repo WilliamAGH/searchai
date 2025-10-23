@@ -40,7 +40,7 @@ export function usePaginatedMessages({
 }: UsePaginatedMessagesOptions): PaginatedMessagesState {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -252,7 +252,7 @@ export function usePaginatedMessages({
     if (!chatId) return;
 
     setCursor(undefined);
-    setHasMore(true);
+    setHasMore(false);
     setMessages([]);
     setError(null);
 
@@ -271,7 +271,7 @@ export function usePaginatedMessages({
     sessionRef.current++;
     setMessages([]);
     setCursor(undefined);
-    setHasMore(true);
+    setHasMore(false);
     setError(null);
     setRetryCount(0);
 

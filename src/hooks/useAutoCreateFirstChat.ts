@@ -1,55 +1,28 @@
-import { useEffect, useRef } from "react";
-
 interface UseAutoCreateFirstChatProps {
   currentChatId: string | null;
   chats: Array<{ id?: string }>;
   isAuthenticated: boolean;
   handleNewChat: () => Promise<string | null>;
+  isLoading?: boolean; // Add loading state to prevent premature creation
 }
 
 /**
  * Hook to automatically create first chat if needed
  */
 export function useAutoCreateFirstChat({
-  currentChatId,
-  chats,
+  currentChatId: _currentChatId,
+  chats: _chats,
   isAuthenticated: _isAuthenticated,
-  handleNewChat,
+  handleNewChat: _handleNewChat,
+  isLoading: _isLoading = false,
 }: UseAutoCreateFirstChatProps) {
-  const hasCreatedInitialChatRef = useRef(false);
-  const isCreatingRef = useRef(false);
-
-  useEffect(() => {
-    // Only create initial chat if:
-    // 1. No current chat ID
-    // 2. No existing chats
-    // 3. Haven't already created one
-    // 4. Not currently creating one
-    if (
-      !currentChatId &&
-      chats.length === 0 &&
-      !hasCreatedInitialChatRef.current &&
-      !isCreatingRef.current
-    ) {
-      isCreatingRef.current = true;
-
-      // Don't return the Promise directly - useEffect expects a cleanup function or undefined
-      void handleNewChat()
-        .then((newChatId) => {
-          if (newChatId) {
-            hasCreatedInitialChatRef.current = true;
-          }
-        })
-        .catch(() => {
-          // Swallow errors here; UI can prompt user as needed
-        })
-        .finally(() => {
-          isCreatingRef.current = false;
-        });
-    }
-  }, [currentChatId, chats.length, handleNewChat]);
+  void _currentChatId;
+  void _chats;
+  void _isAuthenticated;
+  void _handleNewChat;
+  void _isLoading;
 
   return {
-    isCreatingInitialChat: isCreatingRef.current,
+    isCreatingInitialChat: false,
   };
 }

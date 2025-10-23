@@ -6,8 +6,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import type { ChatState } from "./useChatState";
-import type { UnifiedChat, UnifiedMessage } from "../lib/types/unified";
-import { TitleUtils } from "../lib/types/unified";
+import type {
+  UnifiedChat,
+  UnifiedMessage,
+  PersistedPayload,
+} from "../lib/types/unified";
+import { TitleUtils, IdUtils } from "../lib/types/unified";
 import { logger } from "../lib/logger";
 // Minimal fallback to avoid missing StorageService import during build
 const storageService = {
@@ -104,9 +108,10 @@ export function createChatActions(
         })();
         if (!chat) throw new Error("Failed to create chat");
 
+        // Don't manually add chat to state - the reactive useQuery will handle it
+        // This prevents duplicate chats from appearing in the sidebar
         setState((prev) => ({
           ...prev,
-          chats: [chat, ...prev.chats],
           currentChatId: chat.id,
           currentChat: chat,
           messages: [],
@@ -276,8 +281,31 @@ export function createChatActions(
         return;
       }
 
-      // Update state to show generation is starting
-      // Also ensure we have the correct chat object for UI display
+      // Create user message with unique ID
+      const userMessageId = IdUtils.generateLocalId("msg");
+      const userMessage: UnifiedMessage = {
+        id: userMessageId,
+        chatId,
+        role: "user",
+        content,
+        timestamp: Date.now(),
+      } as unknown as UnifiedMessage;
+
+      // Create assistant placeholder
+      const assistantPlaceholderId = IdUtils.generateLocalId("msg");
+      const assistantPlaceholder: UnifiedMessage = {
+        id: assistantPlaceholderId,
+        chatId,
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+        reasoning: "",
+        searchResults: [],
+        sources: [],
+        timestamp: Date.now(),
+      } as unknown as UnifiedMessage;
+
+      // Update state to show both user message and assistant placeholder
       setState((prev) => ({
         ...prev,
         isGenerating: true,
@@ -286,6 +314,7 @@ export function createChatActions(
         currentChatId: chatId,
         currentChat:
           prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+        messages: [...prev.messages, userMessage, assistantPlaceholder],
       }));
 
       try {
@@ -294,6 +323,7 @@ export function createChatActions(
 
         let fullContent = "";
         let accumulatedReasoning = "";
+        let persistedPayload: PersistedPayload | null = null;
 
         for await (const chunk of generator) {
           switch (chunk.type) {
@@ -363,13 +393,47 @@ export function createChatActions(
             case "metadata":
               // Apply final metadata (sources, searchResults, etc.)
               if (chunk.metadata && typeof chunk.metadata === "object") {
+                const metadata = chunk.metadata as Record<string, unknown>;
+
+                // Convert contextReferences to searchResults for UI compatibility
+                const searchResults = Array.isArray(metadata.contextReferences)
+                  ? metadata.contextReferences.map((ref: unknown) => {
+                      const contextRef = ref as {
+                        title?: string;
+                        url?: string;
+                        relevanceScore?: number;
+                        relevance?: string;
+                        type?: string;
+                      };
+                      return {
+                        title:
+                          contextRef.title ||
+                          (contextRef.url
+                            ? new URL(contextRef.url).hostname
+                            : "Unknown"),
+                        url: contextRef.url || "",
+                        snippet: "",
+                        relevanceScore:
+                          contextRef.relevanceScore ||
+                          (contextRef.relevance === "high"
+                            ? 0.9
+                            : contextRef.relevance === "medium"
+                              ? 0.7
+                              : 0.5),
+                        kind: contextRef.type,
+                      };
+                    })
+                  : metadata.searchResults || [];
+
                 setState((prev) => ({
                   ...prev,
                   messages: prev.messages.map((m, index) =>
                     index === prev.messages.length - 1 && m.role === "assistant"
                       ? {
                           ...m,
-                          ...chunk.metadata,
+                          ...metadata,
+                          searchResults,
+                          contextReferences: metadata.contextReferences,
                           isStreaming: false,
                           thinking: undefined,
                         }
@@ -385,30 +449,133 @@ export function createChatActions(
 
             case "done":
             case "complete":
-              // Stream completion
-              logger.debug("Stream complete");
+              // Stream completion - mark as not streaming but keep generating=true
+              // until persist completes (to prevent premature refresh)
+              setState((prev) => ({
+                ...prev,
+                searchProgress: { stage: "idle" },
+                messages: prev.messages.map((m, index) =>
+                  index === prev.messages.length - 1 && m.role === "assistant"
+                    ? { ...m, isStreaming: false, thinking: undefined }
+                    : m,
+                ),
+              }));
+              logger.debug("Stream complete, waiting for persist...");
+              break;
+
+            case "persisted":
+              // Persistence complete - NOW we can safely refresh
+              persistedPayload = chunk.payload;
+              setState((prev) => ({
+                ...prev,
+                isGenerating: false,
+                messages: prev.messages.map((m, index) =>
+                  index === prev.messages.length - 1 && m.role === "assistant"
+                    ? {
+                        ...m,
+                        workflowId: chunk.payload.workflowId,
+                        sources: chunk.payload.sources,
+                        contextReferences: chunk.payload.contextReferences,
+                        searchResults:
+                          chunk.payload.contextReferences
+                            ?.filter(
+                              (ref) => ref && typeof ref.url === "string",
+                            )
+                            .map((ref) => ({
+                              title: ref.title || ref.url || "Unknown",
+                              url: ref.url || "",
+                              snippet: "",
+                              relevanceScore: ref.relevanceScore ?? 0.5,
+                              kind: ref.type,
+                            })) || m.searchResults,
+                        isStreaming: false,
+                        thinking: undefined,
+                      }
+                    : m,
+                ),
+              }));
+              logger.debug("Persistence confirmed, triggering refresh", {
+                chatId,
+                workflowId: chunk.payload.workflowId,
+              });
               break;
           }
         }
 
-        // Refresh messages after generation completes
-        // This is critical for displaying the new messages
-        const messages = await repository.getMessages(chatId);
-        logger.debug("Messages refreshed after generation", {
-          chatId,
-          messageCount: messages.length,
-        });
+        const refreshAfterPersist = async () => {
+          if (!repository) {
+            return;
+          }
 
-        setState((prev) => ({
-          ...prev,
-          messages,
-          isGenerating: false,
-          searchProgress: { stage: "idle" },
-          // Ensure currentChatId and currentChat are still set correctly
-          currentChatId: chatId,
-          currentChat:
-            prev.chats.find((c) => c.id === chatId) || prev.currentChat,
-        }));
+          const maxAttempts = 5;
+          const delay = (ms: number) =>
+            new Promise((resolve) => setTimeout(resolve, ms));
+          const targetAssistantId = persistedPayload
+            ? IdUtils.toUnifiedId(persistedPayload.assistantMessageId)
+            : null;
+          const trimmedAnswer = fullContent.trim();
+          if (!persistedPayload) {
+            logger.warn(
+              "Persist payload missing; relying on content match for refresh",
+              { chatId },
+            );
+          }
+
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+              const messages = await repository.getMessages(chatId);
+              const hasUserMessage = messages.some(
+                (m) => m.role === "user" && m.content === content,
+              );
+              const hasAssistantMessage = messages.some((m) => {
+                if (m.role !== "assistant") return false;
+                if (targetAssistantId && m.id === targetAssistantId) {
+                  return true;
+                }
+                if (
+                  persistedPayload?.workflowId &&
+                  m.workflowId === persistedPayload.workflowId
+                ) {
+                  return true;
+                }
+                return trimmedAnswer
+                  ? (m.content || "").trim() === trimmedAnswer
+                  : false;
+              });
+
+              if (hasUserMessage && (hasAssistantMessage || !trimmedAnswer)) {
+                logger.debug("Messages refreshed after persistence", {
+                  chatId,
+                  messageCount: messages.length,
+                  attempt,
+                });
+
+                setState((prev) => ({
+                  ...prev,
+                  messages,
+                  currentChatId: chatId,
+                  currentChat:
+                    prev.chats.find((c) => c.id === chatId) || prev.currentChat,
+                }));
+                return;
+              }
+            } catch (error) {
+              logger.error("Failed to refresh messages after persistence:", {
+                chatId,
+                error,
+              });
+            }
+
+            await delay(150 * (attempt + 1));
+          }
+
+          logger.warn(
+            "Persisted messages not visible after retries; retaining optimistic state",
+            { chatId },
+          );
+        };
+
+        await refreshAfterPersist();
       } catch (error) {
         logger.error("Failed to send message:", error);
         setState((prev) => ({

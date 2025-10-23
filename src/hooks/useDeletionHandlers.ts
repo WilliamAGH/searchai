@@ -70,7 +70,7 @@ export function useDeletionHandlers({
           },
         });
 
-        // Auto-hide after 5 seconds (with cleanup)
+        // Auto-hide after 2 seconds (with cleanup)
         clearAllTimeouts();
         const timeoutId = window.setTimeout(() => {
           setUndoBanner((prev) =>
@@ -79,7 +79,7 @@ export function useDeletionHandlers({
               ? null
               : prev,
           );
-        }, 5000);
+        }, 2000);
         timeoutsRef.current.push(timeoutId);
       }
     },
@@ -97,18 +97,23 @@ export function useDeletionHandlers({
           message: "Chat deleted successfully",
         });
 
-        // Auto-hide after 3 seconds (with cleanup)
+        // Auto-hide after 2 seconds (with cleanup)
         clearAllTimeouts();
         const timeoutId = window.setTimeout(() => {
-          setUndoBanner({ show: false, message: "" });
-        }, 3000);
+          setUndoBanner(null);
+        }, 2000);
         timeoutsRef.current.push(timeoutId);
       } catch (error) {
-        logger.error("Failed to delete chat:", error);
-        setUndoBanner({
-          show: true,
-          message: "Failed to delete chat",
-        });
+        // Only show error banner if it's not a "not found" error (already deleted)
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes("Chat not found")) {
+          logger.error("Failed to delete chat:", error);
+          setUndoBanner({
+            show: true,
+            message: "Failed to delete chat",
+          });
+        }
       }
     },
     [deleteChat, clearAllTimeouts],
@@ -136,13 +141,13 @@ export function useDeletionHandlers({
           },
         });
 
-        // Auto-hide after 5 seconds (with cleanup)
+        // Auto-hide after 2 seconds (with cleanup)
         clearAllTimeouts();
         const timeoutId = window.setTimeout(() => {
           setUndoBanner((prev) =>
             prev?.message === "Message deleted" ? null : prev,
           );
-        }, 5000);
+        }, 2000);
         timeoutsRef.current.push(timeoutId);
       }
     },
@@ -160,11 +165,11 @@ export function useDeletionHandlers({
           message: "Message deleted",
         });
 
-        // Auto-hide after 3 seconds (with cleanup)
+        // Auto-hide after 2 seconds (with cleanup)
         clearAllTimeouts();
         const timeoutId = window.setTimeout(() => {
-          setUndoBanner({ show: false, message: "" });
-        }, 3000);
+          setUndoBanner(null);
+        }, 2000);
         timeoutsRef.current.push(timeoutId);
       } catch (error) {
         logger.error("Failed to delete message:", error);
