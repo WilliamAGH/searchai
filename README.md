@@ -198,13 +198,29 @@ docker run -p 3000:3000 searchai-app
 
 **Note**: The Docker container only serves the frontend. Convex functions run in Convex's cloud, not in your container.
 
-## API Endpoints
+## API Endpoints (Updated)
+
+Legacy `/api/ai` has been removed. Use the agent endpoints below.
 
 HTTP endpoints for unauthenticated users (served by Convex):
 
 - `POST {CONVEX_URL}/api/search` - Web search
 - `POST {CONVEX_URL}/api/scrape` - URL content extraction
-- `POST {CONVEX_URL}/api/ai` - AI response generation (SSE streaming)
+- `POST {CONVEX_URL}/api/ai/agent` - Agent workflow (non‑streaming JSON)
+- `POST {CONVEX_URL}/api/ai/agent/stream` - Agent workflow (SSE streaming)
+
+## Streaming Event Contract
+
+`POST /api/ai/agent/stream` emits Server-Sent Events with the following JSON frames (each prefixed by `data: `):
+
+- progress: `{ type: "progress", stage: "planning" | "searching" | "scraping" | "analyzing" | "generating", message, urls?, currentUrl?, queries?, sourcesUsed? }`
+- reasoning: `{ type: "reasoning", content }`
+- content: `{ type: "content", content, delta? }`
+- metadata: `{ type: "metadata", searchResults?: Array<{ title, url, snippet, relevanceScore, kind? }>, sources?: string[] }`
+- complete: `{ type: "complete", workflow?: object }`
+- error: `{ type: "error", error }`
+
+`kind` is an optional grouping for sources: `search_result` or `scraped_page`.
 
 ## Environment Variables Reference
 

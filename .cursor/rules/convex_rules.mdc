@@ -145,7 +145,9 @@ npx convex dashboard     # Open dashboard
 - `v.union(...)` - Union types
 - `v.literal("value")` - Literal values
 
-## HTTP Endpoints
+## HTTP Endpoints (Updated)
+
+Use agent endpoints; legacy `/api/ai` is removed.
 
 ```typescript
 // In convex/http.ts
@@ -165,6 +167,11 @@ http.route({
 });
 
 export default http;
+
+### Agent Streaming Endpoints
+
+- `POST /api/ai/agent` → Returns JSON `{ answer, sources, contextReferences, workflow }`
+- `POST /api/ai/agent/stream` → SSE frames with types: `progress`, `reasoning`, `content`, `metadata`, `complete`, `error`
 ```
 
 ## References
