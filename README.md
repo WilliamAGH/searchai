@@ -113,7 +113,7 @@ npx convex env set CONVEX_OPENAI_BASE_URL "https://api.openai.com/v1"  # or your
 npx convex env set SITE_URL "https://dev.search-ai.io"   # set per environment
 
 # Optional: Restrict CORS for export/publish routes (comma-separated origins)
-npx convex env set CONVEX_ALLOWED_ORIGINS "https://dev.search-ai.io,https://localhost:5173"
+npx convex env set CONVEX_ALLOWED_ORIGINS "https://dev.search-ai.io,http://localhost:5173,http://localhost:5174"
 
 # List all env vars to verify
 npx convex env list
@@ -211,7 +211,7 @@ HTTP endpoints for unauthenticated users (served by Convex):
 
 ## Streaming Event Contract
 
-`POST /api/ai/agent/stream` emits Server-Sent Events with the following JSON frames (each prefixed by `data: `):
+`POST /api/ai/agent/stream` emits Server-Sent Events with the following JSON frames (each prefixed by `data:`):
 
 - progress: `{ type: "progress", stage: "planning" | "searching" | "scraping" | "analyzing" | "generating", message, urls?, currentUrl?, queries?, sourcesUsed? }`
 - reasoning: `{ type: "reasoning", content }`
