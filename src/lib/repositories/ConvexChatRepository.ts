@@ -11,6 +11,7 @@ import {
   UnifiedChat,
   UnifiedMessage,
   StreamChunk,
+  PersistedPayload,
   ChatResponse,
   IdUtils,
   TitleUtils,
@@ -382,20 +383,109 @@ export class ConvexChatRepository extends BaseRepository {
     message: string,
   ): AsyncGenerator<StreamChunk> {
     try {
-      // Call agent orchestration that persists messages
-      const result = (await this.client.action(
-        api.agents.orchestration.runAgentWorkflowAndPersist as unknown,
-        {
-          chatId: IdUtils.toConvexChatId(chatId),
-          message,
-        },
-      )) as { answer: string };
+      // Stream via HTTP SSE for live UI updates, then persist
+      const host = window.location.hostname;
+      const isDev = host === "localhost" || host === "127.0.0.1";
+      const apiUrl = isDev ? "/api/ai/agent/stream" : `/api/ai/agent/stream`;
 
-      // Emit the full answer as a single chunk to maintain generator contract
-      if (result?.answer) {
-        yield { type: "content", content: result.answer };
+      // Build recent conversation context
+      const recent = await this.getMessages(chatId);
+      const chatHistory = recent
+        .slice(-20)
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          conversationContext: chatHistory
+            .map(
+              (m) =>
+                `${m.role === "user" ? "User" : m.role === "assistant" ? "Assistant" : "System"}: ${m.content}`,
+            )
+            .join("\n")
+            .slice(0, 4000),
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP ${response.status} ${response.statusText}`);
       }
-      yield { type: "done" };
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      // Stream all events to the generator
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6);
+          if (!data) continue;
+          try {
+            const evt = JSON.parse(data);
+            switch (evt.type) {
+              case "progress":
+              case "reasoning":
+              case "content":
+              case "metadata":
+              case "error":
+                yield evt as StreamChunk;
+                break;
+              case "complete":
+                yield { type: "done" };
+                break;
+            }
+          } catch {
+            // Ignore malformed frames
+          }
+        }
+      }
+
+      // Persist to database and signal completion
+      const persistUrl = isDev
+        ? "/api/ai/agent/persist"
+        : `/api/ai/agent/persist`;
+      const persistResponse = await fetch(persistUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId: IdUtils.toConvexChatId(chatId), // Convert to Convex Id format
+          message,
+          sessionId: this.sessionId, // Pass sessionId for anonymous user chat access
+        }),
+      });
+
+      if (!persistResponse.ok) {
+        const failureBody = await persistResponse.text().catch(() => "");
+        throw new Error(
+          `Persist failed: ${persistResponse.status} ${persistResponse.statusText} ${failureBody}`,
+        );
+      }
+
+      const persistPayload = (await persistResponse
+        .json()
+        .catch(() => null)) as PersistedPayload | null;
+      if (
+        !persistPayload ||
+        typeof persistPayload !== "object" ||
+        !persistPayload.assistantMessageId
+      ) {
+        throw new Error("Persist response malformed");
+      }
+
+      // Signal persistence complete so UI can refresh with authoritative data
+      yield {
+        type: "persisted",
+        payload: persistPayload,
+      };
     } catch (error) {
       yield {
         type: "error",
@@ -459,45 +549,6 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
-  // Migration and sync
-  async exportData(): Promise<{
-    chats: UnifiedChat[];
-    messages: UnifiedMessage[];
-  }> {
-    const chats = await this.getChats();
-    const allMessages: UnifiedMessage[] = [];
-
-    for (const chat of chats) {
-      const messages = await this.getMessages(chat.id);
-      allMessages.push(...messages);
-    }
-
-    return { chats, messages: allMessages };
-  }
-
-  async importData(data: {
-    chats: UnifiedChat[];
-    messages: UnifiedMessage[];
-  }): Promise<void> {
-    // Import is handled through the migration service
-    // This creates new chats and messages in Convex
-    for (const chat of data.chats) {
-      try {
-        await this.createChat(chat.title);
-
-        // Import messages for this chat
-        const chatMessages = data.messages.filter((m) => m.chatId === chat.id);
-        // This would need a special import mutation in Convex
-        // For now, we skip message import
-        logger.info(
-          `Would import ${chatMessages.length} messages for chat ${chat.id}`,
-        );
-      } catch (error) {
-        logger.error(`Failed to import chat ${chat.id}:`, error);
-      }
-    }
-  }
-
   // Helper methods
   private convexToUnifiedChat(chat: unknown): UnifiedChat {
     const c = chat as Record<string, unknown>;
@@ -518,13 +569,38 @@ export class ConvexChatRepository extends BaseRepository {
 
   private convexToUnifiedMessage(msg: unknown): UnifiedMessage {
     const m = msg as Record<string, unknown>;
+    const contextReferences = Array.isArray(m.contextReferences)
+      ? (m.contextReferences as UnifiedMessage["contextReferences"])
+      : undefined;
+    const searchResultsFromDoc =
+      Array.isArray(m.searchResults) && m.searchResults.length > 0
+        ? (m.searchResults as UnifiedMessage["searchResults"])
+        : undefined;
+    const derivedSearchResults =
+      !searchResultsFromDoc && contextReferences
+        ? contextReferences
+            .filter(
+              (ref) =>
+                ref &&
+                typeof ref.url === "string" &&
+                (ref.title || ref.url) &&
+                typeof ref.timestamp === "number",
+            )
+            .map((ref) => ({
+              title: ref.title || ref.url!,
+              url: ref.url!,
+              snippet: "",
+              relevanceScore: ref.relevanceScore ?? 0.5,
+            }))
+        : undefined;
+
     return {
       id: IdUtils.toUnifiedId(m._id as Id<"messages">),
       chatId: IdUtils.toUnifiedId(m.chatId as Id<"chats">),
       role: m.role as "user" | "assistant" | "system",
       content: (m.content || "") as string,
       timestamp: (m.timestamp || m._creationTime) as number,
-      searchResults: m.searchResults as UnifiedMessage["searchResults"],
+      searchResults: searchResultsFromDoc ?? derivedSearchResults,
       sources: m.sources as string[] | undefined,
       reasoning: m.reasoning as string | undefined,
       searchMethod: m.searchMethod as UnifiedMessage["searchMethod"],
@@ -535,6 +611,8 @@ export class ConvexChatRepository extends BaseRepository {
       source: "convex",
       synced: true,
       lastSyncAt: Date.now(),
+      contextReferences,
+      workflowId: m.workflowId as string | undefined,
     };
   }
 }

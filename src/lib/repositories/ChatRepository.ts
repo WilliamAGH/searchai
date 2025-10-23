@@ -1,6 +1,24 @@
 /**
- * Chat Repository Interface and Implementations
- * Provides unified access to chat data regardless of storage backend
+ * Chat Repository Interface and Implementation
+ * Provides unified access to Convex chat data for all users
+ *
+ * MIGRATION COMPLETE (Phase 3):
+ * ✅ LocalChatRepository deleted
+ * ✅ MigrationService deleted
+ * ✅ Migration hooks removed
+ * ✅ All users (auth + anon) now use Convex directly via sessionId
+ *
+ * ARCHITECTURE:
+ * - ConvexChatRepository is the ONLY implementation
+ * - Uses UnifiedChat/UnifiedMessage bridge types for flexibility
+ * - Supports both authenticated users (userId) and anonymous (sessionId)
+ * - Repository pattern provides clean abstraction over Convex operations
+ *
+ * NOTE: This abstraction is intentionally kept because:
+ * - Encapsulates complex Convex operations
+ * - Provides consistent API for hooks layer
+ * - Simplifies testing and mocking
+ * - UnifiedChat/UnifiedMessage types bridge local and Convex formats nicely
  */
 
 import {
@@ -8,9 +26,9 @@ import {
   UnifiedMessage,
   StreamChunk,
   ChatResponse,
-  IdUtils,
   TitleUtils,
 } from "../types/unified";
+import { generateUuidV7 } from "../utils/uuid";
 
 /**
  * Base Chat Repository Interface
@@ -52,13 +70,6 @@ export interface IChatRepository {
   getChatByShareId(shareId: string): Promise<UnifiedChat | null>;
   getChatByPublicId(publicId: string): Promise<UnifiedChat | null>;
 
-  // Migration and sync
-  exportData(): Promise<{ chats: UnifiedChat[]; messages: UnifiedMessage[] }>;
-  importData(data: {
-    chats: UnifiedChat[];
-    messages: UnifiedMessage[];
-  }): Promise<void>;
-
   // Utility
   isAvailable(): boolean;
   getStorageType(): "local" | "convex" | "hybrid";
@@ -74,7 +85,7 @@ export abstract class BaseRepository implements IChatRepository {
   async createChat(title?: string): Promise<ChatResponse> {
     const finalTitle = title || "New Chat";
     const chat: UnifiedChat = {
-      id: IdUtils.generateLocalId("chat"),
+      id: generateUuidV7(),
       title: TitleUtils.sanitize(finalTitle),
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -135,13 +146,4 @@ export abstract class BaseRepository implements IChatRepository {
   ): Promise<{ shareId?: string; publicId?: string }>;
   abstract getChatByShareId(shareId: string): Promise<UnifiedChat | null>;
   abstract getChatByPublicId(publicId: string): Promise<UnifiedChat | null>;
-
-  abstract exportData(): Promise<{
-    chats: UnifiedChat[];
-    messages: UnifiedMessage[];
-  }>;
-  abstract importData(data: {
-    chats: UnifiedChat[];
-    messages: UnifiedMessage[];
-  }): Promise<void>;
 }
