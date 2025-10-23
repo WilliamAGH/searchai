@@ -33,26 +33,44 @@ export const scrapeUrl = action({
   }> => {
     // Short-TTL in-process cache to avoid repeat scrapes across adjacent queries
     const SCRAPE_TTL_MS = 2 * 60 * 1000; // 2 minutes
-    const globalAny: any = globalThis as any;
-    if (!globalAny.__scrapeCache)
-      globalAny.__scrapeCache = new Map<
-        string,
-        {
-          exp: number;
-          val: { title: string; content: string; summary?: string };
-        }
-      >();
-    const cache: Map<
-      string,
-      { exp: number; val: { title: string; content: string; summary?: string } }
-    > = globalAny.__scrapeCache;
-    const now = Date.now();
-    for (const [k, v] of cache) {
-      if (v.exp <= now) cache.delete(k);
+    const SCRAPE_CACHE_MAX_ENTRIES = 100; // Prevent unbounded memory growth
+
+    type CacheEntry = {
+      exp: number;
+      val: { title: string; content: string; summary?: string };
+    };
+
+    const globalWithCache = globalThis as typeof globalThis & {
+      __scrapeCache?: Map<string, CacheEntry>;
+    };
+
+    if (!globalWithCache.__scrapeCache) {
+      globalWithCache.__scrapeCache = new Map<string, CacheEntry>();
     }
-    const hit = cache.get(args.url);
-    if (hit && hit.exp > now) {
-      return hit.val;
+
+    const cache = globalWithCache.__scrapeCache;
+    const now = Date.now();
+
+    // Remove any expired entries while preserving LRU order for active entries
+    for (const [key, entry] of cache) {
+      if (entry.exp <= now) {
+        cache.delete(key);
+      }
+    }
+
+    const enforceCapacity = () => {
+      while (cache.size > SCRAPE_CACHE_MAX_ENTRIES) {
+        const oldestKey = cache.keys().next().value;
+        if (!oldestKey) break;
+        cache.delete(oldestKey);
+      }
+    };
+
+    const cached = cache.get(args.url);
+    if (cached && cached.exp > now) {
+      cache.delete(args.url);
+      cache.set(args.url, cached);
+      return cached.val;
     }
     console.info("🌐 Scraping URL initiated:", {
       url: args.url,
@@ -203,6 +221,7 @@ export const scrapeUrl = action({
 
       const result = { title, content, summary };
       cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
+      enforceCapacity();
       console.info("✅ Scraping completed successfully:", {
         url: args.url,
         resultLength: content.length,
@@ -234,6 +253,7 @@ export const scrapeUrl = action({
         summary: `Content unavailable from ${hostname}`,
       };
       cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val });
+      enforceCapacity();
       return val;
     }
   },
