@@ -9,12 +9,78 @@
 
 import { v } from "convex/values";
 import { action } from "../_generated/server";
-import { run } from "@openai/agents";
+import { RunToolCallItem, RunToolCallOutputItem, run } from "@openai/agents";
 import { agents } from "./definitions";
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
 import { generateChatTitle } from "../chats/utils";
 import { parseAnswerText } from "./answerParser";
+import { vContextReference } from "../lib/validators";
+
+// ============================================
+// Helper types, constants, and utilities
+// ============================================
+
+const UUID_V7_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TOOL_RESULT_MAX_LENGTH = 200;
+
+type ResearchContextReference = {
+  contextId: string;
+  type: "search_result" | "scraped_page" | "research_summary";
+  url?: string;
+  title?: string;
+  timestamp: number;
+  relevanceScore?: number;
+  metadata?: unknown;
+};
+
+const isUuidV7 = (value: string | undefined): boolean =>
+  !!value && UUID_V7_REGEX.test(value);
+
+const formatContextReferencesForPrompt = (
+  references: ResearchContextReference[] | undefined,
+): string => {
+  if (!references?.length) return "";
+  const recent = references
+    .slice(-8)
+    .map((ref, idx) => {
+      let label = ref.title || ref.url || ref.contextId;
+      if (!label && ref.url) {
+        try {
+          label = new URL(ref.url).hostname;
+        } catch {
+          label = ref.url;
+        }
+      }
+      const relevance =
+        typeof ref.relevanceScore === "number"
+          ? ` (relevance ${ref.relevanceScore.toFixed(2)})`
+          : "";
+      return `${idx + 1}. ${label}${ref.url ? ` — ${ref.url}` : ""}${relevance} [${ref.contextId}]`;
+    })
+    .join("\n");
+  return `PREVIOUS CONTEXT REFERENCES:\n${recent}`;
+};
+
+const summarizeToolResult = (output: unknown): string => {
+  if (output === null || typeof output === "undefined") {
+    return "No output";
+  }
+  if (typeof output === "string") {
+    return output.length > TOOL_RESULT_MAX_LENGTH
+      ? `${output.slice(0, TOOL_RESULT_MAX_LENGTH)}…`
+      : output;
+  }
+  try {
+    const json = JSON.stringify(output);
+    return json.length > TOOL_RESULT_MAX_LENGTH
+      ? `${json.slice(0, TOOL_RESULT_MAX_LENGTH)}…`
+      : json;
+  } catch {
+    return "[unserializable output]";
+  }
+};
 
 /**
  * Orchestrate the full research and answer workflow
@@ -32,6 +98,7 @@ export const orchestrateResearchWorkflow = action({
   args: {
     userQuery: v.string(),
     conversationContext: v.optional(v.string()),
+    contextReferences: v.optional(v.array(vContextReference)),
   },
   returns: v.object({
     // Workflow tracking
@@ -169,17 +236,55 @@ export const orchestrateResearchWorkflow = action({
     console.info("🔬 STAGE 2: Research Execution");
     const researchStart = Date.now();
 
-    // Build research instructions with planning context
-    const researchInstructions = `
+    const priorContextReferences = args.contextReferences ?? [];
+    const conversationBlock = args.conversationContext
+      ? `RECENT CONVERSATION CONTEXT:\n${args.conversationContext}\n\n`
+      : "";
+    const referenceBlock = formatContextReferencesForPrompt(
+      priorContextReferences as unknown as ResearchContextReference[],
+    );
+    const plannedQueries = planningResult.finalOutput.searchQueries ?? [];
+    const hasPlannedQueries = plannedQueries.length > 0;
+
+    let researchDuration = 0;
+    let researchOutput: any;
+    let toolCallLog: Array<{
+      toolName: string;
+      timestamp: number;
+      reasoning: string;
+      input: any;
+      resultSummary: string;
+      durationMs: number;
+      success: boolean;
+    }> = [];
+
+    if (!hasPlannedQueries) {
+      researchDuration = Date.now() - researchStart;
+      researchOutput = {
+        researchSummary:
+          "No web research required for this query. Generate the answer using existing context.",
+        keyFindings: [],
+        sourcesUsed: [],
+        informationGaps: undefined,
+        researchQuality: "adequate",
+      };
+      console.info("⏭️ SKIPPING RESEARCH:", {
+        workflowId,
+        reason: "Planner returned zero search queries",
+      });
+    } else {
+      const researchInstructions = `
 ORIGINAL QUESTION: ${args.userQuery}
 
 USER INTENT: ${planningResult.finalOutput.userIntent}
 
-INFORMATION NEEDED:
-${planningResult.finalOutput.informationNeeded.map((info: string, i: number) => `${i + 1}. ${info}`).join("\n")}
+${conversationBlock}${referenceBlock ? `${referenceBlock}\n\n` : ""}INFORMATION NEEDED:
+${planningResult.finalOutput.informationNeeded
+  .map((info: string, i: number) => `${i + 1}. ${info}`)
+  .join("\n")}
 
 SEARCH PLAN:
-${planningResult.finalOutput.searchQueries
+${plannedQueries
   .map(
     (
       q: { query: string; reasoning: string; priority: number },
@@ -193,7 +298,9 @@ ${planningResult.finalOutput.searchQueries
 YOUR TASK:
 1. Execute each planned search using the search_web tool
 2. Review search results and identify the most authoritative sources
-3. Scrape ${planningResult.finalOutput.needsWebScraping ? "2-5" : "1-3"} of the most relevant URLs using scrape_webpage tool
+3. Scrape ${
+        planningResult.finalOutput.needsWebScraping ? "2-5" : "1-3"
+      } of the most relevant URLs using scrape_webpage tool
 4. Synthesize all findings into a comprehensive research summary
 
 Remember:
@@ -203,54 +310,132 @@ Remember:
 - Note any information gaps or conflicting data
 `;
 
-    const researchResult = await run(agents.research, researchInstructions);
+      const researchResult = await run(agents.research, researchInstructions);
+      researchDuration = Date.now() - researchStart;
 
-    const researchDuration = Date.now() - researchStart;
+      if (!researchResult.finalOutput) {
+        throw new Error("Research failed: no final output");
+      }
 
-    if (!researchResult.finalOutput) {
-      throw new Error("Research failed: no final output");
+      researchOutput = researchResult.finalOutput;
+
+      const toolCallEntries = new Map<
+        string,
+        {
+          toolName: string;
+          args: unknown;
+          startTimestamp: number;
+          status?: string;
+          output?: unknown;
+          completionTimestamp?: number;
+          order: number;
+        }
+      >();
+
+      researchResult.newItems.forEach((item, idx) => {
+        const timestamp = researchStart + idx * 10;
+        if (item instanceof RunToolCallItem) {
+          const rawCall = item.rawItem;
+          if (rawCall.type === "function_call") {
+            let parsedArgs: unknown = rawCall.arguments;
+            try {
+              parsedArgs = JSON.parse(rawCall.arguments);
+            } catch {
+              parsedArgs = rawCall.arguments;
+            }
+            toolCallEntries.set(rawCall.callId, {
+              toolName: rawCall.name,
+              args: parsedArgs,
+              startTimestamp: timestamp,
+              status: rawCall.status,
+              order: idx,
+            });
+          }
+        } else if (item instanceof RunToolCallOutputItem) {
+          const rawOutput = item.rawItem;
+          if (rawOutput.type === "function_call_result") {
+            const entry =
+              toolCallEntries.get(rawOutput.callId) ??
+              ({
+                toolName: rawOutput.name,
+                args: undefined,
+                startTimestamp: timestamp,
+                order: idx,
+              } as {
+                toolName: string;
+                args: unknown;
+                startTimestamp: number;
+                status?: string;
+                output?: unknown;
+                completionTimestamp?: number;
+                order: number;
+              });
+            entry.output = item.output;
+            entry.status = rawOutput.status;
+            entry.completionTimestamp = timestamp;
+            toolCallEntries.set(rawOutput.callId, entry);
+          }
+        }
+      });
+
+      toolCallLog = Array.from(toolCallEntries.values())
+        .sort((a, b) => a.order - b.order)
+        .map((entry) => {
+          const args = entry.args;
+          const reasoning =
+            args &&
+            typeof args === "object" &&
+            args !== null &&
+            "reasoning" in args &&
+            typeof (args as Record<string, unknown>).reasoning === "string"
+              ? ((args as Record<string, unknown>).reasoning as string)
+              : "";
+          const durationMs =
+            entry.completionTimestamp !== undefined
+              ? Math.max(entry.completionTimestamp - entry.startTimestamp, 0)
+              : 0;
+          return {
+            toolName: entry.toolName,
+            timestamp: entry.startTimestamp,
+            reasoning,
+            input: args,
+            resultSummary: summarizeToolResult(entry.output),
+            durationMs,
+            success: entry.status === "completed",
+          };
+        });
+
+      if (
+        hasPlannedQueries &&
+        (!Array.isArray(researchOutput.sourcesUsed) ||
+          researchOutput.sourcesUsed.length === 0)
+      ) {
+        console.error("⚠️ RESEARCH VALIDATION FAILURE:", {
+          workflowId,
+          plannedSearches: plannedQueries.length,
+          issue: "Research agent returned zero sources",
+        });
+      }
+
+      const invalidContextIds = (researchOutput.sourcesUsed || [])
+        .map((source: { contextId: string }) => source.contextId)
+        .filter((contextId: string) => !isUuidV7(contextId));
+
+      if (invalidContextIds.length > 0) {
+        console.error("⚠️ INVALID CONTEXT IDS DETECTED:", {
+          workflowId,
+          invalidContextIds,
+        });
+      }
     }
-
-    // Extract tool call logs from research results
-    // The agent framework doesn't expose internal tool calls directly,
-    // so we extract metadata from the sourcesUsed which contain contextIds
-    const toolCallLog: Array<{
-      toolName: string;
-      timestamp: number;
-      reasoning: string;
-      input: any;
-      resultSummary: string;
-      durationMs: number;
-      success: boolean;
-    }> = researchResult.finalOutput.sourcesUsed.map(
-      (source: any, idx: number) => ({
-        toolName:
-          source.type === "scraped_page" ? "scrape_webpage" : "search_web",
-        timestamp: Date.now() - researchDuration + idx * 1000, // Approximate timing
-        reasoning: `Gathering information for: ${planningResult.finalOutput?.userIntent || "user query"}`,
-        input:
-          source.type === "scraped_page"
-            ? { url: source.url }
-            : {
-                query:
-                  planningResult.finalOutput?.searchQueries?.[
-                    idx %
-                      (planningResult.finalOutput?.searchQueries?.length || 1)
-                  ]?.query,
-              },
-        resultSummary: `${source.type === "scraped_page" ? "Scraped" : "Searched"}: ${source.title}`,
-        durationMs: 1000, // Estimated
-        success: true,
-      }),
-    );
 
     console.info("✅ RESEARCH COMPLETE:", {
       workflowId,
       duration: researchDuration,
-      sourcesUsed: researchResult.finalOutput.sourcesUsed.length,
-      findingsCount: researchResult.finalOutput.keyFindings.length,
-      researchQuality: researchResult.finalOutput.researchQuality,
-      hasGaps: !!researchResult.finalOutput.informationGaps?.length,
+      sourcesUsed: researchOutput.sourcesUsed?.length || 0,
+      findingsCount: researchOutput.keyFindings?.length || 0,
+      researchQuality: researchOutput.researchQuality,
+      hasGaps: !!researchOutput.informationGaps?.length,
       toolCallsLogged: toolCallLog.length,
     });
 
@@ -260,6 +445,39 @@ Remember:
     console.info("✍️ STAGE 3: Answer Synthesis");
     const synthesisStart = Date.now();
 
+    const sourcesAvailable = (researchOutput.sourcesUsed || [])
+      .map(
+        (
+          source: {
+            url: string;
+            title: string;
+            type: string;
+            relevance: string;
+          },
+          i: number,
+        ) => {
+          const index = i + 1;
+          if (source?.url) {
+            try {
+              const hostname = new URL(source.url).hostname;
+              return `${index}. [${hostname}] ${source.title}
+   Type: ${source.type}
+   Relevance: ${source.relevance}
+   URL: ${source.url}`;
+            } catch {
+              return `${index}. ${source.title}
+   Type: ${source.type}
+   Relevance: ${source.relevance}
+   URL: ${source.url}`;
+            }
+          }
+          return `${index}. ${source.title}
+   Type: ${source.type}
+   Relevance: ${source.relevance}`;
+        },
+      )
+      .join("\n");
+
     // Build synthesis instructions with full context
     const synthesisInstructions = `
 ORIGINAL QUESTION: ${args.userQuery}
@@ -268,10 +486,10 @@ USER INTENT: ${planningResult.finalOutput.userIntent}
 
 RESEARCH FINDINGS:
 
-${researchResult.finalOutput.researchSummary}
+${researchOutput.researchSummary}
 
 KEY FACTS:
-${researchResult.finalOutput.keyFindings
+${researchOutput.keyFindings
   .map(
     (
       finding: { finding: string; sources: string[]; confidence: string },
@@ -283,21 +501,13 @@ ${researchResult.finalOutput.keyFindings
   .join("\n\n")}
 
 SOURCES AVAILABLE:
-${researchResult.finalOutput.sourcesUsed
-  .map(
-    (
-      source: { url: string; title: string; type: string; relevance: string },
-      i: number,
-    ) => `${i + 1}. [${new URL(source.url).hostname}] ${source.title}
-   Type: ${source.type}
-   Relevance: ${source.relevance}
-   URL: ${source.url}`,
-  )
-  .join("\n")}
+${sourcesAvailable}
 
 ${
-  researchResult.finalOutput.informationGaps?.length
-    ? `INFORMATION GAPS:\n${researchResult.finalOutput.informationGaps.map((gap: string, i: number) => `${i + 1}. ${gap}`).join("\n")}\n`
+  researchOutput.informationGaps?.length
+    ? `INFORMATION GAPS:\n${researchOutput.informationGaps
+        .map((gap: string, i: number) => `${i + 1}. ${gap}`)
+        .join("\n")}\n`
     : ""
 }
 
@@ -360,8 +570,8 @@ Remember the user wants to know: ${planningResult.finalOutput.userIntent}
     };
 
     const normalizedResearch = {
-      ...researchResult.finalOutput,
-      informationGaps: researchResult.finalOutput.informationGaps ?? undefined,
+      ...researchOutput,
+      informationGaps: researchOutput.informationGaps ?? undefined,
     };
 
     const normalizedAnswer = {
@@ -406,10 +616,15 @@ export const orchestrateResearchWorkflowStreaming = action({
   args: {
     userQuery: v.string(),
     conversationContext: v.optional(v.string()),
+    contextReferences: v.optional(v.array(vContextReference)),
   },
   handler: async (ctx, args) => {
     const workflowId = generateMessageId();
     const startTime = Date.now();
+    const streamingContextReferences = args.contextReferences ?? [];
+    const _referenceBlockForStreaming = formatContextReferencesForPrompt(
+      streamingContextReferences,
+    );
 
     console.info("🚀 STREAMING WORKFLOW STARTED:", {
       workflowId,
@@ -799,6 +1014,19 @@ export const runAgentWorkflowAndPersist = action({
       .join("\n")
       .slice(0, 4000);
 
+    const priorContextReferences: ResearchContextReference[] = [];
+    for (const message of recent || []) {
+      if (Array.isArray((message as any).contextReferences)) {
+        for (const ref of (message as any)
+          .contextReferences as ResearchContextReference[]) {
+          if (!priorContextReferences.find((existing) => existing.contextId === ref.contextId)) {
+            priorContextReferences.push(ref);
+          }
+        }
+      }
+    }
+    const contextReferencesForResearch = priorContextReferences.slice(-8);
+
     // 4) Run orchestration
     const result: {
       workflowId: string;
@@ -820,6 +1048,7 @@ export const runAgentWorkflowAndPersist = action({
       {
         userQuery: args.message,
         conversationContext,
+        contextReferences: contextReferencesForResearch,
       },
     );
 
