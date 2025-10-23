@@ -2,12 +2,134 @@
  * UI Utilities and Helper Types
  * This file contains ONLY UI-specific utilities and helpers
  * Per AGENT.md: NO database entity types - use Doc<T> from Convex directly
+ *
+ * MIGRATION NOTE: UnifiedChat and UnifiedMessage types below are TEMPORARY bridge types
+ * for the localStorage → Convex migration. They will be removed once migration is complete.
  */
 
-import { Id } from "../../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
+import type { SearchResult } from "./message";
+
+/**
+ * Unified Chat - Bridge type for local/Convex chats during migration
+ *
+ * This type allows repositories to work with both localStorage chats (local IDs)
+ * and Convex chats (Convex IDs) during the migration period.
+ *
+ * @deprecated This is a temporary bridge type for localStorage → Convex migration.
+ * Target removal: 6 months after migration completes (when localStorage usage < 5%).
+ * FUTURE: Replace all usage with Doc<"chats"> from convex/_generated/dataModel
+ */
+export interface UnifiedChat {
+  // ID can be either local (string) or Convex (Id<"chats">)
+  id?: string | Id<"chats">;
+  _id?: string | Id<"chats">;
+
+  // Core fields (match Convex schema)
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  privacy?: "private" | "shared" | "public";
+
+  // Optional fields
+  shareId?: string;
+  publicId?: string;
+  userId?: Id<"users"> | string;
+  threadId?: string;
+  rollingSummary?: string;
+  rollingSummaryUpdatedAt?: number;
+
+  // Migration tracking fields
+  source?: "local" | "convex";
+  synced?: boolean;
+  isLocal?: boolean;
+
+  // Convex system fields
+  _creationTime?: number;
+}
+
+/**
+ * Unified Message - Bridge type for local/Convex messages during migration
+ *
+ * This type allows repositories to work with both localStorage messages (local IDs)
+ * and Convex messages (Convex IDs) during the migration period.
+ *
+ * @deprecated This is a temporary bridge type for localStorage → Convex migration.
+ * Target removal: 6 months after migration completes (when localStorage usage < 5%).
+ * FUTURE: Replace all usage with Doc<"messages"> from convex/_generated/dataModel
+ */
+export interface UnifiedMessage {
+  // ID can be either local (string) or Convex (Id<"messages">)
+  id?: string | Id<"messages">;
+  _id?: string | Id<"messages">;
+
+  // Core fields (match Convex schema)
+  chatId: string | Id<"chats">;
+  role: "user" | "assistant" | "system";
+  content?: string;
+  timestamp?: number;
+
+  // Search and AI fields
+  searchResults?: SearchResult[];
+  sources?: string[];
+  reasoning?: string | unknown; // may be string or structured reasoning from agents
+  searchMethod?: "serp" | "openrouter" | "duckduckgo" | "fallback";
+  hasRealResults?: boolean;
+
+  // Streaming fields
+  isStreaming?: boolean;
+  streamedContent?: string;
+  thinking?: string;
+
+  // Migration tracking fields
+  source?: "local" | "convex";
+  synced?: boolean;
+
+  // Convex system fields
+  _creationTime?: number;
+
+  // UUID v7 tracking
+  messageId?: string;
+  threadId?: string;
+
+  // Context references (from agent workflow)
+  contextReferences?: Array<{
+    contextId: string;
+    type: "search_result" | "scraped_page" | "research_summary";
+    url?: string;
+    title?: string;
+    timestamp: number;
+    relevanceScore?: number;
+    metadata?: unknown;
+  }>;
+
+  // Agent workflow tracking
+  workflowId?: string;
+}
+
+/**
+ * Chat creation response
+ *
+ * @deprecated This is a temporary bridge type for localStorage → Convex migration.
+ * FUTURE: Return Doc<"chats"> directly instead of wrapping it
+ */
+export interface ChatResponse {
+  chat: UnifiedChat;
+  isNew: boolean;
+}
+
+/**
+ * Stream chunk type alias
+ *
+ * @deprecated Use MessageStreamChunk directly from types/message.ts
+ */
+export type StreamChunk = import("./message").MessageStreamChunk;
+export type PersistedPayload = import("./message").PersistedPayload;
 
 /**
  * Operation for offline-first sync (future feature)
+ *
+ * @deprecated Planned for offline-first sync feature. Remove if not implemented in next 2 releases.
  */
 export interface Operation {
   type: "create" | "update" | "delete";
@@ -63,22 +185,19 @@ export const IdUtils = {
   },
 
   /**
-   * Generate a local ID using UUID v7
-   * @deprecated Use UUID v7 directly via generateUuidV7() from utils/uuid.ts
-   */
-  generateLocalId: (_prefix: "chat" | "msg" = "chat"): string => {
-    // Import dynamically to avoid circular dependency
-    const { uuidv7 } = require("uuidv7");
-    return uuidv7();
-  },
-
-  /**
    * Check if ID is a local ID (not from Convex)
    */
   isLocalId: (id: string): boolean => {
     return (
       id.startsWith("chat_") || id.startsWith("msg_") || id.startsWith("local_")
     );
+  },
+
+  /**
+   * Generate a local ID for temporary messages/chats
+   */
+  generateLocalId: (prefix: "chat" | "msg"): string => {
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   },
 };
 

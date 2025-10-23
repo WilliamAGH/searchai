@@ -15,6 +15,8 @@ export interface SearchResult {
   url: string;
   snippet: string;
   relevanceScore: number;
+  // Optional grouping kind for agent sources
+  kind?: "search_result" | "scraped_page";
 }
 
 /**
@@ -101,6 +103,21 @@ export const createLocalMessage = (
  * Message stream chunk for real-time updates
  * Extended to support agent workflow streaming events
  */
+export interface PersistedPayload {
+  assistantMessageId: Id<"messages">;
+  workflowId: string;
+  answer: string;
+  sources: string[];
+  contextReferences: Array<{
+    contextId: string;
+    type: "search_result" | "scraped_page" | "research_summary";
+    url?: string;
+    title?: string;
+    timestamp: number;
+    relevanceScore?: number;
+  }>;
+}
+
 export type MessageStreamChunk =
   | { type: "chunk"; content: string } // Legacy: text content chunk
   | { type: "content"; content: string; delta?: string } // Answer content (with optional delta)
@@ -118,7 +135,11 @@ export type MessageStreamChunk =
   | { type: "metadata"; metadata: unknown } // Final metadata (sources, etc.)
   | { type: "complete"; workflow?: unknown } // Workflow completion
   | { type: "error"; error: string } // Error events
-  | { type: "done" }; // Stream completion
+  | { type: "done" } // Stream completion
+  | {
+      type: "persisted";
+      payload: PersistedPayload;
+    }; // Database persistence confirmation
 
 /**
  * Search progress state for UI updates

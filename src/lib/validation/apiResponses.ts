@@ -95,34 +95,6 @@ export function validateAIResponse(data: unknown): {
 }
 
 /**
- * Validate streaming chunk from SSE
- */
-export function validateStreamChunk(data: string): {
-  type: "chunk" | "done" | "error";
-  content?: string;
-  thinking?: string;
-  error?: string;
-} | null {
-  try {
-    const chunk = JSON.parse(data);
-
-    if (!chunk || typeof chunk !== "object") return null;
-
-    // Validate chunk type
-    if (!["chunk", "done", "error"].includes(chunk.type)) return null;
-
-    return {
-      type: chunk.type,
-      content: typeof chunk.content === "string" ? chunk.content : undefined,
-      thinking: typeof chunk.thinking === "string" ? chunk.thinking : undefined,
-      error: typeof chunk.error === "string" ? chunk.error : undefined,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Validate share response from publish endpoint
  */
 export function validateShareResponse(data: unknown): {
