@@ -3,7 +3,7 @@
  * Refactored to use sub-components for better organization
  */
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -21,6 +21,8 @@ import {
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
 import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
+import { useIsMobile } from "../../hooks/useIsMobile";
+import { throttle, isNearBottom } from "../../lib/utils";
 
 /**
  * Public props for `MessageList` UI component.
@@ -80,28 +82,64 @@ export function MessageList({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const previousMessagesLengthRef = useRef(messages.length);
   const isLoadingMoreRef = useRef(false);
-  const [collapsedById, setCollapsedById] = React.useState<
-    Record<string, boolean>
-  >({});
-  const [userHasScrolled, setUserHasScrolled] = React.useState(false);
-  const [hoveredSourceUrl, setHoveredSourceUrl] = React.useState<string | null>(
+  const lastSeenMessageCountRef = useRef(messages.length);
+  const autoScrollEnabledRef = useRef(true);
+  const isTouchingRef = useRef(false);
+  const smoothScrollInProgressRef = useRef(false);
+
+  const isMobile = useIsMobile();
+  const [collapsedById, setCollapsedById] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
+  const [unseenMessageCount, setUnseenMessageCount] = useState(0);
+  const [hoveredSourceUrl, setHoveredSourceUrl] = useState<string | null>(null);
+  const [_hoveredCitationUrl, setHoveredCitationUrl] = useState<string | null>(
     null,
   );
-  const [_hoveredCitationUrl, setHoveredCitationUrl] = React.useState<
-    string | null
-  >(null);
+
+  // Dynamic thresholds based on viewport
+  const NEAR_BOTTOM_THRESHOLD = isMobile ? 100 : 200;
+  const STUCK_THRESHOLD = isMobile ? 50 : 100;
+
+  /**
+   * Cancel any ongoing smooth scroll
+   */
+  const cancelSmoothScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (container && smoothScrollInProgressRef.current) {
+      const currentPos = container.scrollTop;
+      container.scrollTo({ top: currentPos, behavior: "instant" });
+      smoothScrollInProgressRef.current = false;
+    }
+  }, []);
 
   /**
    * Scroll to bottom of messages
    */
-  const scrollToBottom = React.useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    if (behavior === "smooth") {
+      smoothScrollInProgressRef.current = true;
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      // Reset flag after animation completes (~500ms)
+      setTimeout(() => {
+        smoothScrollInProgressRef.current = false;
+      }, 600);
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+    }
   }, []);
 
-  const handleScrollToBottom = React.useCallback(() => {
-    scrollToBottom();
+  const handleScrollToBottom = useCallback(() => {
+    scrollToBottom("smooth");
     setUserHasScrolled(false);
-  }, [scrollToBottom]);
+    setUnseenMessageCount(0);
+    autoScrollEnabledRef.current = true;
+    lastSeenMessageCountRef.current = messages.length;
+  }, [scrollToBottom, messages.length]);
 
   const handleDeleteMessage = React.useCallback(
     async (messageId: Id<"messages"> | string | undefined) => {
@@ -129,12 +167,27 @@ export function MessageList({
     [onRequestDeleteMessage, onDeleteLocalMessage, deleteMessage],
   );
 
-  // Only auto-scroll if user hasn't manually scrolled up
+  // Intelligent auto-scroll: scroll when near bottom or actively generating
   useEffect(() => {
-    if (!userHasScrolled) {
-      scrollToBottom();
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const shouldAutoScroll =
+      autoScrollEnabledRef.current &&
+      (isNearBottom(container, NEAR_BOTTOM_THRESHOLD) ||
+        (isGenerating && !userHasScrolled));
+
+    if (shouldAutoScroll) {
+      scrollToBottom("smooth");
+      lastSeenMessageCountRef.current = messages.length;
     }
-  }, [userHasScrolled, scrollToBottom]);
+  }, [
+    messages,
+    isGenerating,
+    userHasScrolled,
+    scrollToBottom,
+    NEAR_BOTTOM_THRESHOLD,
+  ]);
 
   // Debug logging
   useEffect(() => {
@@ -146,20 +199,91 @@ export function MessageList({
     }
   }, [messages]);
 
-  // Detect when user scrolls manually
+  // Track unseen messages when user is scrolled up
+  useEffect(() => {
+    if (userHasScrolled) {
+      const newMessages = messages.length - lastSeenMessageCountRef.current;
+      if (newMessages > 0) {
+        setUnseenMessageCount(newMessages);
+      }
+    }
+  }, [messages.length, userHasScrolled]);
+
+  // Reset auto-scroll when new assistant message starts streaming
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (
+      lastMessage?.role === "assistant" &&
+      lastMessage?.isStreaming &&
+      isGenerating
+    ) {
+      // Re-enable auto-scroll for new responses if near bottom
+      const container = scrollContainerRef.current;
+      if (container && isNearBottom(container, NEAR_BOTTOM_THRESHOLD * 2)) {
+        autoScrollEnabledRef.current = true;
+        setUserHasScrolled(false);
+      }
+    }
+  }, [messages, isGenerating, NEAR_BOTTOM_THRESHOLD]);
+
+  // Detect when user scrolls manually with touch/scroll awareness
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
-      setUserHasScrolled(!isAtBottom);
+    const handleTouchStart = () => {
+      isTouchingRef.current = true;
+      cancelSmoothScroll();
     };
 
+    const handleTouchEnd = () => {
+      isTouchingRef.current = false;
+    };
+
+    const handleWheel = () => {
+      cancelSmoothScroll();
+    };
+
+    const handleScroll = throttle(() => {
+      // If smooth scroll is in progress, don't update state
+      if (smoothScrollInProgressRef.current) return;
+
+      const nearBottom = isNearBottom(container, STUCK_THRESHOLD);
+      const wasScrolledUp = userHasScrolled;
+
+      // User is near bottom - enable auto-scroll
+      if (nearBottom) {
+        if (wasScrolledUp) {
+          setUserHasScrolled(false);
+          setUnseenMessageCount(0);
+          lastSeenMessageCountRef.current = messages.length;
+        }
+        autoScrollEnabledRef.current = true;
+      }
+      // User scrolled up - disable auto-scroll
+      else {
+        if (!wasScrolledUp) {
+          setUserHasScrolled(true);
+          lastSeenMessageCountRef.current = messages.length;
+        }
+        autoScrollEnabledRef.current = false;
+      }
+    }, 100);
+
     container.addEventListener("scroll", handleScroll, { passive: true });
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, []);
+    container.addEventListener("touchstart", handleTouchStart, {
+      passive: true,
+    });
+    container.addEventListener("touchend", handleTouchEnd, { passive: true });
+    container.addEventListener("wheel", handleWheel, { passive: true });
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchend", handleTouchEnd);
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, [userHasScrolled, messages.length, STUCK_THRESHOLD, cancelSmoothScroll]);
 
   // Auto-collapse sources and reasoning appropriately
   useEffect(() => {
@@ -261,6 +385,7 @@ export function MessageList({
       <ScrollToBottomFab
         visible={userHasScrolled && messages.length > 0}
         onClick={handleScrollToBottom}
+        unseenCount={unseenMessageCount}
       />
 
       {/* Show skeleton when initially loading messages */}
@@ -340,7 +465,55 @@ export function MessageList({
             ))
           )}
 
-          {/* Show "AI is thinking" when in generating stage */}
+          {/* Show reasoning/thinking while AI is planning or thinking */}
+          {isGenerating &&
+            messages.length > 0 &&
+            (() => {
+              const lastMessage = messages[messages.length - 1];
+              return (
+                lastMessage?.role === "assistant" &&
+                lastMessage?.reasoning && (
+                  <div className="flex gap-2 sm:gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                        />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700">
+                        <div className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-2 flex items-center gap-2">
+                          <span>💭</span>
+                          <span>Thinking process</span>
+                        </div>
+                        <div className="text-xs text-purple-600 dark:text-purple-400 whitespace-pre-wrap font-mono">
+                          {lastMessage.reasoning}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              );
+            })()}
+
+          {/* Show search progress for all active stages */}
+          {isGenerating &&
+            searchProgress &&
+            searchProgress.stage !== "idle" &&
+            searchProgress.stage !== "generating" && (
+              <SearchProgress progress={searchProgress} />
+            )}
+
+          {/* Show "AI is generating" when in generating stage */}
           {isGenerating &&
             searchProgress &&
             searchProgress.stage === "generating" && (
@@ -377,7 +550,7 @@ export function MessageList({
                         d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                       />
                     </svg>
-                    <span>AI is thinking and generating response...</span>
+                    <span>Writing comprehensive answer...</span>
                     <div className="flex space-x-1">
                       <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:0ms]"></div>
                       <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:100ms]"></div>
@@ -386,13 +559,6 @@ export function MessageList({
                   </div>
                 </div>
               </div>
-            )}
-
-          {/* Show search progress for non-generating stages */}
-          {isGenerating &&
-            searchProgress &&
-            searchProgress.stage !== "generating" && (
-              <SearchProgress progress={searchProgress} />
             )}
         </div>
       )}

@@ -2,11 +2,15 @@
  * AI generation route handlers
  * - OPTIONS and POST /api/ai endpoints
  * - SSE streaming for AI responses
+ *
+ * @deprecated Legacy endpoint. Replaced by agent-based workflow at /api/ai/agent
+ * Use registerAgentAIRoutes in convex/http/routes/aiAgent.ts.
  */
 
 import { httpAction } from "../../_generated/server";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
+import { corsPreflightResponse } from "../cors";
 import type { SearchResult } from "../../search/providers/serpapi";
 import { applyEnhancements } from "../../enhancements";
 import { normalizeSearchResults } from "../../lib/security/sanitization";
@@ -20,17 +24,7 @@ export function registerAIRoutes(http: HttpRouter) {
     path: "/api/ai",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request) => {
-      const requested = request.headers.get("Access-Control-Request-Headers");
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": requested || "Content-Type",
-          "Access-Control-Max-Age": "600",
-          Vary: "Origin",
-        },
-      });
+      return corsPreflightResponse(request);
     }),
   });
 
@@ -39,6 +33,11 @@ export function registerAIRoutes(http: HttpRouter) {
     path: "/api/ai",
     method: "POST",
     handler: httpAction(async (_ctx, request) => {
+      const origin = request.headers.get("Origin");
+      // Enforce strict origin validation early
+      const probe = corsResponse("{}", 204, origin);
+      if (probe.status === 403) return probe;
+
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
@@ -46,6 +45,7 @@ export function registerAIRoutes(http: HttpRouter) {
         return corsResponse(
           JSON.stringify({ error: "Invalid JSON body" }),
           400,
+          origin,
         );
       }
 
@@ -54,6 +54,7 @@ export function registerAIRoutes(http: HttpRouter) {
         return corsResponse(
           JSON.stringify({ error: "Invalid request payload" }),
           400,
+          origin,
         );
       }
       const payload = rawPayload as Record<string, unknown>;
@@ -63,6 +64,7 @@ export function registerAIRoutes(http: HttpRouter) {
         return corsResponse(
           JSON.stringify({ error: "Message must be a string" }),
           400,
+          origin,
         );
       }
       // Remove control characters and null bytes, then limit length
@@ -110,6 +112,7 @@ export function registerAIRoutes(http: HttpRouter) {
         return corsResponse(
           JSON.stringify({ error: "Message is required" }),
           400,
+          origin,
         );
       }
 
@@ -175,6 +178,7 @@ export function registerAIRoutes(http: HttpRouter) {
           message,
           searchResults || [],
           sources || [],
+          origin,
         );
       }
 
@@ -189,6 +193,7 @@ export function registerAIRoutes(http: HttpRouter) {
           enh,
           SITE_URL,
           SITE_TITLE,
+          origin,
         );
       } catch (error) {
         console.error("💥 OPENROUTER FAILED with exception:", {
@@ -204,6 +209,7 @@ export function registerAIRoutes(http: HttpRouter) {
           message,
           searchResults || [],
           sources || [],
+          origin,
         );
       }
     }),
@@ -220,6 +226,7 @@ async function handleNoOpenRouter(
   message: string,
   searchResults: SearchResult[],
   sources: string[],
+  origin: string | null,
 ) {
   dlog("🤖 No OpenRouter API key, trying Convex OpenAI...");
 
@@ -284,7 +291,7 @@ async function handleNoOpenRouter(
           JSON.stringify(successResponse, null, 2),
         );
 
-        return corsResponse(JSON.stringify(successResponse));
+        return corsResponse(JSON.stringify(successResponse), 200, origin);
       } else {
         const errorText = await response.text();
         console.error("🤖 CONVEX OPENAI ERROR RESPONSE:", errorText);
@@ -328,7 +335,7 @@ async function handleNoOpenRouter(
     JSON.stringify(fallbackResponseObj, null, 2),
   );
 
-  return corsResponse(JSON.stringify(fallbackResponseObj));
+  return corsResponse(JSON.stringify(fallbackResponseObj), 200, origin);
 }
 
 /**
@@ -344,6 +351,7 @@ async function handleOpenRouterStreaming(
   enh: any,
   SITE_URL: string | undefined,
   SITE_TITLE: string | undefined,
+  origin: string | null,
 ) {
   dlog("🔄 Attempting OpenRouter API call with streaming...");
 
@@ -421,7 +429,20 @@ async function handleOpenRouterStreaming(
 
   if (response.body) {
     dlog("✅ OpenRouter streaming response started");
-    return createStreamingResponse(response.body, searchResults, sources, enh);
+    // Validate origin to obtain allowed origin header value for SSE
+    const probe = corsResponse("{}", 204, origin);
+    if (probe.status === 403) {
+      return probe;
+    }
+    const allowedOrigin =
+      probe.headers.get("Access-Control-Allow-Origin") || "null";
+    return createStreamingResponse(
+      response.body,
+      searchResults,
+      sources,
+      enh,
+      allowedOrigin,
+    );
   } else {
     throw new Error("No response body received from OpenRouter");
   }
@@ -435,6 +456,7 @@ function createStreamingResponse(
   searchResults: SearchResult[],
   sources: string[],
   enh: any,
+  allowedOrigin: string,
 ) {
   const stream = new ReadableStream({
     async start(controller) {
@@ -613,7 +635,7 @@ function createStreamingResponse(
       // Disable proxy buffering on common reverse proxies (harmless elsewhere)
       "X-Accel-Buffering": "no",
       // CORS: endpoints are proxied locally during dev
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": allowedOrigin,
       "Access-Control-Allow-Headers": "Content-Type",
       Vary: "Origin",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -632,6 +654,7 @@ async function handleOpenRouterFailure(
   message: string,
   searchResults: SearchResult[],
   sources: string[],
+  origin: string | null,
 ) {
   // Try Convex OpenAI as backup
   if (CONVEX_OPENAI_API_KEY && CONVEX_OPENAI_BASE_URL) {
@@ -697,7 +720,11 @@ async function handleOpenRouterFailure(
           JSON.stringify(fallbackSuccessResponse, null, 2),
         );
 
-        return corsResponse(JSON.stringify(fallbackSuccessResponse));
+        return corsResponse(
+          JSON.stringify(fallbackSuccessResponse),
+          200,
+          origin,
+        );
       } else {
         const fallbackErrorText = await fallbackResponse.text();
         console.error("🤖 CONVEX OPENAI FALLBACK ERROR:", fallbackErrorText);
@@ -742,5 +769,5 @@ async function handleOpenRouterFailure(
     JSON.stringify(finalErrorResponse, null, 2),
   );
 
-  return corsResponse(JSON.stringify(finalErrorResponse));
+  return corsResponse(JSON.stringify(finalErrorResponse), 200, origin);
 }

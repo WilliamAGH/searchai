@@ -40,138 +40,253 @@ export class UnauthenticatedAIService {
   }
 
   /**
-   * Generate a streamed AI response via SSE.
-   * @param message - User message to send to the AI.
-   * @param chatId - The current chat identifier.
-   * @param onChunk - Optional handler for streamed message chunks.
-   * @param searchResults - Optional normalized search results to include.
-   * @param sources - Optional list of source URLs.
-   * @param chatHistory - Optional prior messages for context.
-   * @param onComplete - Optional callback invoked when the stream completes.
+   * Generate an AI response using STREAMING agent workflow.
+   *
+   * Consumes SSE stream from /api/ai/agent/stream endpoint.
+   * Emits progress events for: planning, searching, scraping, analyzing, generating
+   * Streams answer content token-by-token for real-time UX.
    */
   async generateResponse(
     message: string,
     chatId: string,
     onChunk?: (chunk: MessageStreamChunk) => void,
-    searchResults?: Array<{
+    _searchResults?: Array<{
       title: string;
       url: string;
       snippet: string;
       relevanceScore: number;
     }>,
-    sources?: string[],
+    _sources?: string[],
     chatHistory?: Array<{ role: "user" | "assistant"; content: string }>,
     onComplete?: () => void,
   ): Promise<void> {
-    // Create new abort controller for this request
     this.abortController = new AbortController();
 
-    logger.info("[UnauthenticatedAIService] Starting generateResponse", {
-      message: message.substring(0, 50),
-      chatId,
-      hasOnChunk: !!onChunk,
-      hasOnComplete: !!onComplete,
-    });
-
     try {
-      // In development, use the proxied path directly
-      // In production, use the full Convex URL
       const host = window.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
-      const apiUrl = isDev ? "/api/ai" : `${this.convexUrl}/api/ai`;
+      const apiUrl = isDev
+        ? "/api/ai/agent/stream" // NEW: Streaming endpoint
+        : `${this.convexUrl}/api/ai/agent/stream`;
 
-      logger.debug("[UnauthenticatedAIService] API URL", { apiUrl, isDev });
+      // Build optional conversationContext string from chatHistory
+      const conversationContext = (chatHistory || [])
+        .slice(-20)
+        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+        .join("\n")
+        .slice(0, 4000);
 
-      const requestBody = {
-        message,
-        systemPrompt: "You are a helpful AI assistant.",
-        searchResults: searchResults || [],
-        sources: sources || [],
-        chatHistory: chatHistory || [],
-      };
-
-      logger.debug("[UnauthenticatedAIService] Sending request", {
-        bodySize: JSON.stringify(requestBody).length,
-      });
+      logger.info(
+        "[UnauthenticatedAIService] Starting streaming request to:",
+        apiUrl,
+      );
 
       const response = await fetch(apiUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, conversationContext }),
         signal: this.abortController.signal,
       });
 
-      logger.info("[UnauthenticatedAIService] Response received", {
-        status: response.status,
-        ok: response.ok,
-      });
-
       if (!response.ok) {
-        const errorText = await response.text().catch(() => "No error text");
-        logger.error("[UnauthenticatedAIService] HTTP error", {
-          status: response.status,
-          errorText,
-        });
+        const errorText = await response.text().catch(() => "");
         throw new Error(
-          `HTTP error! status: ${response.status}, message: ${errorText}`,
+          `HTTP ${response.status} ${response.statusText} ${errorText}`,
         );
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("No response body");
+      if (!response.body) {
+        throw new Error("No response body received from streaming endpoint");
       }
 
+      logger.info(
+        "[UnauthenticatedAIService] Streaming response received, parsing SSE...",
+      );
+
+      // Parse SSE stream
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let chunksReceived = 0;
+      let buffer = "";
+      const searchResults: Array<{
+        title: string;
+        url: string;
+        snippet: string;
+        relevanceScore: number;
+      }> = [];
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) {
-          // Stream completed successfully - notify completion
-          logger.info("[UnauthenticatedAIService] Stream completed", {
-            chunksReceived,
-          });
-          onComplete?.();
-          break;
-        }
+        if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || "";
 
-        // Parse SSE format (data: {...})
-        const lines = chunk.split("\n");
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              // Best-effort runtime guard
-              if (data && typeof data === "object" && "type" in data) {
-                chunksReceived++;
-                onChunk?.(data as MessageStreamChunk);
-              }
-            } catch {
-              // Skip unparseable lines including "data: [DONE]"
-              if (line !== "data: [DONE]") {
-                logger.debug("[UnauthenticatedAIService] Skipped line", {
-                  line: line.substring(0, 100),
+          if (!line.startsWith("data: ")) continue;
+
+          const data = line.slice(6);
+          if (data === "[DONE]") {
+            logger.info("[UnauthenticatedAIService] Stream complete");
+            onComplete?.();
+            return;
+          }
+
+          try {
+            const event = JSON.parse(data);
+
+            // Handle different event types from backend
+            switch (event.type) {
+              case "progress":
+                // Emit searchProgress updates for all stages
+                onChunk?.({
+                  type: "progress",
+                  stage: event.stage, // planning, searching, scraping, analyzing, generating
+                  message: event.message,
+                  urls: event.urls,
+                  currentUrl: event.currentUrl,
+                  queries: event.queries,
+                  sourcesUsed: event.sourcesUsed,
                 });
-              }
+                logger.debug(
+                  "[UnauthenticatedAIService] Progress:",
+                  event.stage,
+                  event.message,
+                );
+                break;
+
+              case "reasoning":
+                // Emit thinking/reasoning chunks
+                onChunk?.({
+                  type: "reasoning",
+                  content: event.content,
+                });
+                logger.debug(
+                  "[UnauthenticatedAIService] Reasoning chunk received",
+                );
+                break;
+
+              case "content":
+                // Emit answer content chunks
+                const delta = event.delta || event.content || "";
+                onChunk?.({
+                  type: "content",
+                  content: delta,
+                  delta: delta,
+                });
+                break;
+
+              case "tool_result":
+                // Extract search results from tool outputs
+                if (event.toolName === "search_web") {
+                  try {
+                    const toolOutput = JSON.parse(event.result);
+                    const results = toolOutput.results || [];
+                    searchResults.push(
+                      ...results.map((r: unknown) => {
+                        const result = r as Record<string, unknown>;
+                        return {
+                          title: String(result.title || ""),
+                          url: String(result.url || ""),
+                          snippet: String(result.snippet || ""),
+                          relevanceScore: Number(result.relevanceScore) || 0.5,
+                        };
+                      }),
+                    );
+                    logger.debug(
+                      "[UnauthenticatedAIService] Search results extracted:",
+                      results.length,
+                    );
+                  } catch (parseError) {
+                    logger.warn(
+                      "[UnauthenticatedAIService] Failed to parse search results",
+                      parseError,
+                    );
+                  }
+                }
+                break;
+
+              case "complete":
+                // Final metadata with workflow details
+                const workflow = event.workflow || {};
+                const research = workflow.research || {};
+                const answer = workflow.answer || {};
+
+                onChunk?.({
+                  type: "metadata",
+                  metadata: {
+                    sources: answer.sourcesUsed || [],
+                    searchResults:
+                      searchResults.length > 0
+                        ? searchResults
+                        : (research.sourcesUsed || []).map((s: unknown) => {
+                            const source = s as Record<string, unknown>;
+                            return {
+                              title: String(source.title || ""),
+                              url: String(source.url || ""),
+                              snippet: "",
+                              relevanceScore:
+                                source.relevance === "high"
+                                  ? 0.9
+                                  : source.relevance === "medium"
+                                    ? 0.7
+                                    : 0.5,
+                            };
+                          }),
+                    workflowId: workflow.workflowId,
+                  } as unknown,
+                });
+                logger.info(
+                  "[UnauthenticatedAIService] Workflow complete:",
+                  workflow.workflowId,
+                );
+                break;
+
+              case "error":
+                logger.error(
+                  "[UnauthenticatedAIService] Stream error:",
+                  event.error,
+                );
+                onChunk?.({
+                  type: "error",
+                  error: event.error,
+                });
+                break;
+
+              default:
+                logger.warn(
+                  "[UnauthenticatedAIService] Unknown event type:",
+                  event.type,
+                );
             }
+          } catch (parseError) {
+            logger.warn(
+              "[UnauthenticatedAIService] Failed to parse SSE event:",
+              parseError,
+            );
           }
         }
       }
-    } catch (error: unknown) {
+
+      logger.info("[UnauthenticatedAIService] Stream ended normally");
+      onComplete?.();
+    } catch (error) {
       if (
         error &&
         typeof error === "object" &&
         (error as { name?: string }).name === "AbortError"
       ) {
-        logger.info("[UnauthenticatedAIService] Request aborted");
+        logger.info("[UnauthenticatedAIService] Stream aborted by user");
+        // Swallow aborts
       } else {
-        logger.error("[UnauthenticatedAIService] Request failed", error);
-        throw error;
+        logger.error(
+          "[UnauthenticatedAIService] Streaming request failed",
+          error,
+        );
+        onChunk?.({
+          type: "error",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       }
     } finally {
       this.abortController = null;
@@ -190,25 +305,4 @@ export class UnauthenticatedAIService {
    * Execute the web search endpoint with a natural language query.
    * @param query - Search query text.
    */
-  async searchWithAI(query: string): Promise<unknown> {
-    // In development, use the proxied path directly
-    // In production, use the full Convex URL
-    const host = window.location.hostname;
-    const isDev = host === "localhost" || host === "127.0.0.1";
-    const apiUrl = isDev ? "/api/search" : `${this.convexUrl}/api/search`;
-
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Search failed: ${response.status}`);
-    }
-
-    return response.json();
-  }
 }

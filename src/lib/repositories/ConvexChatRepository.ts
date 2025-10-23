@@ -382,83 +382,20 @@ export class ConvexChatRepository extends BaseRepository {
     message: string,
   ): AsyncGenerator<StreamChunk> {
     try {
-      // Start the generation
-      await this.client.action(api.ai.generateStreamingResponse, {
-        chatId: IdUtils.toConvexChatId(chatId),
-        message,
-      });
+      // Call agent orchestration that persists messages
+      const result = (await this.client.action(
+        api.agents.orchestration.runAgentWorkflowAndPersist as unknown,
+        {
+          chatId: IdUtils.toConvexChatId(chatId),
+          message,
+        },
+      )) as { answer: string };
 
-      // Use Convex real-time subscriptions instead of polling
-      // Note: This is a simplified implementation that still uses polling
-      // because AsyncGenerators can't directly use Convex subscriptions.
-      // For true real-time updates, the UI should subscribe directly.
-
-      let lastContent = "";
-      let iterations = 0;
-      const maxIterations = 300; // 30 seconds timeout
-      const convexChatId = IdUtils.toConvexChatId(chatId);
-
-      while (iterations < maxIterations) {
-        // Query the subscription endpoint for real-time data
-        const updates = await this.client.query(
-          api.chats.subscribeToChatUpdates,
-          {
-            chatId: convexChatId,
-            sessionId: this.sessionId,
-          },
-        );
-
-        if (!updates) {
-          yield { type: "error", error: "Failed to get chat updates" };
-          return;
-        }
-
-        // Check for streaming content in messages
-        const streamingMessage = updates.messages?.find(
-          (m) => m.role === "assistant" && m.isStreaming,
-        );
-
-        if (streamingMessage) {
-          // Yield new content as it arrives
-          if (
-            streamingMessage.content &&
-            streamingMessage.content !== lastContent
-          ) {
-            const newContent = streamingMessage.content.substring(
-              lastContent.length,
-            );
-            if (newContent) {
-              yield { type: "content", content: newContent };
-              lastContent = streamingMessage.content;
-            }
-          }
-        } else {
-          // Check if there's a completed assistant message
-          const completedMessage = updates.messages
-            ?.filter((m) => m.role === "assistant")
-            .pop();
-
-          if (completedMessage && completedMessage.content) {
-            // Yield any remaining content
-            if (completedMessage.content !== lastContent) {
-              const finalContent = completedMessage.content.substring(
-                lastContent.length,
-              );
-              if (finalContent) {
-                yield { type: "content", content: finalContent };
-              }
-            }
-            yield { type: "done" };
-            return;
-          }
-        }
-
-        // Wait before next check
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        iterations++;
+      // Emit the full answer as a single chunk to maintain generator contract
+      if (result?.answer) {
+        yield { type: "content", content: result.answer };
       }
-
-      yield { type: "error", error: "Response timeout" };
+      yield { type: "done" };
     } catch (error) {
       yield {
         type: "error",

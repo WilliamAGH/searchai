@@ -25,6 +25,11 @@ export const addMessage = internalMutation({
       ),
     ),
     hasRealResults: v.optional(v.boolean()),
+    // New: provenance tracking and workflow linkage
+    contextReferences: v.optional(
+      v.array(require("./lib/validators").vContextReference),
+    ),
+    workflowId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -155,6 +160,11 @@ export const updateMessage = internalMutation({
       ),
     ),
     hasRealResults: v.optional(v.boolean()),
+    // New
+    contextReferences: v.optional(
+      v.array(require("./lib/validators").vContextReference),
+    ),
+    workflowId: v.optional(v.string()),
   },
   handler: async (ctx, { messageId, ...rest }) => {
     await ctx.db.patch(messageId, { ...rest });

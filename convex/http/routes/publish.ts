@@ -405,10 +405,12 @@ export function registerPublishRoutes(http: HttpRouter) {
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
       const requested = request.headers.get("Access-Control-Request-Headers");
+      const origin = request.headers.get("Origin");
+      const allowOrigin = getAllowedOrigin(origin);
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": allowOrigin,
           "Access-Control-Allow-Methods": "GET, OPTIONS",
           "Access-Control-Allow-Headers": requested || "Content-Type",
           "Access-Control-Max-Age": "600",

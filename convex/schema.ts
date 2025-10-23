@@ -86,6 +86,26 @@ const applicationTables = {
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
     timestamp: v.optional(v.number()),
+    // Context provenance tracking with UUIDv7
+    contextReferences: v.optional(
+      v.array(
+        v.object({
+          contextId: v.string(), // UUIDv7 unique identifier
+          type: v.union(
+            v.literal("search_result"),
+            v.literal("scraped_page"),
+            v.literal("research_summary"),
+          ),
+          url: v.optional(v.string()),
+          title: v.optional(v.string()),
+          timestamp: v.number(),
+          relevanceScore: v.optional(v.number()),
+          metadata: v.optional(v.any()), // Additional context metadata
+        }),
+      ),
+    ),
+    // Agent workflow tracking
+    workflowId: v.optional(v.string()), // Links to agent orchestration workflow
   })
     .index("by_chatId", ["chatId"])
     .index("by_messageId", ["messageId"])

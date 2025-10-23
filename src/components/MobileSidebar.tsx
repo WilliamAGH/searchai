@@ -69,15 +69,20 @@ export function MobileSidebar({
     async (chatId: Id<"chats"> | string, isCurrentChat: boolean) => {
       try {
         if (!window.confirm("Delete this chat? This cannot be undone.")) return;
+
         if (onRequestDeleteChat) {
           onRequestDeleteChat(chatId);
         } else {
-          if (typeof chatId === "string") {
-            onDeleteLocalChat?.(chatId);
+          // Infer local vs server by ID shape (Convex IDs contain '|')
+          const isConvexId =
+            typeof chatId === "string" ? chatId.includes("|") : true;
+          if (!isConvexId) {
+            onDeleteLocalChat?.(chatId as string);
           } else {
-            await deleteChat({ chatId });
+            await deleteChat({ chatId: chatId as Id<"chats"> });
           }
         }
+
         if (isCurrentChat) {
           onSelectChat(null);
         }

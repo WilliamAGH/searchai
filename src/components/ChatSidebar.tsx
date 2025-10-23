@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 import { logger } from "../lib/logger";
+import { isLocalChat } from "../lib/types/chat";
 
 /**
  * Props for the ChatSidebar component
@@ -82,15 +83,38 @@ export function ChatSidebar({
       const match = chats.find((c) => String(c._id) === attr);
       try {
         if (!window.confirm("Delete this chat? This cannot be undone.")) return;
+
+        // Prefer parent-provided handler (shows undo banner, etc.)
         if (onRequestDeleteChat) {
-          onRequestDeleteChat(match ? match._id : attr);
-        } else if (match) {
-          if (typeof match._id === "string") {
-            onDeleteLocalChat?.(match._id);
+          if (match) {
+            onRequestDeleteChat(
+              isLocalChat(match)
+                ? (match._id as unknown as string)
+                : (match._id as unknown as Id<"chats">),
+            );
           } else {
-            await deleteChat({ chatId: match._id });
+            onRequestDeleteChat(
+              attr.includes("|")
+                ? (attr as unknown as Id<"chats">)
+                : (attr as string),
+            );
+          }
+        } else if (match) {
+          // Decide local vs server based on chat object, not typeof _id
+          if (isLocalChat(match)) {
+            onDeleteLocalChat?.(match._id as string);
+          } else {
+            await deleteChat({ chatId: match._id as Id<"chats"> });
+          }
+        } else {
+          // Fallback if no match: infer by Convex ID shape (contains '|')
+          if (attr.includes("|")) {
+            await deleteChat({ chatId: attr as unknown as Id<"chats"> });
+          } else {
+            onDeleteLocalChat?.(attr);
           }
         }
+
         if (match && currentChatId === match._id) {
           onSelectChat(null);
         }

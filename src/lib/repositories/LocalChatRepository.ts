@@ -302,20 +302,6 @@ export class LocalChatRepository extends BaseRepository {
     }
   }
 
-  async searchWeb(query: string): Promise<unknown> {
-    const response = await fetch("/api/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Search failed: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
   // Sharing operations
   async shareChat(
     id: string,
@@ -488,15 +474,5 @@ export class LocalChatRepository extends BaseRepository {
     }));
 
     localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(legacy));
-  }
-
-  private async getRecentContext(
-    chatId: string,
-    limit: number = 10,
-  ): Promise<unknown[]> {
-    const messages = await this.getMessages(chatId);
-    return messages
-      .slice(-limit)
-      .map((m) => ({ role: m.role, content: m.content }));
   }
 }

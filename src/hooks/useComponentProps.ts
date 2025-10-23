@@ -48,7 +48,7 @@ interface UseComponentPropsArgs {
 export function useComponentProps({
   allChats,
   currentChatId,
-  currentChat,
+  currentChat: _currentChat,
   currentMessages,
   sidebarOpen,
   isMobile,
@@ -81,16 +81,15 @@ export function useComponentProps({
       chats: allChats,
       currentChatId,
       onSelectChat: handleSelectChat,
-      onDeleteChat: currentChat?.isLocal
-        ? handleDeleteLocalChat
-        : handleRequestDeleteChat,
+      // Pass both handlers explicitly; component decides which to use per chat
+      onDeleteLocalChat: handleDeleteLocalChat,
+      onRequestDeleteChat: handleRequestDeleteChat,
       onNewChat: handleNewChatButton,
       isCreatingChat,
     }),
     [
       allChats,
       currentChatId,
-      currentChat?.isLocal,
       isCreatingChat,
       handleSelectChat,
       handleDeleteLocalChat,
@@ -105,9 +104,9 @@ export function useComponentProps({
       chats: allChats,
       currentChatId,
       onSelectChat: handleSelectChat,
-      onDeleteChat: currentChat?.isLocal
-        ? handleDeleteLocalChat
-        : handleRequestDeleteChat,
+      // Pass both handlers explicitly; component decides which to use per chat
+      onDeleteLocalChat: handleDeleteLocalChat,
+      onRequestDeleteChat: handleRequestDeleteChat,
       onNewChat: handleNewChatButton,
       onClose: handleMobileSidebarClose,
       isCreatingChat,
@@ -117,7 +116,6 @@ export function useComponentProps({
       isMobile,
       allChats,
       currentChatId,
-      currentChat?.isLocal,
       isCreatingChat,
       handleSelectChat,
       handleDeleteLocalChat,

@@ -137,7 +137,8 @@ function ChatInterfaceComponent({
     onSelectChat: chatActions.selectChat,
   });
   const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
-  const generateResponse = useAction(api.ai.generateStreamingResponse);
+  // @deprecated - This file appears to be unused. The active ChatInterface is in ChatInterface.tsx
+  // TODO: Remove this file after confirming it's not used
   const planSearch = useAction(api.search.planSearch);
   const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
@@ -276,7 +277,8 @@ function ChatInterfaceComponent({
         message,
       });
     },
-    [generateResponse],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   const sendRefTemp = useRef<((message: string) => Promise<void>) | null>(null);

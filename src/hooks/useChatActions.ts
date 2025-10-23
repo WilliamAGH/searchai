@@ -293,16 +293,101 @@ export function createChatActions(
         const generator = repository.generateResponse(chatId, content);
 
         let fullContent = "";
+        let accumulatedReasoning = "";
+
         for await (const chunk of generator) {
-          if (chunk.type === "content") {
-            fullContent += chunk.content;
-            // Update UI with streaming content
-            setState((prev) => ({
-              ...prev,
-              searchProgress: { stage: "generating", message: fullContent },
-            }));
-          } else if (chunk.type === "error") {
-            throw new Error(chunk.error);
+          switch (chunk.type) {
+            case "progress":
+              // Update searchProgress with all stage information
+              setState((prev) => ({
+                ...prev,
+                searchProgress: {
+                  stage: chunk.stage,
+                  message: chunk.message,
+                  urls: chunk.urls,
+                  currentUrl: chunk.currentUrl,
+                  queries: chunk.queries,
+                  sourcesUsed: chunk.sourcesUsed,
+                },
+              }));
+              logger.debug("Progress update:", chunk.stage, chunk.message);
+              break;
+
+            case "reasoning":
+              // Accumulate reasoning/thinking content
+              accumulatedReasoning += chunk.content;
+              setState((prev) => ({
+                ...prev,
+                messages: prev.messages.map((m, index) =>
+                  index === prev.messages.length - 1 && m.role === "assistant"
+                    ? {
+                        ...m,
+                        reasoning: accumulatedReasoning,
+                        thinking: "Thinking...",
+                      }
+                    : m,
+                ),
+              }));
+              logger.debug("Reasoning chunk received");
+              break;
+
+            case "content":
+            case "chunk":
+              // Accumulate answer content (handle both "content" and legacy "chunk")
+              const delta =
+                chunk.type === "content" && "delta" in chunk
+                  ? chunk.delta
+                  : chunk.content;
+              if (delta) {
+                fullContent += delta;
+                // Update last assistant message with streaming content
+                setState((prev) => ({
+                  ...prev,
+                  messages: prev.messages.map((m, index) =>
+                    index === prev.messages.length - 1 && m.role === "assistant"
+                      ? {
+                          ...m,
+                          content: fullContent,
+                          isStreaming: true,
+                        }
+                      : m,
+                  ),
+                  searchProgress: {
+                    stage: "generating",
+                    message: "Writing answer...",
+                  },
+                }));
+              }
+              break;
+
+            case "metadata":
+              // Apply final metadata (sources, searchResults, etc.)
+              if (chunk.metadata && typeof chunk.metadata === "object") {
+                setState((prev) => ({
+                  ...prev,
+                  messages: prev.messages.map((m, index) =>
+                    index === prev.messages.length - 1 && m.role === "assistant"
+                      ? {
+                          ...m,
+                          ...chunk.metadata,
+                          isStreaming: false,
+                          thinking: undefined,
+                        }
+                      : m,
+                  ),
+                }));
+              }
+              logger.debug("Metadata received");
+              break;
+
+            case "error":
+              throw new Error(chunk.error);
+
+            case "done":
+            case "complete":
+              // Stream completion
+              logger.debug("Stream complete");
+              break;
           }
         }
 
@@ -325,6 +410,7 @@ export function createChatActions(
             prev.chats.find((c) => c.id === chatId) || prev.currentChat,
         }));
       } catch (error) {
+        logger.error("Failed to send message:", error);
         setState((prev) => ({
           ...prev,
           isGenerating: false,

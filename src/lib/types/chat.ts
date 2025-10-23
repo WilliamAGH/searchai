@@ -91,36 +91,12 @@ export const createLocalChat = (title: string = "New Chat"): LocalChat => {
 };
 
 /**
- * Prepare local chat for migration to Convex
- * Removes local-only fields that shouldn't be stored in database
- */
-export const prepareForMigration = (
-  chat: LocalChat,
-): Omit<LocalChat, "_id" | "isLocal" | "source"> => {
-  const {
-    _id: _localId,
-    isLocal: _isLocal,
-    source: _source,
-    ...convexCompatible
-  } = chat;
-  return convexCompatible;
-};
-
-/**
  * Chat API response types
  */
 export interface ShareChatResponse {
   shareId?: string;
   publicId?: string;
   url?: string;
-}
-
-/**
- * Migration mapping for tracking local to server ID changes
- */
-export interface ChatMigrationMapping {
-  localId: string;
-  serverId: Id<"chats">;
 }
 
 /**

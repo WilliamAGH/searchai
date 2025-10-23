@@ -7,6 +7,7 @@ import { httpAction } from "../../_generated/server";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
+import { corsPreflightResponse } from "../cors";
 
 /**
  * Register scrape routes on the HTTP router
@@ -17,17 +18,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
     path: "/api/scrape",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request) => {
-      const requested = request.headers.get("Access-Control-Request-Headers");
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": requested || "Content-Type",
-          "Access-Control-Max-Age": "600",
-          Vary: "Origin",
-        },
-      });
+      return corsPreflightResponse(request);
     }),
   });
 
@@ -36,6 +27,11 @@ export function registerScrapeRoutes(http: HttpRouter) {
     path: "/api/scrape",
     method: "POST",
     handler: httpAction(async (ctx, request) => {
+      const origin = request.headers.get("Origin");
+      // Enforce strict origin validation early
+      const probe = corsResponse("{}", 204, origin);
+      if (probe.status === 403) return probe;
+
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
@@ -43,6 +39,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
         return corsResponse(
           JSON.stringify({ error: "Invalid JSON body" }),
           400,
+          origin,
         );
       }
 
@@ -59,6 +56,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
           return corsResponse(
             JSON.stringify({ error: "Invalid URL protocol" }),
             400,
+            origin,
           );
         }
 
@@ -85,6 +83,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
               error: "Access to local addresses is not allowed",
             }),
             400,
+            origin,
           );
         }
 
@@ -102,6 +101,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
                   error: "Access to private networks is not allowed",
                 }),
                 400,
+                origin,
               );
             }
 
@@ -112,6 +112,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
                   error: "Access to private networks is not allowed",
                 }),
                 400,
+                origin,
               );
             }
 
@@ -122,6 +123,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
                   error: "Access to private networks is not allowed",
                 }),
                 400,
+                origin,
               );
             }
 
@@ -132,6 +134,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
                   error: "Access to link-local addresses is not allowed",
                 }),
                 400,
+                origin,
               );
             }
           }
@@ -150,6 +153,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
               error: "Access to metadata endpoints is not allowed",
             }),
             400,
+            origin,
           );
         }
 
@@ -158,6 +162,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
         return corsResponse(
           JSON.stringify({ error: "Invalid URL format" }),
           400,
+          origin,
         );
       }
 
@@ -169,7 +174,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
 
         dlog("🌐 SCRAPE RESULT:", JSON.stringify(result, null, 2));
 
-        return corsResponse(JSON.stringify(result));
+        return corsResponse(JSON.stringify(result), 200, origin);
       } catch (error) {
         console.error("❌ SCRAPE API ERROR:", error);
 
@@ -193,7 +198,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
           JSON.stringify(errorResponse, null, 2),
         );
 
-        return corsResponse(JSON.stringify(errorResponse));
+        return corsResponse(JSON.stringify(errorResponse), 200, origin);
       }
     }),
   });

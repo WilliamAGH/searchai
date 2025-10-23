@@ -11,17 +11,45 @@
  * - Globally unique across distributed systems
  * - Compatible with standard UUID tooling
  *
- * Uses Web Crypto API (compatible with Convex runtime)
+ * Compatible with both Convex V8 runtime and Node.js runtime
  * Port of data-tools-bun/tools/shared/id-generator.ts
  */
 
 /**
- * Generate random bytes using Web Crypto API
- * Compatible with Convex runtime (no Node.js dependencies)
+ * Get crypto implementation based on runtime
+ * - V8 runtime (queries/mutations): uses global crypto
+ * - Node.js runtime (actions with "use node"): uses node:crypto webcrypto
+ */
+function getCrypto(): Crypto {
+  // Check if we're in Node.js runtime
+  if (
+    typeof globalThis.process !== "undefined" &&
+    globalThis.process.versions?.node
+  ) {
+    // Node.js runtime - use webcrypto from node:crypto
+    // Note: This is dynamically imported to avoid bundling issues
+    const nodeRequire = typeof require !== "undefined" ? require : undefined;
+    if (nodeRequire) {
+      try {
+        const { webcrypto } = nodeRequire("crypto") as { webcrypto: Crypto };
+        return webcrypto;
+      } catch {
+        // Fallback to global crypto if available
+      }
+    }
+  }
+  // V8 runtime or browser - use global crypto
+  return crypto;
+}
+
+/**
+ * Generate random bytes using runtime-appropriate crypto
+ * Works in both Convex V8 runtime and Node.js runtime
  */
 function getRandomBytes(length: number): Uint8Array {
   const buffer = new Uint8Array(length);
-  crypto.getRandomValues(buffer);
+  const cryptoImpl = getCrypto();
+  cryptoImpl.getRandomValues(buffer);
   return buffer;
 }
 

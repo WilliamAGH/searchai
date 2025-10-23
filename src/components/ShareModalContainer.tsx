@@ -64,7 +64,7 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
         return resolveApi("/api/chatTextMarkdown");
       } catch (error) {
         // Fall back to default if resolveApi fails
-        console.debug("Failed to resolve API path", error);
+        console.error("Failed to resolve API path", error);
       }
     }
     return `${window.location.origin}/api/chatTextMarkdown`;

@@ -13,3 +13,17 @@ export const vSearchResult = v.object({
   fullTitle: v.optional(v.string()),
   summary: v.optional(v.string()),
 });
+
+export const vContextReference = v.object({
+  contextId: v.string(),
+  type: v.union(
+    v.literal("search_result"),
+    v.literal("scraped_page"),
+    v.literal("research_summary"),
+  ),
+  url: v.optional(v.string()),
+  title: v.optional(v.string()),
+  timestamp: v.number(),
+  relevanceScore: v.optional(v.number()),
+  metadata: v.optional(v.any()),
+});

@@ -13,7 +13,10 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as ai from "../ai.js";
+import type * as agents_definitions from "../agents/definitions.js";
+import type * as agents_index from "../agents/index.js";
+import type * as agents_orchestration from "../agents/orchestration.js";
+import type * as agents_tools from "../agents/tools.js";
 import type * as auth from "../auth.js";
 import type * as chats_anonymous from "../chats/anonymous.js";
 import type * as chats_claim from "../chats/claim.js";
@@ -30,13 +33,9 @@ import type * as chats_utils from "../chats/utils.js";
 import type * as chats from "../chats.js";
 import type * as email from "../email.js";
 import type * as enhancements from "../enhancements.js";
-import type * as generation_context from "../generation/context.js";
-import type * as generation_index from "../generation/index.js";
-import type * as generation_pipeline from "../generation/pipeline.js";
-import type * as generation_streaming from "../generation/streaming.js";
 import type * as http_cors from "../http/cors.js";
 import type * as http_routes_ai from "../http/routes/ai.js";
-import type * as http_routes_chat from "../http/routes/chat.js";
+import type * as http_routes_aiAgent from "../http/routes/aiAgent.js";
 import type * as http_routes_publish from "../http/routes/publish.js";
 import type * as http_routes_scrape from "../http/routes/scrape.js";
 import type * as http_routes_search from "../http/routes/search.js";
@@ -76,7 +75,10 @@ import type * as search from "../search.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  ai: typeof ai;
+  "agents/definitions": typeof agents_definitions;
+  "agents/index": typeof agents_index;
+  "agents/orchestration": typeof agents_orchestration;
+  "agents/tools": typeof agents_tools;
   auth: typeof auth;
   "chats/anonymous": typeof chats_anonymous;
   "chats/claim": typeof chats_claim;
@@ -93,13 +95,9 @@ declare const fullApi: ApiFromModules<{
   chats: typeof chats;
   email: typeof email;
   enhancements: typeof enhancements;
-  "generation/context": typeof generation_context;
-  "generation/index": typeof generation_index;
-  "generation/pipeline": typeof generation_pipeline;
-  "generation/streaming": typeof generation_streaming;
   "http/cors": typeof http_cors;
   "http/routes/ai": typeof http_routes_ai;
-  "http/routes/chat": typeof http_routes_chat;
+  "http/routes/aiAgent": typeof http_routes_aiAgent;
   "http/routes/publish": typeof http_routes_publish;
   "http/routes/scrape": typeof http_routes_scrape;
   "http/routes/search": typeof http_routes_search;

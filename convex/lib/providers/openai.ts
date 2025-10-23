@@ -16,8 +16,13 @@ import {
   setDefaultOpenAIClient,
   setOpenAIAPI,
   setDefaultOpenAITracingExporter,
+  OpenAIProvider,
 } from "@openai/agents-openai";
-import { setTraceProcessors, type ModelSettings } from "@openai/agents-core";
+import {
+  setTraceProcessors,
+  setDefaultModelProvider,
+  type ModelSettings,
+} from "@openai/agents-core";
 import OpenAI from "openai";
 import { generateMessageId } from "../id_generator";
 
@@ -324,6 +329,14 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   }
 
   setDefaultOpenAIClient(client);
+
+  // CRITICAL: Create and set the default model provider
+  // This is required for @openai/agents to use our configured client with OpenRouter
+  const modelProvider = new OpenAIProvider({
+    openAIClient: client,
+    useResponses: true, // Force Responses API mode (not Chat Completions)
+  });
+  setDefaultModelProvider(modelProvider);
 
   // Build default model settings
   const temperature = process.env.LLM_TEMPERATURE

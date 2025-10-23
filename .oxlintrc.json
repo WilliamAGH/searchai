@@ -20,6 +20,7 @@
     "no-eval": "error",
     "no-debugger": "error",
     "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
+    "no-control-regex": "off",
 
     "no-restricted-imports": [
       "error",
@@ -101,6 +102,7 @@
         "*.spec.ts",
         "*.test.tsx",
         "*.spec.tsx",
+        "*.mjs",
         "tests/**/*",
         "scripts/**/*"
       ],

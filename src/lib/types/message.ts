@@ -98,41 +98,45 @@ export const createLocalMessage = (
 };
 
 /**
- * Prepare local message for migration to Convex
- * Removes local-only fields that shouldn't be stored in database
- */
-export const prepareMessageForMigration = (
-  message: LocalMessage,
-): Omit<LocalMessage, "_id" | "isLocal" | "source" | "hasStartedContent"> => {
-  const {
-    _id: _localId,
-    isLocal: _isLocal,
-    source: _source,
-    hasStartedContent: _hasStarted,
-    ...convexCompatible
-  } = message;
-  return convexCompatible;
-};
-
-/**
  * Message stream chunk for real-time updates
+ * Extended to support agent workflow streaming events
  */
-export interface MessageStreamChunk {
-  type: "content" | "metadata" | "error" | "done" | "chunk";
-  content?: string;
-  thinking?: string;
-  metadata?: Partial<Message>;
-  error?: string;
-}
+export type MessageStreamChunk =
+  | { type: "chunk"; content: string } // Legacy: text content chunk
+  | { type: "content"; content: string; delta?: string } // Answer content (with optional delta)
+  | {
+      type: "progress";
+      stage: "planning" | "searching" | "scraping" | "analyzing" | "generating";
+      message: string;
+      urls?: string[];
+      currentUrl?: string;
+      queries?: string[];
+      sourcesUsed?: number;
+    }
+  | { type: "reasoning"; content: string } // Thinking/reasoning from agents
+  | { type: "tool_result"; toolName: string; result: string } // Tool execution results
+  | { type: "metadata"; metadata: unknown } // Final metadata (sources, etc.)
+  | { type: "complete"; workflow?: unknown } // Workflow completion
+  | { type: "error"; error: string } // Error events
+  | { type: "done" }; // Stream completion
 
 /**
  * Search progress state for UI updates
+ * Extended to support planning stage and additional metadata
  */
 export interface SearchProgress {
-  stage: "searching" | "scraping" | "analyzing" | "generating";
-  message: string;
+  stage:
+    | "idle"
+    | "planning"
+    | "searching"
+    | "scraping"
+    | "analyzing"
+    | "generating";
+  message?: string;
   urls?: string[];
   currentUrl?: string;
+  queries?: string[];
+  sourcesUsed?: number;
 }
 
 /**

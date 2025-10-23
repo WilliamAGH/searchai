@@ -29,9 +29,23 @@ export interface ChatState {
   /** Real-time search progress tracking */
   searchProgress: {
     /** Current stage of the search/response process */
-    stage: "idle" | "searching" | "scraping" | "analyzing" | "generating";
+    stage:
+      | "idle"
+      | "planning"
+      | "searching"
+      | "scraping"
+      | "analyzing"
+      | "generating";
     /** Optional status message for current stage */
     message?: string;
+    /** URLs being processed during scraping */
+    urls?: string[];
+    /** Currently active URL being scraped */
+    currentUrl?: string;
+    /** Search queries being executed */
+    queries?: string[];
+    /** Number of sources used in research */
+    sourcesUsed?: number;
   };
   // UI state fields
   /** Whether to display follow-up prompt suggestions */
