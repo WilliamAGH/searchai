@@ -25,6 +25,7 @@
     "test:ci": "vitest run --reporter=dot --pool=vmForks --poolOptions.vmForks.singleFork",
     "test:watch": "vitest",
     "test:vitest": "vitest run",
+    "postinstall": "npm run playwright:install",
     "playwright:install": "npx playwright install chromium",
     "playwright:update": "npm run playwright:install -- --with-deps",
     "test:playwright": "playwright test",
