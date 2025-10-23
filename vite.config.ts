@@ -48,12 +48,6 @@ window.addEventListener('message', async (message) => {
         manualChunks: (id) => {
           if (!id.includes("node_modules")) return;
           if (id.includes("convex")) return "convex";
-          if (
-            id.includes("@ai-sdk") ||
-            id.includes("openai") ||
-            id.includes("ai/")
-          )
-            return "ai";
           if (id.includes("tailwind") || id.includes("@headlessui"))
             return "ui";
           // Do not force vendor/react chunks to avoid TDZ/cycle issues.

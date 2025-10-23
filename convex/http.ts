@@ -11,10 +11,10 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
-import { registerChatRoutes } from "./http/routes/chat";
 import { registerSearchRoutes } from "./http/routes/search";
 import { registerScrapeRoutes } from "./http/routes/scrape";
 import { registerAIRoutes } from "./http/routes/ai";
+import { registerAgentAIRoutes } from "./http/routes/aiAgent";
 import { registerPublishRoutes } from "./http/routes/publish";
 import { corsJsonResponseForRequest } from "./http/utils";
 
@@ -22,10 +22,10 @@ import { corsJsonResponseForRequest } from "./http/utils";
  * HTTP router for unauthenticated endpoints.
  *
  * Routes:
- * - POST /api/chat   : simple chat demo endpoint
  * - POST /api/search : web search for unauthenticated users
  * - POST /api/scrape : scrape URL and return cleaned content
- * - POST /api/ai     : AI generation with SSE streaming
+ * - POST /api/ai     : AI generation with SSE streaming (legacy)
+ * - POST /api/ai/agent : Agent-based AI with multi-stage research workflow
  * - POST /api/publishChat : publish anonymous chat
  * - GET  /api/exportChat : export chat in various formats
  * - GET  /api/chatTextMarkdown : export chat as markdown
@@ -33,10 +33,10 @@ import { corsJsonResponseForRequest } from "./http/utils";
 const http = httpRouter();
 
 // Register modular route handlers
-registerChatRoutes(http);
 registerSearchRoutes(http);
 registerScrapeRoutes(http);
 registerAIRoutes(http);
+registerAgentAIRoutes(http); // New agent-based AI route
 registerPublishRoutes(http);
 
 // Register auth routes
