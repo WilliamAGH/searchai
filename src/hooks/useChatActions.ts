@@ -535,12 +535,14 @@ export function createChatActions(
                 ) {
                   return true;
                 }
-                return trimmedAnswer
-                  ? (m.content || "").trim() === trimmedAnswer
-                  : false;
+                const normalizedContent = (m.content || "").trim();
+                if (trimmedAnswer.length === 0) {
+                  return normalizedContent.length === 0;
+                }
+                return normalizedContent === trimmedAnswer;
               });
 
-              if (hasUserMessage && (hasAssistantMessage || !trimmedAnswer)) {
+              if (hasUserMessage && hasAssistantMessage) {
                 logger.debug("Messages refreshed after persistence", {
                   chatId,
                   messageCount: messages.length,
