@@ -586,12 +586,16 @@ export class ConvexChatRepository extends BaseRepository {
                 (ref.title || ref.url) &&
                 typeof ref.timestamp === "number",
             )
-            .map((ref) => ({
-              title: ref.title || ref.url!,
-              url: ref.url!,
-              snippet: "",
-              relevanceScore: ref.relevanceScore ?? 0.5,
-            }))
+            .map((ref) => {
+              const safeUrl = ref.url as string;
+              const title = ref.title || safeUrl;
+              return {
+                title,
+                url: safeUrl,
+                snippet: "",
+                relevanceScore: ref.relevanceScore ?? 0.5,
+              };
+            })
         : undefined;
 
     return {

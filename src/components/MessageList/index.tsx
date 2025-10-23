@@ -7,7 +7,6 @@ import React, { useEffect, useRef, useCallback, useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { SearchProgress } from "../SearchProgress";
 import { logger } from "../../lib/logger";
 import { EmptyState } from "./EmptyState";
 import { ScrollToBottomFab } from "./ScrollToBottomFab";

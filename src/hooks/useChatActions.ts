@@ -6,12 +6,9 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import type { ChatState } from "./useChatState";
-import type {
-  UnifiedChat,
-  UnifiedMessage,
-  PersistedPayload,
-} from "../lib/types/unified";
+import type { UnifiedChat, UnifiedMessage } from "../lib/types/unified";
 import { TitleUtils, IdUtils } from "../lib/types/unified";
+import type { PersistedPayload } from "../lib/types/message";
 import { logger } from "../lib/logger";
 // Minimal fallback to avoid missing StorageService import during build
 const storageService = {

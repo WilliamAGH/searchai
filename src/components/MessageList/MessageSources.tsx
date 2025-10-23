@@ -17,7 +17,7 @@ type ContextReference = {
   title?: string;
   timestamp: number;
   relevanceScore?: number;
-  metadata?: any;
+  metadata?: unknown;
 };
 
 interface MessageSourcesProps {
@@ -61,8 +61,8 @@ export function MessageSources({
   const messageId = id || "unknown";
 
   // Prefer contextReferences from agent workflow, fallback to legacy results
-  const hasContextRefs = contextReferences && contextReferences.length > 0;
-  const hasLegacyResults = results && results.length > 0;
+  const hasContextRefs =
+    Array.isArray(contextReferences) && contextReferences.length > 0;
 
   // Convert contextReferences to display format
   const displaySources: Array<{
@@ -73,13 +73,25 @@ export function MessageSources({
     relevanceScore?: number;
   }> = hasContextRefs
     ? contextReferences
-        .filter((ref) => ref.url) // Only show refs with URLs
-        .map((ref) => ({
-          url: ref.url!,
-          title: ref.title || new URL(ref.url!).hostname,
-          type: ref.type,
-          relevanceScore: ref.relevanceScore,
-        }))
+        .filter((ref) => typeof ref.url === "string" && ref.url.length > 0)
+        .map((ref) => {
+          const safeUrl = ref.url as string;
+          let inferredTitle = ref.title;
+          if (!inferredTitle) {
+            try {
+              inferredTitle = new URL(safeUrl).hostname;
+            } catch {
+              inferredTitle = safeUrl;
+            }
+          }
+
+          return {
+            url: safeUrl,
+            title: inferredTitle,
+            type: ref.type,
+            relevanceScore: ref.relevanceScore,
+          };
+        })
     : results.map((r) => ({
         url: r.url,
         title: r.title,

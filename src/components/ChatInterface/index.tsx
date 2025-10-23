@@ -323,13 +323,13 @@ function ChatInterfaceComponent({
     onRequestSignUp,
     planSearch,
     isTopicChange,
-    generateResponse: chatActions.sendMessage
-      ? async (args: { chatId: string; message: string }) => {
-          await chatActions.sendMessage!(args.chatId, args.message);
-        }
-      : async () => {
-          logger.error("generateResponse: sendMessage not available");
-        },
+    generateResponse: async (args: { chatId: string; message: string }) => {
+      if (chatActions.sendMessage) {
+        await chatActions.sendMessage(args.chatId, args.message);
+      } else {
+        logger.error("generateResponse: sendMessage not available");
+      }
+    },
     generateUnauthenticatedResponse,
     maybeShowFollowUpPrompt,
     chatActions,

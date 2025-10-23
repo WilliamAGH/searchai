@@ -1,9 +1,10 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import type { Chat } from "../lib/types/chat";
 
 interface UseChatNavigationProps {
   currentChatId: string | null;
-  allChats: Array<{ id: string }>;
+  allChats: Chat[];
   isAuthenticated: boolean;
   onSelectChat: (chatId: string) => Promise<void>;
 }
@@ -20,17 +21,35 @@ export function useChatNavigation({
     return `/chat/${chatId}`;
   }, []);
 
+  const resolveChatId = useCallback((chat: Chat): string => {
+    if (typeof (chat as { id?: unknown }).id === "string") {
+      return String((chat as { id: string }).id);
+    }
+
+    const maybeId = (chat as { _id?: unknown })._id;
+    if (typeof maybeId === "string") {
+      return maybeId;
+    }
+
+    return "";
+  }, []);
+
   const navigateWithVerification = useCallback(
     async (chatId: string) => {
-      const chatExists = allChats.some((chat) => chat.id === chatId);
-      if (chatExists) {
-        await onSelectChat(chatId);
-        navigate(buildChatPath(chatId));
-        return true;
+      const normalizedChatId = String(chatId);
+      const chatExists = allChats.some(
+        (chat) => resolveChatId(chat) === normalizedChatId,
+      );
+
+      if (!chatExists) {
+        return false;
       }
-      return false;
+
+      await onSelectChat(normalizedChatId);
+      navigate(buildChatPath(normalizedChatId));
+      return true;
     },
-    [allChats, onSelectChat, navigate, buildChatPath],
+    [allChats, onSelectChat, navigate, buildChatPath, resolveChatId],
   );
 
   const handleSelectChat = useCallback(
