@@ -1,35 +1,51 @@
 "use node";
 /**
  * SSE streaming utilities for AI generation
- * Handles OpenRouter API streaming and chunk processing
+ *
+ * UPDATED: Now uses @openai/agents with shared provider library
+ * - Modern Responses API (not deprecated Chat Completions)
+ * - UUID v7 message IDs
+ * - OpenRouter compatibility with provider routing
+ * - Reasoning token support
+ * - Maintains backward compatibility with existing code
  */
-
-interface OpenRouterMessage {
-  role: string;
-  content: string;
-  cache_control?: { type: string };
-}
-
-interface OpenRouterBody {
-  model: string;
-  messages: OpenRouterMessage[];
-  temperature: number;
-  max_tokens: number;
-  top_p?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
-  stream?: boolean;
-}
 
 // Re-export from shared utility
 export { normalizeUrlForKey } from "../lib/url";
 
+// Legacy types for backward compatibility
+export type OpenRouterMessage = {
+  role: string; // Allow any string for flexibility
+  content: string;
+};
+
+export type OpenRouterBody = {
+  model: string;
+  messages: OpenRouterMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  stream?: boolean;
+};
+
 /**
- * Stream chunks from OpenRouter API
+ * Stream chunks from OpenRouter API (Legacy)
+ *
+ * LEGACY FUNCTION: This maintains backward compatibility with existing code.
+ * For new implementations, consider using the shared OpenAI provider library
+ * which supports both OpenRouter and OpenAI with unified configuration.
+ *
+ * Features:
  * - Yields parsed SSE JSON payloads
  * - Handles [DONE] signal
  * - Detailed error logging
  * - Throws on HTTP/parsing errors
+ *
+ * Environment variables:
+ * - OPENROUTER_API_KEY (or LLM_API_KEY via shared library)
+ * - DEBUG_OPENROUTER (for debug logging)
+ * - SITE_URL (for HTTP-Referer header)
+ * - SITE_TITLE (for X-Title header)
+ *
  * @param body - OpenRouter API request body
  * @yields Parsed JSON chunks from stream
  */
