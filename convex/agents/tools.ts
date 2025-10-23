@@ -46,6 +46,7 @@ Returns search results with titles, URLs, snippets, and relevance scores.`,
   ) => {
     const actionCtx = ctx as ActionCtx;
     const contextId = generateMessageId();
+    const callStart = Date.now();
 
     console.info("🔍 SEARCH TOOL CALLED:", {
       contextId,
@@ -62,14 +63,16 @@ Returns search results with titles, URLs, snippets, and relevance scores.`,
         maxResults: input.maxResults || 5,
       });
 
+      const durationMs = Date.now() - callStart;
       console.info("✅ SEARCH TOOL SUCCESS:", {
         contextId,
         resultCount: results.results.length,
         searchMethod: results.searchMethod,
         hasRealResults: results.hasRealResults,
+        durationMs,
       });
 
-      return {
+      const output = {
         contextId,
         query: input.query,
         reasoning: input.reasoning,
@@ -90,11 +93,20 @@ Returns search results with titles, URLs, snippets, and relevance scores.`,
           }),
         ),
         timestamp: Date.now(),
+        _toolCallMetadata: {
+          toolName: "search_web",
+          callStart,
+          durationMs,
+        },
       };
+
+      return output;
     } catch (error) {
+      const durationMs = Date.now() - callStart;
       console.error("❌ SEARCH TOOL ERROR:", {
         contextId,
         error: error instanceof Error ? error.message : "Unknown error",
+        durationMs,
       });
 
       return {
@@ -108,6 +120,11 @@ Returns search results with titles, URLs, snippets, and relevance scores.`,
         resultCount: 0,
         hasRealResults: false,
         timestamp: Date.now(),
+        _toolCallMetadata: {
+          toolName: "search_web",
+          callStart,
+          durationMs,
+        },
       };
     }
   },
@@ -144,6 +161,7 @@ Returns the page title, full cleaned content, and a summary.`,
   ) => {
     const actionCtx = ctx as ActionCtx;
     const contextId = generateMessageId();
+    const callStart = Date.now();
 
     console.info("🌐 SCRAPE TOOL CALLED:", {
       contextId,
@@ -157,11 +175,13 @@ Returns the page title, full cleaned content, and a summary.`,
         url: input.url,
       });
 
+      const durationMs = Date.now() - callStart;
       console.info("✅ SCRAPE TOOL SUCCESS:", {
         contextId,
         url: input.url,
         titleLength: content.title.length,
         contentLength: content.content.length,
+        durationMs,
       });
 
       return {
@@ -173,12 +193,19 @@ Returns the page title, full cleaned content, and a summary.`,
         summary: content.summary || content.content.substring(0, 500) + "...",
         contentLength: content.content.length,
         timestamp: Date.now(),
+        _toolCallMetadata: {
+          toolName: "scrape_webpage",
+          callStart,
+          durationMs,
+        },
       };
     } catch (error) {
+      const durationMs = Date.now() - callStart;
       console.error("❌ SCRAPE TOOL ERROR:", {
         contextId,
         url: input.url,
         error: error instanceof Error ? error.message : "Unknown error",
+        durationMs,
       });
 
       // Extract hostname for fallback
@@ -200,6 +227,11 @@ Returns the page title, full cleaned content, and a summary.`,
         content: `Unable to fetch content from ${input.url}`,
         summary: `Content unavailable from ${hostname}`,
         timestamp: Date.now(),
+        _toolCallMetadata: {
+          toolName: "scrape_webpage",
+          callStart,
+          durationMs,
+        },
       };
     }
   },

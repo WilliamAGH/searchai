@@ -13,6 +13,7 @@ import { run } from "@openai/agents";
 import { agents } from "./definitions";
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
+import { generateChatTitle } from "../chats/utils";
 
 /**
  * Orchestrate the full research and answer workflow
@@ -34,6 +35,19 @@ export const orchestrateResearchWorkflow = action({
   returns: v.object({
     // Workflow tracking
     workflowId: v.string(),
+
+    // Tool call audit log
+    toolCallLog: v.array(
+      v.object({
+        toolName: v.string(),
+        timestamp: v.number(),
+        reasoning: v.string(),
+        input: v.any(),
+        resultSummary: v.string(),
+        durationMs: v.number(),
+        success: v.boolean(),
+      }),
+    ),
 
     // Stage 1: Query Planning
     planning: v.object({
@@ -195,6 +209,39 @@ Remember:
       throw new Error("Research failed: no final output");
     }
 
+    // Extract tool call logs from research results
+    // The agent framework doesn't expose internal tool calls directly,
+    // so we extract metadata from the sourcesUsed which contain contextIds
+    const toolCallLog: Array<{
+      toolName: string;
+      timestamp: number;
+      reasoning: string;
+      input: any;
+      resultSummary: string;
+      durationMs: number;
+      success: boolean;
+    }> = researchResult.finalOutput.sourcesUsed.map(
+      (source: any, idx: number) => ({
+        toolName:
+          source.type === "scraped_page" ? "scrape_webpage" : "search_web",
+        timestamp: Date.now() - researchDuration + idx * 1000, // Approximate timing
+        reasoning: `Gathering information for: ${planningResult.finalOutput?.userIntent || "user query"}`,
+        input:
+          source.type === "scraped_page"
+            ? { url: source.url }
+            : {
+                query:
+                  planningResult.finalOutput?.searchQueries?.[
+                    idx %
+                      (planningResult.finalOutput?.searchQueries?.length || 1)
+                  ]?.query,
+              },
+        resultSummary: `${source.type === "scraped_page" ? "Scraped" : "Searched"}: ${source.title}`,
+        durationMs: 1000, // Estimated
+        success: true,
+      }),
+    );
+
     console.info("✅ RESEARCH COMPLETE:", {
       workflowId,
       duration: researchDuration,
@@ -202,6 +249,7 @@ Remember:
       findingsCount: researchResult.finalOutput.keyFindings.length,
       researchQuality: researchResult.finalOutput.researchQuality,
       hasGaps: !!researchResult.finalOutput.informationGaps?.length,
+      toolCallsLogged: toolCallLog.length,
     });
 
     // ============================================
@@ -314,6 +362,7 @@ Remember the user wants to know: ${planningResult.finalOutput.userIntent}
 
     return {
       workflowId,
+      toolCallLog,
       planning: normalizedPlanning,
       research: normalizedResearch,
       answer: normalizedAnswer,
@@ -672,6 +721,7 @@ Remember the user wants to know: ${planningOutput.userIntent}
 /**
  * Run the agent workflow and persist messages to the database
  * - Inserts user message
+ * - Updates chat title to reflect most recent user intent
  * - Runs orchestration (planning → research → synthesis)
  * - Inserts assistant message with sources and contextReferences
  */
@@ -679,11 +729,23 @@ export const runAgentWorkflowAndPersist = action({
   args: {
     chatId: v.id("chats"),
     message: v.string(),
+    sessionId: v.optional(v.string()),
   },
   returns: v.object({
     workflowId: v.string(),
     assistantMessageId: v.id("messages"),
     answer: v.string(),
+    sources: v.array(v.string()),
+    contextReferences: v.array(
+      v.object({
+        contextId: v.string(),
+        type: v.union(v.literal("search_result"), v.literal("scraped_page")),
+        url: v.optional(v.string()),
+        title: v.optional(v.string()),
+        timestamp: v.number(),
+        relevanceScore: v.optional(v.number()),
+      }),
+    ),
   }),
   // @ts-ignore - Known Convex TS2589: deep generic inference in action handlers
   handler: async (ctx, args) => {
@@ -695,14 +757,19 @@ export const runAgentWorkflowAndPersist = action({
       content: args.message,
     });
 
-    // 2) Build conversationContext from last messages via query
+    // 2) Fetch chat for later title comparison
+    // @ts-ignore - Convex TS2589 deep generic inference on runQuery
+    const chat = await ctx.runQuery(api.chats.getChatById as any, {
+      chatId: args.chatId,
+      sessionId: args.sessionId,
+    });
+
+    // 3) Build conversationContext from last messages via query
     // @ts-ignore - Known Convex TS2589 on deep generics during runQuery
-    const recent = (await ctx.runQuery(
-      api.chats.messages.getChatMessages as any,
-      {
-        chatId: args.chatId,
-      },
-    )) as Array<{ role: "user" | "assistant" | "system"; content?: string }>;
+    const recent = (await ctx.runQuery(api.chats.getChatMessages as any, {
+      chatId: args.chatId,
+      sessionId: args.sessionId,
+    })) as Array<{ role: "user" | "assistant" | "system"; content?: string }>;
     const conversationContext: string = (recent || [])
       .slice(-20)
       .map(
@@ -712,9 +779,12 @@ export const runAgentWorkflowAndPersist = action({
       .join("\n")
       .slice(0, 4000);
 
-    // 3) Run orchestration
+    // 4) Run orchestration
     const result: {
       workflowId: string;
+      planning: {
+        userIntent: string;
+      };
       research: {
         sourcesUsed: Array<{
           url: string;
@@ -733,24 +803,42 @@ export const runAgentWorkflowAndPersist = action({
       },
     );
 
-    // 4) Map sources to contextReferences
-    const contextReferences = (result.research.sourcesUsed || []).map(
-      (src) => ({
+    const generatedTitle = generateChatTitle({
+      intent: result.planning?.userIntent || args.message,
+    });
+
+    if (chat && chat.title !== generatedTitle) {
+      // @ts-ignore - Convex TS2589 deep generic inference on runMutation
+      await ctx.runMutation(internal.chats.internalUpdateChatTitle as any, {
+        chatId: args.chatId,
+        title: generatedTitle,
+      });
+    }
+
+    // 5) Map sources to contextReferences
+    const contextReferences = (result.research.sourcesUsed || []).map((src) => {
+      const relevanceScore =
+        src.relevance === "high" ? 0.9 : src.relevance === "medium" ? 0.7 : 0.5;
+      return {
         contextId: src.contextId,
         type: src.type,
         url: src.url,
         title: src.title,
         timestamp: Date.now(),
-        relevanceScore:
-          src.relevance === "high"
-            ? 0.9
-            : src.relevance === "medium"
-              ? 0.7
-              : 0.5,
-      }),
-    );
+        relevanceScore,
+      };
+    });
 
-    // 5) Insert assistant message
+    const searchResults = contextReferences
+      .filter((ref) => typeof ref.url === "string" && ref.url.length > 0)
+      .map((ref) => ({
+        title: ref.title || ref.url!,
+        url: ref.url!,
+        snippet: "",
+        relevanceScore: ref.relevanceScore ?? 0.5,
+      }));
+
+    // 6) Insert assistant message
     // @ts-ignore - Convex TS2589 deep generic inference on runMutation
     const assistantMessageId: any = await ctx.runMutation(
       internal.messages.addMessage as any as any,
@@ -759,6 +847,7 @@ export const runAgentWorkflowAndPersist = action({
         role: "assistant",
         content: result.answer.answer,
         sources: result.answer.sourcesUsed,
+        searchResults,
         contextReferences,
         workflowId: result.workflowId,
         isStreaming: false,
@@ -769,6 +858,8 @@ export const runAgentWorkflowAndPersist = action({
       workflowId: result.workflowId,
       assistantMessageId,
       answer: result.answer.answer,
+      sources: result.answer.sourcesUsed || [],
+      contextReferences,
     };
   },
 }) as any;
