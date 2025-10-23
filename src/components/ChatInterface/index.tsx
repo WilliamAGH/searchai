@@ -137,8 +137,6 @@ function ChatInterfaceComponent({
     onSelectChat: chatActions.selectChat,
   });
   const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
-  // @deprecated - This file appears to be unused. The active ChatInterface is in ChatInterface.tsx
-  // TODO: Remove this file after confirming it's not used
   const planSearch = useAction(api.search.planSearch);
   const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
@@ -266,19 +264,18 @@ function ChatInterfaceComponent({
     if (isCreatingChat && currentChatId) setIsCreatingChat(false);
   }, [isCreatingChat, currentChatId]);
 
-  // Unified flow: generateResponse is now used for all users
-  // The Convex action handles both authenticated and anonymous users via sessionId
+  // Unified flow: Use chatActions.sendMessage for all message handling
+  // The repository layer handles both authenticated and anonymous users
   const generateUnauthenticatedResponse = useCallback(
     async (message: string, chatId: string) => {
-      // This function is kept for backwards compatibility but now uses the unified flow
-      // The generateResponse action will use sessionId for anonymous users
-      await generateResponse({
-        chatId: chatId as Id<"chats">, // Proper type cast
-        message,
-      });
+      // Use the unified chat actions sendMessage method
+      if (chatActions.sendMessage) {
+        await chatActions.sendMessage(chatId, message);
+      } else {
+        logger.error("sendMessage not available in chatActions");
+      }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [chatActions],
   );
 
   const sendRefTemp = useRef<((message: string) => Promise<void>) | null>(null);
@@ -326,7 +323,13 @@ function ChatInterfaceComponent({
     onRequestSignUp,
     planSearch,
     isTopicChange,
-    generateResponse,
+    generateResponse: chatActions.sendMessage
+      ? async (args: { chatId: string; message: string }) => {
+          await chatActions.sendMessage!(args.chatId, args.message);
+        }
+      : async () => {
+          logger.error("generateResponse: sendMessage not available");
+        },
     generateUnauthenticatedResponse,
     maybeShowFollowUpPrompt,
     chatActions,
@@ -359,6 +362,7 @@ function ChatInterfaceComponent({
     propPublicId,
     handleNewChat,
     userSelectedChatAtRef,
+    isLoading: chatState.isLoading, // Prevent creation while loading existing chats
   });
 
   // Track if we're on mobile for rendering decisions

@@ -70,8 +70,8 @@ export function ChatSidebar({
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const attr = e.currentTarget.getAttribute("data-chat-id");
       if (!attr) return;
-      const match = chats.find((c) => String(c._id) === attr);
-      handleSelectChat(match ? match._id : attr);
+      const match = chats.find((c) => String(c._id ?? c.id ?? "") === attr);
+      handleSelectChat(match ? (match._id ?? match.id ?? attr) : attr);
     },
     [chats, handleSelectChat],
   );
@@ -80,17 +80,19 @@ export function ChatSidebar({
     async (e: React.MouseEvent<HTMLButtonElement>) => {
       const attr = e.currentTarget.getAttribute("data-chat-id");
       if (!attr) return;
-      const match = chats.find((c) => String(c._id) === attr);
+      const match = chats.find((c) => String(c._id ?? c.id ?? "") === attr);
       try {
         if (!window.confirm("Delete this chat? This cannot be undone.")) return;
 
+        const resolvedId = match?._id ?? match?.id ?? undefined;
+
         // Prefer parent-provided handler (shows undo banner, etc.)
         if (onRequestDeleteChat) {
-          if (match) {
+          if (match && resolvedId) {
             onRequestDeleteChat(
               isLocalChat(match)
-                ? (match._id as unknown as string)
-                : (match._id as unknown as Id<"chats">),
+                ? (String(resolvedId) as string)
+                : (resolvedId as Id<"chats">),
             );
           } else {
             onRequestDeleteChat(
@@ -102,9 +104,9 @@ export function ChatSidebar({
         } else if (match) {
           // Decide local vs server based on chat object, not typeof _id
           if (isLocalChat(match)) {
-            onDeleteLocalChat?.(match._id as string);
+            onDeleteLocalChat?.(String(resolvedId ?? attr));
           } else {
-            await deleteChat({ chatId: match._id as Id<"chats"> });
+            await deleteChat({ chatId: (resolvedId ?? attr) as Id<"chats"> });
           }
         } else {
           // Fallback if no match: infer by Convex ID shape (contains '|')
@@ -115,7 +117,9 @@ export function ChatSidebar({
           }
         }
 
-        if (match && currentChatId === match._id) {
+        const currentIdString =
+          currentChatId !== null ? String(currentChatId) : null;
+        if (match && resolvedId && currentIdString === String(resolvedId)) {
           onSelectChat(null);
         }
       } catch (err) {
@@ -221,59 +225,66 @@ export function ChatSidebar({
           </div>
         ) : (
           <div className="p-2">
-            {chats.map((chat) => (
-              <div
-                key={chat._id}
-                className="flex items-center gap-2 mb-1 pr-2 min-w-0"
-              >
-                <button
-                  type="button"
-                  data-chat-id={String(chat._id)}
-                  onClick={handleSelectClick}
-                  className={`flex-1 min-w-0 p-3 rounded-lg text-left hover:bg-muted transition-colors ${
-                    currentChatId === chat._id ? "bg-muted" : ""
-                  }`}
+            {chats.map((chat) => {
+              const resolvedChatId = String(chat._id ?? chat.id ?? "");
+              const isSelected =
+                currentChatId !== null &&
+                String(currentChatId) === resolvedChatId;
+
+              return (
+                <div
+                  key={chat._id || chat.id || `chat-${Math.random()}`}
+                  className="flex items-center gap-2 mb-1 pr-2 min-w-0"
                 >
-                  <div className="font-medium truncate min-w-0">
-                    {chat.title}
-                  </div>
-                  <div className="text-sm text-muted-foreground flex items-center gap-1 min-w-0">
-                    {"isLocal" in chat && chat.isLocal && (
-                      <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
-                        Local
-                      </span>
-                    )}
-                    <span className="truncate">
-                      {new Date(chat.updatedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  data-chat-id={String(chat._id)}
-                  onClick={handleDeleteClick}
-                  className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
-                  title="Delete chat"
-                  aria-label="Delete chat"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
+                  <button
+                    type="button"
+                    data-chat-id={resolvedChatId}
+                    onClick={handleSelectClick}
+                    className={`flex-1 min-w-0 p-3 rounded-lg text-left hover:bg-muted transition-colors ${
+                      isSelected ? "bg-muted" : ""
+                    }`}
                   >
-                    <title>Delete chat</title>
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
-              </div>
-            ))}
+                    <div className="font-medium truncate min-w-0">
+                      {chat.title}
+                    </div>
+                    <div className="text-sm text-muted-foreground flex items-center gap-1 min-w-0">
+                      {"isLocal" in chat && chat.isLocal && (
+                        <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
+                          Local
+                        </span>
+                      )}
+                      <span className="truncate">
+                        {new Date(chat.updatedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    data-chat-id={resolvedChatId}
+                    onClick={handleDeleteClick}
+                    className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+                    title="Delete chat"
+                    aria-label="Delete chat"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <title>Delete chat</title>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

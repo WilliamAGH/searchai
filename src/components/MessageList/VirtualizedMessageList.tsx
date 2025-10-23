@@ -69,9 +69,14 @@ export function VirtualizedMessageList({
         >
           {group.map((message, index) => {
             const actualIndex = groupIndex * 10 + index;
+            // Generate stable key that never evaluates to undefined
+            const messageKey =
+              message._id ||
+              message.id ||
+              `msg-${actualIndex}-${message.role || "unknown"}`;
             return (
               <div
-                key={message._id || `msg-${actualIndex}`}
+                key={messageKey}
                 className="message-item"
                 data-message-index={actualIndex}
               >

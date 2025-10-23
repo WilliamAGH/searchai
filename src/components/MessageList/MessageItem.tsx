@@ -24,6 +24,19 @@ interface MessageItemProps {
   onDeleteMessage: (messageId: Id<"messages"> | string | undefined) => void;
   onSourceHover: (url: string | null) => void;
   onCitationHover: (url: string | null) => void;
+  searchProgress?: {
+    stage:
+      | "idle"
+      | "planning"
+      | "searching"
+      | "scraping"
+      | "analyzing"
+      | "generating";
+    message?: string;
+    urls?: string[];
+    currentUrl?: string;
+    queries?: string[];
+  } | null;
 }
 
 export function MessageItem({
@@ -35,6 +48,7 @@ export function MessageItem({
   onDeleteMessage,
   onSourceHover,
   onCitationHover,
+  searchProgress,
 }: MessageItemProps) {
   const safeTimestamp =
     typeof message.timestamp === "number" ? message.timestamp : Date.now();
@@ -100,7 +114,7 @@ export function MessageItem({
               id={messageId}
               results={safeResults}
               method={message.searchMethod}
-              collapsed={collapsedById[messageId] ?? true}
+              collapsed={collapsedById[messageId] ?? false}
               onToggle={onToggleCollapsed}
               hoveredSourceUrl={hoveredSourceUrl}
               onSourceHover={onSourceHover}
@@ -154,7 +168,36 @@ export function MessageItem({
             </div>
           )}
 
-        {/* 4) AI/user content last – always appears under sources/thinking */}
+        {/* 4) Search progress status when streaming */}
+        {message.role === "assistant" &&
+          searchProgress &&
+          searchProgress.stage !== "idle" &&
+          searchProgress.stage !== "generating" && (
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="text-emerald-600 dark:text-emerald-400">
+                  <svg
+                    className="w-4 h-4 animate-pulse"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {searchProgress.message || "Processing..."}
+                </span>
+              </div>
+            </div>
+          )}
+
+        {/* 5) AI/user content last – always appears under sources/thinking */}
         <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden text-[15px] sm:text-base leading-6">
           {message.role === "assistant" ? (
             <ContentWithCitations

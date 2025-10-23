@@ -2,11 +2,23 @@
  * Compact sources component for messages
  * Shows collapsed summary by default
  * Expands to show all sources on click
+ *
+ * Supports both legacy searchResults and new contextReferences from agent workflow
  */
 
 import React from "react";
 import type { SearchResult } from "../../lib/types/message";
 import { getFaviconUrl } from "../../lib/utils/favicon";
+
+type ContextReference = {
+  contextId: string;
+  type: "search_result" | "scraped_page" | "research_summary";
+  url?: string;
+  title?: string;
+  timestamp: number;
+  relevanceScore?: number;
+  metadata?: any;
+};
 
 interface MessageSourcesProps {
   id: string;
@@ -16,6 +28,8 @@ interface MessageSourcesProps {
   onToggle: (id: string) => void;
   hoveredSourceUrl: string | null;
   onSourceHover: (url: string | null) => void;
+  // New: Support contextReferences from agent workflow
+  contextReferences?: ContextReference[];
 }
 
 /**
@@ -41,18 +55,49 @@ export function MessageSources({
   onToggle,
   hoveredSourceUrl,
   onSourceHover,
+  contextReferences,
 }: MessageSourcesProps) {
-  const hostnames = results
-    .map((r) => getSafeHostname(r.url) || r.url)
+  // Ensure id is always defined to prevent React key warnings
+  const messageId = id || "unknown";
+
+  // Prefer contextReferences from agent workflow, fallback to legacy results
+  const hasContextRefs = contextReferences && contextReferences.length > 0;
+  const hasLegacyResults = results && results.length > 0;
+
+  // Convert contextReferences to display format
+  const displaySources: Array<{
+    url: string;
+    title: string;
+    snippet?: string;
+    type?: "search_result" | "scraped_page" | "research_summary";
+    relevanceScore?: number;
+  }> = hasContextRefs
+    ? contextReferences
+        .filter((ref) => ref.url) // Only show refs with URLs
+        .map((ref) => ({
+          url: ref.url!,
+          title: ref.title || new URL(ref.url!).hostname,
+          type: ref.type,
+          relevanceScore: ref.relevanceScore,
+        }))
+    : results.map((r) => ({
+        url: r.url,
+        title: r.title,
+        snippet: r.snippet,
+        relevanceScore: r.relevanceScore,
+      }));
+
+  const hostnames = displaySources
+    .map((s) => getSafeHostname(s.url) || s.url)
     .filter(Boolean);
   const summary = hostnames.slice(0, 3).join(" · ");
 
   const handleToggleClick = React.useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
-      onToggle(id);
+      onToggle(messageId);
     },
-    [id, onToggle],
+    [messageId, onToggle],
   );
 
   return (
@@ -82,9 +127,14 @@ export function MessageSources({
             </svg>
             <span className="font-medium">Sources</span>
             <span className="text-gray-500 dark:text-gray-400">
-              ({results.length})
+              ({displaySources.length})
             </span>
-            {method && (
+            {hasContextRefs && (
+              <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400 truncate">
+                via agent research
+              </span>
+            )}
+            {!hasContextRefs && method && (
               <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400 truncate">
                 via web search
               </span>
@@ -115,14 +165,47 @@ export function MessageSources({
 
       {!collapsed && (
         <div className="mt-2 space-y-2 px-2 max-h-[300px] overflow-y-auto">
-          {results.map((result, i) => {
-            const hostname = getSafeHostname(result.url);
-            const isHovered = hoveredSourceUrl === result.url;
+          {displaySources.map((source, i) => {
+            const hostname = getSafeHostname(source.url);
+            const isHovered = hoveredSourceUrl === source.url;
+
+            // Determine relevance badge color
+            const relevanceBadge =
+              source.relevanceScore !== undefined &&
+              source.relevanceScore >= 0.8
+                ? {
+                    label: "high",
+                    color:
+                      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+                  }
+                : source.relevanceScore !== undefined &&
+                    source.relevanceScore >= 0.5
+                  ? {
+                      label: "medium",
+                      color:
+                        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+                    }
+                  : null;
+
+            const typeBadge =
+              source.type === "scraped_page"
+                ? {
+                    label: "scraped",
+                    color:
+                      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+                  }
+                : source.type === "research_summary"
+                  ? {
+                      label: "summary",
+                      color:
+                        "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+                    }
+                  : null;
 
             return (
               <a
-                key={`${id}-source-${i}`}
-                href={result.url}
+                key={`${messageId}-source-${i}`}
+                href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`block p-2 sm:p-3 rounded-lg border transition-all ${
@@ -130,12 +213,12 @@ export function MessageSources({
                     ? "border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20"
                     : "border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                 }`}
-                onMouseEnter={() => onSourceHover(result.url)}
+                onMouseEnter={() => onSourceHover(source.url)}
                 onMouseLeave={() => onSourceHover(null)}
               >
                 <div className="flex items-start gap-2">
                   <img
-                    src={getFaviconUrl(result.url)}
+                    src={getFaviconUrl(source.url)}
                     alt=""
                     className="w-4 h-4 mt-0.5 rounded"
                     onError={(e) => {
@@ -143,15 +226,31 @@ export function MessageSources({
                     }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-[15px] sm:text-base text-gray-900 dark:text-gray-100 line-clamp-1">
-                      {result.title}
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <div className="font-medium text-[15px] sm:text-base text-gray-900 dark:text-gray-100 line-clamp-1 flex-1 min-w-0">
+                        {source.title}
+                      </div>
+                      {typeBadge && (
+                        <span
+                          className={`px-1.5 py-0.5 text-[10px] sm:text-xs font-medium rounded flex-shrink-0 ${typeBadge.color}`}
+                        >
+                          {typeBadge.label}
+                        </span>
+                      )}
+                      {relevanceBadge && (
+                        <span
+                          className={`px-1.5 py-0.5 text-[10px] sm:text-xs font-medium rounded flex-shrink-0 ${relevanceBadge.color}`}
+                        >
+                          {relevanceBadge.label}
+                        </span>
+                      )}
                     </div>
                     <div className="text-[13px] sm:text-sm text-gray-500 dark:text-gray-400 truncate">
                       {hostname}
                     </div>
-                    {result.snippet && (
+                    {source.snippet && (
                       <div className="mt-1 text-[13px] sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
-                        {result.snippet}
+                        {source.snippet}
                       </div>
                     )}
                   </div>

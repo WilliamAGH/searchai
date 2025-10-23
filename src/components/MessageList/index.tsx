@@ -429,12 +429,51 @@ export function MessageList({
               messages={messages}
               className="space-y-6 sm:space-y-8"
               estimatedItemHeight={150}
-              renderItem={(message, index) => (
+              renderItem={(message, index) => {
+                const messageKey =
+                  message._id ||
+                  message.id ||
+                  `fallback-${index}-${message.role}-${message.timestamp || 0}`;
+                return (
+                  <MessageItem
+                    key={messageKey}
+                    message={message}
+                    index={index}
+                    collapsedById={collapsedById}
+                    hoveredSourceUrl={hoveredSourceUrl}
+                    onToggleCollapsed={toggleCollapsed}
+                    onDeleteMessage={handleDeleteMessage}
+                    onSourceHover={setHoveredSourceUrl}
+                    onCitationHover={setHoveredCitationUrl}
+                    searchProgress={
+                      index === messages.length - 1 && isGenerating
+                        ? searchProgress
+                        : undefined
+                    }
+                  />
+                );
+              }}
+            />
+          ) : (
+            messages.map((message, index) => {
+              // Generate stable unique key for each message
+              const messageKey =
+                message._id ||
+                message.id ||
+                `fallback-${index}-${message.role}-${message.timestamp || 0}`;
+
+              // Debug undefined keys in development
+              if (!message._id && !message.id && import.meta.env.DEV) {
+                console.warn("Message missing both _id and id:", {
+                  index,
+                  role: message.role,
+                  content: message.content?.substring(0, 50),
+                });
+              }
+
+              return (
                 <MessageItem
-                  key={
-                    message._id ||
-                    `message-${index}-${message.timestamp || Date.now()}`
-                  }
+                  key={messageKey}
                   message={message}
                   index={index}
                   collapsedById={collapsedById}
@@ -443,26 +482,14 @@ export function MessageList({
                   onDeleteMessage={handleDeleteMessage}
                   onSourceHover={setHoveredSourceUrl}
                   onCitationHover={setHoveredCitationUrl}
+                  searchProgress={
+                    index === messages.length - 1 && isGenerating
+                      ? searchProgress
+                      : undefined
+                  }
                 />
-              )}
-            />
-          ) : (
-            messages.map((message, index) => (
-              <MessageItem
-                key={
-                  message._id ||
-                  `message-${index}-${message.timestamp || Date.now()}`
-                }
-                message={message}
-                index={index}
-                collapsedById={collapsedById}
-                hoveredSourceUrl={hoveredSourceUrl}
-                onToggleCollapsed={toggleCollapsed}
-                onDeleteMessage={handleDeleteMessage}
-                onSourceHover={setHoveredSourceUrl}
-                onCitationHover={setHoveredCitationUrl}
-              />
-            ))
+              );
+            })
           )}
 
           {/* Show reasoning/thinking while AI is planning or thinking */}
@@ -505,61 +532,7 @@ export function MessageList({
               );
             })()}
 
-          {/* Show search progress for all active stages */}
-          {isGenerating &&
-            searchProgress &&
-            searchProgress.stage !== "idle" &&
-            searchProgress.stage !== "generating" && (
-              <SearchProgress progress={searchProgress} />
-            )}
-
-          {/* Show "AI is generating" when in generating stage */}
-          {isGenerating &&
-            searchProgress &&
-            searchProgress.stage === "generating" && (
-              <div className="flex gap-2 sm:gap-4">
-                <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 animate-spin"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                    <span>Writing comprehensive answer...</span>
-                    <div className="flex space-x-1">
-                      <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:0ms]"></div>
-                      <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:100ms]"></div>
-                      <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:200ms]"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* Search progress and generation status now shown inline within MessageItem */}
         </div>
       )}
       <div ref={messagesEndRef} />

@@ -113,13 +113,15 @@ export function SearchProgress({ progress }: SearchProgressProps) {
   };
 
   return (
-    <div className="flex gap-4">
+    <div className="flex gap-2 sm:gap-4 max-w-full overflow-hidden">
+      {/* Avatar icon matching MessageItem assistant style */}
       <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
         <svg
           className="w-4 h-4 text-white"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -129,8 +131,12 @@ export function SearchProgress({ progress }: SearchProgressProps) {
           />
         </svg>
       </div>
-      <div className="flex-1">
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+      <div className="flex-1 min-w-0 overflow-hidden">
+        {/* Timestamp at top */}
+        <div className="text-xs text-gray-500 dark:text-gray-500 mb-1">
+          {new Date().toLocaleTimeString()}
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3 mb-3">
             <div className="text-emerald-600 dark:text-emerald-400 animate-pulse">
               {getStageIcon(progress.stage)}
