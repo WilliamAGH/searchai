@@ -98,6 +98,11 @@ async function validateChatAccess(
 
   if (!chat) return null;
 
+  // Shared and public chats are accessible regardless of owner or session
+  if (chat.privacy === "shared" || chat.privacy === "public") {
+    return chat;
+  }
+
   // For authenticated users: check userId matches
   if (chat.userId) {
     if (chat.userId !== userId) return null;
