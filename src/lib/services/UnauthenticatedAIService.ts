@@ -1,7 +1,14 @@
 /**
- * AI Service for unauthenticated users
- * Handles streaming responses via HTTP endpoints
+ * @deprecated Removed. Streaming now uses direct fetch to /api/ai/agent/stream.
+ * This stub remains temporarily to avoid import churn. Safe to delete once
+ * no external tooling references it.
+ *
+ * Removal plan:
+ * - Verify no imports in repo (grep UnauthenticatedAIService) → none
+ * - Delete this file in next cleanup PR
  */
+// Removed: UnauthenticatedAIService (streaming now uses direct fetch in repositories)
+// This file is kept temporarily to avoid import churn; will be deleted after confirming no references remain.
 import { logger } from "../logger";
 import type { MessageStreamChunk } from "../types/message";
 

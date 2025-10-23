@@ -21,7 +21,8 @@ export const deleteChat = mutation({
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
 
-    if (!chat) throw new Error("Chat not found");
+    // Silently succeed if chat already deleted (idempotent operation)
+    if (!chat) return null;
     if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
     // Delete all messages in the chat via async iteration to reduce memory usage

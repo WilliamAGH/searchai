@@ -13,7 +13,6 @@ import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
 import { registerSearchRoutes } from "./http/routes/search";
 import { registerScrapeRoutes } from "./http/routes/scrape";
-import { registerAIRoutes } from "./http/routes/ai";
 import { registerAgentAIRoutes } from "./http/routes/aiAgent";
 import { registerPublishRoutes } from "./http/routes/publish";
 import { corsJsonResponseForRequest } from "./http/utils";
@@ -24,8 +23,8 @@ import { corsJsonResponseForRequest } from "./http/utils";
  * Routes:
  * - POST /api/search : web search for unauthenticated users
  * - POST /api/scrape : scrape URL and return cleaned content
- * - POST /api/ai     : AI generation with SSE streaming (legacy)
- * - POST /api/ai/agent : Agent-based AI with multi-stage research workflow
+ * - POST /api/ai/agent : Agent-based AI with multi-stage research workflow (non-streaming)
+ * - POST /api/ai/agent/stream : Agent-based AI with SSE streaming (real-time UX)
  * - POST /api/publishChat : publish anonymous chat
  * - GET  /api/exportChat : export chat in various formats
  * - GET  /api/chatTextMarkdown : export chat as markdown
@@ -35,8 +34,7 @@ const http = httpRouter();
 // Register modular route handlers
 registerSearchRoutes(http);
 registerScrapeRoutes(http);
-registerAIRoutes(http);
-registerAgentAIRoutes(http); // New agent-based AI route
+registerAgentAIRoutes(http); // Agent-based AI routes (streaming + non-streaming)
 registerPublishRoutes(http);
 
 // Register auth routes

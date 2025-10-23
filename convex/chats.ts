@@ -8,7 +8,8 @@
  */
 
 // Re-export utility functions
-export { buildContextSummary, generateOpaqueId } from "./chats/utils";
+export { buildContextSummary } from "./chats/utils";
+export { generateOpaqueId } from "./lib/uuid";
 
 // Re-export core chat operations
 export {
@@ -46,3 +47,6 @@ export {
   subscribeToChatUpdates,
   subscribeToMessageStream,
 } from "./chats/subscriptions";
+
+// Re-export cleanup operations
+export { cleanupEmptyChats } from "./chats/cleanup";

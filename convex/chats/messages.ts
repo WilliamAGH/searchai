@@ -6,7 +6,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import { vSearchResult } from "../lib/validators";
+import { vContextReference, vSearchResult } from "../lib/validators";
 
 /**
  * Get chat messages
@@ -23,6 +23,9 @@ export const getChatMessages = query({
   },
   returns: v.array(
     v.object({
+      _id: v.id("messages"),
+      _creationTime: v.number(),
+      chatId: v.id("chats"),
       role: v.union(
         v.literal("user"),
         v.literal("assistant"),
@@ -36,6 +39,8 @@ export const getChatMessages = query({
       searchResults: v.optional(v.array(vSearchResult)),
       sources: v.optional(v.array(v.string())),
       reasoning: v.optional(v.string()),
+      contextReferences: v.optional(v.array(vContextReference)),
+      workflowId: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -69,8 +74,11 @@ export const getChatMessages = query({
       .order("asc")
       .collect();
 
-    // Map to validated/minimal shape
+    // Map to validated shape with _id for client identification
     return docs.map((m) => ({
+      _id: m._id,
+      _creationTime: m._creationTime,
+      chatId: m.chatId,
       role: m.role,
       content: m.content,
       timestamp: m.timestamp,
@@ -82,6 +90,10 @@ export const getChatMessages = query({
         : undefined,
       sources: Array.isArray(m.sources) ? m.sources : undefined,
       reasoning: m.reasoning,
+      contextReferences: Array.isArray(m.contextReferences)
+        ? m.contextReferences
+        : undefined,
+      workflowId: m.workflowId,
     }));
   },
 });

@@ -24,7 +24,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
     }),
   });
 
-  // Agent-based AI generation endpoint
+  // Agent-based AI generation endpoint (non-streaming)
   http.route({
     path: "/api/ai/agent",
     method: "POST",
@@ -212,9 +212,219 @@ export function registerAgentAIRoutes(http: HttpRouter) {
     }),
   });
 
-  // STREAMING agent-based AI generation endpoint
+  // CORS preflight for streaming endpoint
   http.route({
     path: "/api/ai/agent/stream",
+    method: "OPTIONS",
+    handler: httpAction(async (_ctx, request) => {
+      return corsPreflightResponse(request);
+    }),
+  });
+
+  // Agent-based AI generation endpoint (SSE streaming)
+  http.route({
+    path: "/api/ai/agent/stream",
+    method: "POST",
+    handler: httpAction(async (ctx, request) => {
+      const origin = request.headers.get("Origin");
+      // Enforce strict origin validation early
+      const probe = corsResponse("{}", 204, origin);
+      if (probe.status === 403) return probe;
+      const allowedOrigin =
+        probe.headers.get("Access-Control-Allow-Origin") || "*";
+
+      let rawPayload: unknown;
+      try {
+        rawPayload = await request.json();
+      } catch {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          400,
+          origin,
+        );
+      }
+
+      if (!rawPayload || typeof rawPayload !== "object") {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid request payload" }),
+          400,
+          origin,
+        );
+      }
+      const payload = rawPayload as Record<string, unknown>;
+
+      if (!payload.message || typeof payload.message !== "string") {
+        return corsResponse(
+          JSON.stringify({ error: "Message must be a string" }),
+          400,
+          origin,
+        );
+      }
+      const message = String(payload.message)
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+        .slice(0, 10000);
+      const conversationContext = payload.conversationContext
+        ? String(payload.conversationContext)
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+            .slice(0, 5000)
+        : undefined;
+
+      try {
+        // Create SSE stream that wraps the non-streaming workflow
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const sendEvent = (data: any) => {
+              try {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+                );
+              } catch (error) {
+                console.error("Failed to send SSE event:", error);
+              }
+            };
+
+            try {
+              // Stage 1: Planning
+              sendEvent({
+                type: "progress",
+                stage: "planning",
+                message:
+                  "Analyzing your question and planning research strategy...",
+                timestamp: Date.now(),
+              });
+
+              // Execute the full workflow
+              const workflowResult = await ctx.runAction(
+                api.agents.orchestration.orchestrateResearchWorkflow,
+                { userQuery: message, conversationContext },
+              );
+
+              // Stage 2: Research (emit tool calls)
+              if (
+                workflowResult.toolCallLog &&
+                workflowResult.toolCallLog.length > 0
+              ) {
+                sendEvent({
+                  type: "progress",
+                  stage: "searching",
+                  message: `Executing ${workflowResult.toolCallLog.length} research ${workflowResult.toolCallLog.length === 1 ? "operation" : "operations"}...`,
+                  timestamp: Date.now(),
+                });
+
+                // Send individual tool results
+                for (const toolCall of workflowResult.toolCallLog) {
+                  sendEvent({
+                    type: "tool_result",
+                    toolName: toolCall.toolName,
+                    result: toolCall.resultSummary,
+                    durationMs: toolCall.durationMs,
+                    timestamp: toolCall.timestamp,
+                  });
+                }
+              }
+
+              // Stage 3: Synthesis
+              sendEvent({
+                type: "progress",
+                stage: "generating",
+                message: "Synthesizing final answer with citations...",
+                timestamp: Date.now(),
+              });
+
+              // Send answer content
+              sendEvent({
+                type: "content",
+                content: workflowResult.answer.answer,
+                timestamp: Date.now(),
+              });
+
+              // Send metadata
+              sendEvent({
+                type: "metadata",
+                metadata: {
+                  workflowId: workflowResult.workflowId,
+                  sources: workflowResult.answer.sourcesUsed,
+                  contextReferences: workflowResult.research.sourcesUsed.map(
+                    (src: any) => ({
+                      contextId: src.contextId,
+                      type: src.type,
+                      url: src.url,
+                      title: src.title,
+                      timestamp: Date.now(),
+                      relevance: src.relevance,
+                    }),
+                  ),
+                  hasLimitations: workflowResult.answer.hasLimitations,
+                  limitations: workflowResult.answer.limitations,
+                  completeness: workflowResult.answer.answerCompleteness,
+                  confidence: workflowResult.answer.confidence,
+                  totalDuration: workflowResult.metadata.totalDuration,
+                },
+                timestamp: Date.now(),
+              });
+
+              // Send completion
+              sendEvent({
+                type: "complete",
+                workflow: {
+                  id: workflowResult.workflowId,
+                  totalDuration: workflowResult.metadata.totalDuration,
+                },
+                timestamp: Date.now(),
+              });
+
+              dlog("✅ STREAMING AGENT WORKFLOW COMPLETE");
+            } catch (e) {
+              console.error("💥 STREAMING WORKFLOW ERROR:", e);
+              sendEvent({
+                type: "error",
+                error:
+                  e instanceof Error ? e.message : "Unknown streaming error",
+                timestamp: Date.now(),
+              });
+            } finally {
+              try {
+                controller.close();
+              } catch {}
+            }
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": allowedOrigin,
+            "Access-Control-Allow-Headers": "Content-Type",
+            Vary: "Origin",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          },
+        });
+      } catch (error) {
+        const body = JSON.stringify({
+          error: "Agent streaming workflow failed",
+          details: error instanceof Error ? error.message : String(error),
+        });
+        return corsResponse(body, 500, origin);
+      }
+    }),
+  });
+
+  // CORS preflight for persist endpoint
+  http.route({
+    path: "/api/ai/agent/persist",
+    method: "OPTIONS",
+    handler: httpAction(async (_ctx, request) => {
+      return corsPreflightResponse(request);
+    }),
+  });
+
+  // Agent-based AI generation with persistence (requires chatId)
+  http.route({
+    path: "/api/ai/agent/persist",
     method: "POST",
     handler: httpAction(async (ctx, request) => {
       const origin = request.headers.get("Origin");
@@ -233,161 +443,17 @@ export function registerAgentAIRoutes(http: HttpRouter) {
         );
       }
 
-      // Validate payload structure
-      if (!rawPayload || typeof rawPayload !== "object") {
-        return corsResponse(
-          JSON.stringify({ error: "Invalid request payload" }),
-          400,
-          origin,
-        );
-      }
-      const payload = rawPayload as Record<string, unknown>;
-
-      // Validate and sanitize message (required field)
-      if (!payload.message || typeof payload.message !== "string") {
-        return corsResponse(
-          JSON.stringify({ error: "Message must be a string" }),
-          400,
-          origin,
-        );
-      }
-
-      // Remove control characters and null bytes, then limit length
-      const message = String(payload.message)
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-        .slice(0, 10000);
-
-      if (!message.trim()) {
-        return corsResponse(
-          JSON.stringify({ error: "Message is required" }),
-          400,
-          origin,
-        );
-      }
-
-      // Optional conversation context (chat history summary)
-      const conversationContext = payload.conversationContext
-        ? String(payload.conversationContext)
-            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-            .slice(0, 5000)
-        : undefined;
-
-      dlog("🌊 STREAMING AGENT ENDPOINT CALLED:");
-      dlog("Message length:", message.length);
-      dlog("Has context:", !!conversationContext);
-
-      try {
-        // Create ReadableStream for SSE
-        const stream = new ReadableStream({
-          async start(controller) {
-            const encoder = new TextEncoder();
-
-            try {
-              dlog("🚀 Starting streaming orchestration...");
-
-              // Get the async generator from streaming orchestration
-              const eventGenerator = await ctx.runAction(
-                api.agents.orchestration.orchestrateResearchWorkflowStreaming,
-                {
-                  userQuery: message,
-                  conversationContext,
-                },
-              );
-
-              dlog("📡 Consuming event stream...");
-
-              // Consume events and emit as SSE
-              for await (const event of eventGenerator) {
-                const sseData = `data: ${JSON.stringify(event)}\n\n`;
-                controller.enqueue(encoder.encode(sseData));
-                dlog("📤 Sent event:", event.type);
-              }
-
-              // Send done signal
-              dlog("✅ Stream complete, sending [DONE]");
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              controller.close();
-            } catch (error) {
-              console.error("💥 STREAMING ERROR:", {
-                error: error instanceof Error ? error.message : "Unknown error",
-                stack: error instanceof Error ? error.stack : "No stack trace",
-              });
-
-              const errorEvent = {
-                type: "error",
-                error: error instanceof Error ? error.message : "Unknown error",
-              };
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`),
-              );
-              controller.close();
-            }
-          },
-        });
-
-        // Return SSE response with CORS headers
-        return new Response(stream, {
-          status: 200,
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no", // Disable nginx buffering
-            "Access-Control-Allow-Origin": origin || "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-          },
-        });
-      } catch (error) {
-        console.error("💥 STREAMING SETUP FAILED:", {
-          error: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : "No stack trace",
-        });
-
-        return corsResponse(
-          JSON.stringify({
-            error: "Streaming setup failed",
-            details: error instanceof Error ? error.message : String(error),
-          }),
-          500,
-          origin,
-        );
-      }
-    }),
-  });
-
-  // CORS preflight for streaming endpoint
-  http.route({
-    path: "/api/ai/agent/stream",
-    method: "OPTIONS",
-    handler: httpAction(async (_ctx, request) => {
-      return corsPreflightResponse(request);
-    }),
-  });
-
-  // Agent-based AI generation with persistence (requires chatId)
-  http.route({
-    path: "/api/ai/agent/persist",
-    method: "POST",
-    handler: httpAction(async (ctx, request) => {
-      let rawPayload: unknown;
-      try {
-        rawPayload = await request.json();
-      } catch {
-        return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
-          400,
-        );
-      }
-
       const payload = rawPayload as Record<string, unknown>;
       const message =
         typeof payload.message === "string" ? payload.message : "";
       const chatId = typeof payload.chatId === "string" ? payload.chatId : "";
+      const sessionId =
+        typeof payload.sessionId === "string" ? payload.sessionId : undefined;
       if (!message.trim() || !chatId) {
         return corsResponse(
           JSON.stringify({ error: "chatId and message required" }),
           400,
+          origin,
         );
       }
 
@@ -398,9 +464,10 @@ export function registerAgentAIRoutes(http: HttpRouter) {
           {
             chatId, // Convex will validate this is a valid Id
             message,
+            sessionId,
           },
         );
-        return corsResponse(JSON.stringify(result));
+        return corsResponse(JSON.stringify(result), 200, origin);
       } catch (error) {
         return corsResponse(
           JSON.stringify({
@@ -408,6 +475,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
             details: error instanceof Error ? error.message : String(error),
           }),
           500,
+          origin,
         );
       }
     }),

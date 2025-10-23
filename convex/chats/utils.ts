@@ -55,9 +55,28 @@ export function buildContextSummary(params: {
   return lines.join("\n").slice(0, maxChars);
 }
 
+const DEFAULT_TITLE_MAX_LENGTH = 60;
+
 /**
- * Generate a URL-safe opaque ID using UUID v7
- * Provides time-sortable, collision-resistant identifiers
- * @deprecated Use specific generators from convex/lib/uuid.ts instead
+ * Generate a concise chat title from user intent/message
+ * Mirrors frontend TitleUtils logic but keeps server dependency isolation.
  */
-export { generateOpaqueId } from "../lib/uuid";
+export function generateChatTitle(params: {
+  intent: string;
+  maxLength?: number;
+}): string {
+  const { intent, maxLength = DEFAULT_TITLE_MAX_LENGTH } = params;
+  if (!intent) return "New Chat";
+
+  const sanitized = intent.replace(/<+/g, "").replace(/\s+/g, " ").trim();
+  if (!sanitized) return "New Chat";
+
+  if (sanitized.length <= maxLength) return sanitized;
+
+  const truncated = sanitized.slice(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(" ");
+  if (lastSpace >= Math.floor(maxLength / 2)) {
+    return `${truncated.slice(0, lastSpace)}...`;
+  }
+  return `${truncated}...`;
+}
