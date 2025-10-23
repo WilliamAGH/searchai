@@ -220,22 +220,35 @@ export default function App() {
 
   // Handle responsive sidebar behavior
   useEffect(() => {
-    const handleResize = () => {
-      const isDesktop = window.innerWidth >= 1024;
-      // Only auto-manage sidebar if user hasn't manually toggled it
-      if (!hasManuallyToggled) {
-        setIsSidebarOpen((current) => {
-          if (isDesktop && !current) {
-            return true;
-          } else if (!isDesktop && current) {
-            return false;
-          }
-          return current;
-        });
-      }
+    const syncSidebarToLayout = (isDesktop: boolean) => {
+      setIsSidebarOpen((current) => {
+        if (isDesktop && !current) {
+          return true;
+        }
+        if (!isDesktop && current) {
+          return false;
+        }
+        return current;
+      });
     };
 
-    // Set initial state based on current screen size only if not manually toggled
+    let lastIsDesktop = window.innerWidth >= 1024;
+
+    const handleResize = () => {
+      const isDesktop = window.innerWidth >= 1024;
+
+      if (hasManuallyToggled) {
+        if (isDesktop !== lastIsDesktop) {
+          setHasManuallyToggled(false);
+          syncSidebarToLayout(isDesktop);
+        }
+      } else {
+        syncSidebarToLayout(isDesktop);
+      }
+
+      lastIsDesktop = isDesktop;
+    };
+
     if (!hasManuallyToggled) {
       handleResize();
     }
