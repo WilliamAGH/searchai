@@ -11,6 +11,62 @@ import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { corsPreflightResponse } from "../cors";
 
+type SanitizedContextReference = {
+  contextId: string;
+  type: "search_result" | "scraped_page" | "research_summary";
+  url?: string;
+  title?: string;
+  timestamp: number;
+  relevanceScore?: number;
+  metadata?: unknown;
+};
+
+export function sanitizeContextReferences(
+  input: unknown,
+): SanitizedContextReference[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+
+  return input
+    .slice(0, 12)
+    .map((refRaw) => {
+      if (typeof refRaw !== "object" || refRaw === null) return null;
+      const ref = refRaw as Record<string, unknown>;
+      const contextId = typeof ref.contextId === "string" ? ref.contextId : "";
+      const type = ref.type;
+      if (
+        !contextId ||
+        (type !== "search_result" &&
+          type !== "scraped_page" &&
+          type !== "research_summary")
+      ) {
+        return null;
+      }
+
+      const sanitized: SanitizedContextReference = {
+        contextId,
+        type,
+        timestamp:
+          typeof ref.timestamp === "number" ? ref.timestamp : Date.now(),
+      };
+
+      if (typeof ref.url === "string") {
+        sanitized.url = ref.url.slice(0, 2000);
+      }
+      if (typeof ref.title === "string") {
+        sanitized.title = ref.title.slice(0, 500);
+      }
+      if (typeof ref.relevanceScore === "number") {
+        sanitized.relevanceScore = ref.relevanceScore;
+      }
+      if (typeof ref.metadata !== "undefined") {
+        sanitized.metadata = ref.metadata;
+      }
+
+      return sanitized;
+    })
+    .filter((ref): ref is SanitizedContextReference => !!ref);
+}
+
 /**
  * Register agent-based AI routes on the HTTP router
  */
@@ -84,10 +140,18 @@ export function registerAgentAIRoutes(http: HttpRouter) {
             .slice(0, 5000)
         : undefined;
 
+      const contextReferences = sanitizeContextReferences(
+        (payload as Record<string, unknown>).contextReferences,
+      );
+
       dlog("🤖 AGENT AI ENDPOINT CALLED:");
       dlog("Message length:", message.length);
       dlog("Has context:", !!conversationContext);
       dlog("Context length:", conversationContext?.length || 0);
+      dlog(
+        "Context references provided:",
+        contextReferences ? contextReferences.length : 0,
+      );
       dlog("Environment Variables Available:");
       dlog(
         "- OPENROUTER_API_KEY:",
@@ -104,6 +168,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
           {
             userQuery: message,
             conversationContext,
+            contextReferences,
           },
         );
 
@@ -268,6 +333,9 @@ export function registerAgentAIRoutes(http: HttpRouter) {
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
             .slice(0, 5000)
         : undefined;
+      const contextReferences = sanitizeContextReferences(
+        payload.contextReferences,
+      );
 
       try {
         // Create SSE stream that wraps the non-streaming workflow
@@ -297,7 +365,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
               // Execute the full workflow
               const workflowResult = await ctx.runAction(
                 api.agents.orchestration.orchestrateResearchWorkflow,
-                { userQuery: message, conversationContext },
+                { userQuery: message, conversationContext, contextReferences },
               );
 
               // Stage 2: Research (emit tool calls)
