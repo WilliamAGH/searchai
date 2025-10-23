@@ -64,10 +64,10 @@ export function registerScrapeRoutes(http: HttpRouter) {
         const hostname = urlObj.hostname.toLowerCase();
 
         // Allow localhost in development mode for testing
+        const deployment = process.env.CONVEX_DEPLOYMENT;
         const isDevelopment =
           process.env.NODE_ENV === "development" ||
-          process.env.CONVEX_DEPLOYMENT?.includes("dev") ||
-          !process.env.CONVEX_DEPLOYMENT;
+          Boolean(deployment && deployment.includes("dev"));
 
         // Block localhost and loopback (except in development)
         if (
