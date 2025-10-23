@@ -22,6 +22,7 @@ import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { throttle, isNearBottom } from "../../lib/utils";
+import { resolveMessageKey } from "./messageKey";
 
 /**
  * Public props for `MessageList` UI component.
@@ -429,10 +430,10 @@ export function MessageList({
               className="space-y-6 sm:space-y-8"
               estimatedItemHeight={150}
               renderItem={(message, index) => {
-                const messageKey =
-                  message._id ||
-                  message.id ||
-                  `fallback-${index}-${message.role}-${message.timestamp || 0}`;
+                const messageKey = resolveMessageKey(
+                  message,
+                  `virtual-${index}`,
+                );
                 return (
                   <MessageItem
                     key={messageKey}
@@ -456,10 +457,7 @@ export function MessageList({
           ) : (
             messages.map((message, index) => {
               // Generate stable unique key for each message
-              const messageKey =
-                message._id ||
-                message.id ||
-                `fallback-${index}-${message.role}-${message.timestamp || 0}`;
+              const messageKey = resolveMessageKey(message, `linear-${index}`);
 
               // Debug undefined keys in development
               if (!message._id && !message.id && import.meta.env.DEV) {

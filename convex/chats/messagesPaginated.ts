@@ -2,6 +2,7 @@
  * Paginated message operations for better performance
  * - Supports cursor-based pagination
  * - Returns messages in chronological order
+ * - SECURITY: Validates cursor ownership before query execution
  */
 
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -108,20 +109,24 @@ export const getChatMessagesPaginated = query({
       .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
       .order("desc"); // Get newest first, we'll reverse later
 
-    // If we have a cursor, validate and start after it
+    // If we have a cursor, validate it BEFORE using it in any query
     if (args.cursor) {
       // The cursor we return is a message _id. Type it to narrow return type
       const cursorMessage = await ctx.db.get(args.cursor as Id<"messages">);
-      if (!cursorMessage) {
-        // Invalid/expired cursor: recover by returning the most recent page
-        return await fetchPage(baseQuery);
+
+      // SECURITY: Validate cursor belongs to the requested chat BEFORE any query execution
+      // This prevents a malicious cursor from a different chat exposing unauthorized data
+      if (!cursorMessage || cursorMessage.chatId !== args.chatId) {
+        // Invalid/expired cursor OR cursor from different chat:
+        // Return empty result to prevent any data leakage
+        // Client should handle this by refreshing from the beginning
+        return {
+          messages: [],
+          hasMore: false,
+        };
       }
-      // Verify the cursor is from the same chat
-      if (cursorMessage.chatId !== args.chatId) {
-        // Cursor from different chat: return the most recent page
-        return await fetchPage(baseQuery);
-      }
-      // Continue from the cursor position
+
+      // Cursor is valid and belongs to this chat - continue from the cursor position
       baseQuery = baseQuery.filter((q) =>
         q.lt(q.field("_creationTime"), cursorMessage._creationTime),
       );
