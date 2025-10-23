@@ -159,13 +159,8 @@ export const getChatByOpaqueId = query({
   },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
-    // Validate the ID format before using it
-    // Convex IDs are typically 25+ character alphanumeric strings
-    if (!/^[a-zA-Z0-9]{20,}$/.test(args.opaqueId)) {
-      return null;
-    }
-
     // Treat the opaque ID string as a Convex chat ID
+    // The try-catch will handle invalid IDs gracefully
     const chatId = args.opaqueId as Id<"chats">;
 
     // Use try-catch to handle invalid IDs gracefully
