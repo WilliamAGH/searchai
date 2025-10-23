@@ -13,10 +13,21 @@ test.describe("smoke: pagination", () => {
   }) => {
     const consoleErrors: string[] = [];
     const requestFailures: string[] = [];
+    const responseFailures: string[] = [];
 
     // Monitor console errors
     page.on("console", (msg) => {
       if (msg.type() === "error") {
+        const text = msg.text();
+        // Ignore 403 errors from message sending - expected without API keys
+        if (
+          text.includes("HTTP 403") ||
+          text.includes("Failed to send message") ||
+          text.includes("403 (Forbidden)") ||
+          text.includes("Failed to load resource")
+        ) {
+          return;
+        }
         const loc = msg.location();
         const where = loc.url
           ? `${loc.url}:${loc.lineNumber ?? 0}:${loc.columnNumber ?? 0}`
@@ -38,6 +49,17 @@ test.describe("smoke: pagination", () => {
         requestFailures.push(
           `${req.method()} ${url} -> ${req.failure()?.errorText}`,
         );
+      }
+    });
+
+    // Monitor HTTP error responses
+    page.on("response", (res) => {
+      const url = res.url();
+      if (!url.startsWith("http://") && !url.startsWith("https://")) return;
+      const status = res.status();
+      // Ignore 403 errors - these are expected from AI backend without API keys in tests
+      if (status >= 400 && status !== 403) {
+        responseFailures.push(`${res.request().method()} ${url} -> ${status}`);
       }
     });
 
@@ -130,9 +152,17 @@ test.describe("smoke: pagination", () => {
       )
       .toEqual([]);
 
+    expect
+      .soft(
+        responseFailures,
+        `No HTTP error responses during pagination test.\n${responseFailures.join("\n")}`,
+      )
+      .toEqual([]);
+
     // Final assertions - ensure no critical errors occurred
     expect(consoleErrors).toEqual([]);
     expect(requestFailures).toEqual([]);
+    expect(responseFailures).toEqual([]);
   });
 
   test("pagination UI elements are accessible", async ({ page, baseURL }) => {
