@@ -42,6 +42,8 @@ import type * as http_routes_scrape from "../http/routes/scrape.js";
 import type * as http_routes_search from "../http/routes/search.js";
 import type * as http_utils from "../http/utils.js";
 import type * as http from "../http.js";
+import type * as lib_id_generator from "../lib/id_generator.js";
+import type * as lib_providers_openai from "../lib/providers/openai.js";
 import type * as lib_security_patterns from "../lib/security/patterns.js";
 import type * as lib_security_sanitization from "../lib/security/sanitization.js";
 import type * as lib_security_webContent from "../lib/security/webContent.js";
@@ -103,6 +105,8 @@ declare const fullApi: ApiFromModules<{
   "http/routes/search": typeof http_routes_search;
   "http/utils": typeof http_utils;
   http: typeof http;
+  "lib/id_generator": typeof lib_id_generator;
+  "lib/providers/openai": typeof lib_providers_openai;
   "lib/security/patterns": typeof lib_security_patterns;
   "lib/security/sanitization": typeof lib_security_sanitization;
   "lib/security/webContent": typeof lib_security_webContent;
