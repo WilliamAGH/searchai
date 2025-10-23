@@ -328,15 +328,16 @@ function ChatInterfaceComponent({
     planSearch,
     isTopicChange,
     generateResponse: async (args: { chatId: string; message: string }) => {
-      if (chatActions.sendMessage) {
-        await chatActions.sendMessage(args.chatId, args.message);
-      } else {
-        logger.error("generateResponse: sendMessage not available");
+      if (!chatActions.sendMessage) {
+        throw new Error("Message sending is currently unavailable.");
       }
+
+      await chatActions.sendMessage(args.chatId, args.message);
     },
     generateUnauthenticatedResponse,
     maybeShowFollowUpPrompt,
     chatActions,
+    setErrorMessage: chatActions.setError,
   });
 
   useEffect(() => {

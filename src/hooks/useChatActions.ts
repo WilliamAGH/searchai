@@ -63,6 +63,7 @@ export interface ChatActions {
   setShowShareModal: (show: boolean) => void;
   setPendingMessage: (message: string) => void;
   addToHistory: (message: string) => void;
+  setError: (message: string) => void;
 
   // Utility
   refreshChats: () => Promise<void>;
@@ -731,6 +732,10 @@ export function createChatActions(
         ...prev,
         userHistory: [...prev.userHistory, message],
       }));
+    },
+
+    setError(message: string) {
+      setState((prev) => ({ ...prev, error: message }));
     },
 
     // Utility
