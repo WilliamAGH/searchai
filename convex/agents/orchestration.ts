@@ -20,7 +20,6 @@ import { vContextReference } from "../lib/validators";
 // ============================================
 // Helper types, constants, and utilities
 // ============================================
-
 const UUID_V7_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOOL_RESULT_MAX_LENGTH = 200;
@@ -57,7 +56,9 @@ const formatContextReferencesForPrompt = (
         typeof ref.relevanceScore === "number"
           ? ` (relevance ${ref.relevanceScore.toFixed(2)})`
           : "";
-      return `${idx + 1}. ${label}${ref.url ? ` — ${ref.url}` : ""}${relevance} [${ref.contextId}]`;
+      return `${idx + 1}. ${label}${
+        ref.url ? ` — ${ref.url}` : ""
+      }${relevance} [${ref.contextId}]`;
     })
     .join("\n");
   return `PREVIOUS CONTEXT REFERENCES:\n${recent}`;
@@ -221,11 +222,21 @@ export const orchestrateResearchWorkflow = action({
       throw new Error("Planning failed: no final output");
     }
 
+    const plannedQueries = planningResult.finalOutput.searchQueries ?? [];
+    const hasPlannedQueries = plannedQueries.length > 0;
+    const priorContextReferences = args.contextReferences ?? [];
+    const conversationBlock = args.conversationContext
+      ? `RECENT CONVERSATION CONTEXT:\n${args.conversationContext}\n\n`
+      : "";
+    const referenceBlock = formatContextReferencesForPrompt(
+      priorContextReferences,
+    );
+
     console.info("✅ PLANNING COMPLETE:", {
       workflowId,
       duration: planningDuration,
       userIntent: planningResult.finalOutput.userIntent,
-      queryCount: planningResult.finalOutput.searchQueries.length,
+      queryCount: plannedQueries.length,
       needsScraping: planningResult.finalOutput.needsWebScraping,
       confidence: planningResult.finalOutput.confidenceLevel,
     });
@@ -235,16 +246,6 @@ export const orchestrateResearchWorkflow = action({
     // ============================================
     console.info("🔬 STAGE 2: Research Execution");
     const researchStart = Date.now();
-
-    const priorContextReferences = args.contextReferences ?? [];
-    const conversationBlock = args.conversationContext
-      ? `RECENT CONVERSATION CONTEXT:\n${args.conversationContext}\n\n`
-      : "";
-    const referenceBlock = formatContextReferencesForPrompt(
-      priorContextReferences as unknown as ResearchContextReference[],
-    );
-    const plannedQueries = planningResult.finalOutput.searchQueries ?? [];
-    const hasPlannedQueries = plannedQueries.length > 0;
 
     let researchDuration = 0;
     let researchOutput: any;
@@ -622,7 +623,10 @@ export const orchestrateResearchWorkflowStreaming = action({
     const workflowId = generateMessageId();
     const startTime = Date.now();
     const streamingContextReferences = args.contextReferences ?? [];
-    const _referenceBlockForStreaming = formatContextReferencesForPrompt(
+    const conversationBlock = args.conversationContext
+      ? `RECENT CONVERSATION CONTEXT:\n${args.conversationContext}\n\n`
+      : "";
+    const referenceBlock = formatContextReferencesForPrompt(
       streamingContextReferences,
     );
 
@@ -630,6 +634,7 @@ export const orchestrateResearchWorkflowStreaming = action({
       workflowId,
       query: args.userQuery,
       hasContext: !!args.conversationContext,
+      hasReferences: streamingContextReferences.length > 0,
       timestamp: new Date().toISOString(),
     });
 
@@ -697,7 +702,7 @@ ORIGINAL QUESTION: ${args.userQuery}
 
 USER INTENT: ${planningOutput.userIntent}
 
-INFORMATION NEEDED:
+${conversationBlock}${referenceBlock ? `${referenceBlock}\n\n` : ""}INFORMATION NEEDED:
 ${planningOutput.informationNeeded.map((info: string, i: number) => `${i + 1}. ${info}`).join("\n")}
 
 SEARCH PLAN:
@@ -1019,7 +1024,11 @@ export const runAgentWorkflowAndPersist = action({
       if (Array.isArray((message as any).contextReferences)) {
         for (const ref of (message as any)
           .contextReferences as ResearchContextReference[]) {
-          if (!priorContextReferences.find((existing) => existing.contextId === ref.contextId)) {
+          if (
+            !priorContextReferences.find(
+              (existing) => existing.contextId === ref.contextId,
+            )
+          ) {
             priorContextReferences.push(ref);
           }
         }

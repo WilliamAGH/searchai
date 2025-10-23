@@ -132,6 +132,68 @@ TOOL USAGE GUIDELINES:
 - Aim for comprehensive coverage but avoid redundancy
 - Track which URLs you've used
 
+CRITICAL TOOL OUTPUT HARVESTING:
+- Every tool call returns a \`contextId\` (UUIDv7). Capture it exactly as returned.
+- For \`search_web\` responses you receive an object shaped like:
+  {
+    contextId: "019a122e-....",
+    query: "original search query",
+    results: [
+      { title, url, snippet, relevanceScore }
+    ]
+  }
+  For each result, emit a \`sourcesUsed\` entry:
+  {
+    url: result.url,
+    title: result.title,
+    contextId: <top-level contextId>,
+    type: "search_result",
+    relevance: result.relevanceScore >= 0.75 ? "high" : result.relevanceScore >= 0.5 ? "medium" : "low"
+  }
+- For \`scrape_webpage\` responses shaped like:
+  {
+    contextId,
+    url,
+    title,
+    content,
+    summary
+  }
+  emit exactly one \`sourcesUsed\` entry with type "scraped_page" and relevance "high".
+- NEVER omit sources when tools were used. If no authoritative data is found, explicitly list the attempted searches and explain the gap.
+
+KEY FINDINGS CONSTRUCTION:
+- Every \`keyFindings[i].sources\` array must list the precise URLs you included in \`sourcesUsed\`.
+- Use the captured \`contextId\` to keep findings aligned with the supporting evidence.
+
+OUTPUT EXAMPLE:
+{
+  researchSummary: "Banana Republic is headquartered in San Francisco...",
+  keyFindings: [
+    {
+      finding: "Banana Republic is headquartered in San Francisco, California.",
+      sources: ["https://bananarepublic.gap.com/about"],
+      confidence: "high"
+    }
+  ],
+  sourcesUsed: [
+    {
+      url: "https://bananarepublic.gap.com/about",
+      title: "About Banana Republic",
+      contextId: "019a122e-c507-7851-99f7-b8f5d7345b40",
+      type: "search_result",
+      relevance: "high"
+    },
+    {
+      url: "https://gap.com/corporate",
+      title: "Gap Inc Corporate Information",
+      contextId: "019a122e-c507-7851-99f7-b8f5d7345b40",
+      type: "search_result",
+      relevance: "medium"
+    }
+  ],
+  researchQuality: "comprehensive"
+}
+
 IMPORTANT:
 - Be systematic and thorough
 - Cross-reference information from multiple sources
@@ -185,7 +247,7 @@ IMPORTANT:
   modelSettings: {
     ...env.defaultModelSettings,
     temperature: 0.4,
-    reasoning: { effort: "medium" }, // Enable reasoning for tool selection
+    reasoning: { effort: "high" }, // Allocate more deliberate steps for tool orchestration
   },
 });
 

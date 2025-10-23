@@ -22,7 +22,18 @@ export const searchWebTool: FunctionTool<any, any, unknown> = tool({
 - Product details
 - Current events
 - Location information
-Returns search results with titles, URLs, snippets, and relevance scores.`,
+Returns search results with titles, URLs, snippets, and relevance scores.
+
+OUTPUT FORMAT EXAMPLE:
+{
+  "contextId": "019a122e-....",
+  "query": "original search query",
+  "resultCount": 3,
+  "results": [
+    { "title": "Example", "url": "https://example.com", "snippet": "...", "relevanceScore": 0.82 }
+  ]
+}
+Always propagate the top-level contextId into every sourcesUsed entry you derive from these results.`,
   parameters: z.object({
     query: z
       .string()
@@ -141,7 +152,17 @@ export const scrapeWebpageTool: FunctionTool<any, any, unknown> = tool({
 - Content verification from official sources
 - In-depth article or page content
 - Information beyond search result snippets
-Returns the page title, full cleaned content, and a summary.`,
+Returns the page title, full cleaned content, and a summary.
+
+OUTPUT FORMAT EXAMPLE:
+{
+  "contextId": "019a122e-....",
+  "url": "https://example.com/page",
+  "title": "Example Page",
+  "content": "Full cleaned content...",
+  "summary": "Short synopsis..."
+}
+Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high", copying the contextId verbatim.`,
   parameters: z.object({
     url: z
       .string()
