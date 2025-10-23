@@ -16,6 +16,7 @@ const applicationTables = {
    * - User conversations
    * - Share IDs for URLs
    * - Rolling summaries for context
+   * - UUID v7 thread tracking for external integrations
    */
   chats: defineTable({
     title: v.string(),
@@ -23,6 +24,7 @@ const applicationTables = {
     sessionId: v.optional(v.string()),
     shareId: v.optional(v.string()),
     publicId: v.optional(v.string()),
+    threadId: v.optional(v.string()), // UUID v7 for conversation thread tracking
     privacy: v.optional(
       v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
     ),
@@ -34,7 +36,8 @@ const applicationTables = {
     .index("by_user", ["userId"])
     .index("by_sessionId", ["sessionId"])
     .index("by_share_id", ["shareId"])
-    .index("by_public_id", ["publicId"]),
+    .index("by_public_id", ["publicId"])
+    .index("by_thread_id", ["threadId"]),
 
   /**
    * Messages table
@@ -42,9 +45,12 @@ const applicationTables = {
    * - Search results metadata
    * - Streaming state tracking
    * - Reasoning/thinking tokens
+   * - UUID v7 message and thread tracking for context continuity
    */
   messages: defineTable({
     chatId: v.id("chats"),
+    messageId: v.optional(v.string()), // UUID v7 for unique message tracking
+    threadId: v.optional(v.string()), // UUID v7 for thread/conversation tracking
     role: v.union(
       v.literal("user"),
       v.literal("assistant"),
@@ -58,6 +64,10 @@ const applicationTables = {
           url: v.string(),
           snippet: v.string(),
           relevanceScore: v.number(), // Required, not optional - consistent with most definitions
+          // Optional fields from search results
+          content: v.optional(v.string()),
+          fullTitle: v.optional(v.string()),
+          summary: v.optional(v.string()),
         }),
       ),
     ),
@@ -76,7 +86,10 @@ const applicationTables = {
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
     timestamp: v.optional(v.number()),
-  }).index("by_chatId", ["chatId"]),
+  })
+    .index("by_chatId", ["chatId"])
+    .index("by_messageId", ["messageId"])
+    .index("by_threadId", ["threadId"]),
 
   /**
    * Metrics table

@@ -8,4 +8,8 @@ export const vSearchResult = v.object({
   url: v.string(),
   snippet: v.string(),
   relevanceScore: v.number(),
+  // Optional fields from search results
+  content: v.optional(v.string()),
+  fullTitle: v.optional(v.string()),
+  summary: v.optional(v.string()),
 });

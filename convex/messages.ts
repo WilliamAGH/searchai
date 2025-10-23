@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { vSearchResult } from "./lib/validators";
+import { generateMessageId, generateThreadId } from "./lib/id_generator";
 
 export const addMessage = internalMutation({
   args: {
@@ -32,9 +33,22 @@ export const addMessage = internalMutation({
     if (!chat) throw new Error("Chat not found");
     if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
+    // Generate UUID v7 for message tracking
+    const messageId = generateMessageId();
+
+    // Get or create thread ID from chat
+    let threadId = chat.threadId;
+    if (!threadId) {
+      threadId = generateThreadId();
+      // Update chat with threadId if not present
+      await ctx.db.patch(args.chatId, { threadId });
+    }
+
     const { chatId, ...rest } = args;
     return await ctx.db.insert("messages", {
       chatId: chatId,
+      messageId, // UUID v7 for unique message tracking
+      threadId, // UUID v7 for conversation thread continuity
       ...rest,
       timestamp: Date.now(),
     });
