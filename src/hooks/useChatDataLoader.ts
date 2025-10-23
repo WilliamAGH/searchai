@@ -72,38 +72,90 @@ export function useChatDataLoader(
   // Auto-select first chat if none selected
   // Only runs when chats list changes AND no chat is currently selected
   useEffect(() => {
+    if (!repository) return;
+
+    let cancelled = false;
+    let pendingChatId: string | null = null;
+    let pendingChat: ChatState["chats"][number] | null = null;
+
     setState((prev) => {
       // Skip if already have a chat selected or no chats available
-      if (prev.currentChatId || !prev.chats.length || !repository) {
+      if (prev.currentChatId || !prev.chats.length) {
         return prev;
       }
 
-      const firstChat = prev.chats[0];
+      const [firstChat] = prev.chats;
+      if (!firstChat) {
+        return prev;
+      }
 
-      // Load messages for first chat asynchronously
-      repository
-        .getMessages(firstChat.id)
-        .then((messages) => {
-          setState((current) => {
-            // Double-check that no chat was selected in the meantime
-            if (current.currentChatId) return current;
-            return {
-              ...current,
-              currentChatId: firstChat.id,
-              currentChat: firstChat,
-              messages,
-            };
-          });
-        })
-        .catch((error) => {
-          logger.error("Failed to load messages for first chat:", error);
-        });
+      pendingChatId = firstChat.id;
+      pendingChat = firstChat;
 
       return {
         ...prev,
-        currentChatId: firstChat.id,
-        currentChat: firstChat,
+        isLoading: true,
       };
     });
+
+    if (!pendingChatId || !pendingChat) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    repository
+      .getMessages(pendingChatId)
+      .then((messages) => {
+        if (cancelled) return;
+
+        setState((current) => {
+          if (
+            current.currentChatId &&
+            current.currentChatId !== pendingChatId
+          ) {
+            return current.isLoading
+              ? { ...current, isLoading: false }
+              : current;
+          }
+
+          const nextChat =
+            current.chats.find((chat) => chat.id === pendingChatId) ??
+            pendingChat;
+
+          if (!nextChat) {
+            return {
+              ...current,
+              isLoading: false,
+            };
+          }
+
+          return {
+            ...current,
+            currentChatId: nextChat.id,
+            currentChat: nextChat,
+            messages,
+            isLoading: false,
+          };
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+
+        logger.error("Failed to load messages for first chat:", error);
+
+        setState((current) => ({
+          ...current,
+          isLoading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to load messages for first chat",
+        }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [repository, setState]);
 }
