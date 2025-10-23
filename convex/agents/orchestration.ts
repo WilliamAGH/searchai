@@ -14,6 +14,7 @@ import { agents } from "./definitions";
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
 import { generateChatTitle } from "../chats/utils";
+import { parseAnswerText } from "./answerParser";
 
 /**
  * Orchestrate the full research and answer workflow
@@ -123,6 +124,7 @@ export const orchestrateResearchWorkflow = action({
       timestamp: v.number(),
     }),
   }),
+  // @ts-ignore - Known Convex TS2719: deeply nested generic inference in action handlers
   handler: async (ctx, args) => {
     const workflowId = generateMessageId();
     const startTime = Date.now();
@@ -317,18 +319,25 @@ Remember the user wants to know: ${planningResult.finalOutput.userIntent}
     const synthesisDuration = Date.now() - synthesisStart;
     const totalDuration = Date.now() - startTime;
 
-    if (!synthesisResult.finalOutput) {
-      throw new Error("Synthesis failed: no final output");
+    // Extract raw text from synthesis result
+    // Since we removed structured output, finalOutput is now just the raw text
+    const rawAnswerText = synthesisResult.finalOutput as string;
+
+    if (!rawAnswerText || typeof rawAnswerText !== "string") {
+      throw new Error("Synthesis failed: no text output");
     }
+
+    // Parse the raw answer text to extract metadata
+    const parsedAnswer = parseAnswerText(rawAnswerText);
 
     console.info("✅ SYNTHESIS COMPLETE:", {
       workflowId,
       duration: synthesisDuration,
-      answerLength: synthesisResult.finalOutput.answer.length,
-      hasLimitations: synthesisResult.finalOutput.hasLimitations,
-      completeness: synthesisResult.finalOutput.answerCompleteness,
-      confidence: synthesisResult.finalOutput.confidence,
-      sourcesUsed: synthesisResult.finalOutput.sourcesUsed.length,
+      answerLength: parsedAnswer.answer.length,
+      hasLimitations: parsedAnswer.hasLimitations,
+      completeness: parsedAnswer.answerCompleteness,
+      confidence: parsedAnswer.confidence,
+      sourcesUsed: parsedAnswer.sourcesUsed.length,
     });
 
     console.info("🎉 WORKFLOW COMPLETE:", {
@@ -356,8 +365,8 @@ Remember the user wants to know: ${planningResult.finalOutput.userIntent}
     };
 
     const normalizedAnswer = {
-      ...synthesisResult.finalOutput,
-      limitations: synthesisResult.finalOutput.limitations ?? undefined,
+      ...parsedAnswer,
+      limitations: parsedAnswer.limitations ?? undefined,
     };
 
     return {
@@ -657,13 +666,14 @@ Remember the user wants to know: ${planningOutput.userIntent}
           { stream: true }, // Enable streaming!
         );
 
-        let synthesisOutput: any = null;
+        let accumulatedAnswer = "";
 
         // Stream answer content token-by-token
         for await (const event of synthesisResult) {
           if (event.type === "raw_model_stream_event") {
             const delta = (event.data as any).choices?.[0]?.delta?.content;
             if (delta) {
+              accumulatedAnswer += delta;
               yield {
                 type: "content",
                 delta: delta,
@@ -672,18 +682,25 @@ Remember the user wants to know: ${planningOutput.userIntent}
           }
         }
 
-        synthesisOutput = synthesisResult.finalOutput;
+        // Get final output (should be the complete raw text)
+        const synthesisOutput = synthesisResult.finalOutput as string;
 
-        if (!synthesisOutput) {
-          throw new Error("Synthesis failed: no final output");
+        if (!synthesisOutput || typeof synthesisOutput !== "string") {
+          throw new Error("Synthesis failed: no text output");
         }
+
+        // Parse the complete answer to extract metadata
+        const parsedAnswer = parseAnswerText(synthesisOutput);
+        const finalAnswerText = parsedAnswer.answer || accumulatedAnswer;
 
         const totalDuration = Date.now() - startTime;
 
         console.info("✅ STREAMING WORKFLOW COMPLETE:", {
           workflowId,
           totalDuration,
-          answerLength: synthesisOutput.answer.length,
+          answerLength: finalAnswerText.length,
+          hasLimitations: parsedAnswer.hasLimitations,
+          confidence: parsedAnswer.confidence,
         });
 
         // Final completion event with metadata
@@ -693,7 +710,10 @@ Remember the user wants to know: ${planningOutput.userIntent}
             workflowId,
             planning: planningOutput,
             research: researchOutput,
-            answer: synthesisOutput,
+            answer: {
+              ...parsedAnswer,
+              answer: finalAnswerText,
+            },
             metadata: {
               totalDuration,
               timestamp: Date.now(),

@@ -192,6 +192,10 @@ IMPORTANT:
 /**
  * Phase 3: Answer Synthesis Agent
  * Synthesizes final answer from research context
+ *
+ * NOTE: This agent uses RAW TEXT OUTPUT (no structured output)
+ * to preserve answer quality and avoid rewriting artifacts.
+ * Metadata is extracted via parsing after generation.
  */
 export const answerSynthesisAgent = Agent.create({
   name: "AnswerSynthesisAgent",
@@ -236,36 +240,11 @@ IMPORTANT:
 - Don't describe your process or research steps
 - Don't say "based on my search" - just answer
 - Only mention limitations if genuinely relevant
-- Use GitHub-Flavored Markdown for formatting`,
+- Use GitHub-Flavored Markdown for formatting
+- Write your complete answer directly - it will be used as-is`,
 
-  outputType: z.object({
-    answer: z
-      .string()
-      .describe(
-        "The complete answer with inline citations. This is what the user will see.",
-      ),
-    hasLimitations: z
-      .boolean()
-      .describe("Whether there are limitations or gaps in the answer"),
-    limitations: z
-      .string()
-      .nullable()
-      .optional()
-      .describe(
-        "Brief description of limitations, if any (only if hasLimitations=true)",
-      ),
-    sourcesUsed: z
-      .array(z.string())
-      .describe("List of source URLs cited in the answer"),
-    answerCompleteness: z
-      .enum(["complete", "partial", "insufficient"])
-      .describe("How completely the research answered the question"),
-    confidence: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe("Confidence in the accuracy of the answer"),
-  }),
+  // NO outputType - we want raw text generation to preserve quality
+  outputType: undefined,
 
   modelSettings: {
     ...env.defaultModelSettings,

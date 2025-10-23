@@ -13,6 +13,7 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as agents_answerParser from "../agents/answerParser.js";
 import type * as agents_definitions from "../agents/definitions.js";
 import type * as agents_index from "../agents/index.js";
 import type * as agents_orchestration from "../agents/orchestration.js";
@@ -76,6 +77,7 @@ import type * as search from "../search.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  "agents/answerParser": typeof agents_answerParser;
   "agents/definitions": typeof agents_definitions;
   "agents/index": typeof agents_index;
   "agents/orchestration": typeof agents_orchestration;
