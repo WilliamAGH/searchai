@@ -196,6 +196,10 @@ function ChatInterfaceComponent({
     enabled: isAuthenticated && !!currentChatId && !currentChat?.isLocal,
   });
 
+  const handlePaginatedLoadMore = useCallback(async () => {
+    await loadMore();
+  }, [loadMore]);
+
   // Use paginated messages when available, fallback to regular messages
   const effectiveMessages = useMemo(() => {
     if (
@@ -432,7 +436,7 @@ function ChatInterfaceComponent({
     // Pagination props
     isLoadingMore,
     hasMore,
-    onLoadMore: loadMore,
+    onLoadMore: handlePaginatedLoadMore,
     isLoadingMessages,
     loadError,
     retryCount,
