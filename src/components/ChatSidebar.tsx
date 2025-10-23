@@ -5,6 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 import { logger } from "../lib/logger";
 import { isLocalChat } from "../lib/types/chat";
+import { toConvexId } from "../lib/utils/idValidation";
 
 /**
  * Props for the ChatSidebar component
@@ -95,23 +96,35 @@ export function ChatSidebar({
                 : (resolvedId as Id<"chats">),
             );
           } else {
-            onRequestDeleteChat(
-              attr.includes("|")
-                ? (attr as unknown as Id<"chats">)
-                : (attr as string),
-            );
+            // Safely validate Convex ID before casting
+            const convexId = toConvexId<"chats">(attr);
+            if (convexId) {
+              onRequestDeleteChat(convexId);
+            } else {
+              onRequestDeleteChat(attr as string);
+            }
           }
         } else if (match) {
           // Decide local vs server based on chat object, not typeof _id
           if (isLocalChat(match)) {
             onDeleteLocalChat?.(String(resolvedId ?? attr));
           } else {
-            await deleteChat({ chatId: (resolvedId ?? attr) as Id<"chats"> });
+            // Safely validate before calling mutation
+            const chatId = toConvexId<"chats">(String(resolvedId ?? attr));
+            if (chatId) {
+              await deleteChat({ chatId });
+            } else {
+              logger.warn(
+                "Invalid Convex ID format for chat deletion:",
+                resolvedId ?? attr,
+              );
+            }
           }
         } else {
-          // Fallback if no match: infer by Convex ID shape (contains '|')
-          if (attr.includes("|")) {
-            await deleteChat({ chatId: attr as unknown as Id<"chats"> });
+          // Fallback: safely validate before deciding local vs Convex
+          const convexId = toConvexId<"chats">(attr);
+          if (convexId) {
+            await deleteChat({ chatId: convexId });
           } else {
             onDeleteLocalChat?.(attr);
           }

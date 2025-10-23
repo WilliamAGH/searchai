@@ -10,6 +10,7 @@ import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { generateShareId, generatePublicId } from "../lib/uuid";
+import { safeConvexId } from "../lib/validators";
 
 /**
  * Create new chat
@@ -164,16 +165,19 @@ export const getChatByOpaqueId = query({
   },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
-    // Treat the opaque ID string as a Convex chat ID
-    // The try-catch will handle invalid IDs gracefully
-    const chatId = args.opaqueId as Id<"chats">;
+    // Validate the opaque ID is a valid Convex ID format before using it
+    const chatId = safeConvexId<"chats">(args.opaqueId);
 
-    // Use try-catch to handle invalid IDs gracefully
+    // Return null immediately if the ID format is invalid
+    if (!chatId) {
+      return null;
+    }
+
+    // Use try-catch to handle database errors (e.g., ID exists but table mismatch)
     try {
-      // Reuse validation logic
       return await validateChatAccess(ctx, chatId, args.sessionId);
     } catch {
-      // Invalid ID format will throw when accessing the database
+      // Database error (e.g., malformed ID that passed format check)
       return null;
     }
   },
