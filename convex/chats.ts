@@ -16,6 +16,7 @@ export {
   createChat,
   getUserChats,
   getChatById,
+  getChatByIdDirect,
   getChat,
   getChatByOpaqueId,
   getChatByShareId,

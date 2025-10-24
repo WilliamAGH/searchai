@@ -10,7 +10,6 @@ import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { generateShareId, generatePublicId } from "../lib/uuid";
-import { safeConvexId } from "../lib/validators";
 
 /**
  * Create new chat
@@ -107,18 +106,23 @@ async function validateChatAccess(
   // For authenticated users: check userId matches
   if (chat.userId) {
     if (chat.userId !== userId) return null;
-  }
-  // For anonymous chats: check sessionId matches
-  else if (chat.sessionId) {
-    if (!sessionId || chat.sessionId !== sessionId) return null;
-  }
-  // For shared/public chats: check privacy setting
-  else if (chat.privacy === "shared" || chat.privacy === "public") {
-    // Allow access to shared/public chats
     return chat;
   }
 
-  return chat;
+  // For anonymous chats: check sessionId matches
+  if (chat.sessionId) {
+    if (!sessionId || chat.sessionId !== sessionId) return null;
+    return chat;
+  }
+
+  // Newly created chats may not yet have ownership fields populated.
+  // Allow read when the caller supplies a matching anonymous session.
+  if (!chat.userId && !chat.sessionId && sessionId) {
+    return chat;
+  }
+
+  // No valid access path
+  return null;
 }
 
 /**
@@ -137,6 +141,54 @@ export const getChatById = query({
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
     return await validateChatAccess(ctx, args.chatId, args.sessionId);
+  },
+});
+
+/**
+ * Get chat by ID with direct database lookup (bypasses indexes)
+ * Use this immediately after creation to avoid index propagation delays
+ * @param chatId - Chat database ID
+ * @param sessionId - Optional session ID for anonymous users
+ * @returns Chat or null
+ */
+export const getChatByIdDirect = query({
+  args: {
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+  },
+  returns: v.union(v.any(), v.null()),
+  handler: async (ctx, args) => {
+    // Direct lookup bypasses index - use for immediate post-creation reads
+    const chat = await ctx.db.get(args.chatId);
+
+    if (!chat) return null;
+
+    const userId = await getAuthUserId(ctx);
+
+    // Shared and public chats are accessible regardless of owner or session
+    if (chat.privacy === "shared" || chat.privacy === "public") {
+      return chat;
+    }
+
+    // For authenticated users: check userId matches
+    if (chat.userId) {
+      if (chat.userId !== userId) return null;
+      return chat;
+    }
+
+    // For anonymous chats: check sessionId matches
+    if (chat.sessionId) {
+      if (!args.sessionId || chat.sessionId !== args.sessionId) return null;
+      return chat;
+    }
+
+    // Newly inserted anonymous chats might not yet have session ownership stored.
+    if (!chat.userId && !chat.sessionId && args.sessionId) {
+      return chat;
+    }
+
+    // Chat has no userId or sessionId - only accessible if public/shared
+    return null;
   },
 });
 
@@ -165,21 +217,13 @@ export const getChatByOpaqueId = query({
   },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
-    // Validate the opaque ID is a valid Convex ID format before using it
-    const chatId = safeConvexId<"chats">(args.opaqueId);
+    const chatId = ctx.db.normalizeId("chats", args.opaqueId);
 
-    // Return null immediately if the ID format is invalid
     if (!chatId) {
       return null;
     }
 
-    // Use try-catch to handle database errors (e.g., ID exists but table mismatch)
-    try {
-      return await validateChatAccess(ctx, chatId, args.sessionId);
-    } catch {
-      // Database error (e.g., malformed ID that passed format check)
-      return null;
-    }
+    return await validateChatAccess(ctx, chatId, args.sessionId);
   },
 });
 

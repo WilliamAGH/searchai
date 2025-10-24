@@ -117,7 +117,8 @@ export class ConvexChatRepository extends BaseRepository {
         sessionId: this.sessionId,
       });
 
-      const chat = await this.getChatById(IdUtils.toUnifiedId(chatId));
+      // Use direct lookup with retry to handle index propagation delay
+      const chat = await this.getChatByIdWithRetry(chatId);
       if (!chat) throw new Error("Failed to create chat");
 
       return { chat, isNew: true };
@@ -547,6 +548,66 @@ export class ConvexChatRepository extends BaseRepository {
       logger.error("Failed to fetch chat by public ID:", error);
       return null;
     }
+  }
+
+  /**
+   * Get chat by ID with retry logic for post-creation lookups
+   * Uses direct database lookup to bypass index propagation delays
+   * @param chatId - Convex chat ID
+   * @param maxAttempts - Maximum number of retry attempts (default: 5)
+   * @returns UnifiedChat or null
+   */
+  private async getChatByIdWithRetry(
+    chatId: Id<"chats">,
+    maxAttempts = 5,
+  ): Promise<UnifiedChat | null> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        // Use direct lookup query that bypasses indexes
+        const chat = await this.client.query(api.chats.getChatByIdDirect, {
+          chatId,
+          sessionId: this.sessionId,
+        });
+
+        if (chat) {
+          logger.debug("Chat retrieved successfully", {
+            chatId,
+            attempt,
+            sessionId: this.sessionId,
+          });
+          return this.convexToUnifiedChat(chat);
+        }
+
+        // Chat not found - wait before retrying
+        if (attempt < maxAttempts - 1) {
+          const delay = 50 * Math.pow(2, attempt); // Exponential backoff: 50ms, 100ms, 200ms, 400ms
+          logger.debug("Chat not found, retrying", {
+            chatId,
+            attempt,
+            delay,
+            sessionId: this.sessionId,
+          });
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      } catch (error) {
+        logger.error("Error fetching chat", {
+          chatId,
+          attempt,
+          error,
+          sessionId: this.sessionId,
+        });
+
+        // Don't retry on errors, only on null results
+        throw error;
+      }
+    }
+
+    logger.error("Failed to retrieve chat after retries", {
+      chatId,
+      maxAttempts,
+      sessionId: this.sessionId,
+    });
+    return null;
   }
 
   // Helper methods
