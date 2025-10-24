@@ -51,11 +51,11 @@ export const isServerChat = (chat: Chat): chat is Doc<"chats"> => {
 };
 
 /**
- * Type guard to check if ID is a Convex ID
- * Convex IDs contain '|' character
+ * Type guard to check if ID comes from Convex storage
+ * Local IDs always use explicit prefixes; anything else is treated as Convex
  */
 export const isConvexId = (id: string | Id<"chats">): id is Id<"chats"> => {
-  return typeof id === "string" && id.includes("|");
+  return typeof id === "string" ? !isLocalId(id) : true;
 };
 
 /**

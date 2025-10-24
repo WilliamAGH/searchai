@@ -9,6 +9,7 @@
 
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SearchResult } from "./message";
+import { toConvexId as convertToConvexId } from "../utils/idValidation";
 
 /**
  * Unified Chat - Bridge type for local/Convex chats during migration
@@ -159,8 +160,7 @@ export const IdUtils = {
    * Check if an ID is a Convex ID
    */
   isConvexId: (id: string): boolean => {
-    // Convex IDs contain '|' character
-    return id.includes("|");
+    return !IdUtils.isLocalId(id);
   },
 
   /**
@@ -174,14 +174,22 @@ export const IdUtils = {
    * Convert string to Convex ID (unsafe - only use when certain)
    */
   toConvexChatId: (id: string): Id<"chats"> => {
-    return id as Id<"chats">;
+    const safeId = convertToConvexId<"chats">(id);
+    if (!safeId) {
+      throw new Error("Invalid Convex chat ID");
+    }
+    return safeId;
   },
 
   /**
    * Convert string to Convex Message ID (unsafe - only use when certain)
    */
   toConvexMessageId: (id: string): Id<"messages"> => {
-    return id as Id<"messages">;
+    const safeId = convertToConvexId<"messages">(id);
+    if (!safeId) {
+      throw new Error("Invalid Convex message ID");
+    }
+    return safeId;
   },
 
   /**
