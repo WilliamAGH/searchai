@@ -29,27 +29,34 @@ export const vContextReference = v.object({
   metadata: v.optional(v.any()),
 });
 
+const LOCAL_ID_PREFIXES = ["local_", "chat_", "msg_"];
+const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
+
+function extractRawIdentifier(str: string): string | null {
+  if (LOCAL_ID_PREFIXES.some((prefix) => str.startsWith(prefix))) {
+    return null;
+  }
+
+  const normalized = str.includes("|") ? (str.split("|").pop() ?? "") : str;
+  if (!normalized) {
+    return null;
+  }
+
+  return CONVEX_ID_PATTERN.test(normalized) ? normalized : null;
+}
+
 /**
- * Validate if a string is a valid Convex ID format
- * Convex IDs contain a pipe separator (|) and follow the pattern: table|identifier
+ * Validate if a string is a candidate Convex ID
  *
- * @param str - String to validate
- * @returns True if the string appears to be a valid Convex ID format
- *
- * @example
- * isValidConvexIdFormat("kg24lrv8sq2j9xf0v2q8k6z5sw6z") // true (standard format)
- * isValidConvexIdFormat("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z") // true (with table prefix)
- * isValidConvexIdFormat("invalid-uuid") // false
- * isValidConvexIdFormat("") // false
+ * Convex guarantees IDs are stable strings (see docs.convex.dev/database/document-ids).
+ * We only reject values that match client-generated "local" identifiers.
  */
 export function isValidConvexIdFormat(str: string): boolean {
   if (!str || typeof str !== "string") {
     return false;
   }
 
-  // Convex IDs are non-empty strings that contain the pipe separator
-  // and have a specific base32-like encoding pattern
-  return str.includes("|") && str.length > 10;
+  return extractRawIdentifier(str) !== null;
 }
 
 /**
@@ -71,5 +78,6 @@ export function safeConvexId<TableName extends TableNames>(
   if (!str || !isValidConvexIdFormat(str)) {
     return null;
   }
+
   return str as Id<TableName>;
 }

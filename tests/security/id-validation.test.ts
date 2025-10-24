@@ -22,26 +22,21 @@ import {
 
 describe("Frontend ID Validation", () => {
   describe("isValidConvexId", () => {
-    it("should accept valid Convex ID format with pipe separator", () => {
-      expect(isValidConvexId("kg24lrv8sq2j9xf0v2q8k6z5sw6z|123")).toBe(true);
+    it("should accept identifiers that are not marked as local", () => {
+      expect(isValidConvexId("kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(true);
       expect(isValidConvexId("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(true);
     });
 
-    it("should reject strings without pipe separator", () => {
-      expect(isValidConvexId("local-chat-123")).toBe(false);
-      expect(isValidConvexId("invalid-uuid-v7")).toBe(false);
-      expect(isValidConvexId("abc123")).toBe(false);
+    it("should reject local identifiers", () => {
+      expect(isValidConvexId("local_123")).toBe(false);
+      expect(isValidConvexId("chat_123")).toBe(false);
+      expect(isValidConvexId("msg_456")).toBe(false);
     });
 
     it("should reject empty, null, or undefined values", () => {
       expect(isValidConvexId("")).toBe(false);
       expect(isValidConvexId(null)).toBe(false);
       expect(isValidConvexId(undefined)).toBe(false);
-    });
-
-    it("should reject strings that are too short even with pipe", () => {
-      expect(isValidConvexId("a|b")).toBe(false);
-      expect(isValidConvexId("|")).toBe(false);
     });
   });
 
@@ -52,48 +47,42 @@ describe("Frontend ID Validation", () => {
       expect(result).toBe(validId);
     });
 
-    it("should return null for invalid ID formats", () => {
-      expect(toConvexId<"chats">("local-123")).toBeNull();
+    it("should return null for local identifiers", () => {
+      expect(toConvexId<"chats">("local_123")).toBeNull();
+      expect(toConvexId<"chats">("chat_456")).toBeNull();
+      expect(toConvexId<"chats">("msg_777")).toBeNull();
       expect(toConvexId<"chats">("")).toBeNull();
       expect(toConvexId<"chats">(null)).toBeNull();
       expect(toConvexId<"chats">(undefined)).toBeNull();
-    });
-
-    it("should return null for malformed IDs that could cause errors", () => {
-      // These could previously cause runtime errors in database operations
-      expect(toConvexId<"chats">("not-a-convex-id")).toBeNull();
-      expect(toConvexId<"chats">("uuid-v7-format-12345")).toBeNull();
-      expect(toConvexId<"chats">("random-string")).toBeNull();
     });
   });
 
   describe("isLocalId", () => {
     it("should identify local IDs correctly", () => {
-      expect(isLocalId("local-chat-123")).toBe(true);
-      expect(isLocalId("temp-message-456")).toBe(true);
+      expect(isLocalId("local_123")).toBe(true);
+      expect(isLocalId("msg_456")).toBe(true);
     });
 
     it("should identify Convex IDs as non-local", () => {
-      expect(isLocalId("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(false);
+      expect(isLocalId("kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(false);
     });
   });
 });
 
 describe("Backend ID Validation", () => {
   describe("isValidConvexIdFormat", () => {
-    it("should accept valid Convex ID format", () => {
-      expect(isValidConvexIdFormat("kg24lrv8sq2j9xf0v2q8k6z5sw6z|123")).toBe(
-        true,
-      );
+    it("should accept identifiers that are not local", () => {
+      expect(isValidConvexIdFormat("kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(true);
       expect(isValidConvexIdFormat("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(
         true,
       );
     });
 
-    it("should reject invalid formats", () => {
-      expect(isValidConvexIdFormat("local-chat")).toBe(false);
+    it("should reject local identifiers", () => {
+      expect(isValidConvexIdFormat("local_123")).toBe(false);
+      expect(isValidConvexIdFormat("chat_123")).toBe(false);
+      expect(isValidConvexIdFormat("msg_001")).toBe(false);
       expect(isValidConvexIdFormat("")).toBe(false);
-      expect(isValidConvexIdFormat("a|b")).toBe(false);
     });
   });
 
@@ -104,20 +93,17 @@ describe("Backend ID Validation", () => {
       expect(result).toBe(validId);
     });
 
-    it("should return null for invalid formats", () => {
-      expect(safeConvexId<"chats">("invalid")).toBeNull();
+    it("should return null for local identifiers", () => {
+      expect(safeConvexId<"chats">("local_123")).toBeNull();
+      expect(safeConvexId<"chats">("chat_999")).toBeNull();
       expect(safeConvexId<"chats">("")).toBeNull();
       expect(safeConvexId<"chats">(null)).toBeNull();
       expect(safeConvexId<"chats">(undefined)).toBeNull();
     });
 
-    it("should prevent unsafe casts that could cause database errors", () => {
-      // These scenarios previously used unsafe `as Id<"chats">` casts
-      const invalidId = "not-a-real-id";
-      const result = safeConvexId<"chats">(invalidId);
-
-      // Should return null instead of throwing when used in database operations
-      expect(result).toBeNull();
+    it("should allow unknown remote identifiers for further validation", () => {
+      const opaqueId = "kg24lrv8sq2j9xf0v2q8k6z5sw6z";
+      expect(safeConvexId<"chats">(opaqueId)).toBe(opaqueId);
     });
   });
 });
@@ -133,24 +119,9 @@ describe("Security: Preventing Unsafe Casts", () => {
     expect(safeId).toBeNull();
   });
 
-  it("should prevent errors in getChatByOpaqueId with invalid ID", () => {
-    // Scenario from convex/chats/core.ts line 169
-    const opaqueId = "some-opaque-string";
-
-    // Before fix: args.opaqueId as Id<"chats"> could cause database errors
-    // After fix: safeConvexId returns null early
-    const chatId = safeConvexId<"chats">(opaqueId);
-    expect(chatId).toBeNull();
-  });
-
   it("should handle edge cases that could bypass simple checks", () => {
     // Edge cases that contain pipe but are still invalid
-    const edgeCases = [
-      "|", // Just pipe
-      "a|b", // Too short
-      "|||", // Multiple pipes
-      " | ", // Whitespace
-    ];
+    const edgeCases = ["local_", "chat_", "msg_"];
 
     for (const testCase of edgeCases) {
       expect(toConvexId<"chats">(testCase)).toBeNull();
