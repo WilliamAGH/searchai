@@ -65,7 +65,7 @@ const CitationLink: React.FC<{
       target="_blank"
       rel="noopener noreferrer"
       className={`
-        inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium
+        inline-flex items-center gap-0.5 px-1 py-0.5 mx-1 rounded-md text-xs font-medium
         transition-all duration-200 no-underline
         ${
           isHighlighted
@@ -203,15 +203,8 @@ export function CitationRenderer({
           />,
         );
       } else {
-        // No matching source - render as plain text in brackets
-        parts.push(
-          <span
-            key={`plain-${keyIndex++}`}
-            className="text-gray-500 dark:text-gray-400"
-          >
-            [{citedDomain}]
-          </span>,
-        );
+        // No matching source - skip rendering to avoid bracket artifacts
+        // The unmatched citation pattern is simply removed from display
       }
 
       lastIndex = match.index + match[0].length;

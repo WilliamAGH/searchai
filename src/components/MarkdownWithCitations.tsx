@@ -207,7 +207,7 @@ export function MarkdownWithCitations({
                     target="_blank"
                     rel="noopener noreferrer"
                     className={clsx(
-                      "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
+                      "inline-flex items-center gap-0.5 px-1 py-0.5 mx-1 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
                       isHighlighted
                         ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
                         : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
@@ -266,7 +266,7 @@ export function MarkdownWithCitations({
                     target="_blank"
                     rel="noopener noreferrer"
                     className={clsx(
-                      "inline-flex items-center gap-0.5 px-1 py-0.5 mx-0.5 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
+                      "inline-flex items-center gap-0.5 px-1 py-0.5 mx-1 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
                       isHighlighted
                         ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
                         : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",

@@ -125,7 +125,8 @@ export function ContentWithCitations({
 
       // Only convert to markdown link if we found a matching URL
       // Always show just the domain in the link text
-      return url ? `[${domain}](${url})` : match;
+      // Remove unmatched brackets to prevent display artifacts
+      return url ? `[${domain}](${url})` : "";
     });
   }, [content, domainToUrlMap, searchResults]);
 
@@ -185,7 +186,7 @@ export function ContentWithCitations({
       const isCitation = url && [...domainToUrlMap.values()].includes(url);
       const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
       const baseClass =
-        "inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md font-medium no-underline align-baseline transition-colors";
+        "inline-flex items-center gap-0.5 px-1 py-0.5 mx-1 rounded-md font-medium no-underline align-baseline transition-colors";
       const normalClass =
         "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[15px] sm:text-base hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300";
       const hiClass =
