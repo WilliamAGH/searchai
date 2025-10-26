@@ -177,6 +177,55 @@ describe("Agent Grounding Specifications", () => {
     console.info("✅ Tool call log structure validated");
   });
 
+  it("documents streaming event ordering and persisted metadata", () => {
+    const expectedSequence = [
+      "progress",
+      "reasoning",
+      "content",
+      "metadata",
+      "complete",
+      "persisted",
+    ];
+
+    expect(expectedSequence.indexOf("metadata")).toBeLessThan(
+      expectedSequence.indexOf("complete"),
+    );
+    expect(expectedSequence.indexOf("complete")).toBeLessThan(
+      expectedSequence.indexOf("persisted"),
+    );
+
+    const persistedChunkShape = expect.objectContaining({
+      type: "persisted",
+      payload: expect.objectContaining({
+        assistantMessageId: expect.any(String),
+        workflowId: expect.any(String),
+        answer: expect.any(String),
+        sources: expect.any(Array),
+        contextReferences: expect.any(Array),
+      }),
+      nonce: expect.any(String),
+      signature: expect.any(String),
+    });
+
+    const examplePersistedChunk = {
+      type: "persisted",
+      payload: {
+        assistantMessageId: "msg_123",
+        workflowId: "019a122e-c507-7851-99f7-b8f5d7345b40",
+        answer: "Example answer",
+        sources: ["anthropic.com"],
+        contextReferences: [],
+      },
+      nonce: "019a122e-c507-7851-99f7-b8f5d7345b41",
+      signature: "deadbeef",
+    };
+
+    expect(examplePersistedChunk).toEqual(persistedChunkShape);
+    console.info(
+      "✅ Streaming event ordering and security metadata documented",
+    );
+  });
+
   it("should validate sourcesUsed cross-referencing with keyFindings", () => {
     const sourcesUsed = [
       {
