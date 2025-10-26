@@ -107,6 +107,14 @@ const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
   const orderRaw = process.env.LLM_PROVIDER_ORDER;
   const allowFallbacks = process.env.LLM_PROVIDER_ALLOW_FALLBACKS;
 
+  // Only configure provider routing if we have any provider settings
+  // Empty objects {} are not supported by Convex
+  const hasProviderConfig = sort || orderRaw || allowFallbacks !== undefined;
+
+  if (!hasProviderConfig) {
+    return undefined;
+  }
+
   const provider: OpenRouterProvider = {};
 
   if (sort) {
@@ -348,6 +356,15 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   const provider = parseOpenRouterProvider();
   const reasoning = parseReasoningSettings();
 
+  console.info(
+    "🔍 parseOpenRouterProvider returned:",
+    JSON.stringify(provider),
+  );
+  console.info(
+    "🔍 parseReasoningSettings returned:",
+    JSON.stringify(reasoning),
+  );
+
   const defaultModelSettings: Partial<ModelSettings> = {
     temperature,
   };
@@ -372,6 +389,11 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
       provider,
     };
   }
+
+  console.info(
+    "🔍 Final defaultModelSettings:",
+    JSON.stringify(defaultModelSettings),
+  );
 
   return {
     client,
