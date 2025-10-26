@@ -8,6 +8,7 @@ import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { corsPreflightResponse } from "../cors";
+import { checkIpRateLimit } from "../../lib/rateLimit";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
 import { normalizeUrlForKey } from "../../lib/url";
 
@@ -33,6 +34,20 @@ export function registerSearchRoutes(http: HttpRouter) {
       // Enforce strict origin validation early
       const probe = corsResponse("{}", 204, origin);
       if (probe.status === 403) return probe;
+
+      // Rate limiting check
+      const rateLimit = checkIpRateLimit(request, "/api/search");
+      if (!rateLimit.allowed) {
+        return corsResponse(
+          JSON.stringify({
+            error: "Rate limit exceeded",
+            message: "Too many search requests. Please try again later.",
+            retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+          }),
+          429,
+          origin,
+        );
+      }
 
       let rawPayload: unknown;
       try {

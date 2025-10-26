@@ -8,6 +8,7 @@ import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { corsPreflightResponse } from "../cors";
+import { checkIpRateLimit } from "../../lib/rateLimit";
 
 /**
  * Register scrape routes on the HTTP router
@@ -31,6 +32,20 @@ export function registerScrapeRoutes(http: HttpRouter) {
       // Enforce strict origin validation early
       const probe = corsResponse("{}", 204, origin);
       if (probe.status === 403) return probe;
+
+      // Rate limiting check
+      const rateLimit = checkIpRateLimit(request, "/api/scrape");
+      if (!rateLimit.allowed) {
+        return corsResponse(
+          JSON.stringify({
+            error: "Rate limit exceeded",
+            message: "Too many scrape requests. Please try again later.",
+            retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+          }),
+          429,
+          origin,
+        );
+      }
 
       let rawPayload: unknown;
       try {
