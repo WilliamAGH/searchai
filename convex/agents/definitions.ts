@@ -247,7 +247,7 @@ IMPORTANT:
   modelSettings: {
     ...env.defaultModelSettings,
     temperature: 0.4,
-    reasoning: { effort: "high" }, // Allocate more deliberate steps for tool orchestration
+    reasoning: { effort: "high" as const }, // Allocate more deliberate steps for tool orchestration
   },
 });
 

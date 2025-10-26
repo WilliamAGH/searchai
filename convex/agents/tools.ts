@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { tool } from "@openai/agents";
-import type { FunctionTool } from "@openai/agents";
+import type { FunctionTool, RunContext } from "@openai/agents";
 import type { ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { generateMessageId } from "../lib/id_generator";
@@ -14,6 +14,20 @@ import { generateMessageId } from "../lib/id_generator";
  * Web Search Tool
  * Searches the web and returns results with context tracking
  */
+type AgentToolRunContext =
+  | RunContext<{ actionCtx?: ActionCtx } | undefined>
+  | undefined;
+
+const getActionCtx = (ctx?: AgentToolRunContext): ActionCtx => {
+  const actionCtx = ctx?.context?.actionCtx;
+  if (!actionCtx) {
+    throw new Error(
+      "Convex ActionCtx missing from tool run context. Ensure run() is called with context: { actionCtx }.",
+    );
+  }
+  return actionCtx;
+};
+
 export const searchWebTool: FunctionTool<any, any, unknown> = tool({
   name: "search_web",
   description: `Search the web for current information. Use this when you need to find:
@@ -53,9 +67,9 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
   }),
   execute: async (
     input: { query: string; maxResults?: number; reasoning: string },
-    ctx: any, // @openai/agents expects RunContext<unknown> but Convex runtime provides ActionCtx
+    ctx: AgentToolRunContext,
   ) => {
-    const actionCtx = ctx as ActionCtx;
+    const actionCtx = getActionCtx(ctx);
     const contextId = generateMessageId();
     const callStart = Date.now();
 
@@ -178,9 +192,9 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
   }),
   execute: async (
     input: { url: string; reasoning: string },
-    ctx: any, // @openai/agents expects RunContext<unknown> but Convex runtime provides ActionCtx
+    ctx: AgentToolRunContext,
   ) => {
-    const actionCtx = ctx as ActionCtx;
+    const actionCtx = getActionCtx(ctx);
     const contextId = generateMessageId();
     const callStart = Date.now();
 
