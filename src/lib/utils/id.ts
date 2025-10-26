@@ -3,23 +3,36 @@
  * Avoids hydration mismatches by using deterministic IDs
  */
 
-import { useState, useEffect } from "react";
-
-let idCounter = 0;
+import { useState, useEffect, useId } from "react";
 
 /**
- * Generate a stable ID for client-side use
- * Uses a counter instead of timestamp to avoid hydration issues
+ * Generate a stable ID for component use (SSR-safe)
+ * Uses React's built-in useId() which is designed for SSR hydration
+ *
+ * @example
+ * function MyComponent() {
+ *   const id = useStableId("input");
+ *   return <input id={id} />;
+ * }
  */
-export function generateStableId(prefix: string = "id"): string {
+export function useStableId(prefix: string = "id"): string {
+  const reactId = useId();
+  return `${prefix}_${reactId}`;
+}
+
+/**
+ * @deprecated DO NOT USE during SSR/initial render - will cause hydration mismatches
+ * Use useStableId() hook instead for SSR-safe IDs
+ * Only call this in client-side event handlers or useEffect
+ */
+export function generateClientOnlyId(prefix: string = "id"): string {
   if (typeof window === "undefined") {
-    // During SSR, use a placeholder that will be replaced on client
-    return `${prefix}_ssr_placeholder`;
+    throw new Error(
+      "generateClientOnlyId() cannot be called during SSR. Use useStableId() hook instead.",
+    );
   }
 
-  // On client, use incrementing counter
-  idCounter++;
-  return `${prefix}_${idCounter}_${performance.now().toFixed(0)}`;
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
