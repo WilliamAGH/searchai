@@ -487,31 +487,6 @@ export async function* streamResearchWorkflow(
     contextReferences?: ResearchContextReference[];
   }>;
 
-  // CRITICAL: Update title if this is the first user message (25 char limit)
-  // This must happen here because orchestration uses addMessage directly,
-  // bypassing addMessageWithTransaction which handles title generation
-  const userMessageCount = recentMessages.filter(
-    (m) => m.role === "user",
-  ).length;
-  console.log("🔍 TITLE DEBUG:", {
-    userMessageCount,
-    chatTitle: chat.title,
-    titleType: typeof chat.title,
-    condition: userMessageCount === 1 && chat.title === "New Chat",
-    userQuery: args.userQuery?.substring(0, 50),
-  });
-  if (userMessageCount === 1 && chat.title === "New Chat") {
-    const generatedTitle = generateChatTitle({ intent: args.userQuery });
-    console.log("🔍 GENERATED TITLE:", generatedTitle);
-    await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-      chatId: args.chatId,
-      title: generatedTitle,
-    });
-    console.log("🔍 TITLE UPDATED SUCCESSFULLY");
-  } else {
-    console.log("🔍 TITLE NOT UPDATED - condition was false");
-  }
-
   const conversationContextFromDb = buildConversationContext(
     recentMessages || [],
   );
@@ -957,6 +932,20 @@ export async function* streamResearchWorkflow(
       },
       nonce,
     });
+
+    // Generate and update chat title using refined intent from planning
+    // The 25-char limit is enforced by generateChatTitle utility
+    const generatedTitle = generateChatTitle({
+      intent: planningOutput?.userIntent || args.userQuery,
+    });
+
+    // Only update if title hasn't been customized (still default or matches generated)
+    if (chat.title === "New Chat" || !chat.title) {
+      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
+        chatId: args.chatId,
+        title: generatedTitle,
+      });
+    }
 
     console.log("🔍 DEBUG: Saving assistant message...");
     const assistantMessageId: Id<"messages"> = (await ctx.runMutation(
