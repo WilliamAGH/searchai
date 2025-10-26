@@ -201,15 +201,41 @@ function ChatInterfaceComponent({
   }, [loadMore]);
 
   // Use paginated messages when available, fallback to regular messages
+  // CRITICAL: Prioritize unified messages during active generation (optimistic state)
   const effectiveMessages = useMemo(() => {
+    // Check if unified messages have optimistic state (isStreaming or unpersisted)
+    const hasOptimisticMessages = messages.some(
+      (m) => m.isStreaming === true || m.persisted === false,
+    );
+
+    // If we have optimistic messages, always use unified messages (source of truth during generation)
+    if (hasOptimisticMessages) {
+      logger.debug("Using unified messages - optimistic state present", {
+        count: messages.length,
+        chatId: currentChatId,
+      });
+      return messages;
+    }
+
+    // Otherwise, use paginated messages if available (for authenticated users with DB data)
     if (
       isAuthenticated &&
       currentChatId &&
       !currentChat?.isLocal &&
       paginatedMessages.length > 0
     ) {
+      logger.debug("Using paginated messages - no optimistic state", {
+        count: paginatedMessages.length,
+        chatId: currentChatId,
+      });
       return paginatedMessages;
     }
+
+    // Fallback to unified messages
+    logger.debug("Using unified messages - fallback", {
+      count: messages.length,
+      chatId: currentChatId,
+    });
     return messages;
   }, [
     isAuthenticated,

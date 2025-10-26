@@ -427,7 +427,9 @@ export function createChatActions(
                           sources: metadataSources ?? m.sources,
                           searchResults:
                             searchResults as UnifiedMessage["searchResults"],
-                          isStreaming: false,
+                          // CRITICAL: Keep isStreaming=true until persisted event fires
+                          // This prevents effectiveMessages from switching to paginatedMessages too early
+                          isStreaming: true,
                           thinking: undefined,
                         }
                       : m,
@@ -443,14 +445,14 @@ export function createChatActions(
 
             case "done":
             case "complete":
-              // Stream completion - mark as not streaming but keep generating=true
-              // until persist completes (to prevent premature refresh)
+              // Stream completion - keep isStreaming=true until persist completes
+              // This prevents effectiveMessages from switching to paginatedMessages too early
               setState((prev) => ({
                 ...prev,
                 searchProgress: { stage: "idle" },
                 messages: prev.messages.map((m, index) =>
                   index === prev.messages.length - 1 && m.role === "assistant"
-                    ? { ...m, isStreaming: false, thinking: undefined }
+                    ? { ...m, isStreaming: true, thinking: undefined }
                     : m,
                 ),
               }));
@@ -502,9 +504,32 @@ export function createChatActions(
         }
 
         const refreshAfterPersist = async (shouldForce: boolean) => {
-          if (!repository || !shouldForce) {
+          if (!repository) {
             return;
           }
+
+          // CRITICAL FIX: For authenticated users, SKIP refresh entirely
+          // Optimistic state is already correct and refreshing causes flickering
+          // because DB messages have different IDs than optimistic messages
+          logger.debug(
+            "Skipping refresh - optimistic state is source of truth",
+            {
+              chatId,
+              shouldForce,
+            },
+          );
+          return;
+
+          // The code below is disabled to prevent flickering
+          // If needed in the future, we need to merge DB messages with optimistic state
+          // instead of replacing entirely
+
+          /*
+          if (!shouldForce) {
+            logger.debug("Skipping refresh - persistence not confirmed", { chatId });
+            return;
+          }
+          */
 
           const maxAttempts = 5;
           const delay = (ms: number) =>
@@ -551,13 +576,36 @@ export function createChatActions(
                   attempt,
                 });
 
-                setState((prev) => ({
-                  ...prev,
-                  messages,
-                  currentChatId: chatId,
-                  currentChat:
-                    prev.chats.find((c) => c.id === chatId) || prev.currentChat,
-                }));
+                // CRITICAL: Only update if DB messages are actually different
+                // This prevents flickering when optimistic state is already correct
+                setState((prev) => {
+                  // Check if we already have the correct messages (optimistic state)
+                  const hasOptimisticState = prev.messages.some(
+                    (m) =>
+                      m.role === "assistant" &&
+                      m.content === trimmedAnswer &&
+                      m.persisted === true,
+                  );
+
+                  if (hasOptimisticState) {
+                    logger.debug(
+                      "Skipping refresh - optimistic state already correct",
+                      { chatId },
+                    );
+                    // Don't replace messages - optimistic state is already good
+                    return prev;
+                  }
+
+                  // Messages from DB are different - do the update
+                  return {
+                    ...prev,
+                    messages,
+                    currentChatId: chatId,
+                    currentChat:
+                      prev.chats.find((c) => c.id === chatId) ||
+                      prev.currentChat,
+                  };
+                });
                 return;
               }
             } catch (error) {
@@ -576,7 +624,10 @@ export function createChatActions(
           );
         };
 
-        await refreshAfterPersist(!persistedConfirmed);
+        // CRITICAL FIX: Pass persistedConfirmed directly (not inverted)
+        // When persistence is confirmed (TRUE), we SHOULD refresh to sync with DB
+        // When persistence is not confirmed (FALSE), we SHOULD NOT refresh (keep optimistic state)
+        await refreshAfterPersist(persistedConfirmed);
       } catch (error) {
         logger.error("Failed to send message:", error);
         setState((prev) => ({

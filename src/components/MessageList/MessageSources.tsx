@@ -166,7 +166,7 @@ export function MessageSources({
           </svg>
         </div>
         {collapsed && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
             {previewSources.map((source, i) => {
               const hostname = getSafeHostname(source.url);
               return (
