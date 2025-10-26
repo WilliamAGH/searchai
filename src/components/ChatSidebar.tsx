@@ -257,10 +257,10 @@ export function ChatSidebar({
                       isSelected ? "bg-muted" : ""
                     }`}
                   >
-                    <div className="font-medium truncate min-w-0">
+                    <div className="text-sm font-medium truncate min-w-0 leading-tight">
                       {chat.title}
                     </div>
-                    <div className="text-sm text-muted-foreground flex items-center gap-1 min-w-0">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1 min-w-0 mt-0.5">
                       {"isLocal" in chat && chat.isLocal && (
                         <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
                           Local

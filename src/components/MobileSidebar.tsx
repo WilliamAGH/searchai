@@ -278,10 +278,10 @@ export function MobileSidebar({
                                   : ""
                               }`}
                             >
-                              <div className="font-medium truncate text-sm min-w-0">
+                              <div className="text-xs font-medium truncate min-w-0 leading-tight">
                                 {chat.title}
                               </div>
-                              <div className="text-xs text-gray-500 flex items-center gap-1 min-w-0">
+                              <div className="text-[11px] text-gray-500 flex items-center gap-1 min-w-0 mt-0.5">
                                 {"isLocal" in chat && chat.isLocal && (
                                   <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
                                     Local
