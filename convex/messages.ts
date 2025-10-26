@@ -274,10 +274,9 @@ export const addMessageWithTransaction = internalMutation({
 
       // Update title only for first user message
       if (userMessageCount === 0 && !args.isReplyToAssistant) {
-        const title =
-          args.userMessage.length > 50
-            ? `${args.userMessage.substring(0, 50)}...`
-            : args.userMessage;
+        // Import the smart title generation function
+        const { generateChatTitle } = await import("./chats/utils");
+        const title = generateChatTitle({ intent: args.userMessage });
 
         await ctx.db.patch(args.chatId, {
           title,
