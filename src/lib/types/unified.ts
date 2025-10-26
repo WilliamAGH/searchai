@@ -179,7 +179,9 @@ export const IdUtils = {
   toConvexChatId: (id: string): Id<"chats"> => {
     const safeId = convertToConvexId<"chats">(id);
     if (!safeId) {
-      throw new Error("Invalid Convex chat ID");
+      throw new Error(
+        `Invalid Convex chat ID: "${id}" (expected format: j1234567890abcdef)`,
+      );
     }
     return safeId;
   },
@@ -190,7 +192,9 @@ export const IdUtils = {
   toConvexMessageId: (id: string): Id<"messages"> => {
     const safeId = convertToConvexId<"messages">(id);
     if (!safeId) {
-      throw new Error("Invalid Convex message ID");
+      throw new Error(
+        `Invalid Convex message ID: "${id}" (expected format: j1234567890abcdef)`,
+      );
     }
     return safeId;
   },
