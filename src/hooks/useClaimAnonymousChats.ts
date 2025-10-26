@@ -25,8 +25,12 @@ export function useClaimAnonymousChats() {
             await claimChats({ sessionId });
             // Successfully claimed anonymous chats
 
-            // Remove session ID after successful claim
-            localStorage.removeItem(SESSION_KEY);
+            // CRITICAL: Keep sessionId in localStorage for HTTP endpoint access
+            // Reason: HTTP actions lack Convex auth context and validate via sessionId
+            // The sessionId is now associated with both anonymous chats (now claimed)
+            // and will be used for future HTTP requests from this authenticated user
+            // Do NOT remove: localStorage.removeItem(SESSION_KEY);
+
             hasClaimedRef.current = true;
           } catch {
             // Failed to claim anonymous chats - will retry on next login

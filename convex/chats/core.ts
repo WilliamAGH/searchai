@@ -37,7 +37,11 @@ export const createChat = mutation({
     return await ctx.db.insert("chats", {
       title: args.title,
       userId: userId || undefined,
-      sessionId: !userId ? args.sessionId : undefined,
+      // CRITICAL: Always set sessionId if provided, even for authenticated users
+      // Reason: HTTP endpoints lack Convex auth context and validate via sessionId
+      // Having both userId and sessionId enables access via both Convex queries (userId)
+      // and HTTP actions (sessionId)
+      sessionId: args.sessionId,
       shareId,
       publicId,
       privacy: "private",
@@ -87,6 +91,10 @@ export const getUserChats = query({
 
 /**
  * Helper function to validate chat access
+ * Supports dual ownership: chats can have both userId AND sessionId
+ * This enables access via:
+ * 1. Convex queries/mutations (use userId from auth context)
+ * 2. HTTP endpoints (use sessionId, since httpAction has no auth context)
  */
 async function validateChatAccess(
   ctx: any,
@@ -103,15 +111,14 @@ async function validateChatAccess(
     return chat;
   }
 
-  // For authenticated users: check userId matches
-  if (chat.userId) {
-    if (chat.userId !== userId) return null;
+  // For authenticated users: check userId matches (Convex queries/mutations)
+  if (chat.userId && userId && chat.userId === userId) {
     return chat;
   }
 
-  // For anonymous chats: check sessionId matches
-  if (chat.sessionId) {
-    if (!sessionId || chat.sessionId !== sessionId) return null;
+  // For sessionId-based access: HTTP endpoints or anonymous users
+  // Note: HTTP actions don't have auth context, so they rely on sessionId
+  if (chat.sessionId && sessionId && chat.sessionId === sessionId) {
     return chat;
   }
 

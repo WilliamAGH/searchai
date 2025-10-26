@@ -38,23 +38,21 @@ export function useAnonymousSession(): string | null {
     // Skip if auth is still loading
     if (isLoading) return;
 
-    // Only need session ID for unauthenticated users
-    if (!isAuthenticated) {
-      // Check for existing session ID
-      let existingId = localStorage.getItem(SESSION_KEY);
+    // CRITICAL: Keep session ID for ALL users (authenticated and unauthenticated)
+    // Reason: HTTP endpoints don't have Convex auth context, so they rely on sessionId
+    // Backend mutations/queries prefer userId when available, but sessionId provides
+    // fallback auth for HTTP actions that can't access getAuthUserId(ctx)
 
-      if (!existingId) {
-        // Generate new session ID
-        existingId = generateSessionId();
-        localStorage.setItem(SESSION_KEY, existingId);
-      }
+    // Check for existing session ID
+    let existingId = localStorage.getItem(SESSION_KEY);
 
-      setSessionId(existingId);
-    } else {
-      // Clear session ID when authenticated
-      setSessionId(null);
-      localStorage.removeItem(SESSION_KEY);
+    if (!existingId) {
+      // Generate new session ID
+      existingId = generateSessionId();
+      localStorage.setItem(SESSION_KEY, existingId);
     }
+
+    setSessionId(existingId);
   }, [isAuthenticated, isLoading]);
 
   return sessionId;
