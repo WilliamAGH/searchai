@@ -1,7 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
-@import './styles/responsive.css';
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
+@import "./styles/responsive.css";
+@import "./styles/sidebar-guards.css";
 
 @tailwind base;
 @tailwind components;
@@ -58,11 +59,11 @@
   * {
     @apply border-border;
   }
-  
+
   body {
     @apply bg-background text-foreground;
   }
-  
+
   /* Light mode - Beautiful serif font with proper sizing */
   html:not(.dark) body {
     font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
@@ -71,82 +72,106 @@
     line-height: 1.7;
     letter-spacing: 0.01em;
   }
-  
-  /* Dark mode - Sleek futuristic mono with character */
+
+  /* Dark mode - Sleek mono, tuned for compact mobile readability */
   html.dark body {
-    font-family: "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Source Code Pro", monospace;
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace;
     font-weight: 400;
-    font-size: 15px;
+    font-size: 15px; /* smaller on mobile to avoid oversized feel */
     line-height: 1.6;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.01em; /* tighten tracking to reduce horizontal spread */
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   /* Headers get special treatment */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-weight: 600;
   }
-  
+
   /* Light mode headers - elegant serif with proper weight */
-  html:not(.dark) h1, 
-  html:not(.dark) h2, 
-  html:not(.dark) h3, 
-  html:not(.dark) h4, 
-  html:not(.dark) h5, 
+  html:not(.dark) h1,
+  html:not(.dark) h2,
+  html:not(.dark) h3,
+  html:not(.dark) h4,
+  html:not(.dark) h5,
   html:not(.dark) h6 {
     font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.3;
   }
-  
-  /* Dark mode headers - bold mono with tech aesthetic but LARGER */
-  html.dark h1, 
-  html.dark h2, 
-  html.dark h3, 
-  html.dark h4, 
-  html.dark h5, 
+
+  /* Dark mode headers - bold mono, tighter tracking to avoid wide look */
+  html.dark h1,
+  html.dark h2,
+  html.dark h3,
+  html.dark h4,
+  html.dark h5,
   html.dark h6 {
     font-family: "JetBrains Mono", "SF Mono", monospace;
     font-weight: 700;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     line-height: 1.4;
-    text-transform: uppercase;
-    font-size: 1.2em; /* INCREASED from 0.9em to 1.2em */
+    text-transform: none;
+    font-size: 1em; /* avoid dark-mode heading inflation */
   }
-  
+
   /* Input fields should match body font */
-  textarea, input[type="text"], input[type="email"], input[type="password"] {
+  textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"] {
     font-family: inherit !important;
   }
-  
+
   /* Light mode inputs use serif */
-  html:not(.dark) textarea, 
-  html:not(.dark) input[type="text"], 
-  html:not(.dark) input[type="email"], 
+  html:not(.dark) textarea,
+  html:not(.dark) input[type="text"],
+  html:not(.dark) input[type="email"],
   html:not(.dark) input[type="password"] {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif !important;
+    font-family:
+      "Playfair Display", "Georgia", "Times New Roman", serif !important;
   }
-  
+
   /* Dark mode inputs use mono */
-  html.dark textarea, 
-  html.dark input[type="text"], 
-  html.dark input[type="email"], 
+  html.dark textarea,
+  html.dark input[type="text"],
+  html.dark input[type="email"],
   html.dark input[type="password"] {
-    font-family: "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Source Code Pro", monospace !important;
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace !important;
   }
-  
-  /* Buttons and UI elements use Inter for consistency */
-  button, select {
-    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Buttons and selects: match light mode body (serif) for consistency */
+  html:not(.dark) button,
+  html:not(.dark) select {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
     font-size: 16px;
   }
-  
+
+  html.dark button,
+  html.dark select {
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace !important;
+    font-size: 16px;
+  }
+
   /* Force 16px font size on mobile inputs */
   @media (max-width: 768px) {
-    input, textarea, select {
+    input,
+    textarea,
+    select {
       font-size: 16px !important;
     }
   }
@@ -165,7 +190,7 @@
       text-wrap: balance;
     }
   }
-  
+
   .line-clamp-2 {
     overflow: hidden;
     display: -webkit-box;
@@ -173,15 +198,73 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
   }
-  
+
   /* Font utilities for explicit control */
   .font-serif {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif !important;
+    font-family:
+      "Playfair Display", "Georgia", "Times New Roman", serif !important;
   }
-  
+
   .font-mono {
-    font-family: "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Source Code Pro", monospace !important;
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace !important;
   }
+
+  /* Dynamic viewport units to avoid mobile 100vh bugs */
+  .h-dvh {
+    height: 100dvh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+
+  /* Floating action button bottom offset with safe-area support */
+  .fab-bottom {
+    bottom: 5rem;
+  }
+  @supports (padding: max(0px)) {
+    .fab-bottom {
+      bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+  }
+
+  /* Prevent background rubber-band when inner container scrolls */
+  .overscroll-contain {
+    overscroll-behavior-y: contain;
+  }
+
+  /* UI sans stack used for user-entered text and UI labels */
+  .font-ui {
+    font-family:
+      "Inter",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      "Apple Color Emoji",
+      "Segoe UI Emoji",
+      "Segoe UI Symbol",
+      sans-serif;
+  }
+}
+
+/* Ensure root fills the dynamic viewport */
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100dvh;
+}
+
+/* Respect device safe areas for full-bleed layouts */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
 }
 
 /* Custom scrollbar */
@@ -212,9 +295,44 @@
   @apply w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
 }
 
-/* Prose styles for message content */
+/*
+ * Prose styles for message content
+ * - Assistant messages (Markdown) render inside a `.prose` wrapper
+ * - We intentionally inherit the page font here:
+ *     - Light mode: elegant serif (Playfair)
+ *     - Dark mode: compact mono (JetBrains Mono)
+ * - Numeric style is set to `lining-nums` for readability, but we DO NOT
+ *   force a specific font-family here to avoid fighting page-level choices.
+ * - If you need to change assistant output typography, do it by wrapping the
+ *   message block in component code, not by overriding `.prose` globally.
+ */
 .prose {
   @apply text-foreground;
+  /* Keep prose inheriting page font (Playfair light, Mono dark) */
+  font-family: inherit;
+  font-variant-numeric: lining-nums;
+}
+
+/* Ensure nested text elements inherit numeric features */
+.prose
+  :where(
+    p,
+    li,
+    span,
+    a,
+    strong,
+    em,
+    small,
+    blockquote,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6
+  ) {
+  font-family: inherit;
+  font-variant-numeric: inherit;
 }
 
 .prose p {
@@ -245,7 +363,7 @@
 html.dark .prose strong,
 html.dark .prose b {
   @apply font-extrabold;
-  color: #ffffff;
+  color: hsl(var(--foreground));
 }
 
 .prose em {
@@ -268,7 +386,12 @@ html.dark .prose code {
   color: hsl(var(--foreground));
 }
 
-.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
   @apply text-foreground;
 }
 
@@ -294,16 +417,89 @@ html.dark .prose code {
   @apply my-4 border-gray-300 dark:border-gray-700;
 }
 
-/* Hide scrollbar on message input textarea */
+/* Animation for follow-up prompt */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up {
+    animation: none !important;
+  }
+}
+
+/*
+ * Hide scrollbar on message input textarea
+ * - This affects only the input control the user types into.
+ * - Do not reuse for message content.
+ */
 .message-input-textarea::-webkit-scrollbar {
   display: none;
 }
 
-/* Message textarea sizing and scrollbar behavior (no inline styles) */
+/*
+ * Message textarea sizing and typography (USER INPUT ONLY)
+ * - Uses UI sans stack (Inter/system) for clarity while typing
+ * - Applies numeric features for unambiguous digits
+ * - Assistant/user OUTPUT fonts are NOT controlled here
+ */
 .message-textarea {
-  min-height: 52px;
+  /* Ensure intrinsic line-height-based centering for single-line height */
+  min-height: 48px;
   max-height: 200px;
   -ms-overflow-style: none; /* IE/Edge legacy */
+  /* Override serif body for better numeral clarity while typing */
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  font-variant-numeric: slashed-zero lining-nums tabular-nums;
+  font-feature-settings:
+    "zero" 1,
+    "lnum" 1,
+    "tnum" 1;
+}
+
+/* Slightly reduce input height on small screens to feel less bulky */
+@media (max-width: 480px) {
+  .message-textarea {
+    min-height: 44px;
+  }
+}
+
+/* Normalize textarea vertical alignment and placeholder alignment */
+.message-textarea,
+.message-textarea::placeholder {
+  line-height: 1.5;
+}
+
+/* Dark mode input/editor: tighter leading and no extra tracking to reduce perceived size */
+html.dark .message-textarea {
+  line-height: 1.35; /* slightly tighter for perceived smaller size */
+  letter-spacing: -0.005em; /* subtle negative tracking shrinks appearance */
+}
+
+/* Ensure consistent padding-box sizing so text stays centered with auto-resize */
+.message-textarea {
+  box-sizing: border-box;
+  /* Slightly tighter horizontal letterspacing in dark mono to reduce perceived crowding */
+  letter-spacing: 0.01em;
 }
 
 /* Apply Firefox-specific scrollbar suppression only when supported */

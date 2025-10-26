@@ -40,10 +40,28 @@ window.addEventListener('message', async (message) => {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // Conservative chunk splitting to keep React/runtime intact while
+    // extracting a few heavy but decoupled areas for caching.
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("convex")) return "convex";
+          if (id.includes("tailwind") || id.includes("@headlessui"))
+            return "ui";
+          // Do not force vendor/react chunks to avoid TDZ/cycle issues.
+          return undefined;
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+    sourcemap: mode !== "production",
+  },
   server: {
     proxy: {
-      '/api': {
-        target: 'https://diligent-greyhound-240.convex.site',
+      "/api": {
+        target: "https://diligent-greyhound-240.convex.site",
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path,

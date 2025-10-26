@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { logger } from "../lib/logger";
 
 /**
  * LocalStorage hook with debounced persistence.
@@ -11,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 export function useLocalStorage<T>(
   key: string,
   initialValue: T,
-  options: { debounceMs?: number } = {}
+  options: { debounceMs?: number } = {},
 ): [T, (value: T | ((prev: T) => T)) => void] {
   const { debounceMs = 500 } = options; // Lower write frequency during streams
 
@@ -20,7 +21,7 @@ export function useLocalStorage<T>(
       const item = window.localStorage.getItem(key);
       return item ? (JSON.parse(item) as T) : initialValue;
     } catch (error) {
-      console.error(`Error reading localStorage key "${key}":`, error);
+      logger.error(`Error reading localStorage key "${key}":`, error);
       return initialValue;
     }
   });
@@ -33,13 +34,13 @@ export function useLocalStorage<T>(
     latestRef.current = storedValue;
   }, [storedValue]);
 
-  const persist = () => {
+  const persist = useCallback(() => {
     try {
       window.localStorage.setItem(key, JSON.stringify(latestRef.current));
     } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
+      logger.error(`Error setting localStorage key "${key}":`, error);
     }
-  };
+  }, [key]);
 
   const schedulePersist = () => {
     if (timerRef.current !== null) {
@@ -49,8 +50,9 @@ export function useLocalStorage<T>(
   };
 
   const setValue = (value: T | ((prev: T) => T)) => {
-    setStoredValue(prev => {
-      const next = value instanceof Function ? (value as (p: T) => T)(prev) : (value as T);
+    setStoredValue((prev) => {
+      const next =
+        value instanceof Function ? (value as (p: T) => T)(prev) : (value as T);
       latestRef.current = next;
       schedulePersist();
       return next;
@@ -66,7 +68,7 @@ export function useLocalStorage<T>(
         persist();
       }
     };
-  }, []);
+  }, [persist]);
 
   return [storedValue, setValue];
 }

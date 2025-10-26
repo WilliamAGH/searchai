@@ -1,0 +1,67 @@
+/* Sidebar Responsive Guards */
+/* These styles provide additional safeguards against sidebar conflicts */
+
+/* Ensure desktop sidebar is completely hidden on mobile */
+@media (max-width: 1023px) {
+  .desktop-sidebar-container {
+    display: none !important;
+  }
+}
+
+/* Ensure mobile sidebar dialog is hidden on desktop */
+@media (min-width: 1024px) {
+  .mobile-sidebar-dialog {
+    display: none !important;
+  }
+}
+
+/* Prevent any sidebar from taking up space when it shouldn't */
+.sidebar-guard {
+  /* Desktop: show sidebar, hide mobile */
+  @media (min-width: 1024px) {
+    .mobile-sidebar-overlay {
+      display: none !important;
+    }
+  }
+
+  /* Mobile: hide desktop sidebar completely */
+  @media (max-width: 1023px) {
+    .desktop-sidebar-wrapper {
+      width: 0 !important;
+      min-width: 0 !important;
+      max-width: 0 !important;
+      overflow: hidden !important;
+    }
+  }
+}
+
+/* Additional z-index management */
+.mobile-sidebar-dialog {
+  /* z-50 from Tailwind (50) is sufficient, no override needed */
+}
+
+.desktop-sidebar-container {
+  /* Normal stacking context, no special z-index needed */
+}
+
+/* Prevent layout shifts during responsive transitions */
+.sidebar-transition-guard {
+  transition: width 0.2s ease-in-out;
+}
+
+/* Debug helper - remove in production */
+.debug-sidebar {
+  outline: 2px solid red;
+}
+
+.debug-sidebar::before {
+  content: "SIDEBAR DEBUG";
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: red;
+  color: white;
+  padding: 2px 4px;
+  font-size: 10px;
+  z-index: 10000;
+}

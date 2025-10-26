@@ -1,0 +1,105 @@
+/**
+ * Browser-compatible signature verification for agent workflow payloads
+ *
+ * Uses Web Crypto API (available in all modern browsers)
+ * Verifies HMAC-SHA256 signatures from backend
+ */
+
+export type PersistedPayload = {
+  assistantMessageId: string;
+  workflowId: string;
+  answer: string;
+  sources: string[];
+  contextReferences: Array<{
+    contextId: string;
+    type: "search_result" | "scraped_page" | "research_summary";
+    url?: string;
+    title?: string;
+    timestamp: number;
+    relevanceScore?: number;
+  }>;
+};
+
+/**
+ * Convert hex string to Uint8Array
+ */
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes;
+}
+
+/**
+ * Convert Uint8Array to hex string
+ */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * Verify a signature for a persisted payload using Web Crypto API
+ *
+ * @param payload - The persisted payload to verify
+ * @param nonce - Nonce from the workflow
+ * @param signature - Hex-encoded signature to verify
+ * @param signingKey - HMAC signing key (from env)
+ * @returns Promise<boolean> - true if signature is valid
+ */
+export async function verifyPersistedPayload(
+  payload: PersistedPayload,
+  nonce: string,
+  signature: string,
+  signingKey: string,
+): Promise<boolean> {
+  try {
+    // Serialize payload + nonce (must match backend serialization)
+    const body = JSON.stringify({ payload, nonce });
+    const encoder = new TextEncoder();
+    const data = encoder.encode(body);
+
+    // Import signing key
+    const keyData = encoder.encode(signingKey);
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      keyData,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+
+    // Generate expected signature
+    const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, data);
+    const expectedSignature = bytesToHex(new Uint8Array(signatureBuffer));
+
+    // Constant-time comparison
+    if (signature.length !== expectedSignature.length) {
+      return false;
+    }
+
+    let mismatch = 0;
+    for (let i = 0; i < signature.length; i++) {
+      mismatch |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+    }
+
+    return mismatch === 0;
+  } catch (error) {
+    console.error("🚫 Signature verification failed:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if signature verification is available
+ * @returns true if Web Crypto API is available
+ */
+export function isSignatureVerificationAvailable(): boolean {
+  return (
+    typeof crypto !== "undefined" &&
+    typeof crypto.subtle !== "undefined" &&
+    typeof crypto.subtle.importKey === "function"
+  );
+}

@@ -1,44 +1,185 @@
+/**
+ * Database schema definition
+ * - Chat/message storage
+ * - User preferences
+ * - Analytics metrics
+ * - Auth tables from Convex Auth
+ */
+
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 const applicationTables = {
+  /**
+   * Chats table
+   * - User conversations
+   * - Share IDs for URLs
+   * - Rolling summaries for context
+   * - UUID v7 thread tracking for external integrations
+   */
   chats: defineTable({
     title: v.string(),
     userId: v.optional(v.id("users")),
+    sessionId: v.optional(v.string()),
     shareId: v.optional(v.string()),
-    isShared: v.optional(v.boolean()),
-    isPublic: v.optional(v.boolean()),
+    publicId: v.optional(v.string()),
+    threadId: v.optional(v.string()), // UUID v7 for conversation thread tracking
+    privacy: v.optional(
+      v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
+    rollingSummary: v.optional(v.string()),
+    rollingSummaryUpdatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
-    .index("by_share_id", ["shareId"]),
+    .index("by_sessionId", ["sessionId"])
+    .index("by_share_id", ["shareId"])
+    .index("by_public_id", ["publicId"])
+    .index("by_thread_id", ["threadId"]),
 
+  /**
+   * Messages table
+   * - Chat messages (user/assistant)
+   * - Search results metadata
+   * - Streaming state tracking
+   * - Reasoning/thinking tokens
+   * - UUID v7 message and thread tracking for context continuity
+   */
   messages: defineTable({
-    chatId: v.id('chats'),
-    role: v.union(v.literal('user'), v.literal('assistant'), v.literal('system')),
+    chatId: v.id("chats"),
+    messageId: v.optional(v.string()), // UUID v7 for unique message tracking
+    threadId: v.optional(v.string()), // UUID v7 for thread/conversation tracking
+    role: v.union(
+      v.literal("user"),
+      v.literal("assistant"),
+      v.literal("system"),
+    ),
     content: v.optional(v.string()),
-    searchResults: v.optional(v.array(v.any())),
+    searchResults: v.optional(
+      v.array(
+        v.object({
+          title: v.string(),
+          url: v.string(),
+          snippet: v.string(),
+          relevanceScore: v.number(), // Required, not optional - consistent with most definitions
+          // Optional fields from search results
+          content: v.optional(v.string()),
+          fullTitle: v.optional(v.string()),
+          summary: v.optional(v.string()),
+        }),
+      ),
+    ),
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.any()),
-    searchMethod: v.optional(v.union(v.literal('serp'), v.literal('openrouter'), v.literal('duckduckgo'), v.literal('fallback'))),
+    searchMethod: v.optional(
+      v.union(
+        v.literal("serp"),
+        v.literal("openrouter"),
+        v.literal("duckduckgo"),
+        v.literal("fallback"),
+      ),
+    ),
     hasRealResults: v.optional(v.boolean()),
     isStreaming: v.optional(v.boolean()),
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
     timestamp: v.optional(v.number()),
-  }).index('by_chatId', ['chatId']),
+    // Context provenance tracking with UUIDv7
+    contextReferences: v.optional(
+      v.array(
+        v.object({
+          contextId: v.string(), // UUIDv7 unique identifier
+          type: v.union(
+            v.literal("search_result"),
+            v.literal("scraped_page"),
+            v.literal("research_summary"),
+          ),
+          url: v.optional(v.string()),
+          title: v.optional(v.string()),
+          timestamp: v.number(),
+          relevanceScore: v.optional(v.number()),
+          metadata: v.optional(v.any()), // Additional context metadata
+        }),
+      ),
+    ),
+    // Agent workflow tracking
+    workflowId: v.optional(v.string()), // Links to agent orchestration workflow
+  })
+    .index("by_chatId", ["chatId"])
+    .index("by_messageId", ["messageId"])
+    .index("by_threadId", ["threadId"]),
 
+  /**
+   * Agent workflow tokens
+   * - Tracks per-workflow nonce/signature for replay prevention
+   */
+  workflowTokens: defineTable({
+    workflowId: v.string(),
+    nonce: v.string(),
+    signature: v.string(),
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+    status: v.union(
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("invalidated"),
+    ),
+    issuedAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_workflow", ["workflowId"])
+    .index("by_chat", ["chatId"]),
+
+  /**
+   * Agent workflow events
+   * - Streaming events for real-time workflow progress
+   * - Polled by HTTP handler to stream to client
+   * - Auto-cleaned after completion
+   */
+  workflowEvents: defineTable({
+    workflowId: v.string(),
+    sequence: v.number(), // Event order
+    type: v.string(), // "progress", "reasoning", "tool_call", "complete", "error"
+    data: v.any(), // Event payload
+    timestamp: v.number(),
+  })
+    .index("by_workflow_sequence", ["workflowId", "sequence"])
+    .index("by_workflow", ["workflowId"]),
+
+  /**
+   * Metrics table
+   * - Daily aggregated counters
+   * - Planner events
+   * - User behavior tracking
+   */
+  metrics: defineTable({
+    name: v.string(),
+    date: v.string(), // YYYY-MM-DD
+    chatId: v.optional(v.id("chats")),
+    count: v.number(),
+  }).index("by_name_and_date", ["name", "date"]),
+
+  /**
+   * User preferences
+   * - Theme settings
+   * - Search configuration
+   * - Per-user customization
+   */
   preferences: defineTable({
-    userId: v.string(),
+    userId: v.id("users"),
     theme: v.union(v.literal("light"), v.literal("dark"), v.literal("system")),
     searchEnabled: v.boolean(),
     maxSearchResults: v.number(),
-  })
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 };
 
+/**
+ * Complete schema export
+ * - Merges auth tables
+ * - Includes app tables
+ */
 export default defineSchema({
   ...authTables,
   ...applicationTables,

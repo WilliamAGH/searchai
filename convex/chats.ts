@@ -1,158 +1,53 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+/**
+ * Chat management functions
+ * Re-exports modularized functions from dedicated files
+ * - CRUD operations for chats/messages
+ * - Share ID generation and lookup
+ * - Auth-based access control
+ * - Rolling summary for context compression
+ */
 
-export const createChat = mutation({
-	args: {
-		title: v.string(),
-		shareId: v.optional(v.string()),
-	},
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const now = Date.now();
+// Re-export utility functions
+export { buildContextSummary } from "./chats/utils";
+export { generateOpaqueId } from "./lib/uuid";
 
-		// Generate unique share ID if not provided
-		const shareId =
-			args.shareId ||
-			Math.random().toString(36).substring(2, 15) +
-				Math.random().toString(36).substring(2, 15);
+// Re-export core chat operations
+export {
+  createChat,
+  getUserChats,
+  getChatById,
+  getChatByIdDirect,
+  getChat,
+  getChatByOpaqueId,
+  getChatByShareId,
+  getChatByPublicId,
+} from "./chats/core";
 
-		return await ctx.db.insert("chats", {
-			title: args.title,
-			userId: userId || undefined,
-			shareId,
-			createdAt: now,
-			updatedAt: now,
-		});
-	},
-});
+// Re-export message operations
+export { getChatMessages } from "./chats/messages";
 
-export const getUserChats = query({
-	args: {},
-	handler: async (ctx) => {
-		const userId = await getAuthUserId(ctx);
+// Re-export update operations
+export {
+  updateChatTitle,
+  internalUpdateChatTitle,
+  updateRollingSummary,
+  updateChatPrivacy,
+} from "./chats/updates";
 
-		// Return empty array for unauthenticated users - they'll use local storage
-		if (!userId) return [];
+// Re-export summarization operations
+export { summarizeRecent, summarizeRecentAction } from "./chats/summarization";
 
-		return await ctx.db
-			.query("chats")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
-			.order("desc")
-			.collect();
-	},
-});
+// Re-export deletion operations
+export { deleteChat } from "./chats/deletion";
 
-export const getChatById = query({
-	args: { chatId: v.id("chats") },
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
+// Re-export migration operations
+export { importLocalChats, publishAnonymousChat } from "./chats/migration";
 
-		if (!chat) return null;
+// Re-export subscription operations
+export {
+  subscribeToChatUpdates,
+  subscribeToMessageStream,
+} from "./chats/subscriptions";
 
-		// Allow access to chats without userId (anonymous chats) or user's own chats
-		if (chat.userId && chat.userId !== userId) return null;
-
-		return chat;
-	},
-});
-
-export const getChatByShareId = query({
-	args: { shareId: v.string() },
-	handler: async (ctx, args) => {
-		const chat = await ctx.db
-			.query("chats")
-			.withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
-			.first();
-
-		if (!chat || !chat.shareId) return null;
-
-		// Only return shared chats or user's own chats
-		const userId = await getAuthUserId(ctx);
-		if (!chat.isShared && chat.userId !== userId) return null;
-
-		return chat;
-	},
-});
-
-export const getChatMessages = query({
-	args: { chatId: v.id("chats") },
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
-
-		if (!chat) return [];
-
-		// Allow access to chats without userId (anonymous chats) or user's own chats
-		if (chat.userId && chat.userId !== userId) return [];
-
-		return await ctx.db
-			.query("messages")
-			.withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-			.order("asc")
-			.collect();
-	},
-});
-
-export const updateChatTitle = mutation({
-	args: {
-		chatId: v.id("chats"),
-		title: v.string(),
-	},
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
-
-		if (!chat) throw new Error("Chat not found");
-		if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
-
-		await ctx.db.patch(args.chatId, {
-			title: args.title,
-			updatedAt: Date.now(),
-		});
-	},
-});
-
-export const shareChat = mutation({
-	args: {
-		chatId: v.id("chats"),
-		isPublic: v.boolean(),
-	},
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
-
-		if (!chat) throw new Error("Chat not found");
-		if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
-
-		await ctx.db.patch(args.chatId, {
-			isShared: true,
-			isPublic: args.isPublic,
-			updatedAt: Date.now(),
-		});
-	},
-});
-
-export const deleteChat = mutation({
-	args: { chatId: v.id("chats") },
-	handler: async (ctx, args) => {
-		const userId = await getAuthUserId(ctx);
-		const chat = await ctx.db.get(args.chatId);
-
-		if (!chat) throw new Error("Chat not found");
-		if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
-
-		// Delete all messages in the chat
-		const messages = await ctx.db
-			.query("messages")
-			.withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-			.collect();
-
-		for (const message of messages) {
-			await ctx.db.delete(message._id);
-		}
-
-		await ctx.db.delete(args.chatId);
-	},
-});
+// Re-export cleanup operations
+export { cleanupEmptyChats } from "./chats/cleanup";

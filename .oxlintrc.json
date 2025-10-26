@@ -3,7 +3,12 @@
   "plugins": [
     "import",
     "typescript",
-    "unicorn"
+    "unicorn",
+    "react",
+    "jsx-a11y",
+    "promise",
+    "vitest",
+    "react-perf"
   ],
   "env": {
     "browser": true,
@@ -11,20 +16,82 @@
   },
   "settings": {},
   "rules": {
-    "eqeqeq": "warn",
+    "eqeqeq": "error",
+    "no-eval": "error",
+    "no-debugger": "error",
+    "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
+    "no-control-regex": "off",
+
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "**/convexTypes",
+              "**/convexTypes.ts",
+              "**/convex-types",
+              "**/types/convex"
+            ],
+            "message": "❌ NEVER create abstraction layers over Convex _generated types. Import directly from 'convex/_generated/' as per Convex best practices."
+          },
+          {
+            "group": [
+              "./lib/convexTypes",
+              "../lib/convexTypes",
+              "../../lib/convexTypes"
+            ],
+            "message": "❌ CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See CLAUDE.md for correct patterns."
+          },
+          {
+            "group": [
+              "**/lib/convex*",
+              "**/wrappers/convex*",
+              "**/abstractions/convex*"
+            ],
+            "message": "❌ Do not create wrapper files for Convex types. The _generated directory IS the abstraction layer."
+          }
+        ]
+      }
+    ],
+
     "import/no-cycle": "error",
     "import/order": "off",
+    "import/no-duplicates": "error",
+
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-non-null-assertion": "warn",
+
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "error",
     "react/self-closing-comp": [
       "error",
       {
         "html": false
       }
-    ]
+    ],
+    "react/jsx-no-target-blank": "error",
+    "react/jsx-key": "error",
+
+    "react-perf/jsx-no-new-function-as-prop": "off",
+    "react-perf/jsx-no-new-array-as-prop": "off",
+    "react-perf/jsx-no-new-object-as-prop": "off",
+
+    "jsx-a11y/anchor-is-valid": "warn",
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/no-aria-hidden-on-focusable": "error",
+
+    "promise/no-return-await": "error",
+    "promise/catch-or-return": "warn",
+
+    "unicorn/no-array-reduce": "warn",
+    "unicorn/prefer-node-protocol": "warn"
   },
   "ignorePatterns": [
     "dist/**",
     "convex/_generated/**",
     "node_modules/**",
+    "playwright-report/**",
     "*.config.js",
     "*.config.ts"
   ],
@@ -32,10 +99,52 @@
     {
       "files": [
         "*.test.ts",
-        "*.spec.ts"
+        "*.spec.ts",
+        "*.test.tsx",
+        "*.spec.tsx",
+        "*.mjs",
+        "tests/**/*",
+        "scripts/**/*"
       ],
       "rules": {
-        "@typescript-eslint/no-explicit-any": "off"
+        "@typescript-eslint/no-explicit-any": "off",
+        "no-console": "off",
+        "unicorn/prefer-node-protocol": "off"
+      }
+    },
+    {
+      "files": ["convex/**/*.ts"],
+      "rules": {
+        "no-console": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-non-null-assertion": "off",
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["./lib/convexTypes", "../lib/convexTypes"],
+                "message": "❌ In Convex backend files, import from './_generated/' not from wrapper files"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/**/*.ts", "src/**/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/convex/lib/convexTypes", "**/convexTypes"],
+                "message": "❌ In frontend files, import from 'convex/_generated/' not from wrapper files"
+              }
+            ]
+          }
+        ]
       }
     }
   ]

@@ -1,22 +1,24 @@
-import React, { Fragment } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { Id } from '../../convex/_generated/dataModel';
+// Refactored to use stable callbacks; no inline function props
 
-interface Chat {
-  _id: Id<"chats"> | string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  isLocal?: boolean;
-}
+import { Dialog, Transition } from "@headlessui/react";
+import { useMutation } from "convex/react";
+import { Fragment, useRef, useCallback } from "react";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+import type { Chat } from "../lib/types/chat";
+import { isLocalId as isLocalChatId } from "../lib/types/chat";
+import { logger } from "../lib/logger";
 
 interface MobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   chats: Chat[];
   currentChatId: Id<"chats"> | string | null;
-  onSelectChat: (chatId: Id<"chats"> | string) => void;
+  onSelectChat: (chatId: Id<"chats"> | string | null) => void;
   onNewChat: () => void;
+  onDeleteLocalChat?: (chatId: string) => void;
+  onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
+  isCreatingChat?: boolean;
 }
 
 export function MobileSidebar({
@@ -26,10 +28,92 @@ export function MobileSidebar({
   currentChatId,
   onSelectChat,
   onNewChat,
+  onDeleteLocalChat,
+  onRequestDeleteChat,
+  isCreatingChat = false,
 }: MobileSidebarProps) {
+  const deleteChat = useMutation(api.chats.deleteChat);
+  // Ensure Headless UI Dialog has a stable initial focusable element on open
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleNewChat = useCallback(() => {
+    logger.info("🖱️ New Chat button clicked in MobileSidebar");
+    onNewChat();
+    onClose();
+  }, [onNewChat, onClose]);
+
+  const handleSelectChat = useCallback(
+    (chatId: Id<"chats"> | string) => {
+      onSelectChat(chatId);
+      onClose();
+    },
+    [onSelectChat, onClose],
+  );
+
+  const handleOverlayKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === "Escape") onClose();
+    },
+    [onClose],
+  );
+
+  const handleSelectChatFromBtn = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const id = e.currentTarget.getAttribute("data-chat-id");
+      if (!id) return;
+      handleSelectChat(id);
+    },
+    [handleSelectChat],
+  );
+
+  const handleDeleteChat = useCallback(
+    async (chatId: Id<"chats"> | string, isCurrentChat: boolean) => {
+      try {
+        if (!window.confirm("Delete this chat? This cannot be undone.")) return;
+
+        if (onRequestDeleteChat) {
+          onRequestDeleteChat(chatId);
+        } else {
+          // Infer local vs server using our shared local ID prefixes
+          const isLocal =
+            typeof chatId === "string" ? isLocalChatId(chatId) : false;
+          if (isLocal) {
+            onDeleteLocalChat?.(chatId as string);
+          } else {
+            await deleteChat({ chatId: chatId as Id<"chats"> });
+          }
+        }
+
+        if (isCurrentChat) {
+          onSelectChat(null);
+        }
+      } catch (err) {
+        if ((import.meta as unknown as { env?: { DEV?: boolean } })?.env?.DEV) {
+          logger.warn("Chat deletion failed:", err);
+        }
+      }
+    },
+    [onRequestDeleteChat, onDeleteLocalChat, deleteChat, onSelectChat],
+  );
+
+  const handleDeleteChatFromBtn = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const id = e.currentTarget.getAttribute("data-chat-id");
+      const isCurrent = e.currentTarget.getAttribute("data-current") === "1";
+      if (!id) return;
+      void handleDeleteChat(id, isCurrent);
+    },
+    [handleDeleteChat],
+  );
+
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50 lg:hidden" onClose={onClose}>
+      <Dialog
+        as="div"
+        className="relative z-50 lg:hidden mobile-sidebar-dialog"
+        onClose={onClose}
+        initialFocus={closeButtonRef}
+      >
         <Transition.Child
           as={Fragment}
           enter="transition-opacity ease-linear duration-300"
@@ -39,7 +123,13 @@ export function MobileSidebar({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-900/80" />
+          <button
+            className="fixed inset-0 bg-gray-900/80"
+            onClick={onClose}
+            onKeyDown={handleOverlayKeyDown}
+            type="button"
+            aria-label="Close sidebar overlay"
+          />
         </Transition.Child>
 
         <div className="fixed inset-0 flex">
@@ -52,7 +142,10 @@ export function MobileSidebar({
             leaveFrom="translate-x-0"
             leaveTo="-translate-x-full"
           >
-            <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
+            <Dialog.Panel
+              tabIndex={-1}
+              className="relative mr-16 flex w-full max-w-xs flex-1"
+            >
               <Transition.Child
                 as={Fragment}
                 enter="ease-in-out duration-300"
@@ -67,41 +160,99 @@ export function MobileSidebar({
                     type="button"
                     className="-m-2.5 p-2.5"
                     onClick={onClose}
+                    ref={closeButtonRef}
                   >
                     <span className="sr-only">Close sidebar</span>
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="h-6 w-6 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth="1.5"
+                      stroke="currentColor"
+                      aria-label="Close sidebar"
+                    >
+                      <title>Close sidebar</title>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
               </Transition.Child>
-              
+
               <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-900 px-6 pb-2">
                 <div className="flex h-16 shrink-0 items-center">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <svg
+                        className="w-5 h-5 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <title>Search</title>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
                       </svg>
                     </div>
                     <span className="text-lg font-semibold">SearchAI</span>
                   </div>
                 </div>
-                
+
                 <nav className="flex flex-1 flex-col">
                   <button
-                    onClick={() => {
-                      onNewChat();
-                      onClose();
-                    }}
-                    className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4"
+                    type="button"
+                    onClick={handleNewChat}
+                    disabled={isCreatingChat}
+                    className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    New Chat
+                    {isCreatingChat ? (
+                      <svg
+                        className="w-5 h-5 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <title>Creating chat</title>
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-label="New chat"
+                      >
+                        <title>New chat</title>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                    )}
+                    {isCreatingChat ? "Creating..." : "New Chat"}
                   </button>
-                  
+
                   <div className="space-y-1">
                     <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Recent Chats
@@ -113,26 +264,65 @@ export function MobileSidebar({
                     ) : (
                       <div className="space-y-1">
                         {chats.map((chat) => (
-                          <button
+                          <div
                             key={chat._id}
-                            onClick={() => {
-                              onSelectChat(chat._id as any);
-                              onClose();
-                            }}
-                            className={`w-full px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
-                              currentChatId === chat._id ? 'bg-gray-100 dark:bg-gray-800' : ''
-                            }`}
+                            className="flex items-center gap-2 pr-2 min-w-0"
                           >
-                            <div className="font-medium truncate text-sm">{chat.title}</div>
-                            <div className="text-xs text-gray-500 flex items-center gap-1">
-                              {chat.isLocal && (
-                                <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded">
-                                  Local
+                            <button
+                              type="button"
+                              data-chat-id={String(chat._id)}
+                              onClick={handleSelectChatFromBtn}
+                              className={`flex-1 min-w-0 px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                                currentChatId === chat._id
+                                  ? "bg-gray-100 dark:bg-gray-800"
+                                  : ""
+                              }`}
+                            >
+                              <div className="text-xs font-medium truncate min-w-0 leading-tight">
+                                {chat.title}
+                              </div>
+                              <div className="text-[11px] text-gray-500 flex items-center gap-1 min-w-0 mt-0.5">
+                                {"isLocal" in chat && chat.isLocal && (
+                                  <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
+                                    Local
+                                  </span>
+                                )}
+                                <span className="truncate">
+                                  {new Date(
+                                    chat.updatedAt,
+                                  ).toLocaleDateString()}
                                 </span>
-                              )}
-                              {new Date(chat.updatedAt).toLocaleDateString()}
-                            </div>
-                          </button>
+                              </div>
+                            </button>
+                            <button
+                              type="button"
+                              data-chat-id={String(chat._id)}
+                              data-current={
+                                currentChatId === chat._id ? "1" : "0"
+                              }
+                              onClick={handleDeleteChatFromBtn}
+                              className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+                              title="Delete chat"
+                              aria-label="Delete chat"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg"
+                                aria-label="Delete chat"
+                              >
+                                <title>Delete chat</title>
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                         ))}
                       </div>
                     )}

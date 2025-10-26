@@ -6,12 +6,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
+.last-run.json
+trace.zip
+test-results
+coverage
+playwright-report
+*.bak
+.crush*
 node_modules
 dist
 dist-ssr
 *.local
 .env
+.gh*
 
 # Editor directories and files
 .idea

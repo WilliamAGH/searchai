@@ -1,0 +1,195 @@
+/**
+ * Search route handlers
+ * - OPTIONS and POST /api/search endpoints
+ */
+
+import { httpAction } from "../../_generated/server";
+import { api } from "../../_generated/api";
+import type { HttpRouter } from "convex/server";
+import { corsResponse, dlog } from "../utils";
+import { corsPreflightResponse } from "../cors";
+import { checkIpRateLimit } from "../../lib/rateLimit";
+import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
+import { normalizeUrlForKey } from "../../lib/url";
+
+/**
+ * Register search routes on the HTTP router
+ */
+export function registerSearchRoutes(http: HttpRouter) {
+  // CORS preflight handler for /api/search
+  http.route({
+    path: "/api/search",
+    method: "OPTIONS",
+    handler: httpAction(async (_ctx, request) => {
+      return corsPreflightResponse(request);
+    }),
+  });
+
+  // Web search endpoint for unauthenticated users
+  http.route({
+    path: "/api/search",
+    method: "POST",
+    handler: httpAction(async (ctx, request) => {
+      const origin = request.headers.get("Origin");
+      // Enforce strict origin validation early
+      const probe = corsResponse("{}", 204, origin);
+      if (probe.status === 403) return probe;
+
+      // Rate limiting check
+      const rateLimit = checkIpRateLimit(request, "/api/search");
+      if (!rateLimit.allowed) {
+        return corsResponse(
+          JSON.stringify({
+            error: "Rate limit exceeded",
+            message: "Too many search requests. Please try again later.",
+            retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+          }),
+          429,
+          origin,
+        );
+      }
+
+      let rawPayload: unknown;
+      try {
+        rawPayload = await request.json();
+      } catch {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid JSON body" }),
+          400,
+          origin,
+        );
+      }
+
+      // Validate and normalize input
+      const payload = rawPayload as any;
+      const query = String(payload.query || "").slice(0, 1000);
+      const maxResults =
+        typeof payload.maxResults === "number"
+          ? Math.max(1, Math.min(payload.maxResults, 50))
+          : 5;
+
+      if (!query.trim()) {
+        return corsResponse(
+          JSON.stringify({
+            results: [],
+            searchMethod: "fallback",
+            hasRealResults: false,
+          }),
+          200,
+          origin,
+        );
+      }
+
+      dlog("🔍 SEARCH ENDPOINT CALLED:");
+      dlog("Query:", query);
+      dlog("Max Results:", maxResults);
+      dlog("Environment Variables Available:");
+      dlog("- SERP_API_KEY:", process.env.SERP_API_KEY ? "SET" : "NOT SET");
+      dlog(
+        "- OPENROUTER_API_KEY:",
+        process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET",
+      );
+
+      try {
+        // Apply universal enhancements to anonymous search queries
+        const enh = applyEnhancements(String(query), {
+          enhanceQuery: true,
+          enhanceSearchTerms: true,
+          injectSearchResults: true,
+          enhanceContext: true,
+          enhanceSystemPrompt: true,
+        });
+
+        const enhancedQuery = enh.enhancedQuery || String(query);
+        const prioritizedUrls = enh.prioritizedUrls || [];
+
+        const result = await ctx.runAction(api.search.searchWeb, {
+          query: enhancedQuery,
+          maxResults: maxResults || 5,
+        });
+
+        // Inject any enhancement-provided results at the front then de-duplicate by normalized URL
+        let mergedResults = Array.isArray(result.results)
+          ? [...result.results]
+          : [];
+        if (enh.injectedResults && enh.injectedResults.length > 0) {
+          mergedResults.unshift(...enh.injectedResults);
+        }
+        // Deduplicate by normalized URL, keep the entry with higher relevanceScore
+        const byUrl = new Map<
+          string,
+          {
+            title: string;
+            url: string;
+            snippet: string;
+            relevanceScore?: number;
+          }
+        >();
+        for (const r of mergedResults) {
+          const key = normalizeUrlForKey(r.url);
+          const prev = byUrl.get(key);
+          const curScore =
+            typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;
+          const prevScore =
+            typeof prev?.relevanceScore === "number"
+              ? prev.relevanceScore
+              : -Infinity;
+          if (!prev || curScore > prevScore) byUrl.set(key, r);
+        }
+        mergedResults = Array.from(byUrl.values()).map((r) => ({
+          ...r,
+          relevanceScore: r.relevanceScore ?? 0.5,
+        }));
+        // If prioritization hints exist, sort with priority
+        if (prioritizedUrls.length > 0 && mergedResults.length > 1) {
+          mergedResults = sortResultsWithPriority(
+            mergedResults,
+            prioritizedUrls,
+          );
+        }
+
+        const enhancedResult = {
+          ...result,
+          results: mergedResults,
+          hasRealResults:
+            result.hasRealResults || (mergedResults?.length ?? 0) > 0,
+          // Surface matched rules for debugging in dev if needed (non-breaking)
+        } as const;
+
+        dlog("🔍 SEARCH RESULT:", JSON.stringify(enhancedResult, null, 2));
+
+        return corsResponse(JSON.stringify(enhancedResult), 200, origin);
+      } catch (error) {
+        console.error("❌ SEARCH API ERROR:", error);
+
+        // Create fallback search results
+        const fallbackResults = [
+          {
+            title: `Search for: ${query}`,
+            url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+            snippet:
+              "Search results temporarily unavailable. Click to search manually.",
+            relevanceScore: 0.3,
+          },
+        ];
+
+        const errorResponse = {
+          results: fallbackResults,
+          searchMethod: "fallback",
+          hasRealResults: false,
+          error: "Search failed",
+          errorDetails: {
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        dlog(
+          "🔍 SEARCH FALLBACK RESPONSE:",
+          JSON.stringify(errorResponse, null, 2),
+        );
+
+        return corsResponse(JSON.stringify(errorResponse), 200, origin);
+      }
+    }),
+  });
+}

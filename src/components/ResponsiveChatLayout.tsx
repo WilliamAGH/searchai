@@ -1,14 +1,5 @@
-import React, { Fragment } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { Id } from '../../convex/_generated/dataModel';
-
-interface Chat {
-  _id: Id<"chats"> | string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  isLocal?: boolean;
-}
+import React, { Fragment } from "react";
+import { Dialog, Transition } from "@headlessui/react";
 
 interface ResponsiveChatLayoutProps {
   children: React.ReactNode;
@@ -17,11 +8,11 @@ interface ResponsiveChatLayoutProps {
   onToggleSidebar: () => void;
 }
 
-export function ResponsiveChatLayout({ 
-  children, 
+export function ResponsiveChatLayout({
+  children,
   sidebarContent,
   isSidebarOpen,
-  onToggleSidebar
+  onToggleSidebar,
 }: ResponsiveChatLayoutProps) {
   return (
     <div className="flex h-full">
@@ -36,7 +27,11 @@ export function ResponsiveChatLayout({
 
       {/* Mobile Sidebar - Headless UI Dialog */}
       <Transition.Root show={isSidebarOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50 lg:hidden" onClose={onToggleSidebar}>
+        <Dialog
+          as="div"
+          className="relative z-50 lg:hidden"
+          onClose={onToggleSidebar}
+        >
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
@@ -76,8 +71,18 @@ export function ResponsiveChatLayout({
                       onClick={onToggleSidebar}
                     >
                       <span className="sr-only">Close sidebar</span>
-                      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="h-6 w-6 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -92,9 +97,7 @@ export function ResponsiveChatLayout({
       </Transition.Root>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col min-w-0">
-        {children}
-      </div>
+      <div className="flex flex-1 flex-col min-w-0">{children}</div>
     </div>
   );
 }
