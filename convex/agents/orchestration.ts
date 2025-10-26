@@ -470,6 +470,7 @@ export async function* streamResearchWorkflow(
     chatId: args.chatId,
     role: "user",
     content: args.userQuery,
+    sessionId: args.sessionId, // Pass sessionId for HTTP action auth
   });
 
   const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
@@ -932,6 +933,7 @@ export async function* streamResearchWorkflow(
         contextReferences,
         workflowId,
         isStreaming: false,
+        sessionId: args.sessionId, // Pass sessionId for HTTP action auth
       },
     )) as Id<"messages">;
 
