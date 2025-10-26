@@ -21,6 +21,7 @@ import {
   isSignatureVerificationAvailable,
   type PersistedPayload,
 } from "../security/signature";
+import { env } from "../env";
 // Removed unused imports from errorHandling
 
 export class ConvexChatRepository extends BaseRepository {
@@ -392,7 +393,9 @@ export class ConvexChatRepository extends BaseRepository {
       // Stream via HTTP SSE for live UI updates (server now persists)
       const host = window.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
-      const apiUrl = isDev ? "/api/ai/agent/stream" : `/api/ai/agent/stream`;
+      const apiUrl = isDev
+        ? "/api/ai/agent/stream"
+        : `${env.convexUrl}/api/ai/agent/stream`;
 
       // Build recent conversation context
       const recent = await this.getMessages(chatId);
