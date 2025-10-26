@@ -6,6 +6,10 @@
  */
 
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
+// Import from the dedicated types module (not orchestration_helpers) so we don't pull
+// any Node-only helpers into browser bundles.
+import type { StreamingPersistPayload } from "../../../convex/agents/types";
+export type { ResearchContextReference } from "../../../convex/agents/types";
 
 /**
  * Search result structure (shared between local and server)
@@ -103,20 +107,7 @@ export const createLocalMessage = (
  * Message stream chunk for real-time updates
  * Extended to support agent workflow streaming events
  */
-export interface PersistedPayload {
-  assistantMessageId: Id<"messages">;
-  workflowId: string;
-  answer: string;
-  sources: string[];
-  contextReferences: Array<{
-    contextId: string;
-    type: "search_result" | "scraped_page" | "research_summary";
-    url?: string;
-    title?: string;
-    timestamp: number;
-    relevanceScore?: number;
-  }>;
-}
+export type PersistedPayload = StreamingPersistPayload;
 
 export type MessageStreamChunk =
   | { type: "chunk"; content: string } // Legacy: text content chunk
@@ -132,14 +123,16 @@ export type MessageStreamChunk =
     }
   | { type: "reasoning"; content: string } // Thinking/reasoning from agents
   | { type: "tool_result"; toolName: string; result: string } // Tool execution results
-  | { type: "metadata"; metadata: unknown } // Final metadata (sources, etc.)
+  | { type: "metadata"; metadata: unknown; nonce?: string } // Final metadata (sources, etc.)
   | { type: "complete"; workflow?: unknown } // Workflow completion
   | { type: "error"; error: string } // Error events
   | { type: "done" } // Stream completion
   | {
       type: "persisted";
       payload: PersistedPayload;
-    }; // Database persistence confirmation
+      nonce: string;
+      signature: string;
+    }; // Database persistence confirmation with security metadata
 
 /**
  * Search progress state for UI updates

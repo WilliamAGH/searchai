@@ -157,8 +157,8 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
         await deps.chatActions.sendMessage(activeChatId, message.trim());
 
-        // Title update now handled by backend in runAgentWorkflowAndPersist
-        // This ensures title persists to Convex and survives page refresh
+        // Title updates handled server-side during streaming persistence
+        // This ensures titles persist to Convex and survive page refresh
 
         deps.maybeShowFollowUpPrompt();
       } catch (error) {

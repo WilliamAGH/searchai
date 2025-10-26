@@ -42,6 +42,7 @@ export function useChatDataLoader(
         rollingSummary: chat.rollingSummary,
         source: "convex" as const,
         synced: true,
+        isLocal: false,
         lastSyncAt: Date.now(),
       }));
 

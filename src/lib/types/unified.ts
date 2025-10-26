@@ -106,6 +106,9 @@ export interface UnifiedMessage {
 
   // Agent workflow tracking
   workflowId?: string;
+  workflowNonce?: string;
+  workflowSignature?: string;
+  persisted?: boolean;
 }
 
 /**

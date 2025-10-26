@@ -321,7 +321,8 @@ export function createChatActions(
 
         let fullContent = "";
         let accumulatedReasoning = "";
-        let persistedPayload: PersistedPayload | null = null;
+        let persistedDetails: PersistedPayload | null = null;
+        let persistedConfirmed = false;
 
         for await (const chunk of generator) {
           switch (chunk.type) {
@@ -388,39 +389,28 @@ export function createChatActions(
               }
               break;
 
-            case "metadata":
-              // Apply final metadata (sources, searchResults, etc.)
+            case "metadata": {
               if (chunk.metadata && typeof chunk.metadata === "object") {
                 const metadata = chunk.metadata as Record<string, unknown>;
-
-                // Convert contextReferences to searchResults for UI compatibility
-                const searchResults = Array.isArray(metadata.contextReferences)
-                  ? metadata.contextReferences.map((ref: unknown) => {
-                      const contextRef = ref as {
-                        title?: string;
-                        url?: string;
-                        relevanceScore?: number;
-                        relevance?: string;
-                        type?: string;
-                      };
-                      return {
-                        title:
-                          contextRef.title ||
-                          (contextRef.url
-                            ? new URL(contextRef.url).hostname
-                            : "Unknown"),
-                        url: contextRef.url || "",
-                        snippet: "",
-                        relevanceScore:
-                          contextRef.relevanceScore ||
-                          (contextRef.relevance === "high"
-                            ? 0.9
-                            : contextRef.relevance === "medium"
-                              ? 0.7
-                              : 0.5),
-                        kind: contextRef.type,
-                      };
-                    })
+                const workflowIdFromMetadata = metadata.workflowId as
+                  | string
+                  | undefined;
+                const contextRefs = Array.isArray(metadata.contextReferences)
+                  ? (metadata.contextReferences as UnifiedMessage["contextReferences"])
+                  : undefined;
+                const metadataSources = Array.isArray(metadata.sources)
+                  ? (metadata.sources as string[])
+                  : undefined;
+                const searchResults = contextRefs
+                  ? contextRefs.map((ref) => ({
+                      title:
+                        ref.title ||
+                        (ref.url ? new URL(ref.url).hostname : "Unknown"),
+                      url: ref.url || "",
+                      snippet: "",
+                      relevanceScore: ref.relevanceScore ?? 0.5,
+                      kind: ref.type,
+                    }))
                   : metadata.searchResults || [];
 
                 setState((prev) => ({
@@ -429,9 +419,14 @@ export function createChatActions(
                     index === prev.messages.length - 1 && m.role === "assistant"
                       ? {
                           ...m,
-                          ...metadata,
-                          searchResults,
-                          contextReferences: metadata.contextReferences,
+                          workflowId: workflowIdFromMetadata ?? m.workflowId,
+                          workflowNonce:
+                            (chunk as { nonce?: string }).nonce ??
+                            m.workflowNonce,
+                          contextReferences: contextRefs ?? m.contextReferences,
+                          sources: metadataSources ?? m.sources,
+                          searchResults:
+                            searchResults as UnifiedMessage["searchResults"],
                           isStreaming: false,
                           thinking: undefined,
                         }
@@ -441,6 +436,7 @@ export function createChatActions(
               }
               logger.debug("Metadata received");
               break;
+            }
 
             case "error":
               throw new Error(chunk.error);
@@ -462,16 +458,20 @@ export function createChatActions(
               break;
 
             case "persisted":
-              // Persistence complete - NOW we can safely refresh
-              persistedPayload = chunk.payload;
+              persistedConfirmed = true;
+              persistedDetails = chunk.payload;
               setState((prev) => ({
                 ...prev,
                 isGenerating: false,
+                searchProgress: { stage: "idle" },
                 messages: prev.messages.map((m, index) =>
                   index === prev.messages.length - 1 && m.role === "assistant"
                     ? {
                         ...m,
                         workflowId: chunk.payload.workflowId,
+                        workflowNonce: chunk.nonce ?? m.workflowNonce,
+                        workflowSignature:
+                          chunk.signature ?? m.workflowSignature,
                         sources: chunk.payload.sources,
                         contextReferences: chunk.payload.contextReferences,
                         searchResults:
@@ -488,11 +488,12 @@ export function createChatActions(
                             })) || m.searchResults,
                         isStreaming: false,
                         thinking: undefined,
+                        persisted: true,
                       }
                     : m,
                 ),
               }));
-              logger.debug("Persistence confirmed, triggering refresh", {
+              logger.debug("Persistence confirmed via SSE", {
                 chatId,
                 workflowId: chunk.payload.workflowId,
               });
@@ -500,19 +501,19 @@ export function createChatActions(
           }
         }
 
-        const refreshAfterPersist = async () => {
-          if (!repository) {
+        const refreshAfterPersist = async (shouldForce: boolean) => {
+          if (!repository || !shouldForce) {
             return;
           }
 
           const maxAttempts = 5;
           const delay = (ms: number) =>
             new Promise((resolve) => setTimeout(resolve, ms));
-          const targetAssistantId = persistedPayload
-            ? IdUtils.toUnifiedId(persistedPayload.assistantMessageId)
+          const targetAssistantId = persistedDetails
+            ? IdUtils.toUnifiedId(persistedDetails.assistantMessageId)
             : null;
           const trimmedAnswer = fullContent.trim();
-          if (!persistedPayload) {
+          if (!persistedDetails) {
             logger.warn(
               "Persist payload missing; relying on content match for refresh",
               { chatId },
@@ -531,8 +532,8 @@ export function createChatActions(
                   return true;
                 }
                 if (
-                  persistedPayload?.workflowId &&
-                  m.workflowId === persistedPayload.workflowId
+                  persistedDetails?.workflowId &&
+                  m.workflowId === persistedDetails.workflowId
                 ) {
                   return true;
                 }
@@ -575,7 +576,7 @@ export function createChatActions(
           );
         };
 
-        await refreshAfterPersist();
+        await refreshAfterPersist(!persistedConfirmed);
       } catch (error) {
         logger.error("Failed to send message:", error);
         setState((prev) => ({

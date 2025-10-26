@@ -11,12 +11,16 @@ import {
   UnifiedChat,
   UnifiedMessage,
   StreamChunk,
-  PersistedPayload,
   ChatResponse,
   IdUtils,
   TitleUtils,
 } from "../types/unified";
 import { logger } from "../logger";
+import {
+  verifyPersistedPayload,
+  isSignatureVerificationAvailable,
+  type PersistedPayload,
+} from "../security/signature";
 // Removed unused imports from errorHandling
 
 export class ConvexChatRepository extends BaseRepository {
@@ -64,6 +68,7 @@ export class ConvexChatRepository extends BaseRepository {
         rollingSummary: chat.rollingSummary,
         source: "convex",
         synced: true,
+        isLocal: false,
         lastSyncAt: Date.now(),
       }));
     } catch (error) {
@@ -384,7 +389,7 @@ export class ConvexChatRepository extends BaseRepository {
     message: string,
   ): AsyncGenerator<StreamChunk> {
     try {
-      // Stream via HTTP SSE for live UI updates, then persist
+      // Stream via HTTP SSE for live UI updates (server now persists)
       const host = window.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
       const apiUrl = isDev ? "/api/ai/agent/stream" : `/api/ai/agent/stream`;
@@ -400,6 +405,8 @@ export class ConvexChatRepository extends BaseRepository {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message,
+          chatId: IdUtils.toConvexChatId(chatId),
+          sessionId: this.sessionId,
           conversationContext: chatHistory
             .map(
               (m) =>
@@ -437,9 +444,51 @@ export class ConvexChatRepository extends BaseRepository {
               case "reasoning":
               case "content":
               case "metadata":
+              case "tool_result":
               case "error":
                 yield evt as StreamChunk;
                 break;
+              case "persisted": {
+                // Verify signature if available and enabled
+                // Note: Signature verification is optional in production since
+                // the signing key can't be safely embedded in frontend code.
+                // In dev, you can set VITE_AGENT_SIGNING_KEY for testing.
+                const signingKey = import.meta.env.VITE_AGENT_SIGNING_KEY;
+
+                if (
+                  signingKey &&
+                  isSignatureVerificationAvailable() &&
+                  evt.payload &&
+                  evt.nonce &&
+                  evt.signature
+                ) {
+                  const isValid = await verifyPersistedPayload(
+                    evt.payload as PersistedPayload,
+                    evt.nonce,
+                    evt.signature,
+                    signingKey,
+                  );
+
+                  if (!isValid) {
+                    logger.error(
+                      "🚫 Invalid signature detected on persisted event",
+                      {
+                        workflowId: evt.payload?.workflowId,
+                        nonce: evt.nonce,
+                      },
+                    );
+                    // Skip this event - possible tampering
+                    break;
+                  }
+
+                  logger.debug("✅ Signature verified for persisted event", {
+                    workflowId: evt.payload?.workflowId,
+                  });
+                }
+
+                yield evt as StreamChunk;
+                break;
+              }
               case "complete":
                 yield { type: "done" };
                 break;
@@ -449,44 +498,6 @@ export class ConvexChatRepository extends BaseRepository {
           }
         }
       }
-
-      // Persist to database and signal completion
-      const persistUrl = isDev
-        ? "/api/ai/agent/persist"
-        : `/api/ai/agent/persist`;
-      const persistResponse = await fetch(persistUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId: IdUtils.toConvexChatId(chatId), // Convert to Convex Id format
-          message,
-          sessionId: this.sessionId, // Pass sessionId for anonymous user chat access
-        }),
-      });
-
-      if (!persistResponse.ok) {
-        const failureBody = await persistResponse.text().catch(() => "");
-        throw new Error(
-          `Persist failed: ${persistResponse.status} ${persistResponse.statusText} ${failureBody}`,
-        );
-      }
-
-      const persistPayload = (await persistResponse
-        .json()
-        .catch(() => null)) as PersistedPayload | null;
-      if (
-        !persistPayload ||
-        typeof persistPayload !== "object" ||
-        !persistPayload.assistantMessageId
-      ) {
-        throw new Error("Persist response malformed");
-      }
-
-      // Signal persistence complete so UI can refresh with authoritative data
-      yield {
-        type: "persisted",
-        payload: persistPayload,
-      };
     } catch (error) {
       yield {
         type: "error",
@@ -624,6 +635,7 @@ export class ConvexChatRepository extends BaseRepository {
       rollingSummary: c.rollingSummary as string | undefined,
       source: "convex",
       synced: true,
+      isLocal: false,
       lastSyncAt: Date.now(),
     };
   }

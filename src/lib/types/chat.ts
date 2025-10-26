@@ -166,11 +166,15 @@ export function createChatFromData(
   const id = data._id || data.id || "";
   const now = Date.now();
 
-  if (isAuthenticated && data._creationTime) {
+  // Check if it's a Convex chat by presence of _creationTime OR if ID is a Convex ID
+  // This works for both authenticated users AND anonymous users with Convex chats
+  const isConvexChat = data._creationTime || (id && !isLocalId(id));
+
+  if (isConvexChat) {
     // Server chat (Doc<"chats">)
     return {
       _id: id as Id<"chats">,
-      _creationTime: data._creationTime,
+      _creationTime: data._creationTime || now,
       title: data.title || "Untitled Chat",
       createdAt: data.createdAt || now,
       updatedAt: data.updatedAt || now,
