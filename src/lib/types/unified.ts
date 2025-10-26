@@ -213,36 +213,14 @@ export const IdUtils = {
 };
 
 /**
- * Title Generation Utilities
- * Helper functions for generating and sanitizing titles
+ * Title Utilities
+ * CRITICAL: Title GENERATION is done ONLY by backend convex/chats/utils.ts:generateChatTitle
+ * This file contains ONLY sanitization utilities for the frontend.
  */
 export const TitleUtils = {
   /**
-   * Generate a title from content
-   */
-  generateFromContent: (content: string, maxLength: number = 50): string => {
-    const trimmed = content.trim();
-    if (!trimmed) return "New Chat";
-
-    if (trimmed.length <= maxLength) {
-      return trimmed;
-    }
-
-    // Try to break at word boundary
-    const truncated = trimmed.substring(0, maxLength);
-    const lastSpace = truncated.lastIndexOf(" ");
-
-    // Prefer word boundary if it's at least halfway into the truncated text
-    if (lastSpace >= Math.floor(maxLength / 2)) {
-      return truncated.substring(0, lastSpace) + "...";
-    }
-
-    // Otherwise just truncate
-    return truncated + "...";
-  },
-
-  /**
    * Sanitize title for display
+   * Used to clean titles received from backend before displaying
    */
   sanitize: (title: string): string => {
     return title

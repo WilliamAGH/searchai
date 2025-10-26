@@ -73,7 +73,8 @@ export const addMessage = internalMutation({
       await ctx.db.patch(args.chatId, { threadId });
     }
 
-    const { chatId, ...rest } = args;
+    // Destructure sessionId out - it's only for validation, not storage
+    const { chatId, sessionId, ...rest } = args;
     return await ctx.db.insert("messages", {
       chatId: chatId,
       messageId, // UUID v7 for unique message tracking

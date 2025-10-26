@@ -55,11 +55,27 @@ export function buildContextSummary(params: {
   return lines.join("\n").slice(0, maxChars);
 }
 
+/**
+ * CRITICAL: This is the ONLY place where chat titles are generated.
+ * All chat titles in the entire application use this 25 character limit.
+ * DO NOT create alternative title generation functions.
+ */
 const DEFAULT_TITLE_MAX_LENGTH = 25;
 
 /**
  * Generate a concise chat title from user intent/message
- * Removes filler words and prioritizes meaningful content
+ *
+ * SINGLE SOURCE OF TRUTH for all chat title generation.
+ * - Default max length: 25 characters (used everywhere in the app)
+ * - Removes filler words ("what is the", "tell me about", etc.)
+ * - Smart word-boundary truncation
+ * - Capitalizes first letter
+ *
+ * Called by:
+ * - convex/messages.ts:addMessageWithTransaction (on first user message)
+ *
+ * Frontend (src/lib/types/unified.ts:TitleUtils) only provides sanitization,
+ * NOT generation. All title generation happens here.
  */
 export function generateChatTitle(params: {
   intent: string;

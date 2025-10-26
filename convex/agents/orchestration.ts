@@ -487,6 +487,31 @@ export async function* streamResearchWorkflow(
     contextReferences?: ResearchContextReference[];
   }>;
 
+  // CRITICAL: Update title if this is the first user message (25 char limit)
+  // This must happen here because orchestration uses addMessage directly,
+  // bypassing addMessageWithTransaction which handles title generation
+  const userMessageCount = recentMessages.filter(
+    (m) => m.role === "user",
+  ).length;
+  console.log("🔍 TITLE DEBUG:", {
+    userMessageCount,
+    chatTitle: chat.title,
+    titleType: typeof chat.title,
+    condition: userMessageCount === 1 && chat.title === "New Chat",
+    userQuery: args.userQuery?.substring(0, 50),
+  });
+  if (userMessageCount === 1 && chat.title === "New Chat") {
+    const generatedTitle = generateChatTitle({ intent: args.userQuery });
+    console.log("🔍 GENERATED TITLE:", generatedTitle);
+    await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
+      chatId: args.chatId,
+      title: generatedTitle,
+    });
+    console.log("🔍 TITLE UPDATED SUCCESSFULLY");
+  } else {
+    console.log("🔍 TITLE NOT UPDATED - condition was false");
+  }
+
   const conversationContextFromDb = buildConversationContext(
     recentMessages || [],
   );
@@ -776,9 +801,42 @@ export async function* streamResearchWorkflow(
     );
     let accumulatedAnswer = "";
     for await (const event of synthesisResult) {
-      if (event.type === "raw_model_stream_event") {
-        const delta = (event.data as any).choices?.[0]?.delta?.content;
-        if (delta) {
+      // TypeScript tells us event.type can only be:
+      // - "run_item_stream_event"
+      // - "agent_updated_stream_event"
+
+      if (event.type === "run_item_stream_event") {
+        const item = event.item as any;
+        const eventName = (event as any).name;
+
+        // Only capture DELTA events, not full content events
+        // 'message_output_created' contains the full message - skip it
+        // We want 'text_content_delta' or similar incremental events
+        if (eventName === "message_output_created") {
+          console.log("🔍 Skipping message_output_created (full content)");
+          continue; // Skip full message events
+        }
+
+        // Debug: Log event details to find delta events
+        console.log("🔍 SYNTHESIS RUN_ITEM EVENT:", eventName);
+        console.log("🔍 Item keys:", item ? Object.keys(item) : "no item");
+        console.log("🔍 Item type:", item?.type);
+
+        // Look for actual streaming deltas
+        // Common delta event patterns:
+        // - item.delta.content (incremental text)
+        // - item.content_delta (alternative structure)
+        const delta =
+          item?.delta?.content || // OpenAI Agents SDK delta structure
+          item?.content_delta || // Alternative delta field
+          item?.text_delta || // Text delta field
+          (eventName?.includes("delta") && item?.content); // Any delta event with content
+
+        if (delta && typeof delta === "string" && delta.length > 0) {
+          console.log(
+            "🔍 CAPTURED DELTA:",
+            delta.substring(0, 50) + (delta.length > 50 ? "..." : ""),
+          );
           accumulatedAnswer += delta;
           yield writeEvent("content", { delta });
         }
@@ -899,17 +957,6 @@ export async function* streamResearchWorkflow(
       },
       nonce,
     });
-
-    console.log("🔍 DEBUG: Generating chat title and saving message...");
-    const generatedTitle = generateChatTitle({
-      intent: planningOutput?.userIntent || args.userQuery,
-    });
-    if (chat.title !== generatedTitle) {
-      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-        chatId: args.chatId,
-        title: generatedTitle,
-      });
-    }
 
     console.log("🔍 DEBUG: Saving assistant message...");
     const assistantMessageId: Id<"messages"> = (await ctx.runMutation(
