@@ -133,8 +133,15 @@ export function ShareModal({
   }, [messages]);
 
   const handleGenerateOrCopy = React.useCallback(async () => {
-    // If already generated for the current selection, copy it
-    if (displayUrl && generatedFor === selectedPrivacy) {
+    // Check if already generated for the current selection
+    // Note: "llm" and "shared" both use the same shareId, so they're interchangeable
+    const isAlreadyGenerated =
+      displayUrl &&
+      (generatedFor === selectedPrivacy ||
+        (generatedFor === "llm" && selectedPrivacy === "shared") ||
+        (generatedFor === "shared" && selectedPrivacy === "llm"));
+
+    if (isAlreadyGenerated) {
       try {
         const ok = await copyToClipboard(displayUrl);
         if (ok) {
