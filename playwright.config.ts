@@ -19,7 +19,9 @@ export default defineConfig({
       : "bash -c 'npm run build && vite preview --strictPort --port 4173 --host 127.0.0.1'",
     url: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173",
     reuseExistingServer: true,
-    timeout: 60_000,
+    timeout: 90_000,
+    stdout: "pipe",
+    stderr: "pipe",
     env: useProxyRuntime
       ? {
           PORT: "4173",

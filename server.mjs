@@ -178,7 +178,8 @@ const server = http.createServer(async (req, res) => {
     accept.includes("text/markdown") ||
     /curl|wget|httpie|python-requests|go-http-client|httpclient/.test(ua);
   try {
-    const pathOnly = decodeURIComponent(req.url.split("?")[0] || "/");
+    const rawUrl = typeof req.url === "string" ? req.url : "/";
+    const pathOnly = decodeURIComponent(rawUrl.split("?")[0] || "/");
     const shareMatch = pathOnly.match(/^\/s\/([A-Za-z0-9_-]+)/);
     const publicMatch = pathOnly.match(/^\/p\/([A-Za-z0-9_-]+)/);
     if (wantsPlain && (shareMatch || publicMatch)) {
@@ -191,7 +192,8 @@ const server = http.createServer(async (req, res) => {
   } catch {}
 
   // Static file try
-  const urlPath = decodeURIComponent(req.url.split("?")[0]);
+  const safeRaw = typeof req.url === "string" ? req.url : "/";
+  const urlPath = decodeURIComponent(safeRaw.split("?")[0] || "/");
   const filePath = join(DIST_DIR, urlPath === "/" ? "/index.html" : urlPath);
   if (existsSync(filePath) && statSync(filePath).isFile()) {
     return sendFile(res, filePath);
