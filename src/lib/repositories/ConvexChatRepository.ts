@@ -395,7 +395,7 @@ export class ConvexChatRepository extends BaseRepository {
       const isDev = host === "localhost" || host === "127.0.0.1";
       const apiUrl = isDev
         ? "/api/ai/agent/stream"
-        : `${env.convexUrl}/api/ai/agent/stream`;
+        : `${env.convexUrl.replace(".convex.cloud", ".convex.site")}/api/ai/agent/stream`;
 
       // Build recent conversation context
       const recent = await this.getMessages(chatId);

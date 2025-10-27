@@ -9,10 +9,21 @@ import { Readable } from "node:stream";
 
 const DIST_DIR = resolve("./dist");
 const PORT = process.env.PORT || 3000;
+// Prefer explicit CONVEX_SITE_URL when provided; otherwise derive from
+// VITE_CONVEX_URL by swapping .convex.cloud → .convex.site
+const deriveConvexSite = (val = "") => {
+  try {
+    if (!val) return "";
+    const u = new URL(val);
+    const host = u.host.replace(".convex.cloud", ".convex.site");
+    return `${u.protocol}//${host}`.replace(/\/+$/, "");
+  } catch {
+    return (val || "").replace(/\/+$/, "");
+  }
+};
+
 const CONVEX_SITE_URL = (
-  process.env.CONVEX_SITE_URL ||
-  process.env.VITE_CONVEX_URL ||
-  ""
+  process.env.CONVEX_SITE_URL || deriveConvexSite(process.env.VITE_CONVEX_URL)
 ).replace(/\/+$/, "");
 
 if (!CONVEX_SITE_URL) {

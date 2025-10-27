@@ -24,7 +24,7 @@ for signing SSE payloads. The file **must** begin with `"use node";` so Convex
 executes it in the Node runtime.
 
 Reference: [Convex runtimes documentation](https://docs.convex.dev/functions/runtimes#nodejs-runtime).
-Convex dashboard for this project: https://dashboard.convex.dev/d/diligent-greyhound-240
+[Convex dashboard](https://dashboard.convex.dev/d/diligent-greyhound-240)
 
 ### If you see `Could not resolve "node:crypto"`
 

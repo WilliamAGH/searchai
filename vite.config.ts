@@ -61,7 +61,11 @@ window.addEventListener('message', async (message) => {
   server: {
     proxy: {
       "/api": {
-        target: "https://diligent-greyhound-240.convex.site",
+        target: (() => {
+          const raw =
+            process.env.CONVEX_SITE_URL || process.env.VITE_CONVEX_URL || "";
+          return raw.replace(".convex.cloud", ".convex.site");
+        })(),
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path,
