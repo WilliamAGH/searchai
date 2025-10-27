@@ -47,6 +47,7 @@ import {
   DEFAULT_TEMPERATURE,
   DEFAULT_MAX_TOKENS,
 } from "./search/prompts";
+import { applyEnhancements } from "./enhancements";
 
 // Re-export test utilities for backward compatibility
 export { __extractKeywordsForTest, __augmentQueryForTest };
@@ -367,12 +368,19 @@ export const planSearch = action({
     }
 
     try {
+      const enh = applyEnhancements(args.newMessage, {
+        enhanceSystemPrompt: true,
+      });
+      const systemPrompt = enh.enhancedSystemPrompt
+        ? `${SEARCH_PLANNER_SYSTEM_PROMPT}\n\n${enh.enhancedSystemPrompt}`
+        : SEARCH_PLANNER_SYSTEM_PROMPT;
+
       const prompt = {
         model: DEFAULT_MODEL,
         messages: [
           {
             role: "system",
-            content: SEARCH_PLANNER_SYSTEM_PROMPT,
+            content: systemPrompt,
           },
           {
             role: "user",

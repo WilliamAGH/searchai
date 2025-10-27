@@ -62,9 +62,25 @@ export function buildPlanningInput(
   userQuery: string,
   conversationContext?: string,
 ): string {
+  // Add a brief temporal header so all agent workflows have current time
+  const now = new Date();
+  const utcIso = now.toISOString().replace("T", " ");
+  const pt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZoneName: "short",
+  }).format(now);
+  const temporal = `CURRENT DATE/TIME\n- UTC: ${utcIso}\n- PT: ${pt} (America/Los_Angeles)`;
+
   return conversationContext
-    ? `User Question: ${userQuery}\n\nConversation Context:\n${conversationContext}`
-    : userQuery;
+    ? `${temporal}\n\nUser Question: ${userQuery}\n\nConversation Context:\n${conversationContext}`
+    : `${temporal}\n\n${userQuery}`;
 }
 
 export function buildResearchInstructions(params: {
