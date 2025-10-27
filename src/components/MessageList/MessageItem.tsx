@@ -168,11 +168,10 @@ export function MessageItem({
             </div>
           )}
 
-        {/* 4) Search progress status when streaming */}
+        {/* 4) Search progress status when streaming (now also shows during generating) */}
         {message.role === "assistant" &&
           searchProgress &&
-          searchProgress.stage !== "idle" &&
-          searchProgress.stage !== "generating" && (
+          searchProgress.stage !== "idle" && (
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700 mb-4">
               <div className="flex items-center gap-3">
                 <div className="text-emerald-600 dark:text-emerald-400">
@@ -190,9 +189,14 @@ export function MessageItem({
                     />
                   </svg>
                 </div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {searchProgress.message || "Processing..."}
-                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                    {searchProgress.stage}
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {searchProgress.message || "Processing..."}
+                  </span>
+                </div>
               </div>
             </div>
           )}
