@@ -310,7 +310,7 @@ export function createChatActions(
         error: null,
         // Immediately show a planning status to avoid initial empty gap
         searchProgress: {
-          stage: "planning" as any,
+          stage: "planning",
           message: "Analyzing your question and planning research...",
         },
         // Ensure currentChatId and currentChat match the chat we're sending to
@@ -454,7 +454,7 @@ export function createChatActions(
               setState((prev) => ({
                 ...prev,
                 searchProgress: {
-                  stage: "finalizing" as any,
+                  stage: "finalizing",
                   message: "Saving and securing results...",
                 },
                 messages: prev.messages.map((m, index) =>

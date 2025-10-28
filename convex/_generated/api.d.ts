@@ -53,7 +53,6 @@ import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_security_patterns from "../lib/security/patterns.js";
 import type * as lib_security_sanitization from "../lib/security/sanitization.js";
 import type * as lib_security_webContent from "../lib/security/webContent.js";
-import type * as lib_time from "../lib/time.js";
 import type * as lib_url from "../lib/url.js";
 import type * as lib_uuid from "../lib/uuid.js";
 import type * as lib_validators from "../lib/validators.js";
@@ -126,7 +125,6 @@ declare const fullApi: ApiFromModules<{
   "lib/security/patterns": typeof lib_security_patterns;
   "lib/security/sanitization": typeof lib_security_sanitization;
   "lib/security/webContent": typeof lib_security_webContent;
-  "lib/time": typeof lib_time;
   "lib/url": typeof lib_url;
   "lib/uuid": typeof lib_uuid;
   "lib/validators": typeof lib_validators;
