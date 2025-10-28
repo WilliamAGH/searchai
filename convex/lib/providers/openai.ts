@@ -182,6 +182,36 @@ const parseReasoningSettings = (): ModelSettings["reasoning"] | undefined => {
  * Wrap the native fetch to inject IDs for function_call_output items
  * and optionally dump payloads when debugging
  */
+const SENSITIVE_HEADER_PATTERN =
+  /^(authorization|x[-_]api[-_]key|api[-_]key)$/i;
+
+const redactSensitiveHeaders = (
+  headers: HeadersInit | undefined | null,
+): Record<string, string> | undefined => {
+  if (!headers) {
+    return undefined;
+  }
+
+  const entries: Array<[string, string]> = (() => {
+    if (headers instanceof Headers) {
+      return Array.from(headers.entries());
+    }
+    if (Array.isArray(headers)) {
+      // Only process inner arrays with at least 2 elements; skip or warn on malformed entries
+      return headers
+        .filter((arr) => Array.isArray(arr) && arr.length >= 2)
+        .map(([key, value]) => [key, String(value)]);
+    }
+    return Object.entries(headers).map(([key, value]) => [key, String(value)]);
+  })();
+
+  const redacted: Record<string, string> = {};
+  for (const [key, value] of entries) {
+    redacted[key] = SENSITIVE_HEADER_PATTERN.test(key) ? "REDACTED" : value;
+  }
+  return redacted;
+};
+
 const createInstrumentedFetch = (debugLogging: boolean): typeof fetch => {
   const instrumented = async (
     ...args: Parameters<typeof fetch>
@@ -235,7 +265,11 @@ const createInstrumentedFetch = (debugLogging: boolean): typeof fetch => {
         console.error("[llm-debug] URL:", input);
         console.error(
           "[llm-debug] Headers:",
-          JSON.stringify(clonedInit.headers, null, 2),
+          JSON.stringify(
+            redactSensitiveHeaders(clonedInit.headers) ?? {},
+            null,
+            2,
+          ),
         );
         console.error(
           "[llm-debug] Body:",
@@ -262,7 +296,9 @@ const createInstrumentedFetch = (debugLogging: boolean): typeof fetch => {
         console.error(
           "[llm-debug] Headers:",
           JSON.stringify(
-            Object.fromEntries(response.headers.entries()),
+            redactSensitiveHeaders(
+              Object.fromEntries(response.headers.entries()),
+            ) ?? {},
             null,
             2,
           ),
