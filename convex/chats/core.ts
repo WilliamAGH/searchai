@@ -122,13 +122,9 @@ async function validateChatAccess(
     return chat;
   }
 
-  // Newly created chats may not yet have ownership fields populated.
-  // Allow read when the caller supplies a matching anonymous session.
-  if (!chat.userId && !chat.sessionId && sessionId) {
-    return chat;
-  }
-
   // No valid access path
+  // SECURITY: Reject chats without proper ownership (userId or sessionId)
+  // If a chat has neither, it's a data integrity issue that should not grant access
   return null;
 }
 
@@ -189,12 +185,8 @@ export const getChatByIdDirect = query({
       return chat;
     }
 
-    // Newly inserted anonymous chats might not yet have session ownership stored.
-    if (!chat.userId && !chat.sessionId && args.sessionId) {
-      return chat;
-    }
-
-    // Chat has no userId or sessionId - only accessible if public/shared
+    // SECURITY: Reject chats without proper ownership (userId or sessionId)
+    // Chat has no userId or sessionId - only accessible if public/shared (already checked above)
     return null;
   },
 });

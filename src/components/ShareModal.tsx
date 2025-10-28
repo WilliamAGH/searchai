@@ -133,8 +133,15 @@ export function ShareModal({
   }, [messages]);
 
   const handleGenerateOrCopy = React.useCallback(async () => {
-    // If already generated for the current selection, copy it
-    if (displayUrl && generatedFor === selectedPrivacy) {
+    // Check if already generated for the current selection
+    // Note: "llm" and "shared" both use the same shareId, so they're interchangeable
+    const isAlreadyGenerated =
+      displayUrl &&
+      (generatedFor === selectedPrivacy ||
+        (generatedFor === "llm" && selectedPrivacy === "shared") ||
+        (generatedFor === "shared" && selectedPrivacy === "llm"));
+
+    if (isAlreadyGenerated) {
       try {
         const ok = await copyToClipboard(displayUrl);
         if (ok) {
@@ -167,18 +174,23 @@ export function ShareModal({
           newUrl = llmTxtUrl;
         }
       } else if (selectedPrivacy === "shared") {
-        const sid =
-          ret.shareId ||
-          shareId ||
-          `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-        newUrl = `${window.location.origin}/s/${sid}`;
-        // As a secondary option, if exportBase exists and we prefer txt, we could use it, but tests accept /s/
+        // CRITICAL: Only use shareId from server response or existing prop
+        // Never generate random IDs client-side - they won't exist in the database
+        const sid = ret.shareId || shareId;
+        if (sid) {
+          newUrl = `${window.location.origin}/s/${sid}`;
+        } else {
+          logger.error("Share failed: no shareId returned from server");
+        }
       } else if (selectedPrivacy === "public") {
-        const pid =
-          ret.publicId ||
-          _publicId ||
-          `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-        newUrl = `${window.location.origin}/p/${pid}`;
+        // CRITICAL: Only use publicId from server response or existing prop
+        // Never generate random IDs client-side - they won't exist in the database
+        const pid = ret.publicId || _publicId;
+        if (pid) {
+          newUrl = `${window.location.origin}/p/${pid}`;
+        } else {
+          logger.error("Share failed: no publicId returned from server");
+        }
       }
 
       if (newUrl) {

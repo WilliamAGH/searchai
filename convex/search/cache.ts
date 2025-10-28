@@ -143,7 +143,18 @@ export function invalidatePlanCacheForChat(chatId: string): void {
   }
 }
 
+/**
+ * Invalidate search result cache for a specific chat
+ */
+export function invalidateSearchCacheForChat(chatId: string): void {
+  const prefix = `${chatId}|`;
+  for (const key of Array.from(searchResultCache.keys())) {
+    if (key.startsWith(prefix)) searchResultCache.delete(key);
+  }
+}
+
 // Legacy compatibility exports
 export const getCachedResults = getCachedSearchResults;
 export const setCachedResults = setCachedSearchResults;
-export const invalidateCache = invalidatePlanCacheForChat;
+// FIXED: invalidateCache now matches the pattern of other search-related aliases
+export const invalidateCache = invalidateSearchCacheForChat;

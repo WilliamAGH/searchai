@@ -1,6 +1,7 @@
 "use node";
 
 import type { ResearchContextReference } from "./types";
+import { buildTemporalHeader } from "../lib/dateTime";
 
 /**
  * Shared helper functions for agent orchestration
@@ -62,9 +63,10 @@ export function buildPlanningInput(
   userQuery: string,
   conversationContext?: string,
 ): string {
+  const temporal = buildTemporalHeader();
   return conversationContext
-    ? `User Question: ${userQuery}\n\nConversation Context:\n${conversationContext}`
-    : userQuery;
+    ? `${temporal}\n\nUser Question: ${userQuery}\n\nConversation Context:\n${conversationContext}`
+    : `${temporal}\n\n${userQuery}`;
 }
 
 export function buildResearchInstructions(params: {

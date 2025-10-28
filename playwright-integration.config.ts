@@ -1,4 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+
+// Ensure env vars are available (optional .env)
+try {
+  await import("dotenv/config");
+} catch {}
 import { desktopViewport } from "./tests/config/viewports";
 
 /**
@@ -43,15 +48,28 @@ export default defineConfig({
   webServer: [
     {
       command: process.env.CI
-        ? "vite preview --strictPort --port 5173"
+        ? "bash -c 'npm run build && vite preview --strictPort --port 5173'"
         : "npm run dev:frontend",
-      port: 5173,
       url: "http://localhost:5173",
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
       stdout: "pipe",
       stderr: "pipe",
-      // Health check to ensure server is ready (Playwright v1.54+ supports url wait)
+      env: {
+        PORT: "5173",
+        // Use provided env or fall back to dev Convex cloud URL for tests
+        VITE_CONVEX_URL:
+          process.env.VITE_CONVEX_URL ||
+          "https://diligent-greyhound-240.convex.cloud",
+        CONVEX_SITE_URL:
+          process.env.CONVEX_SITE_URL ||
+          (process.env.VITE_CONVEX_URL
+            ? process.env.VITE_CONVEX_URL.replace(
+                ".convex.cloud",
+                ".convex.site",
+              )
+            : "https://diligent-greyhound-240.convex.site"),
+      },
     },
   ],
 });

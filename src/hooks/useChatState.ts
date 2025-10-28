@@ -35,7 +35,8 @@ export interface ChatState {
       | "searching"
       | "scraping"
       | "analyzing"
-      | "generating";
+      | "generating"
+      | "finalizing"; // waiting for persistence confirmation
     /** Optional status message for current stage */
     message?: string;
     /** URLs being processed during scraping */

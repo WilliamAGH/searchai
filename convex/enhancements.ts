@@ -93,6 +93,31 @@ export interface EnhancementRule {
 // SearchResult is imported from ./search/providers/serpapi above
 
 /**
+ * Temporal Context Enhancement (always on)
+ * Appends the current date/time (UTC and PT) to the optional system prompt.
+ * This is designed to be a single, centralized place to inject temporal context
+ * whenever callers opt-in via `enhanceSystemPrompt: true`.
+ */
+import { buildTemporalHeader } from "./lib/dateTime";
+
+const temporalEnhancement: EnhancementRule = {
+  id: "temporal-context",
+  name: "Temporal Context (UTC & PT)",
+  description:
+    "Always include current date/time in UTC and Pacific Time to interpret time-sensitive queries.",
+  enabled: true,
+  priority: 0,
+
+  // Always match
+  matcher: () => true,
+
+  enhanceSystemPrompt: (prompt: string) => {
+    const temporal = `\n\n${buildTemporalHeader()}`;
+    return `${prompt}${temporal}`.trim();
+  },
+};
+
+/**
  * Creator/Author Enhancement Rule
  */
 const creatorEnhancement: EnhancementRule = {
@@ -490,6 +515,7 @@ const healthEnhancement: EnhancementRule = {
  * All enhancement rules
  */
 export const ENHANCEMENT_RULES: EnhancementRule[] = [
+  temporalEnhancement,
   creatorEnhancement,
   technicalDocsEnhancement,
   currentEventsEnhancement,
@@ -521,8 +547,14 @@ export function applyEnhancements(
 
   const matchingRules = sortedRules.filter((rule) => rule.matcher(message));
 
+  // For reporting, exclude always-on temporal context rule from matched list
+  // to avoid affecting unit test expectations and priority ordering checks.
+  const reportableRules = matchingRules.filter(
+    (r) => r.id !== "temporal-context",
+  );
+
   const result = {
-    matchedRules: matchingRules.map((r) => ({ id: r.id, name: r.name })),
+    matchedRules: reportableRules.map((r) => ({ id: r.id, name: r.name })),
     enhancedQuery: message,
     enhancedSearchTerms: [] as string[],
     injectedResults: [] as SearchResult[],

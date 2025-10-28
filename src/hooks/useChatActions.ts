@@ -308,6 +308,11 @@ export function createChatActions(
         ...prev,
         isGenerating: true,
         error: null,
+        // Immediately show a planning status to avoid initial empty gap
+        searchProgress: {
+          stage: "planning",
+          message: "Analyzing your question and planning research...",
+        },
         // Ensure currentChatId and currentChat match the chat we're sending to
         currentChatId: chatId,
         currentChat:
@@ -445,18 +450,20 @@ export function createChatActions(
 
             case "done":
             case "complete":
-              // Stream completion - keep isStreaming=true until persist completes
-              // This prevents effectiveMessages from switching to paginatedMessages too early
+              // Indicate finalizing while waiting for persisted confirmation
               setState((prev) => ({
                 ...prev,
-                searchProgress: { stage: "idle" },
+                searchProgress: {
+                  stage: "finalizing",
+                  message: "Saving and securing results...",
+                },
                 messages: prev.messages.map((m, index) =>
                   index === prev.messages.length - 1 && m.role === "assistant"
                     ? { ...m, isStreaming: true, thinking: undefined }
                     : m,
                 ),
               }));
-              logger.debug("Stream complete, waiting for persist...");
+              logger.debug("Stream complete, awaiting persisted event...");
               break;
 
             case "persisted":

@@ -45,6 +45,7 @@ import type * as http_routes_scrape from "../http/routes/scrape.js";
 import type * as http_routes_search from "../http/routes/search.js";
 import type * as http_utils from "../http/utils.js";
 import type * as http from "../http.js";
+import type * as lib_dateTime from "../lib/dateTime.js";
 import type * as lib_debugUtils from "../lib/debugUtils.js";
 import type * as lib_id_generator from "../lib/id_generator.js";
 import type * as lib_providers_openai from "../lib/providers/openai.js";
@@ -116,6 +117,7 @@ declare const fullApi: ApiFromModules<{
   "http/routes/search": typeof http_routes_search;
   "http/utils": typeof http_utils;
   http: typeof http;
+  "lib/dateTime": typeof lib_dateTime;
   "lib/debugUtils": typeof lib_debugUtils;
   "lib/id_generator": typeof lib_id_generator;
   "lib/providers/openai": typeof lib_providers_openai;
