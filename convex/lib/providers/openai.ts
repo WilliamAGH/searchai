@@ -182,7 +182,8 @@ const parseReasoningSettings = (): ModelSettings["reasoning"] | undefined => {
  * Wrap the native fetch to inject IDs for function_call_output items
  * and optionally dump payloads when debugging
  */
-const SENSITIVE_HEADER_PATTERN = /^(authorization|.*api[_-]?key)$/i;
+const SENSITIVE_HEADER_PATTERN =
+  /^(authorization|x[-_]api[-_]key|api[-_]key)$/i;
 
 const redactSensitiveHeaders = (
   headers: HeadersInit | undefined | null,
@@ -196,7 +197,10 @@ const redactSensitiveHeaders = (
       return Array.from(headers.entries());
     }
     if (Array.isArray(headers)) {
-      return headers.map(([key, value]) => [key, String(value)]);
+      // Only process inner arrays with at least 2 elements; skip or warn on malformed entries
+      return headers
+        .filter((arr) => Array.isArray(arr) && arr.length >= 2)
+        .map(([key, value]) => [key, String(value)]);
     }
     return Object.entries(headers).map(([key, value]) => [key, String(value)]);
   })();
