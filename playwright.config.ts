@@ -18,8 +18,8 @@ export default defineConfig({
       ? "node server.mjs"
       : "bash -c 'npm run build && vite preview --strictPort --port 4173 --host 127.0.0.1'",
     url: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173",
-    reuseExistingServer: true,
-    timeout: 90_000,
+    reuseExistingServer: !process.env.CI,
+    timeout: 180_000,
     stdout: "pipe",
     stderr: "pipe",
     env: useProxyRuntime
@@ -27,6 +27,18 @@ export default defineConfig({
           PORT: "4173",
           CONVEX_SITE_URL: process.env.CONVEX_SITE_URL || "",
         }
-      : undefined,
+      : {
+          VITE_CONVEX_URL:
+            process.env.VITE_CONVEX_URL ||
+            "https://diligent-greyhound-240.convex.cloud",
+          CONVEX_SITE_URL:
+            process.env.CONVEX_SITE_URL ||
+            (process.env.VITE_CONVEX_URL
+              ? process.env.VITE_CONVEX_URL.replace(
+                  ".convex.cloud",
+                  ".convex.site",
+                )
+              : "https://diligent-greyhound-240.convex.site"),
+        },
   },
 });
