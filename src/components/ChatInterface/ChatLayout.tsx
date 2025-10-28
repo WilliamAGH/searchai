@@ -11,7 +11,7 @@ import { MessageInput } from "../MessageInput";
 import { FollowUpPrompt } from "../FollowUpPrompt";
 import { UndoBanner } from "../UndoBanner";
 import { ShareModalContainer } from "../ShareModalContainer";
-import { AgentStatusOverlay } from "../AgentStatusOverlay";
+// Global agent status overlay removed; inline statuses handle all feedback
 import type { Chat } from "../../lib/types/chat";
 import type { ChatState, ChatActions } from "../../hooks/types";
 
@@ -158,11 +158,7 @@ export function ChatLayout({
         resolveApi={resolveApi}
       />
 
-      {/* Global agent status overlay to avoid perceived gaps during steps */}
-      <AgentStatusOverlay
-        isGenerating={messageListProps.isGenerating}
-        searchProgress={messageListProps.searchProgress}
-      />
+      {/* Global agent status overlay removed to prevent overlap and duplication */}
     </div>
   );
 }
