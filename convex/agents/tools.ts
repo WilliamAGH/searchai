@@ -180,7 +180,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
   parameters: z.object({
     url: z
       .string()
-      .url()
+      .regex(/^https?:\/\/.+/i, "Must be an http or https URL")
       .describe(
         "The complete URL to scrape. Must be http or https. Example: 'https://www.bananarepublic.com/about'",
       ),
