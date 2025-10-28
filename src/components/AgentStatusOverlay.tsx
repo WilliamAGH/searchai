@@ -19,6 +19,18 @@ export function AgentStatusOverlay({
     searchProgress?.message ||
     (stage === "generating" ? "Writing answer..." : "Working...");
 
+  // Only show global overlay for stages that don't already have inline UI,
+  // to avoid duplicate status near the input/message area.
+  const showInlineStages = new Set([
+    "searching",
+    "scraping",
+    "analyzing",
+    "generating",
+  ]);
+  if (showInlineStages.has(stage)) {
+    return null;
+  }
+
   return (
     <div className="pointer-events-none fixed inset-0 z-40 flex items-end sm:items-start justify-center sm:justify-end p-4 sm:p-6">
       <div className="pointer-events-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3 text-sm text-gray-800 dark:text-gray-200">
