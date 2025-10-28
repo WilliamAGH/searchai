@@ -98,6 +98,8 @@ export interface EnhancementRule {
  * This is designed to be a single, centralized place to inject temporal context
  * whenever callers opt-in via `enhanceSystemPrompt: true`.
  */
+import { buildTemporalHeader } from "./lib/dateTime";
+
 const temporalEnhancement: EnhancementRule = {
   id: "temporal-context",
   name: "Temporal Context (UTC & PT)",
@@ -110,21 +112,7 @@ const temporalEnhancement: EnhancementRule = {
   matcher: () => true,
 
   enhanceSystemPrompt: (prompt: string) => {
-    const now = new Date();
-    const utcIso = now.toISOString().replace("T", " ");
-    const pt = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Los_Angeles",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-      timeZoneName: "short",
-    }).format(now);
-
-    const temporal = `\n\nCURRENT DATE/TIME:\n- UTC: ${utcIso}\n- PT: ${pt} (America/Los_Angeles)`;
+    const temporal = `\n\n${buildTemporalHeader()}`;
     return `${prompt}${temporal}`.trim();
   },
 };
