@@ -47,10 +47,12 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "node server.mjs",
+      command: process.env.CI
+        ? "bash -c 'npm run build && vite preview --strictPort --port 5173'"
+        : "npm run dev:frontend",
       url: "http://localhost:5173",
       timeout: 180_000,
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI,
       stdout: "pipe",
       stderr: "pipe",
       env: {
