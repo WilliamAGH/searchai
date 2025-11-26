@@ -13,7 +13,10 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
         text.includes("HTTP 403") ||
         text.includes("Failed to send message") ||
         text.includes("403 (Forbidden)") ||
-        text.includes("Failed to load resource")
+        text.includes("Failed to load resource") ||
+        text.includes(
+          'Viewport argument key "interactive-widget" not recognized',
+        )
       ) {
         return;
       }
