@@ -973,6 +973,9 @@ export async function* streamResearchWorkflow(
                 harvested.serpEnrichment.answerBox = enrich.answerBox;
               if (enrich.peopleAlsoAsk)
                 harvested.serpEnrichment.peopleAlsoAsk = enrich.peopleAlsoAsk;
+              if (enrich.relatedSearches)
+                harvested.serpEnrichment.relatedSearches =
+                  enrich.relatedSearches;
             }
           }
         } catch (err) {
@@ -1071,16 +1074,24 @@ export async function* streamResearchWorkflow(
       // This overwrites any hallucinated content or fills empty content
       researchOutput.scrapedContent = harvested.scrapedContent;
 
+      // Map scraped content by URL for quick lookup to ensure contextId consistency
+      const scrapedUrlMap = new Map(
+        harvested.scrapedContent.map((s) => [s.url, s]),
+      );
+
       // Rebuild sourcesUsed from harvested data to ensure consistency
       const newSources = [
-        ...harvested.searchResults.map((r) => ({
-          url: r.url,
-          title: r.title,
-          contextId: generateMessageId(), // We don't have the original contextId for search results if they were harvested or emergency searched, so generate one
-          type: "search_result" as const,
-          relevance:
-            r.relevanceScore > 0.7 ? ("high" as const) : ("medium" as const),
-        })),
+        ...harvested.searchResults.map((r) => {
+          const existing = scrapedUrlMap.get(r.url);
+          return {
+            url: r.url,
+            title: r.title,
+            contextId: existing ? existing.contextId : generateMessageId(),
+            type: "search_result" as const,
+            relevance:
+              r.relevanceScore > 0.7 ? ("high" as const) : ("medium" as const),
+          };
+        }),
         ...harvested.scrapedContent.map((s) => ({
           url: s.url,
           title: s.title,

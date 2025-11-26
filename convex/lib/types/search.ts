@@ -20,9 +20,9 @@ export interface ScrapedContent {
   title: string;
   content: string;
   summary: string;
-  contentLength?: number;
-  scrapedAt?: number;
-  contextId?: string;
+  contentLength: number;
+  scrapedAt: number;
+  contextId: string;
   relevanceScore?: number;
   sourceType?: "search_result" | "scraped_page";
 }

@@ -24,9 +24,9 @@ export const vScrapedContent = v.object({
   title: v.string(),
   content: v.string(),
   summary: v.string(),
-  contentLength: v.optional(v.number()),
-  scrapedAt: v.optional(v.number()),
-  contextId: v.optional(v.string()),
+  contentLength: v.number(),
+  scrapedAt: v.number(),
+  contextId: v.string(),
   relevanceScore: v.optional(v.number()),
   sourceType: v.optional(
     v.union(v.literal("search_result"), v.literal("scraped_page")),
