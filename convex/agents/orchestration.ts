@@ -1089,6 +1089,11 @@ export async function* streamResearchWorkflow(
       );
       researchOutput.sourcesUsed = uniqueSources;
 
+      // Also assign serpEnrichment if harvested (consistency with scrapedContent/sourcesUsed)
+      if (Object.keys(harvested.serpEnrichment).length > 0) {
+        researchOutput.serpEnrichment = harvested.serpEnrichment;
+      }
+
       console.log("🔄 RECONSTRUCTED researchOutput with real harvested data");
     }
 
