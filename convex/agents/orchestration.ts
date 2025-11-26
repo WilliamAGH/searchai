@@ -119,6 +119,12 @@ function harvestToolOutput(
   const out = output as Record<string, unknown>;
 
   if (toolName === "scrape_webpage" && out.content) {
+    // Ensure contextId is a valid UUIDv7, generate one if missing or invalid
+    const rawContextId = typeof out.contextId === "string" ? out.contextId : "";
+    const contextId = isUuidV7(rawContextId)
+      ? rawContextId
+      : generateMessageId();
+
     const scraped: ScrapedContent = {
       url: String(out.url || ""),
       title: String(out.title || ""),
@@ -129,7 +135,7 @@ function harvestToolOutput(
           ? out.contentLength
           : String(out.content || "").length,
       scrapedAt: typeof out.scrapedAt === "number" ? out.scrapedAt : Date.now(),
-      contextId: String(out.contextId || ""),
+      contextId,
       relevanceScore: 0.9, // Scraped content is high relevance
     };
     harvested.scrapedContent.push(scraped);
@@ -137,6 +143,7 @@ function harvestToolOutput(
       url: scraped.url,
       contentLength: scraped.contentLength,
       contextId: scraped.contextId,
+      generatedContextId: !isUuidV7(rawContextId),
     });
   }
 

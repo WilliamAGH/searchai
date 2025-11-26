@@ -216,18 +216,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       metadata.description ||
       new URL(url).hostname;
 
-    // Filter out low-quality content
-    if (content.length < 100) {
-      const errorDetails = {
-        url,
-        contentLength: content.length,
-        timestamp: new Date().toISOString(),
-      };
-      console.error("❌ Content too short after cleaning:", errorDetails);
-      throw new Error(`Content too short (${content.length} characters)`);
-    }
-
-    // Remove common junk patterns
+    // Remove common junk patterns before quality check
     const junkPatterns = [
       /cookie policy/gi,
       /accept cookies/gi,
@@ -248,10 +237,29 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       cleanedContent = cleanedContent.replace(pattern, "");
     }
 
+    // Trim whitespace after junk removal
+    cleanedContent = cleanedContent.trim();
+
     console.log("🗑️ Junk content removed:", {
       url,
       removedCount: removedJunkCount,
+      contentLengthBefore: content.length,
+      contentLengthAfter: cleanedContent.length,
     });
+
+    // Filter out low-quality content AFTER junk removal
+    if (cleanedContent.length < 100) {
+      const errorDetails = {
+        url,
+        contentLengthBefore: content.length,
+        contentLengthAfter: cleanedContent.length,
+        timestamp: new Date().toISOString(),
+      };
+      console.error("❌ Content too short after junk removal:", errorDetails);
+      throw new Error(
+        `Content too short after cleaning (${cleanedContent.length} characters)`,
+      );
+    }
 
     const summaryLength = Math.min(500, cleanedContent.length);
     const summary =
