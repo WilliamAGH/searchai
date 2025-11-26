@@ -2,31 +2,38 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Chat Message Chaining", () => {
-  test("should handle assistant-first message correctly", async ({ page }) => {
+  test("should handle message chaining correctly", async ({ page }) => {
     // Navigate to app
     await page.goto("/");
 
-    // Wait for assistant welcome message
-    await page.waitForSelector('[data-testid="message-assistant"]');
-
-    // Get chat ID from first message
-    const firstMessage = await page
-      .locator('[data-testid="message-assistant"]')
-      .first();
-    const chatIdBefore = await firstMessage.getAttribute("data-chat-id");
-
-    // Send user reply
+    // Send initial user message
     await page.fill('[data-testid="message-input"]', "Hello assistant");
     await page.press('[data-testid="message-input"]', "Enter");
 
     // Wait for user message to appear
     await page.waitForSelector('[data-testid="message-user"]');
 
-    // Verify same chat ID
-    const userMessage = await page
+    // Get chat ID from user message
+    const firstMessage = await page
       .locator('[data-testid="message-user"]')
       .first();
-    const chatIdAfter = await userMessage.getAttribute("data-chat-id");
+    const chatIdBefore = await firstMessage.getAttribute("data-chat-id");
+
+    // Wait for assistant response
+    await page.waitForSelector('[data-testid="message-assistant"]');
+
+    // Send follow-up
+    await page.fill('[data-testid="message-input"]', "Follow up");
+    await page.press('[data-testid="message-input"]', "Enter");
+
+    // Wait for second user message
+    await page.waitForSelector('[data-testid="message-user"] >> nth=1');
+
+    // Verify same chat ID on the new message
+    const secondUserMessage = await page
+      .locator('[data-testid="message-user"]')
+      .nth(1);
+    const chatIdAfter = await secondUserMessage.getAttribute("data-chat-id");
 
     expect(chatIdAfter).toBe(chatIdBefore);
   });

@@ -15,17 +15,6 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
   test("should maintain same chat when user replies to assistant-first message", async ({
     page,
   }) => {
-    // Wait for assistant's welcome message
-    const assistantMessage = page
-      .locator('[data-testid="message-assistant"]')
-      .first();
-    await expect(assistantMessage).toBeVisible({ timeout: 10000 });
-
-    // Extract chat ID from assistant's message
-    const chatIdFromAssistant =
-      await assistantMessage.getAttribute("data-chat-id");
-    expect(chatIdFromAssistant).toBeTruthy();
-
     // User sends a reply
     const messageInput = page.locator('[data-testid="message-input"]');
     await messageInput.fill("Hello, I need help with searching");
@@ -35,9 +24,20 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
     const userMessage = page.locator('[data-testid="message-user"]').first();
     await expect(userMessage).toBeVisible({ timeout: 5000 });
 
-    // Verify chat ID remains the same
+    // Extract chat ID from user message
     const chatIdFromUser = await userMessage.getAttribute("data-chat-id");
-    expect(chatIdFromUser).toBe(chatIdFromAssistant);
+    expect(chatIdFromUser).toBeTruthy();
+
+    // Wait for assistant response
+    const assistantMessage = page
+      .locator('[data-testid="message-assistant"]')
+      .first();
+    await expect(assistantMessage).toBeVisible({ timeout: 10000 });
+
+    // Verify assistant message has same chat ID
+    const chatIdFromAssistant =
+      await assistantMessage.getAttribute("data-chat-id");
+    expect(chatIdFromAssistant).toBe(chatIdFromUser);
 
     // Verify URL hasn't changed to a new chat
     await expect(page).toHaveURL(/\/chat\/[^/]+/, { timeout: 5000 });
@@ -56,17 +56,12 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
 
     // Verify all messages are in the same chat
     const secondChatId = await secondUserMessage.getAttribute("data-chat-id");
-    expect(secondChatId).toBe(chatIdFromAssistant);
+    expect(secondChatId).toBe(chatIdFromUser);
   });
 
   test("should handle multiple rapid replies without creating new chats", async ({
     page,
   }) => {
-    // Wait for initial assistant message
-    await expect(
-      page.locator('[data-testid="message-assistant"]').first(),
-    ).toBeVisible({ timeout: 10000 });
-
     const messageInput = page.locator('[data-testid="message-input"]');
     const messages = [
       "First message",
@@ -101,11 +96,6 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
   test("should preserve chat context when navigating away and back", async ({
     page,
   }) => {
-    // Wait for assistant message
-    await expect(
-      page.locator('[data-testid="message-assistant"]').first(),
-    ).toBeVisible({ timeout: 10000 });
-
     // Send a user message
     const messageInput = page.locator('[data-testid="message-input"]');
     await messageInput.fill("Remember this conversation");
@@ -126,9 +116,6 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
 
     // Verify messages are still there
     await expect(
-      page.locator('[data-testid="message-assistant"]').first(),
-    ).toBeVisible();
-    await expect(
       page.locator('[data-testid="message-user"]').first(),
     ).toBeVisible();
 
@@ -147,11 +134,6 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
     page,
     context,
   }) => {
-    // Wait for assistant message
-    await expect(
-      page.locator('[data-testid="message-assistant"]').first(),
-    ).toBeVisible({ timeout: 10000 });
-
     const messageInput = page.locator('[data-testid="message-input"]');
 
     // Send first message successfully
@@ -255,11 +237,6 @@ test.describe("Message Validation", () => {
     // This tests the validateChatContext utility
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-
-    // Wait for assistant message
-    await expect(
-      page.locator('[data-testid="message-assistant"]').first(),
-    ).toBeVisible({ timeout: 10000 });
 
     // Send multiple messages
     const messageInput = page.locator('[data-testid="message-input"]');

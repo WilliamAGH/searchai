@@ -1,12 +1,14 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
+  // Load env variables - process.env doesn't include VITE_ vars at config time
+  const env = loadEnv(mode, process.cwd(), "");
+
   // Derive Convex proxy target if provided; otherwise disable proxy to avoid crashes
-  const rawConvex =
-    process.env.CONVEX_SITE_URL || process.env.VITE_CONVEX_URL || "";
+  const rawConvex = env.CONVEX_SITE_URL || env.VITE_CONVEX_URL || "";
   const convexProxyTarget = rawConvex
     ? rawConvex.replace(".convex.cloud", ".convex.site")
     : "";
