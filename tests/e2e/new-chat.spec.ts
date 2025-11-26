@@ -15,8 +15,14 @@ import {
 test.describe("New Chat Functionality E2E", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    // Wait for app to load
-    await page.waitForLoadState("networkidle");
+    // Wait for app to load, using a more robust strategy for CI
+    // domcontentloaded is faster and usually sufficient for initial interaction
+    await page.waitForLoadState("domcontentloaded");
+    // Then wait for a key element to ensure app is interactive
+    await page.waitForSelector(
+      '[data-testid="message-input"], textarea, [role="textbox"]',
+      { timeout: 30000 },
+    );
   });
 
   test("should create new chat when clicking New Chat button", async ({
