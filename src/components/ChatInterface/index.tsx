@@ -106,25 +106,22 @@ function ChatInterfaceComponent({
     // Convert from unified format to local format for compatibility
     if (chats && chats.length > 0) {
       baseChats = chats.map((chat) =>
-        createChatFromData(
-          {
-            _id: chat.id || chat._id,
-            title: chat.title,
-            createdAt: chat.createdAt,
-            updatedAt: chat.updatedAt,
-            privacy: chat.privacy,
-            shareId: chat.shareId,
-            publicId: chat.publicId,
-            userId: chat.userId,
-            _creationTime: chat._creationTime,
-          },
-          isAuthenticated,
-        ),
+        createChatFromData({
+          _id: chat.id || chat._id,
+          title: chat.title,
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
+          privacy: chat.privacy,
+          shareId: chat.shareId,
+          publicId: chat.publicId,
+          userId: chat.userId,
+          _creationTime: chat._creationTime,
+        }),
       );
     }
 
     return baseChats;
-  }, [isAuthenticated, chats]);
+  }, [chats]);
 
   const {
     navigateWithVerification,
