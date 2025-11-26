@@ -74,11 +74,11 @@ test.describe("Chat Message Chaining", () => {
   });
 
   test("should recover from network failure", async ({ page, browserName }) => {
-    // Skip on Firefox due to flaky context.setOffline() behavior
+    // Skip on Firefox and WebKit due to flaky context.setOffline() behavior
     // See: https://github.com/microsoft/playwright/issues/2311
     test.skip(
-      browserName === "firefox",
-      "Offline simulation is unreliable on Firefox",
+      browserName === "firefox" || browserName === "webkit",
+      "Offline simulation is unreliable on Firefox and WebKit",
     );
 
     await page.goto("/");

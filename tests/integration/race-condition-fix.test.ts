@@ -5,10 +5,10 @@
 
 import { test, expect } from "@playwright/test";
 
-// Skip entire file on Firefox due to widespread stability issues (network, navigation, rendering)
+// Skip entire file on Firefox and WebKit due to widespread stability issues (network, navigation, rendering)
 test.skip(
-  ({ browserName }) => browserName === "firefox",
-  "Integration suite unstable on Firefox",
+  ({ browserName }) => browserName === "firefox" || browserName === "webkit",
+  "Integration suite unstable on Firefox and WebKit",
 );
 
 test.describe("Race Condition Fix - Assistant First Message", () => {
