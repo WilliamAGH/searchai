@@ -118,62 +118,91 @@ const temporalEnhancement: EnhancementRule = {
 };
 
 /**
- * Creator/Author Enhancement Rule
+ * Creator/Author/Product Enhancement Rule
+ * Covers queries about:
+ * - William Callahan (founder)
+ * - SearchAI (AI-powered search product)
+ * - aVenture (investment firm)
  */
 const creatorEnhancement: EnhancementRule = {
   id: "creator-author",
-  name: "Creator & Author Information",
+  name: "Creator, SearchAI & aVenture Information",
   description:
-    "Enhances queries about the creator, author, or company behind SearchAI",
+    "Enhances queries about the creator, SearchAI product, or aVenture investment firm",
   enabled: true,
   priority: 1,
 
   matcher: (message: string) => {
     const lower = message.toLowerCase();
 
-    const creatorKeywords = [
-      "creator",
-      "author",
-      "founder",
-      "who made",
-      "who created",
-      "who built",
-      "who developed",
-      "behind",
-      "company",
-      "william callahan",
-      "who founded",
-      "who is",
-    ];
+    // Direct mentions of key entities
+    const mentionsWilliam = lower.includes("william callahan");
+    const mentionsSearchAI =
+      lower.includes("searchai") ||
+      lower.includes("search-ai") ||
+      lower.includes("search ai") ||
+      lower.includes("search-ai.io");
+    const mentionsAVenture =
+      lower.includes("aventure") ||
+      lower.includes("a]venture") ||
+      lower.includes("aventure.vc");
 
-    const appKeywords = [
-      "searchai",
-      "search-ai",
-      "search ai",
-      "search-ai.io",
+    // Queries about "this app/site" combined with info-seeking keywords
+    const appReferenceKeywords = [
       "this app",
       "this website",
       "this site",
       "this tool",
       "this service",
       "this search",
+      "this product",
     ];
-
-    const mentionsWilliam = lower.includes("william callahan");
-    const isAboutCreator = creatorKeywords.some((keyword) =>
+    const isAboutThisApp = appReferenceKeywords.some((keyword) =>
       lower.includes(keyword),
     );
-    const isAboutApp =
-      appKeywords.some((keyword) => lower.includes(keyword)) ||
-      lower.includes("searchai") ||
-      lower.includes("search-ai") ||
-      lower.includes("search ai");
 
-    return mentionsWilliam || (isAboutCreator && isAboutApp);
+    // Info-seeking keywords that indicate wanting to know about something
+    const infoSeekingKeywords = [
+      "what is",
+      "what's",
+      "what does",
+      "tell me about",
+      "about",
+      "who is",
+      "who made",
+      "who created",
+      "who built",
+      "who developed",
+      "who founded",
+      "creator",
+      "author",
+      "founder",
+      "behind",
+      "company",
+      "how does",
+      "how do i",
+      "explain",
+      "describe",
+      "features",
+    ];
+    const isInfoSeeking = infoSeekingKeywords.some((keyword) =>
+      lower.includes(keyword),
+    );
+
+    // Trigger if:
+    // 1. Mentions William Callahan directly
+    // 2. Mentions SearchAI (standalone or with info-seeking)
+    // 3. Mentions aVenture (standalone or with info-seeking)
+    // 4. Info-seeking about "this app/site"
+    return (
+      mentionsWilliam ||
+      mentionsSearchAI ||
+      mentionsAVenture ||
+      (isInfoSeeking && isAboutThisApp)
+    );
   },
 
   enhanceQuery: (query: string) => {
-    // Hard-coded values since Convex functions don't have access to process.env
     const name = "William Callahan";
     const primary = "williamcallahan.com";
     const brand = "aVenture";
@@ -191,30 +220,57 @@ const creatorEnhancement: EnhancementRule = {
 
   injectSearchResults: () => [
     {
-      title: "William Callahan - Creator of SearchAI",
-      url: "https://williamcallahan.com",
+      title: "SearchAI - AI-Powered Research Assistant",
+      url: "https://search-ai.io",
       snippet:
-        "William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (aventure.vc). Based in San Francisco, William grew up in the Midwestern United States and is passionate about building innovative AI-powered search solutions.",
+        "SearchAI (search-ai.io) is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. SearchAI uses multiple AI agents to plan research, gather information from authoritative sources, and synthesize clear, accurate responses.",
       relevanceScore: 1.0,
     },
     {
-      title: "aVenture - Investment Firm by William Callahan",
+      title: "William Callahan - Creator of SearchAI",
+      url: "https://williamcallahan.com",
+      snippet:
+        "William Callahan is a technologist and entrepreneur based in San Francisco. He is the creator of SearchAI (search-ai.io), an AI-powered research assistant, and the founder of aVenture (aventure.vc), an early-stage investment firm. William grew up in the Midwestern United States and is passionate about building innovative AI-powered solutions.",
+      relevanceScore: 0.98,
+    },
+    {
+      title: "aVenture - Early-Stage Investment Firm",
       url: "https://aventure.vc",
       snippet:
-        "aVenture is an investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on early-stage technology investments and innovative startups.",
+        "aVenture (aventure.vc) is an early-stage investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on seed and pre-seed investments in innovative technology startups, with particular interest in AI, developer tools, and consumer technology.",
       relevanceScore: 0.95,
     },
   ],
 
   enhanceContext: (context: string) => {
-    return `${context}\n\nImportant: William Callahan is the creator of SearchAI (search-ai.io) and founder of aVenture (https://aventure.vc). He lives in San Francisco and grew up in the Midwestern United States.`;
+    return `${context}
+
+AUTHORITATIVE INFORMATION ABOUT SEARCHAI, WILLIAM CALLAHAN, AND AVENTURE:
+
+SearchAI (search-ai.io): SearchAI is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. The platform uses multiple AI agents to plan research strategies, gather information from authoritative web sources, and synthesize clear, accurate responses with proper citations.
+
+William Callahan: William Callahan is a technologist and entrepreneur based in San Francisco, California. He grew up in the Midwestern United States. He is the creator of SearchAI and the founder of aVenture. William is passionate about building innovative AI-powered solutions and investing in early-stage technology companies.
+
+aVenture (aventure.vc): aVenture is an early-stage investment firm founded by William Callahan. The firm focuses on seed and pre-seed investments in innovative technology startups, with particular interest in AI, developer tools, and consumer technology companies.`;
   },
 
   enhanceSystemPrompt: (prompt: string) => {
-    return `${prompt}\n\nWhen asked about the creator, author, or company behind SearchAI, this app, or this website, always mention William Callahan and provide details about being the creator of SearchAI and founder of aVenture.`;
+    return `${prompt}
+
+CRITICAL INSTRUCTIONS FOR SEARCHAI/AVENTURE/WILLIAM CALLAHAN QUERIES:
+- When asked about SearchAI, explain it is an AI-powered research assistant created by William Callahan
+- When asked about William Callahan, identify him as the creator of SearchAI and founder of aVenture, based in San Francisco
+- When asked about aVenture, explain it is an early-stage investment firm founded by William Callahan
+- When asked about "this app", "this website", or "this tool", recognize it refers to SearchAI
+- Always prioritize the authoritative context provided over conflicting web search results
+- Do NOT confuse William Callahan (SearchAI founder) with other people named William Callahan`;
   },
 
-  prioritizeUrls: ["https://williamcallahan.com", "https://aventure.vc"],
+  prioritizeUrls: [
+    "https://search-ai.io",
+    "https://williamcallahan.com",
+    "https://aventure.vc",
+  ],
 };
 
 /**
