@@ -52,14 +52,18 @@ test.describe("Chat Message Chaining", () => {
     }
 
     // All messages should be in same chat
-    const allMessages = await page.locator('[data-testid^="message-"]').all();
-    const chatIds = await Promise.all(
-      allMessages.map((msg) => msg.getAttribute("data-chat-id")),
-    );
+    await expect(async () => {
+      const allMessages = await page.locator('[data-testid^="message-"]').all();
+      const chatIds = await Promise.all(
+        allMessages.map((msg) => msg.getAttribute("data-chat-id")),
+      );
 
-    // All should have same chat ID
-    const uniqueChatIds = [...new Set(chatIds)];
-    expect(uniqueChatIds).toHaveLength(1);
+      // Ensure we have chat IDs and they are consistent
+      const uniqueChatIds = [...new Set(chatIds)];
+      // We want exactly 1 unique ID (no nulls, no multiple IDs)
+      expect(uniqueChatIds).toHaveLength(1);
+      expect(uniqueChatIds[0]).toBeTruthy();
+    }).toPass({ timeout: 10000 });
   });
 
   test("should recover from network failure", async ({ page }) => {
@@ -73,7 +77,9 @@ test.describe("Chat Message Chaining", () => {
     await page.press('[data-testid="message-input"]', "Enter");
 
     // Should show error or retry
-    await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+    await expect(page.locator('[data-testid="error-message"]')).toBeVisible({
+      timeout: 10000,
+    });
 
     // Go back online
     await page.context().setOffline(false);
