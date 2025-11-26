@@ -90,7 +90,7 @@ test.describe("Debug Mobile Sidebar", () => {
 
       while (fiber && depth < 20) {
         if (fiber.memoizedState) {
-          console.log(`State at depth ${depth}:`, fiber.memoizedState);
+          // console.log(`State at depth ${depth}:`, fiber.memoizedState);
         }
         fiber = fiber.return;
         depth++;
@@ -99,7 +99,7 @@ test.describe("Debug Mobile Sidebar", () => {
       return { found: true, hasReact: true, depth };
     });
 
-    console.log("Sidebar state check:", sidebarState);
+    // console.log("Sidebar state check:", sidebarState);
 
     // Print any errors captured
     if (errors.length > 0) {
@@ -126,7 +126,9 @@ test.describe("Debug Mobile Sidebar", () => {
     }
 
     // Final check - should have a dialog visible
-    await expect(page.locator('[role="dialog"]')).toBeVisible({
+    // Check for nav inside the dialog (more reliable than checking dialog container)
+    const nav = page.locator('[role="dialog"] nav').first();
+    await expect(nav).toBeVisible({
       timeout: 5000,
     });
   });
