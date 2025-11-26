@@ -31,7 +31,7 @@ export interface KnowledgeGraphData {
   title?: string;
   type?: string;
   description?: string;
-  attributes?: Record<string, string | undefined>;
+  attributes?: Record<string, string>;
   url?: string;
 }
 
