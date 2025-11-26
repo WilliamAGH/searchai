@@ -1,4 +1,5 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
+import { desktopViewport } from "./tests/config/viewports";
 
 const useProxyRuntime = process.env.PLAYWRIGHT_RUNTIME === "proxy";
 
@@ -13,6 +14,20 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], viewport: desktopViewport },
+    },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"], viewport: desktopViewport },
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"], viewport: desktopViewport },
+    },
+  ],
   webServer: {
     command: useProxyRuntime
       ? "node server.mjs"

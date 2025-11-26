@@ -5,6 +5,8 @@
  * - TTL management
  */
 
+import { CACHE_TTL } from "../lib/constants/cache";
+
 // Types
 export type PlanResult = {
   shouldSearch: boolean;
@@ -18,8 +20,8 @@ export type PlanResult = {
 // Cache configurations
 export const PLAN_RATE_LIMIT = 6;
 export const PLAN_RATE_WINDOW_MS = 60_000; // 60s
-export const PLAN_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-export const SEARCH_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+export const PLAN_CACHE_TTL_MS = CACHE_TTL.PLAN_MS;
+export const SEARCH_CACHE_TTL_MS = CACHE_TTL.SEARCH_MS;
 
 // Ephemeral in-process cache for planner decisions (best-effort only)
 export const planCache: Map<string, { expires: number; result: PlanResult }> =

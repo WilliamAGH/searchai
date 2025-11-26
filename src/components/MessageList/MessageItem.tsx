@@ -68,6 +68,8 @@ export function MessageItem({
     <div
       key={message._id || `message-${index}-${message.timestamp || Date.now()}`}
       className="flex gap-2 sm:gap-4 max-w-full overflow-hidden"
+      data-testid={`message-${message.role}`}
+      data-chat-id={message.chatId}
     >
       <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center">
         {message.role === "user" ? (

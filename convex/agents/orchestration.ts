@@ -55,7 +55,12 @@ import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
 import { generateChatTitle } from "../chats/utils";
 import { parseAnswerText } from "./answerParser";
-import { vContextReference } from "../lib/validators";
+import {
+  vContextReference,
+  vScrapedContent,
+  vSerpEnrichment,
+} from "../lib/validators";
+import { CACHE_TTL } from "../lib/constants/cache";
 import {
   buildPlanningInput,
   buildResearchInstructions,
@@ -78,9 +83,123 @@ import type {
   ResearchContextReference,
   StreamingPersistPayload,
 } from "./types";
+import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
+import { applyEnhancements } from "../enhancements";
 export type { ResearchContextReference } from "./types";
 
-const WORKFLOW_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// ============================================
+// Tool Output Harvesting
+// ============================================
+// Programmatically capture tool outputs to ensure scraped content
+// and SERP enrichment reach synthesis even if the LLM fails to
+// populate these fields in its structured output.
+
+interface HarvestedToolData {
+  scrapedContent: ScrapedContent[];
+  serpEnrichment: SerpEnrichment;
+  searchResults: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    relevanceScore: number;
+  }>;
+}
+
+/**
+ * Harvest tool output programmatically
+ * This ensures data flows to synthesis regardless of LLM compliance
+ */
+function harvestToolOutput(
+  toolName: string,
+  output: unknown,
+  harvested: HarvestedToolData,
+): void {
+  if (!output || typeof output !== "object") return;
+
+  const out = output as Record<string, unknown>;
+
+  if (toolName === "scrape_webpage" && out.content) {
+    // Ensure contextId is a valid UUIDv7, generate one if missing or invalid
+    const rawContextId = typeof out.contextId === "string" ? out.contextId : "";
+    const contextId = isUuidV7(rawContextId)
+      ? rawContextId
+      : generateMessageId();
+
+    const scraped: ScrapedContent = {
+      url: String(out.url || ""),
+      title: String(out.title || ""),
+      content: String(out.content || ""),
+      summary: String(out.summary || ""),
+      contentLength:
+        typeof out.contentLength === "number"
+          ? out.contentLength
+          : String(out.content || "").length,
+      scrapedAt: typeof out.scrapedAt === "number" ? out.scrapedAt : Date.now(),
+      contextId,
+      relevanceScore: 0.9, // Scraped content is high relevance
+    };
+    harvested.scrapedContent.push(scraped);
+    console.log("📥 HARVESTED scrape_webpage:", {
+      url: scraped.url,
+      contentLength: scraped.contentLength,
+      contextId: scraped.contextId,
+      generatedContextId: !isUuidV7(rawContextId),
+    });
+  }
+
+  if (toolName === "search_web") {
+    // Harvest search results
+    if (Array.isArray(out.results)) {
+      const results = out.results as Array<any>;
+      for (const r of results) {
+        if (r.url && r.title) {
+          harvested.searchResults.push({
+            title: r.title,
+            url: r.url,
+            snippet: r.snippet || "",
+            relevanceScore: r.relevanceScore || 0.5,
+          });
+        }
+      }
+      console.log("📥 HARVESTED search_web results:", results.length);
+    }
+
+    // Harvest enrichment
+    if (out.enrichment) {
+      const enrich = out.enrichment as Partial<SerpEnrichment>;
+      if (enrich.knowledgeGraph) {
+        harvested.serpEnrichment.knowledgeGraph = enrich.knowledgeGraph;
+        console.log(
+          "📥 HARVESTED knowledgeGraph:",
+          enrich.knowledgeGraph.title,
+        );
+      }
+      if (enrich.answerBox) {
+        harvested.serpEnrichment.answerBox = enrich.answerBox;
+        console.log(
+          "📥 HARVESTED answerBox:",
+          enrich.answerBox.answer?.slice(0, 50),
+        );
+      }
+      if (enrich.peopleAlsoAsk?.length) {
+        harvested.serpEnrichment.peopleAlsoAsk = enrich.peopleAlsoAsk;
+        console.log(
+          "📥 HARVESTED peopleAlsoAsk:",
+          enrich.peopleAlsoAsk.length,
+          "questions",
+        );
+      }
+      if (enrich.relatedSearches?.length) {
+        harvested.serpEnrichment.relatedSearches = enrich.relatedSearches;
+        console.log(
+          "📥 HARVESTED relatedSearches:",
+          enrich.relatedSearches.length,
+          "searches",
+        );
+      }
+    }
+  }
+}
 
 type CustomEventParams<T> = {
   detail?: T;
@@ -187,6 +306,8 @@ export const orchestrateResearchWorkflow = action({
         v.literal("adequate"),
         v.literal("limited"),
       ),
+      scrapedContent: v.optional(v.array(vScrapedContent)),
+      serpEnrichment: v.optional(vSerpEnrichment),
     }),
     answer: v.object({
       answer: v.string(),
@@ -258,6 +379,11 @@ export const orchestrateResearchWorkflow = action({
         researchQuality: "adequate",
       };
     } else {
+      // Apply enhancement rules to inject authoritative context for research
+      const researchEnhancements = applyEnhancements(args.userQuery, {
+        enhanceContext: true,
+      });
+
       const researchInstructions = buildResearchInstructions({
         userQuery: args.userQuery,
         userIntent: planningResult.finalOutput.userIntent,
@@ -266,6 +392,7 @@ export const orchestrateResearchWorkflow = action({
         informationNeeded: planningResult.finalOutput.informationNeeded,
         searchQueries: plannedQueries,
         needsWebScraping: planningResult.finalOutput.needsWebScraping,
+        enhancedContext: researchEnhancements.enhancedContext || undefined,
       });
 
       const researchResult = await run(agents.research, researchInstructions, {
@@ -306,6 +433,13 @@ export const orchestrateResearchWorkflow = action({
 
     // Synthesis
     const synthesisStart = Date.now();
+
+    // Apply enhancement rules to inject authoritative context (e.g., founder info)
+    const synthesisEnhancements = applyEnhancements(args.userQuery, {
+      enhanceContext: true,
+      enhanceSystemPrompt: true,
+    });
+
     const synthesisInstructions = buildSynthesisInstructions({
       userQuery: args.userQuery,
       userIntent: planningResult.finalOutput.userIntent,
@@ -313,6 +447,11 @@ export const orchestrateResearchWorkflow = action({
       keyFindings: researchOutput.keyFindings,
       sourcesUsed: researchOutput.sourcesUsed || [],
       informationGaps: researchOutput.informationGaps,
+      scrapedContent: researchOutput.scrapedContent,
+      serpEnrichment: researchOutput.serpEnrichment,
+      enhancedContext: synthesisEnhancements.enhancedContext || undefined,
+      enhancedSystemPrompt:
+        synthesisEnhancements.enhancedSystemPrompt || undefined,
     });
 
     const synthesisResult = await run(
@@ -445,7 +584,7 @@ export async function* streamResearchWorkflow(
     nonce,
     chatId: args.chatId,
     issuedAt,
-    expiresAt: issuedAt + WORKFLOW_TOKEN_TTL_MS,
+    expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
   };
 
   if (args.sessionId) {
@@ -631,6 +770,11 @@ export async function* streamResearchWorkflow(
       });
     }
 
+    // Apply enhancement rules to inject authoritative context for research
+    const researchEnhancements = applyEnhancements(args.userQuery, {
+      enhanceContext: true,
+    });
+
     const researchInstructions = buildResearchInstructions({
       userQuery: args.userQuery,
       userIntent: planningOutput.userIntent,
@@ -639,6 +783,7 @@ export async function* streamResearchWorkflow(
       informationNeeded: planningOutput.informationNeeded,
       searchQueries: planningOutput.searchQueries,
       needsWebScraping: planningOutput.needsWebScraping,
+      enhancedContext: researchEnhancements.enhancedContext || undefined,
     });
 
     const researchResult = await run(agents.research, researchInstructions, {
@@ -647,6 +792,13 @@ export async function* streamResearchWorkflow(
     });
 
     const urlsBeingScrapped: string[] = [];
+
+    // Initialize harvested data container for programmatic tool output capture
+    const harvested: HarvestedToolData = {
+      scrapedContent: [],
+      serpEnrichment: {},
+      searchResults: [],
+    };
 
     for await (const event of researchResult) {
       if (event.type === "run_item_stream_event") {
@@ -695,6 +847,10 @@ export async function* streamResearchWorkflow(
           ) {
             continue;
           }
+
+          // Programmatically harvest tool outputs to ensure data flows to synthesis
+          harvestToolOutput(toolName, rawResult, harvested);
+
           yield writeEvent("tool_result", { toolName, result: rawResult });
         }
       }
@@ -750,14 +906,264 @@ export async function* streamResearchWorkflow(
       throw new Error("Research failed: agent returned empty object {}.");
     }
 
+    // ------------------------------------------------------------
+    // CRITICAL HALLUCINATION CHECK & FALLBACK
+    // ------------------------------------------------------------
+    // If the agent didn't actually run tools (harvested data is empty),
+    // we MUST NOT trust its output, as it's likely hallucinated.
+    // We trigger an emergency search and scrape flow.
+    // ------------------------------------------------------------
+
+    const hasRealToolExecution =
+      harvested.scrapedContent.length > 0 || harvested.searchResults.length > 0;
+
+    if (!hasRealToolExecution) {
+      console.warn(
+        "⚠️ DETECTED HALLUCINATION RISK: Agent produced output but executed NO tools.",
+      );
+      console.warn("⚠️ Discarding potentially hallucinated research output.");
+
+      // Clear potentially hallucinated content
+      researchOutput.scrapedContent = [];
+      researchOutput.sourcesUsed = [];
+      researchOutput.keyFindings = [];
+      researchOutput.researchSummary =
+        "Research agent failed to execute tools. Performing emergency fallback search.";
+
+      // EMERGENCY SEARCH
+      if (
+        planningOutput.searchQueries &&
+        planningOutput.searchQueries.length > 0
+      ) {
+        const fallbackQuery = planningOutput.searchQueries[0].query;
+        console.log(`🚑 EMERGENCY SEARCH: Running query "${fallbackQuery}"...`);
+        yield writeEvent("progress", {
+          stage: "searching",
+          message: "Agent failed to search. Retrying search...",
+        });
+
+        try {
+          // @ts-ignore - ActionCtx type mismatch in some convex versions
+          const searchResult = await ctx.runAction(api.search.searchWeb, {
+            query: fallbackQuery,
+            maxResults: 4,
+          });
+
+          if (searchResult && searchResult.results) {
+            console.log(
+              `✅ EMERGENCY SEARCH SUCCESS: Found ${searchResult.results.length} results`,
+            );
+
+            // Add to harvested results
+            for (const r of searchResult.results) {
+              harvested.searchResults.push({
+                title: r.title,
+                url: r.url,
+                snippet: r.snippet,
+                relevanceScore: r.relevanceScore || 0.5,
+              });
+            }
+
+            // Add enrichment if present
+            if (searchResult.enrichment) {
+              const enrich = searchResult.enrichment;
+              if (enrich.knowledgeGraph)
+                harvested.serpEnrichment.knowledgeGraph = enrich.knowledgeGraph;
+              if (enrich.answerBox)
+                harvested.serpEnrichment.answerBox = enrich.answerBox;
+              if (enrich.peopleAlsoAsk)
+                harvested.serpEnrichment.peopleAlsoAsk = enrich.peopleAlsoAsk;
+              if (enrich.relatedSearches)
+                harvested.serpEnrichment.relatedSearches =
+                  enrich.relatedSearches;
+            }
+          }
+        } catch (err) {
+          console.error("❌ EMERGENCY SEARCH FAILED:", err);
+        }
+      }
+    }
+
+    // FALLBACK: Programmatic scraping if we have no scraped content
+    // (either because agent didn't scrape, or we just did an emergency search)
+    const noScrapedContent = harvested.scrapedContent.length === 0;
+    const hasAvailableUrls = harvested.searchResults.length > 0;
+
+    console.log("🔍 FALLBACK CHECK:", {
+      harvestedScrapedCount: harvested.scrapedContent.length,
+      noScrapedContent,
+      harvestedSearchResultsCount: harvested.searchResults.length,
+      hasAvailableUrls,
+      willTriggerFallback: noScrapedContent && hasAvailableUrls,
+    });
+
+    if (noScrapedContent && hasAvailableUrls) {
+      console.log(
+        "⚠️ FALLBACK SCRAPING: Programmatically scraping top available URLs...",
+      );
+
+      // Get unique URLs from harvested search results
+      const urlsToScrape = harvested.searchResults
+        .filter((r) => r.url && r.url.startsWith("http"))
+        .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+        .slice(0, 3) // Scrape top 3 URLs
+        .map((r) => r.url);
+
+      console.log("🔍 urlsToScrape:", urlsToScrape);
+
+      if (urlsToScrape.length === 0) {
+        console.log("⚠️ No valid URLs to scrape after filtering");
+      }
+
+      yield writeEvent("progress", {
+        stage: "scraping",
+        message: `Reading content from ${urlsToScrape.length} sources (fallback)...`,
+        urls: urlsToScrape,
+      });
+
+      // Scrape URLs in parallel
+      const scrapePromises = urlsToScrape.map(async (url: string) => {
+        try {
+          const contextId = generateMessageId();
+          console.log(`🌐 FALLBACK SCRAPE: ${url}`);
+
+          const content = await ctx.runAction(
+            api.search.scraperAction.scrapeUrl,
+            { url },
+          );
+
+          const scraped: ScrapedContent = {
+            url,
+            title: content.title,
+            content: content.content,
+            summary: content.summary || content.content.substring(0, 500),
+            contentLength: content.content.length,
+            scrapedAt: Date.now(),
+            contextId,
+            relevanceScore: 0.85,
+          };
+
+          console.log(`✅ FALLBACK SCRAPE SUCCESS: ${url}`, {
+            contentLength: scraped.contentLength,
+          });
+
+          return scraped;
+        } catch (error) {
+          console.error(`❌ FALLBACK SCRAPE FAILED: ${url}`, error);
+          return null;
+        }
+      });
+
+      const scrapeResults = await Promise.all(scrapePromises);
+      const successfulScrapes = scrapeResults.filter(
+        (r): r is ScrapedContent => r !== null,
+      );
+
+      // Add to harvested content
+      harvested.scrapedContent.push(...successfulScrapes);
+
+      console.log(
+        `📊 FALLBACK SCRAPING COMPLETE: ${successfulScrapes.length}/${urlsToScrape.length} pages scraped`,
+      );
+    }
+
+    // RECONSTRUCT researchOutput if we had to fallback
+    // We need to ensure the synthesis step sees the harvested data
+    if (harvested.scrapedContent.length > 0) {
+      // Ensure scrapedContent is populated from harvested data
+      // This overwrites any hallucinated content or fills empty content
+      researchOutput.scrapedContent = harvested.scrapedContent;
+
+      // Map scraped content by URL for quick lookup to ensure contextId consistency
+      const scrapedUrlMap = new Map(
+        harvested.scrapedContent.map((s) => [s.url, s]),
+      );
+
+      // Rebuild sourcesUsed from harvested data to ensure consistency
+      const newSources = [
+        ...harvested.searchResults.map((r) => {
+          const existing = scrapedUrlMap.get(r.url);
+          return {
+            url: r.url,
+            title: r.title,
+            contextId: existing ? existing.contextId : generateMessageId(),
+            type: "search_result" as const,
+            relevance:
+              r.relevanceScore > 0.7 ? ("high" as const) : ("medium" as const),
+          };
+        }),
+        ...harvested.scrapedContent.map((s) => ({
+          url: s.url,
+          title: s.title,
+          contextId: s.contextId,
+          type: "scraped_page" as const,
+          relevance: "high" as const,
+        })),
+      ];
+
+      // Dedup sources by URL
+      const uniqueSources = Array.from(
+        new Map(newSources.map((s) => [s.url, s])).values(),
+      );
+      researchOutput.sourcesUsed = uniqueSources;
+
+      // Also assign serpEnrichment if harvested (consistency with scrapedContent/sourcesUsed)
+      if (Object.keys(harvested.serpEnrichment).length > 0) {
+        researchOutput.serpEnrichment = harvested.serpEnrichment;
+      }
+
+      console.log("🔄 RECONSTRUCTED researchOutput with real harvested data");
+    }
+
     yield writeEvent("progress", {
       stage: "analyzing",
-      message: `Analyzing findings from ${researchOutput.sourcesUsed.length} ${researchOutput.sourcesUsed.length === 1 ? "source" : "sources"}...`,
-      sourcesUsed: researchOutput.sourcesUsed.length,
+      message: `Analyzing findings from ${researchOutput.sourcesUsed?.length || 0} sources...`,
+      sourcesUsed: researchOutput.sourcesUsed?.length || 0,
     });
     yield writeEvent("progress", {
       stage: "generating",
       message: "Writing comprehensive answer...",
+    });
+
+    // Merge harvested tool outputs with agent output
+    // Agent output takes precedence if populated, otherwise use harvested data
+    const mergedScrapedContent =
+      researchOutput.scrapedContent && researchOutput.scrapedContent.length > 0
+        ? researchOutput.scrapedContent
+        : harvested.scrapedContent;
+
+    const hasAgentEnrichment =
+      researchOutput.serpEnrichment &&
+      Object.keys(researchOutput.serpEnrichment).length > 0;
+    const hasHarvestedEnrichment =
+      Object.keys(harvested.serpEnrichment).length > 0;
+    const mergedSerpEnrichment = hasAgentEnrichment
+      ? researchOutput.serpEnrichment
+      : hasHarvestedEnrichment
+        ? harvested.serpEnrichment
+        : undefined;
+
+    // Log context pipeline status for debugging
+    console.log("📊 CONTEXT PIPELINE STATUS:", {
+      agentScrapedCount: researchOutput.scrapedContent?.length || 0,
+      harvestedScrapedCount: harvested.scrapedContent.length,
+      mergedScrapedCount: mergedScrapedContent.length,
+      agentEnrichmentKeys: Object.keys(researchOutput.serpEnrichment || {}),
+      harvestedEnrichmentKeys: Object.keys(harvested.serpEnrichment),
+      usingHarvestedScraped:
+        mergedScrapedContent === harvested.scrapedContent &&
+        harvested.scrapedContent.length > 0,
+      usingHarvestedEnrichment:
+        mergedSerpEnrichment === harvested.serpEnrichment &&
+        hasHarvestedEnrichment,
+      hasKnowledgeGraph: !!mergedSerpEnrichment?.knowledgeGraph,
+      hasAnswerBox: !!mergedSerpEnrichment?.answerBox,
+    });
+
+    // Apply enhancement rules to inject authoritative context (e.g., founder info)
+    const synthesisEnhancements = applyEnhancements(args.userQuery, {
+      enhanceContext: true,
+      enhanceSystemPrompt: true,
     });
 
     const synthesisInstructions = buildSynthesisInstructions({
@@ -767,6 +1173,11 @@ export async function* streamResearchWorkflow(
       keyFindings: researchOutput.keyFindings,
       sourcesUsed: researchOutput.sourcesUsed || [],
       informationGaps: researchOutput.informationGaps,
+      scrapedContent: mergedScrapedContent,
+      serpEnrichment: mergedSerpEnrichment,
+      enhancedContext: synthesisEnhancements.enhancedContext || undefined,
+      enhancedSystemPrompt:
+        synthesisEnhancements.enhancedSystemPrompt || undefined,
     });
 
     const synthesisResult = await run(

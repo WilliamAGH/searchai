@@ -9,19 +9,9 @@ import type { Doc, Id } from "../../../convex/_generated/dataModel";
 // Import from the dedicated types module (not orchestration_helpers) so we don't pull
 // any Node-only helpers into browser bundles.
 import type { StreamingPersistPayload } from "../../../convex/agents/types";
+import type { SearchResult } from "../../../convex/lib/types/search";
 export type { ResearchContextReference } from "../../../convex/agents/types";
-
-/**
- * Search result structure (shared between local and server)
- */
-export interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-  // Optional grouping kind for agent sources
-  kind?: "search_result" | "scraped_page";
-}
+export type { SearchResult } from "../../../convex/lib/types/search";
 
 /**
  * Local message for unauthenticated users

@@ -14,6 +14,61 @@ export const vSearchResult = v.object({
   content: v.optional(v.string()),
   fullTitle: v.optional(v.string()),
   summary: v.optional(v.string()),
+  kind: v.optional(
+    v.union(v.literal("search_result"), v.literal("scraped_page")),
+  ),
+});
+
+export const vScrapedContent = v.object({
+  url: v.string(),
+  title: v.string(),
+  content: v.string(),
+  summary: v.string(),
+  contentLength: v.number(),
+  scrapedAt: v.number(),
+  contextId: v.string(),
+  relevanceScore: v.optional(v.number()),
+  sourceType: v.optional(
+    v.union(v.literal("search_result"), v.literal("scraped_page")),
+  ),
+});
+
+export const vSerpEnrichment = v.object({
+  knowledgeGraph: v.optional(
+    v.object({
+      title: v.optional(v.string()),
+      type: v.optional(v.string()),
+      description: v.optional(v.string()),
+      attributes: v.optional(v.record(v.string(), v.string())),
+      url: v.optional(v.string()),
+    }),
+  ),
+  answerBox: v.optional(
+    v.object({
+      type: v.optional(v.string()),
+      answer: v.optional(v.string()),
+      snippet: v.optional(v.string()),
+      source: v.optional(v.string()),
+      url: v.optional(v.string()),
+    }),
+  ),
+  relatedQuestions: v.optional(
+    v.array(
+      v.object({
+        question: v.string(),
+        snippet: v.optional(v.string()),
+      }),
+    ),
+  ),
+  peopleAlsoAsk: v.optional(
+    v.array(
+      v.object({
+        question: v.string(),
+        snippet: v.optional(v.string()),
+      }),
+    ),
+  ),
+  relatedSearches: v.optional(v.array(v.string())),
 });
 
 export const vContextReference = v.object({

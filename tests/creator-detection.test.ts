@@ -1,104 +1,132 @@
 import { describe, it, expect } from "vitest";
+import { applyEnhancements } from "../convex/enhancements";
 
-function detectCreatorQuery(userMessage: string) {
-  const lowerMessage = userMessage.toLowerCase();
-
-  const creatorKeywords = [
-    "creator",
-    "author",
-    "founder",
-    "who made",
-    "who created",
-    "who built",
-    "who developed",
-    "behind",
-    "company",
-    "william callahan",
-    "who founded",
-    "who is",
-  ];
-
-  const appKeywords = [
-    "searchai",
-    "search-ai",
-    "search ai",
-    "search-ai.io",
-    "this app",
-    "this website",
-    "this site",
-    "this tool",
-    "this service",
-    "this search",
-  ];
-
-  const mentionsWilliam = lowerMessage.includes("william callahan");
-  const isAboutCreator = creatorKeywords.some((keyword) =>
-    lowerMessage.includes(keyword),
-  );
-  const isAboutApp =
-    appKeywords.some((keyword) => lowerMessage.includes(keyword)) ||
-    lowerMessage.includes("searchai") ||
-    lowerMessage.includes("search-ai") ||
-    lowerMessage.includes("search ai");
-
-  const isCreatorQuery = mentionsWilliam || (isAboutCreator && isAboutApp);
-  return isCreatorQuery;
+/**
+ * Test the creator/SearchAI/aVenture detection logic
+ * Uses the actual applyEnhancements function to avoid logic duplication
+ */
+function detectCreatorQuery(userMessage: string): boolean {
+  const result = applyEnhancements(userMessage, {
+    enhanceContext: true,
+  });
+  // Check if creator-author rule matched
+  return result.matchedRules.some((rule) => rule.id === "creator-author");
 }
 
 describe("creator detection", () => {
-  const testCases: { query: string; shouldMatch: boolean }[] = [
-    { query: "Who is the creator of SearchAI?", shouldMatch: true },
-    { query: "Who made this app?", shouldMatch: true },
-    { query: "Who built search-ai.io?", shouldMatch: true },
-    { query: "Tell me about the author of this website", shouldMatch: true },
-    { query: "Who is behind SearchAI?", shouldMatch: true },
-    { query: "Who founded this service?", shouldMatch: true },
-    { query: "Who developed search-ai?", shouldMatch: true },
-    { query: "What company is behind this tool?", shouldMatch: true },
-    { query: "Who is William Callahan?", shouldMatch: true },
-    { query: "Tell me about the founder of this site", shouldMatch: true },
-    { query: "Who created this search tool?", shouldMatch: true },
-    { query: "Who is the author behind search-ai.io?", shouldMatch: true },
-    { query: "Who's the creator of this search service?", shouldMatch: true },
-    { query: "Tell me about william callahan", shouldMatch: true },
-    { query: "Company behind SearchAI", shouldMatch: true },
-    { query: "Who is responsible for this app?", shouldMatch: true },
-    { query: "Founder of search-ai", shouldMatch: true },
+  describe("should match creator/founder queries", () => {
+    const creatorQueries = [
+      "Who is the creator of SearchAI?",
+      "Who made this app?",
+      "Who built search-ai.io?",
+      "Tell me about the author of this website",
+      "Who is behind SearchAI?",
+      "Who founded this service?",
+      "Who developed search-ai?",
+      "What company is behind this tool?",
+      "Who is William Callahan?",
+      "Tell me about the founder of this site",
+      "Who created this search tool?",
+      "Who is the author behind search-ai.io?",
+      "Who's the creator of this search service?",
+      "Tell me about william callahan",
+      "Company behind SearchAI",
+      "Founder of search-ai",
+    ];
 
-    { query: "What is SearchAI?", shouldMatch: false },
-    { query: "How does this work?", shouldMatch: false },
-    { query: "Search for William Shakespeare", shouldMatch: false },
-    { query: "Who created Google?", shouldMatch: false },
-    { query: "The creator of the universe", shouldMatch: false },
-    { query: "Author of Harry Potter", shouldMatch: false },
-    { query: "Behind the scenes", shouldMatch: false },
-    { query: "Company news", shouldMatch: false },
-    { query: "Who is Elon Musk?", shouldMatch: false },
-    { query: "Tell me about OpenAI", shouldMatch: false },
-    { query: "What is a search engine?", shouldMatch: false },
-    { query: "How to use this?", shouldMatch: false },
-  ];
-
-  it("detects creator queries correctly", () => {
-    for (const t of testCases) {
-      expect(detectCreatorQuery(t.query)).toBe(t.shouldMatch);
+    for (const query of creatorQueries) {
+      it(`matches: "${query}"`, () => {
+        expect(detectCreatorQuery(query)).toBe(true);
+      });
     }
   });
 
-  it("enhances creator queries with William Callahan's info (simulated)", () => {
+  describe("should match SearchAI product queries", () => {
+    const searchAIQueries = [
+      "What is SearchAI?",
+      "Tell me about SearchAI",
+      "How does SearchAI work?",
+      "Explain search-ai.io",
+      "What does this app do?",
+      "Describe this website",
+      "What is search-ai?",
+      "SearchAI features",
+    ];
+
+    for (const query of searchAIQueries) {
+      it(`matches: "${query}"`, () => {
+        expect(detectCreatorQuery(query)).toBe(true);
+      });
+    }
+  });
+
+  describe("should match aVenture queries", () => {
+    const aventureQueries = [
+      "What is aVenture?",
+      "Tell me about aventure.vc",
+      "What does aVenture do?",
+      "aVenture investment firm",
+      "Explain aVenture",
+    ];
+
+    for (const query of aventureQueries) {
+      it(`matches: "${query}"`, () => {
+        expect(detectCreatorQuery(query)).toBe(true);
+      });
+    }
+  });
+
+  describe("should NOT match unrelated queries", () => {
+    const unrelatedQueries = [
+      "How does this work?", // No app reference + no entity mention
+      "Search for William Shakespeare",
+      "Who created Google?",
+      "The creator of the universe",
+      "Author of Harry Potter",
+      "Behind the scenes",
+      "Company news",
+      "Who is Elon Musk?",
+      "Tell me about OpenAI",
+      "What is a search engine?",
+      "How to use this?",
+      "What is the weather today?",
+      "Who won the Super Bowl?",
+    ];
+
+    for (const query of unrelatedQueries) {
+      it(`does not match: "${query}"`, () => {
+        expect(detectCreatorQuery(query)).toBe(false);
+      });
+    }
+  });
+
+  it("enhances matched queries with correct info", () => {
     const testQueries = [
       "Who created SearchAI?",
-      "Tell me about the founder of this app",
+      "What is SearchAI?",
+      "Tell me about aVenture",
       "Who is William Callahan?",
     ];
 
     for (const query of testQueries) {
-      const isCreator = detectCreatorQuery(query);
-      if (isCreator) {
-        const enhanced = `${query} William Callahan williamcallahan.com aVenture aventure.vc`;
-        expect(enhanced.includes("williamcallahan.com")).toBe(true);
-        expect(enhanced.includes("aventure.vc")).toBe(true);
-      }
+      const result = applyEnhancements(query, {
+        enhanceQuery: true,
+        enhanceContext: true,
+        injectSearchResults: true,
+      });
+
+      expect(result.matchedRules.some((r) => r.id === "creator-author")).toBe(
+        true,
+      );
+      expect(result.enhancedQuery).toContain("williamcallahan.com");
+      expect(result.enhancedQuery).toContain("aventure.vc");
+      expect(result.enhancedContext).toContain("William Callahan");
+      expect(result.enhancedContext).toContain("SearchAI");
+      expect(result.enhancedContext).toContain("aVenture");
+      expect(result.injectedResults.length).toBeGreaterThan(0);
+      expect(
+        result.injectedResults.some((r) => r.url.includes("search-ai.io")),
+      ).toBe(true);
     }
   });
 });

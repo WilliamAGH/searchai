@@ -60,17 +60,23 @@ test.describe("Critical User Paths", () => {
   test("share functionality exists", async ({ page }) => {
     await page.goto("/");
 
-    // Create a message first
+    // Wait for message input to be ready
     const input = page
       .locator('textarea[placeholder*="Type"], [data-testid="message-input"]')
       .first();
+    await expect(input).toBeVisible({ timeout: 10000 });
+
+    // Create a message first
     await input.fill("Message to share");
     await input.press("Enter");
 
-    // Look for share button
-    const shareBtn = page
-      .locator('[title*="Share"], button:has-text("Share")')
-      .first();
+    // Wait for message to be sent (user message appears)
+    await expect(
+      page.locator('[data-testid="message-user"]').first(),
+    ).toBeVisible({ timeout: 10000 });
+
+    // Look for share button - it's in MessageInput with aria-label="Share chat"
+    const shareBtn = page.locator('button[aria-label="Share chat"]').first();
     await expect(shareBtn).toBeVisible({ timeout: 10000 });
   });
 
@@ -85,8 +91,9 @@ test.describe("Critical User Paths", () => {
     await input.press("Enter");
 
     // Wait for assistant response
+    // Messages use data-testid="message-{role}" format
     await expect(
-      page.locator('[data-role="assistant"], .assistant-message').first(),
+      page.locator('[data-testid="message-assistant"]').first(),
     ).toBeVisible({ timeout: 30000 });
   });
 });

@@ -348,6 +348,13 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   const isOpenAIEndpoint = normalizedBase
     ? normalizedBase.includes("api.openai.com")
     : true;
+  // Detect OpenRouter and other non-OpenAI providers that use Chat Completions API
+  const isOpenRouter = normalizedBase?.includes("openrouter") ?? false;
+  const isChatCompletionsEndpoint =
+    normalizedBase?.includes("/chat/completions") ?? false;
+  // Use Chat Completions API for OpenRouter and any endpoint with /chat/completions
+  // OpenAI's Responses API is only supported by api.openai.com
+  const useChatCompletionsAPI = isOpenRouter || isChatCompletionsEndpoint;
   const debugLogging = process.env.LLM_DEBUG_FETCH === "1";
 
   const client = new OpenAI({
@@ -357,10 +364,17 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   });
 
   // Configure API type based on endpoint
-  if (normalizedBase?.includes("/chat/completions")) {
+  // CRITICAL: OpenRouter only supports Chat Completions API, NOT Responses API
+  // Using the wrong API format causes tool definitions to be ignored/malformed
+  if (useChatCompletionsAPI) {
     setOpenAIAPI("chat_completions");
+    console.info(
+      "🔧 API Mode: chat_completions",
+      isOpenRouter ? "(OpenRouter detected)" : "(explicit endpoint)",
+    );
   } else {
     setOpenAIAPI("responses");
+    console.info("🔧 API Mode: responses (OpenAI endpoint)");
   }
 
   // Configure tracing (only for OpenAI endpoints)
@@ -375,12 +389,21 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   setDefaultOpenAIClient(client);
 
   // CRITICAL: Create and set the default model provider
-  // This is required for @openai/agents to use our configured client with OpenRouter
+  // useResponses must be FALSE for OpenRouter - it only supports Chat Completions API
+  // Using useResponses:true with OpenRouter causes tool definitions to be sent incorrectly,
+  // resulting in the model hallucinating tool outputs instead of actually calling tools
   const modelProvider = new OpenAIProvider({
     openAIClient: client,
-    useResponses: true, // Force Responses API mode (not Chat Completions)
+    useResponses: !useChatCompletionsAPI, // Only use Responses API with OpenAI
   });
   setDefaultModelProvider(modelProvider);
+  console.info(
+    "🔧 ModelProvider useResponses:",
+    !useChatCompletionsAPI,
+    useChatCompletionsAPI
+      ? "(disabled for Chat Completions)"
+      : "(enabled for Responses API)",
+  );
 
   // Build default model settings
   const temperature = process.env.LLM_TEMPERATURE

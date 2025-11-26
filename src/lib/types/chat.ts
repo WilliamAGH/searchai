@@ -147,27 +147,27 @@ export function toChat(obj: unknown): Chat | null {
 /**
  * Create a Chat object from partial data with defaults
  * Used for safe conversion from unified format
+ *
+ * Note: Detection of server vs local chat is based solely on data properties
+ * (_creationTime or ID format), supporting both authenticated and anonymous
+ * users with Convex-backed chats.
  */
-export function createChatFromData(
-  data: {
-    _id?: string;
-    id?: string;
-    title?: string;
-    createdAt?: number;
-    updatedAt?: number;
-    privacy?: string;
-    shareId?: string;
-    publicId?: string;
-    userId?: string;
-    _creationTime?: number;
-  },
-  isAuthenticated: boolean,
-): Chat {
+export function createChatFromData(data: {
+  _id?: string;
+  id?: string;
+  title?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  privacy?: string;
+  shareId?: string;
+  publicId?: string;
+  userId?: string;
+  _creationTime?: number;
+}): Chat {
   const id = data._id || data.id || "";
   const now = Date.now();
 
-  // Check if it's a Convex chat by presence of _creationTime OR if ID is a Convex ID
-  // This works for both authenticated users AND anonymous users with Convex chats
+  // Detect Convex chat by presence of _creationTime OR if ID doesn't match local ID patterns
   const isConvexChat = data._creationTime || (id && !isLocalId(id));
 
   if (isConvexChat) {

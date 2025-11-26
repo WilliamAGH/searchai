@@ -185,7 +185,9 @@ export function registerScrapeRoutes(http: HttpRouter) {
       dlog("URL:", url);
 
       try {
-        const result = await ctx.runAction(api.search.scrapeUrl, { url });
+        const result = await ctx.runAction(api.search.scraperAction.scrapeUrl, {
+          url,
+        });
 
         dlog("🌐 SCRAPE RESULT:", JSON.stringify(result, null, 2));
 
