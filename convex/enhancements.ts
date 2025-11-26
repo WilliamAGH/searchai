@@ -9,7 +9,7 @@
  */
 
 // Import SearchResult from the single source of truth
-import type { SearchResult } from "./search/providers/serpapi";
+import type { SearchResult } from "./lib/types/search";
 
 // Enhancement system - no convex values needed here
 
@@ -90,7 +90,7 @@ export interface EnhancementRule {
   prioritizeUrls?: string[];
 }
 
-// SearchResult is imported from ./search/providers/serpapi above
+// SearchResult is imported from ./lib/types/search above
 
 /**
  * Temporal Context Enhancement (always on)
