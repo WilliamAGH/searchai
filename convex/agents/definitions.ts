@@ -115,13 +115,15 @@ YOUR PROCESS:
    - Review the results carefully
    - Note the most relevant sources
 
-2. **Scrape Key URLs**: Use scrape_webpage tool for authoritative sources
+2. **Scrape Key URLs**: You MUST use scrape_webpage tool - THIS IS MANDATORY
+   - CRITICAL: You MUST scrape AT LEAST 2 URLs before completing research
+   - Do NOT skip this step - search snippets alone are insufficient for accurate answers
    - Prioritize official websites, news sources, and authoritative references
    - Focus on URLs that appear most relevant from search results
-   - Scrape 2-5 of the most promising URLs
    - Always explain WHY you're scraping each URL
    - Capture the full content, summary, and metadata for each scrape in scrapedContent[]
    - Preserve the tool-provided contextId on each scraped page entry
+   - If you complete research with 0 scraped pages, your output is INVALID
 
 3. **Build Context Summary**: Synthesize all gathered information
    - Organize findings by topic/category
@@ -213,7 +215,29 @@ IMPORTANT:
 - Be systematic and thorough
 - Cross-reference information from multiple sources
 - Note the quality and authority of sources
-- If information is missing or unclear, acknowledge that`,
+- If information is missing or unclear, acknowledge that
+
+═══════════════════════════════════════════════════════════════════════
+MANDATORY DATA CAPTURE - YOUR OUTPUT WILL BE INVALID WITHOUT THESE
+═══════════════════════════════════════════════════════════════════════
+
+1. **scrapedContent[] MUST be populated** when you use scrape_webpage:
+   - Copy ALL fields from the tool response into scrapedContent[]
+   - Include: url, title, content, summary, contentLength, scrapedAt, contextId
+   - This is the PRIMARY source data for answer synthesis
+   - If scrapedContent[] is empty but you called scrape_webpage, your output is WRONG
+
+2. **serpEnrichment MUST be populated** when search_web returns enrichment:
+   - Check if the search_web response has an "enrichment" field
+   - Copy knowledgeGraph, answerBox, peopleAlsoAsk, relatedSearches as present
+   - This provides instant answers and factual data to synthesis
+
+3. **VERIFY before submitting your output**:
+   - Count your scrape_webpage calls
+   - scrapedContent[] length MUST equal the number of successful scrapes
+   - If search_web returned enrichment, serpEnrichment MUST NOT be empty
+
+FAILURE TO POPULATE THESE FIELDS = LOST CONTEXT = POOR ANSWERS`,
 
   tools: toolsList as any, // Tool<unknown>[] type mismatch with FunctionTool<any>
 
@@ -268,51 +292,55 @@ IMPORTANT:
           contentLength: z.number().describe("Length of the scraped content"),
           scrapedAt: z.number().describe("Timestamp when the page was scraped"),
           contextId: z.string().describe("UUIDv7 context ID from tool output"),
-          relevanceScore: z.number().optional(),
+          relevanceScore: z.number().nullable(),
         }),
       )
-      .optional()
-      .describe("Raw scraped content from webpages"),
+      .nullable()
+      .describe(
+        "Raw scraped content from webpages - MUST be populated when scrape_webpage tool is used",
+      ),
     serpEnrichment: z
       .object({
         knowledgeGraph: z
           .object({
-            title: z.string().optional(),
-            type: z.string().optional(),
-            description: z.string().optional(),
-            attributes: z.record(z.string()).optional(),
-            url: z.string().optional(),
+            title: z.string().nullable(),
+            type: z.string().nullable(),
+            description: z.string().nullable(),
+            attributes: z.record(z.string()).nullable(),
+            url: z.string().nullable(),
           })
-          .optional(),
+          .nullable(),
         answerBox: z
           .object({
-            type: z.string().optional(),
-            answer: z.string().optional(),
-            snippet: z.string().optional(),
-            source: z.string().optional(),
-            url: z.string().optional(),
+            type: z.string().nullable(),
+            answer: z.string().nullable(),
+            snippet: z.string().nullable(),
+            source: z.string().nullable(),
+            url: z.string().nullable(),
           })
-          .optional(),
+          .nullable(),
         relatedQuestions: z
           .array(
             z.object({
               question: z.string(),
-              snippet: z.string().optional(),
+              snippet: z.string().nullable(),
             }),
           )
-          .optional(),
+          .nullable(),
         peopleAlsoAsk: z
           .array(
             z.object({
               question: z.string(),
-              snippet: z.string().optional(),
+              snippet: z.string().nullable(),
             }),
           )
-          .optional(),
-        relatedSearches: z.array(z.string()).optional(),
+          .nullable(),
+        relatedSearches: z.array(z.string()).nullable(),
       })
-      .optional()
-      .describe("Enriched SERP data beyond organic results"),
+      .nullable()
+      .describe(
+        "Enriched SERP data - MUST be populated when search_web returns enrichment data",
+      ),
     researchQuality: z
       .enum(["comprehensive", "adequate", "limited"])
       .describe("Overall quality of research results"),

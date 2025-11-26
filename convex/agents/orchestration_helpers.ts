@@ -166,13 +166,30 @@ export function buildResearchInstructions(params: {
   informationNeeded: string[];
   searchQueries: Array<{ query: string; reasoning: string; priority: number }>;
   needsWebScraping: boolean;
+  /** Authoritative context that should guide research focus */
+  enhancedContext?: string;
 }): string {
+  // If authoritative context is provided, add disambiguation guidance
+  const authoritativeSection = params.enhancedContext
+    ? `
+⚠️ CRITICAL DISAMBIGUATION CONTEXT ⚠️
+The following authoritative information is KNOWN to be relevant to this query.
+When researching, PRIORITIZE sources that align with this context.
+If web results conflict with this authoritative information, favor the authoritative source.
+
+${params.enhancedContext}
+
+---
+
+`
+    : "";
+
   return `
 ORIGINAL QUESTION: ${params.userQuery}
 
 USER INTENT: ${params.userIntent}
 
-${params.conversationBlock}${params.referenceBlock ? `${params.referenceBlock}\n\n` : ""}INFORMATION NEEDED:
+${authoritativeSection}${params.conversationBlock}${params.referenceBlock ? `${params.referenceBlock}\n\n` : ""}INFORMATION NEEDED:
 ${params.informationNeeded.map((info, i) => `${i + 1}. ${info}`).join("\n")}
 
 SEARCH PLAN:
@@ -194,7 +211,7 @@ Remember:
 - Always provide reasoning when calling tools
 - Track all sources and their context IDs
 - Cross-reference information from multiple sources
-- Note any information gaps or conflicting data
+- Note any information gaps or conflicting data${params.enhancedContext ? "\n- PRIORITIZE authoritative context over generic web results" : ""}
 `;
 }
 
@@ -216,6 +233,10 @@ export function buildSynthesisInstructions(params: {
   informationGaps?: string[];
   scrapedContent?: ScrapedContent[];
   serpEnrichment?: SerpEnrichment;
+  /** Injected context from enhancement rules (e.g., founder/creator info) */
+  enhancedContext?: string;
+  /** System-level instructions from enhancement rules */
+  enhancedSystemPrompt?: string;
 }): string {
   const sourcesAvailable = params.sourcesUsed
     .map((source, i) => {
@@ -266,12 +287,40 @@ ${formatSerpEnrichmentForPrompt(params.serpEnrichment)}
 `
     : "";
 
+  // Enhancement context takes priority - it contains authoritative overrides
+  // (e.g., founder/creator info that may not appear in web search results)
+  const enhancementSection = params.enhancedContext
+    ? `
+════════════════════════════════════════════════════════════════════════════════
+⚠️  MANDATORY AUTHORITATIVE CONTEXT - THIS OVERRIDES WEB SEARCH RESULTS  ⚠️
+════════════════════════════════════════════════════════════════════════════════
+
+The following is VERIFIED, AUTHORITATIVE information that MUST be used as the
+PRIMARY basis for your answer. If web search results conflict with this context,
+IGNORE the conflicting web results and USE THIS INFORMATION INSTEAD.
+
+${params.enhancedContext}
+
+════════════════════════════════════════════════════════════════════════════════
+
+`
+    : "";
+
+  // System-level instructions from enhancements
+  const systemInstructions = params.enhancedSystemPrompt
+    ? `
+
+═══ CRITICAL RESPONSE REQUIREMENTS ═══
+${params.enhancedSystemPrompt}
+═══════════════════════════════════════`
+    : "";
+
   return `
 ORIGINAL QUESTION: ${params.userQuery}
 
 USER INTENT: ${params.userIntent}
 
-RESEARCH FINDINGS:
+${enhancementSection}RESEARCH FINDINGS:
 
 ${params.researchSummary}
 
@@ -300,6 +349,7 @@ YOUR TASK:
 4. Only mention limitations if genuinely relevant
 5. Use markdown formatting for readability
 6. Prefer scraped content excerpts when available; use SERP enrichment as supplemental context
+7. PRIORITIZE authoritative context over web search results when available${systemInstructions}
 
 Remember the user wants to know: ${params.userIntent}
 `;
