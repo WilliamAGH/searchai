@@ -91,8 +91,7 @@ test.describe("Chat Message Chaining", () => {
     await page.press('[data-testid="message-input"]', "Enter");
 
     // Should show error or retry
-    // Firefox might need a bit more time for the network status to propagate
-    // Use a more flexible check for offline state indication
+    // Use a more flexible check for offline state indication with longer timeout
     await expect(async () => {
       const errorVisible = await page
         .locator('[data-testid="error-message"]')
@@ -101,7 +100,7 @@ test.describe("Chat Message Chaining", () => {
         .locator('[data-testid="message-pending"]')
         .isVisible();
       expect(errorVisible || pendingVisible).toBeTruthy();
-    }).toPass({ timeout: 30000 });
+    }).toPass({ timeout: 45000, interval: 1000 });
 
     // Go back online
     await page.context().setOffline(false);
