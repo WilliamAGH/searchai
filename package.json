@@ -1,8 +1,25 @@
 {
   "name": "searchai-io",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "description": "AI-powered search application",
   "type": "module",
+  "homepage": "https://search-ai.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WilliamAGH/searchai-io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/WilliamAGH/searchai-io/issues"
+  },
+  "author": "William Callahan",
+  "license": "UNLICENSED",
+  "keywords": [
+    "search",
+    "ai",
+    "convex",
+    "react"
+  ],
   "scripts": {
     "validate:quick": "oxlint && tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false && npm run -s test",
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
