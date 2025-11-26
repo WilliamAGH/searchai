@@ -171,7 +171,7 @@ CRITICAL TOOL OUTPUT HARVESTING:
     content,
     summary,
     contentLength: content.length,
-    scrapedAt: Date.now(),
+    scrapedAt: <use the scrapedAt value from the tool response>,
     contextId
   }
 - NEVER omit sources when tools were used. If no authoritative data is found, explicitly list the attempted searches and explain the gap.
