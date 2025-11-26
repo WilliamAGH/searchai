@@ -235,8 +235,8 @@ test.describe("Chat State Management", () => {
     expect(chatId).toBeTruthy();
 
     // URL should contain the chat ID found in the message
-    // Escape regex special characters in chatId (UUIDs contain only alphanumeric and hyphens, but escaping for safety)
-    const escapedChatId = chatId!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Escape regex special characters in chatId to prevent ReDoS (UUIDs are safe but escaping for correctness)
+    const escapedChatId = (chatId ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     await expect(page).toHaveURL(new RegExp(`/chat/${escapedChatId}`));
   });
 
