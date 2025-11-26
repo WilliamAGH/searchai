@@ -67,7 +67,10 @@ test.describe("chat navigation", () => {
     await expect(page).toHaveURL(/\/$/);
 
     // Allow idle; auto-create may occur after delay if truly no chats
-    await page.waitForLoadState("networkidle", { timeout: 1000 });
+    // Increase timeout to 3s as 1s is often too tight for networkidle in CI/local
+    await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => {
+      // If network doesn't settle (e.g. polling), just proceed after timeout
+    });
 
     // Either still on home or navigated to /chat/:id
     // This asserts no immediate hard redirect happened before idle

@@ -18,6 +18,7 @@ test.describe("Chat Message Chaining", () => {
       .locator('[data-testid="message-user"]')
       .first();
     const chatIdBefore = await firstMessage.getAttribute("data-chat-id");
+    expect(chatIdBefore).toBeTruthy();
 
     // Wait for assistant response
     await page.waitForSelector('[data-testid="message-assistant"]');
