@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildSynthesisInstructions,
   formatScrapedContentForPrompt,
-} from "../../convex/agents/orchestration_helpers";
+} from "../convex/agents/orchestration_helpers";
 
 describe("content pipeline integration (prompt-side)", () => {
   it("includes scraped content excerpts in synthesis instructions", () => {
