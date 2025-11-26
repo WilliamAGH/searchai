@@ -281,13 +281,7 @@ test.describe("Message Validation", () => {
     }
 
     // All messages should have consistent chat IDs
-    const messages = await page.locator('[data-testid^="message-"]').all();
-    const chatIds = await Promise.all(
-      messages.map((msg) => msg.getAttribute("data-chat-id")),
-    );
-
-    // Verify no null or undefined chat IDs
-    // Wait for IDs to be populated
+    // Wait for IDs to be populated and verify consistency
     await expect(async () => {
       const messages = await page.locator('[data-testid^="message-"]').all();
       const currentChatIds = await Promise.all(
