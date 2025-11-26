@@ -71,12 +71,19 @@ thread instead of unilaterally reverting.
 
 - History and branches:
 
-  - Do not amend or rewrite history (no `--amend`, no force pushes) without
-    explicit user permission.
-  - Do not change branches (checkout, merge, rebase, pull) unless the user
-    explicitly instructs it.
-  - Treat all staged or unstaged changes as intentional unless the user says
-    otherwise; never "clean up" someone else’s work unprompted.
+- Do not amend or rewrite history (no `--amend`, no force pushes) without
+  explicit user permission.
+- Do not change branches (checkout, merge, rebase, pull) unless the user
+  explicitly instructs it.
+- Treat all staged or unstaged changes as intentional unless the user says
+  otherwise; never "clean up" someone else’s work unprompted.
+
+## Search/Context Pipeline (2025-11-25 update)
+
+- Research agent output now includes `scrapedContent` (full page text, summary, contextId, relevance) and `serpEnrichment` (knowledge graph, answer box, people-also-ask, related searches).
+- Synthesis prompt consumes scraped content excerpts (~12k token budget; ~3k/page) plus SERP enrichment for citations.
+- Scraper uses Cheerio for HTML parsing and falls back to Playwright when pages look JS-rendered; cache TTLs and URL normalization are centralized in `convex/lib/constants/cache.ts` and `convex/lib/url.ts`.
+- SerpAPI provider returns enrichment and position-based relevance; search tool surfaces enrichment to the research agent.
 
 - Destructive Git commands are prohibited unless explicitly ordered by the
   user: `git restore`, `git reset`, force checkout, etc.

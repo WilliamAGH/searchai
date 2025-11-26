@@ -1,3 +1,5 @@
+"use node";
+
 /**
  * Agent Tools for Search and Research
  * Proper tool definitions with UUIDv7 context tracking
@@ -104,6 +106,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
         resultCount: results.results.length,
         searchMethod: results.searchMethod,
         hasRealResults: results.hasRealResults,
+        enrichment: results.enrichment,
         results: results.results.map(
           (r: {
             title: string;
@@ -206,9 +209,12 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
     });
 
     try {
-      const content = await actionCtx.runAction(api.search.scrapeUrl, {
-        url: input.url,
-      });
+      const content = await actionCtx.runAction(
+        api.search.scraperAction.scrapeUrl,
+        {
+          url: input.url,
+        },
+      );
 
       const durationMs = Date.now() - callStart;
       console.info("✅ SCRAPE TOOL SUCCESS:", {

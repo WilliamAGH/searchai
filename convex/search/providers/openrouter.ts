@@ -3,7 +3,10 @@
  * Uses Perplexity Sonar model for AI-powered web search
  */
 
-import type { SearchResult } from "./serpapi";
+import type {
+  SearchResult,
+  SearchProviderResult,
+} from "../../lib/types/search";
 
 interface OpenRouterResponse {
   choices?: Array<{
@@ -36,7 +39,7 @@ interface OpenRouterResponse {
 export async function searchWithOpenRouter(
   query: string,
   maxResults: number,
-): Promise<SearchResult[]> {
+): Promise<SearchProviderResult> {
   const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",
     {
@@ -109,5 +112,5 @@ export async function searchWithOpenRouter(
     });
   }
 
-  return results.slice(0, maxResults);
+  return { results: results.slice(0, maxResults) };
 }

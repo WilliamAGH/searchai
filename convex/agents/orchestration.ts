@@ -55,7 +55,12 @@ import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
 import { generateChatTitle } from "../chats/utils";
 import { parseAnswerText } from "./answerParser";
-import { vContextReference } from "../lib/validators";
+import {
+  vContextReference,
+  vScrapedContent,
+  vSerpEnrichment,
+} from "../lib/validators";
+import { CACHE_TTL } from "../lib/constants/cache";
 import {
   buildPlanningInput,
   buildResearchInstructions,
@@ -79,8 +84,6 @@ import type {
   StreamingPersistPayload,
 } from "./types";
 export type { ResearchContextReference } from "./types";
-
-const WORKFLOW_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 type CustomEventParams<T> = {
   detail?: T;
@@ -187,6 +190,8 @@ export const orchestrateResearchWorkflow = action({
         v.literal("adequate"),
         v.literal("limited"),
       ),
+      scrapedContent: v.optional(v.array(vScrapedContent)),
+      serpEnrichment: v.optional(vSerpEnrichment),
     }),
     answer: v.object({
       answer: v.string(),
@@ -313,6 +318,8 @@ export const orchestrateResearchWorkflow = action({
       keyFindings: researchOutput.keyFindings,
       sourcesUsed: researchOutput.sourcesUsed || [],
       informationGaps: researchOutput.informationGaps,
+      scrapedContent: researchOutput.scrapedContent,
+      serpEnrichment: researchOutput.serpEnrichment,
     });
 
     const synthesisResult = await run(
@@ -445,7 +452,7 @@ export async function* streamResearchWorkflow(
     nonce,
     chatId: args.chatId,
     issuedAt,
-    expiresAt: issuedAt + WORKFLOW_TOKEN_TTL_MS,
+    expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
   };
 
   if (args.sessionId) {
@@ -767,6 +774,8 @@ export async function* streamResearchWorkflow(
       keyFindings: researchOutput.keyFindings,
       sourcesUsed: researchOutput.sourcesUsed || [],
       informationGaps: researchOutput.informationGaps,
+      scrapedContent: researchOutput.scrapedContent,
+      serpEnrichment: researchOutput.serpEnrichment,
     });
 
     const synthesisResult = await run(

@@ -2,6 +2,8 @@
 
 import type { ResearchContextReference } from "./types";
 import { buildTemporalHeader } from "../lib/dateTime";
+import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
+import { normalizeUrl as normalizeUrlUtil } from "../lib/url";
 
 /**
  * Shared helper functions for agent orchestration
@@ -15,6 +17,9 @@ import { buildTemporalHeader } from "../lib/dateTime";
 const UUID_V7_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOOL_RESULT_MAX_LENGTH = 200;
+const TOTAL_CONTENT_TOKEN_BUDGET = 12000;
+const MAX_TOKENS_PER_PAGE = 3000;
+const CHARS_PER_TOKEN_ESTIMATE = 4;
 
 export const isUuidV7 = (value: string | undefined): boolean =>
   !!value && UUID_V7_REGEX.test(value);
@@ -38,16 +43,100 @@ export const summarizeToolResult = (output: unknown): string => {
   }
 };
 
-export const normalizeUrl = (rawUrl: string | undefined): string | null => {
-  if (!rawUrl || typeof rawUrl !== "string") return null;
-  try {
-    const parsed = new URL(rawUrl);
-    parsed.hash = "";
-    return parsed.toString();
-  } catch {
-    return null;
+export const normalizeUrl = normalizeUrlUtil;
+
+const truncate = (text: string, maxChars: number): string =>
+  text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
+
+export function formatScrapedContentForPrompt(
+  scrapedContent: ScrapedContent[],
+): string {
+  if (!scrapedContent?.length) return "";
+
+  const tokensPerPage = Math.min(
+    MAX_TOKENS_PER_PAGE,
+    Math.floor(TOTAL_CONTENT_TOKEN_BUDGET / Math.max(scrapedContent.length, 1)),
+  );
+  const charsPerPage = tokensPerPage * CHARS_PER_TOKEN_ESTIMATE;
+
+  return scrapedContent
+    .slice()
+    .sort(
+      (a, b) =>
+        (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0) ||
+        (b.contentLength ?? b.content.length) -
+          (a.contentLength ?? a.content.length),
+    )
+    .map((page, idx) => {
+      const safeContent = page.content || "";
+      const excerpt = truncate(safeContent, charsPerPage);
+      const summary = page.summary ? truncate(page.summary, 500) : "";
+      return `#${idx + 1} ${page.title || "Untitled"}
+URL: ${page.url}
+ContextId: ${page.contextId ?? "n/a"}
+Content (truncated to ~${charsPerPage} chars): ${excerpt}
+Summary: ${summary}`;
+    })
+    .join("\n\n---\n\n");
+}
+
+export function formatSerpEnrichmentForPrompt(
+  enrichment: SerpEnrichment | undefined,
+): string {
+  if (!enrichment) return "";
+  const lines: string[] = [];
+
+  if (enrichment.knowledgeGraph) {
+    const kg = enrichment.knowledgeGraph;
+    lines.push(
+      `Knowledge Graph: ${kg.title || "N/A"} (${kg.type || "unknown"})`,
+    );
+    if (kg.description) {
+      lines.push(`Description: ${kg.description}`);
+    }
+    if (kg.url) {
+      lines.push(`URL: ${kg.url}`);
+    }
+    if (kg.attributes && Object.keys(kg.attributes).length > 0) {
+      const attrs = Object.entries(kg.attributes)
+        .map(([k, v]) => `${k}: ${v ?? ""}`)
+        .join("; ");
+      lines.push(`Attributes: ${attrs}`);
+    }
   }
-};
+
+  if (enrichment.answerBox) {
+    const ab = enrichment.answerBox;
+    lines.push(
+      `Answer Box (${ab.type || "general"}): ${ab.answer || ab.snippet || "N/A"}`,
+    );
+    if (ab.source || ab.url) {
+      lines.push(`Answer Source: ${ab.source || ab.url}`);
+    }
+  }
+
+  if (enrichment.peopleAlsoAsk?.length) {
+    lines.push(
+      `People Also Ask: ${enrichment.peopleAlsoAsk
+        .map((q) => `${q.question}${q.snippet ? ` - ${q.snippet}` : ""}`)
+        .join(" | ")}`,
+    );
+  }
+
+  if (enrichment.relatedQuestions?.length) {
+    lines.push(
+      `Related Questions: ${enrichment.relatedQuestions
+        .map((q) => `${q.question}${q.snippet ? ` - ${q.snippet}` : ""}`)
+        .join(" | ")}`,
+    );
+  }
+
+  if (enrichment.relatedSearches?.length) {
+    lines.push(`Related Searches: ${enrichment.relatedSearches.join(" | ")}`);
+  }
+
+  return lines.join("\n");
+}
 
 export const extractContextIdFromOutput = (output: unknown): string | null => {
   if (!output || typeof output !== "object") return null;
@@ -125,6 +214,8 @@ export function buildSynthesisInstructions(params: {
     relevance: string;
   }>;
   informationGaps?: string[];
+  scrapedContent?: ScrapedContent[];
+  serpEnrichment?: SerpEnrichment;
 }): string {
   const sourcesAvailable = params.sourcesUsed
     .map((source, i) => {
@@ -149,6 +240,32 @@ export function buildSynthesisInstructions(params: {
     })
     .join("\n");
 
+  if (params.scrapedContent?.length) {
+    console.log("📄 SCRAPED CONTENT FOR SYNTHESIS:", {
+      pageCount: params.scrapedContent.length,
+      totalChars: params.scrapedContent.reduce(
+        (sum, p) => sum + (p.content?.length || 0),
+        0,
+      ),
+      pages: params.scrapedContent.map((p) => ({
+        url: p.url,
+        contentPreview: truncate(p.content || "", 200),
+      })),
+    });
+  }
+
+  const scrapedSection = params.scrapedContent?.length
+    ? `SCRAPED CONTENT (use these excerpts for citations):
+${formatScrapedContentForPrompt(params.scrapedContent)}
+`
+    : "";
+
+  const serpSection = params.serpEnrichment
+    ? `SERP ENRICHMENT:
+${formatSerpEnrichmentForPrompt(params.serpEnrichment)}
+`
+    : "";
+
   return `
 ORIGINAL QUESTION: ${params.userQuery}
 
@@ -167,7 +284,7 @@ ${params.keyFindings
   )
   .join("\n\n")}
 
-SOURCES AVAILABLE:
+${scrapedSection}${serpSection}SOURCES AVAILABLE:
 ${sourcesAvailable}
 
 ${
@@ -182,6 +299,7 @@ YOUR TASK:
 3. Cite sources inline using [domain.com] format
 4. Only mention limitations if genuinely relevant
 5. Use markdown formatting for readability
+6. Prefer scraped content excerpts when available; use SERP enrichment as supplemental context
 
 Remember the user wants to know: ${params.userIntent}
 `;

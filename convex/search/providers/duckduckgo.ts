@@ -3,7 +3,10 @@
  * Free, privacy-focused search fallback
  */
 
-import type { SearchResult } from "./serpapi";
+import type {
+  SearchResult,
+  SearchProviderResult,
+} from "../../lib/types/search";
 
 interface DuckDuckGoResponse {
   RelatedTopics?: Array<{
@@ -28,7 +31,7 @@ interface DuckDuckGoResponse {
 export async function searchWithDuckDuckGo(
   query: string,
   maxResults: number,
-): Promise<SearchResult[]> {
+): Promise<SearchProviderResult> {
   const searchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
   const response = await fetch(searchUrl, {
     headers: {
@@ -93,5 +96,5 @@ export async function searchWithDuckDuckGo(
     results = fallbackSources.slice(0, Math.min(2, maxResults));
   }
 
-  return results;
+  return { results };
 }

@@ -1,3 +1,5 @@
+"use node";
+
 /**
  * Agent Definitions for Multi-Stage Reasoning and Research
  *
@@ -118,12 +120,15 @@ YOUR PROCESS:
    - Focus on URLs that appear most relevant from search results
    - Scrape 2-5 of the most promising URLs
    - Always explain WHY you're scraping each URL
+   - Capture the full content, summary, and metadata for each scrape in scrapedContent[]
+   - Preserve the tool-provided contextId on each scraped page entry
 
 3. **Build Context Summary**: Synthesize all gathered information
    - Organize findings by topic/category
    - Note which sources provided which information
    - Identify consensus vs. conflicting information
    - Flag any information gaps
+   - Store SERP enrichment data (knowledge graph, answer box, people also ask) in serpEnrichment when available
 
 TOOL USAGE GUIDELINES:
 - Always include reasoning in your tool calls
@@ -159,6 +164,16 @@ CRITICAL TOOL OUTPUT HARVESTING:
     summary
   }
   emit exactly one \`sourcesUsed\` entry with type "scraped_page" and relevance "high".
+  also add an entry in scrapedContent[]:
+  {
+    url,
+    title,
+    content,
+    summary,
+    contentLength: content.length,
+    scrapedAt: Date.now(),
+    contextId
+  }
 - NEVER omit sources when tools were used. If no authoritative data is found, explicitly list the attempted searches and explain the gap.
 
 KEY FINDINGS CONSTRUCTION:
@@ -239,6 +254,65 @@ IMPORTANT:
       .nullable()
       .optional()
       .describe("Any information that couldn't be found"),
+    scrapedContent: z
+      .array(
+        z.object({
+          url: z.string(),
+          title: z.string(),
+          content: z
+            .string()
+            .describe(
+              "Full scraped text content (truncate to budget before returning if needed)",
+            ),
+          summary: z.string().describe("Summary or first 500 characters"),
+          contentLength: z.number().describe("Length of the scraped content"),
+          scrapedAt: z.number().describe("Timestamp when the page was scraped"),
+          contextId: z.string().describe("UUIDv7 context ID from tool output"),
+          relevanceScore: z.number().optional(),
+        }),
+      )
+      .optional()
+      .describe("Raw scraped content from webpages"),
+    serpEnrichment: z
+      .object({
+        knowledgeGraph: z
+          .object({
+            title: z.string().optional(),
+            type: z.string().optional(),
+            description: z.string().optional(),
+            attributes: z.record(z.string()).optional(),
+            url: z.string().optional(),
+          })
+          .optional(),
+        answerBox: z
+          .object({
+            type: z.string().optional(),
+            answer: z.string().optional(),
+            snippet: z.string().optional(),
+            source: z.string().optional(),
+            url: z.string().optional(),
+          })
+          .optional(),
+        relatedQuestions: z
+          .array(
+            z.object({
+              question: z.string(),
+              snippet: z.string().optional(),
+            }),
+          )
+          .optional(),
+        peopleAlsoAsk: z
+          .array(
+            z.object({
+              question: z.string(),
+              snippet: z.string().optional(),
+            }),
+          )
+          .optional(),
+        relatedSearches: z.array(z.string()).optional(),
+      })
+      .optional()
+      .describe("Enriched SERP data beyond organic results"),
     researchQuality: z
       .enum(["comprehensive", "adequate", "limited"])
       .describe("Overall quality of research results"),

@@ -3,12 +3,12 @@
  * Uses Google search via SerpAPI for high-quality results
  */
 
-export interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-}
+import type {
+  SearchResult,
+  SearchProviderResult,
+  SerpEnrichment,
+} from "../../lib/types/search";
+export type { SearchResult } from "../../lib/types/search";
 
 interface SerpApiResponse {
   organic_results?: Array<{
@@ -16,7 +16,27 @@ interface SerpApiResponse {
     link: string;
     snippet?: string;
     displayed_link?: string;
+    position?: number;
   }>;
+  knowledge_graph?: {
+    title?: string;
+    type?: string;
+    description?: string;
+    url?: string;
+    attributes?: Record<string, string | undefined>;
+  };
+  answer_box?: {
+    type?: string;
+    answer?: string;
+    snippet?: string;
+    link?: string;
+    title?: string;
+  };
+  people_also_ask?: Array<{
+    question?: string;
+    snippet?: string;
+  }>;
+  related_searches?: Array<{ query?: string }>;
 }
 
 /**
@@ -32,7 +52,7 @@ interface SerpApiResponse {
 export async function searchWithSerpApiDuckDuckGo(
   query: string,
   maxResults: number,
-): Promise<SearchResult[]> {
+): Promise<SearchProviderResult> {
   const apiUrl = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${process.env.SERP_API_KEY}&hl=en&gl=us&num=${maxResults}`;
   const requestLog = {
     queryLength: query.length,
@@ -82,12 +102,49 @@ export async function searchWithSerpApiDuckDuckGo(
     if (data.organic_results && data.organic_results.length > 0) {
       const results: SearchResult[] = data.organic_results
         .slice(0, maxResults)
-        .map((result) => ({
+        .map((result, index) => ({
           title: result.title || "Untitled",
           url: result.link,
           snippet: result.snippet || result.displayed_link || "",
-          relevanceScore: 0.9,
+          relevanceScore: Math.max(0, 1 - index * 0.05),
         }));
+
+      const enrichment: SerpEnrichment = {};
+
+      if (data.knowledge_graph) {
+        enrichment.knowledgeGraph = {
+          title: data.knowledge_graph.title,
+          type: data.knowledge_graph.type,
+          description: data.knowledge_graph.description,
+          attributes: data.knowledge_graph.attributes,
+          url: data.knowledge_graph.url,
+        };
+      }
+
+      if (data.answer_box) {
+        enrichment.answerBox = {
+          type: data.answer_box.type,
+          answer: data.answer_box.answer || data.answer_box.snippet,
+          snippet: data.answer_box.snippet,
+          source: data.answer_box.title,
+          url: data.answer_box.link,
+        };
+      }
+
+      if (data.people_also_ask?.length) {
+        enrichment.peopleAlsoAsk = data.people_also_ask
+          .filter((p) => p.question)
+          .map((p) => ({
+            question: p.question ?? "",
+            snippet: p.snippet ?? undefined,
+          }));
+      }
+
+      if (data.related_searches?.length) {
+        enrichment.relatedSearches = data.related_searches
+          .map((r) => r.query)
+          .filter((q): q is string => typeof q === "string" && q.length > 0);
+      }
 
       console.info("📋 SERP API Results Parsed:", {
         resultCount: results.length,
@@ -96,17 +153,23 @@ export async function searchWithSerpApiDuckDuckGo(
           url: r.url,
           snippetLength: r.snippet?.length || 0,
         })),
+        hasEnrichment: Boolean(
+          enrichment.knowledgeGraph ||
+            enrichment.answerBox ||
+            enrichment.peopleAlsoAsk?.length ||
+            enrichment.relatedSearches?.length,
+        ),
         timestamp: new Date().toISOString(),
       });
 
-      return results;
+      return { results, enrichment };
     }
 
     console.log("⚠️ SERP API No Results:", {
       queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
-    return [];
+    return { results: [] };
   } catch (error) {
     console.error("💥 SERP API Exception:", {
       error: error instanceof Error ? error.message : "Unknown error",

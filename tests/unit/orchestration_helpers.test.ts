@@ -4,6 +4,8 @@ import {
   buildUrlContextMap,
   extractContextIdFromOutput,
   normalizeUrl,
+  formatScrapedContentForPrompt,
+  formatSerpEnrichmentForPrompt,
 } from "../../convex/agents/orchestration_helpers";
 
 // Helper: simple extractContextId and normalize wrappers for test determinism
@@ -75,5 +77,55 @@ describe("buildUrlContextMap", () => {
     expect(map.get("https://example.com/z")).toBe(
       "019a122e-c507-7851-99f7-b8f5d7345c00",
     );
+  });
+});
+
+describe("formatScrapedContentForPrompt", () => {
+  it("truncates and formats scraped content with ordering by relevance", () => {
+    const formatted = formatScrapedContentForPrompt([
+      {
+        url: "https://example.com/low",
+        title: "Low",
+        content: "l".repeat(200),
+        summary: "low summary",
+        relevanceScore: 0.2,
+      },
+      {
+        url: "https://example.com/high",
+        title: "High",
+        content: "h".repeat(400),
+        summary: "high summary",
+        relevanceScore: 0.9,
+      },
+    ]);
+
+    expect(formatted).toContain("#1 High");
+    expect(formatted).toContain("https://example.com/high");
+    expect(formatted).toContain("Content (truncated");
+  });
+});
+
+describe("formatSerpEnrichmentForPrompt", () => {
+  it("prints knowledge graph and answer box data", () => {
+    const formatted = formatSerpEnrichmentForPrompt({
+      knowledgeGraph: {
+        title: "Apple",
+        type: "Company",
+        description: "Maker of iPhone",
+        attributes: { CEO: "Tim Cook" },
+        url: "https://apple.com",
+      },
+      answerBox: {
+        type: "direct_answer",
+        answer: "Tim Cook",
+        source: "Example",
+        url: "https://example.com",
+      },
+      relatedSearches: ["apple ceo", "apple leadership"],
+    });
+
+    expect(formatted).toContain("Knowledge Graph: Apple");
+    expect(formatted).toContain("Answer Box");
+    expect(formatted).toContain("Related Searches");
   });
 });
