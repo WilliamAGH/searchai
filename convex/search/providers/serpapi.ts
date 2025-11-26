@@ -116,7 +116,13 @@ export async function searchWithSerpApiDuckDuckGo(
           title: data.knowledge_graph.title,
           type: data.knowledge_graph.type,
           description: data.knowledge_graph.description,
-          attributes: data.knowledge_graph.attributes,
+          attributes: data.knowledge_graph.attributes
+            ? (Object.fromEntries(
+                Object.entries(data.knowledge_graph.attributes).filter(
+                  ([, v]) => v !== undefined,
+                ),
+              ) as Record<string, string>)
+            : undefined,
           url: data.knowledge_graph.url,
         };
       }
