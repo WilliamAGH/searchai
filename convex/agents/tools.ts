@@ -233,7 +233,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
         content: content.content,
         summary: content.summary || content.content.substring(0, 500) + "...",
         contentLength: content.content.length,
-        timestamp: Date.now(),
+        scrapedAt: Date.now(),
         _toolCallMetadata: {
           toolName: "scrape_webpage",
           callStart,
@@ -267,7 +267,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
         title: hostname,
         content: `Unable to fetch content from ${input.url}`,
         summary: `Content unavailable from ${hostname}`,
-        timestamp: Date.now(),
+        scrapedAt: Date.now(),
         _toolCallMetadata: {
           toolName: "scrape_webpage",
           callStart,
