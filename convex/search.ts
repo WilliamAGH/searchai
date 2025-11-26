@@ -144,6 +144,7 @@ export const searchWeb = action({
             results: openRouterResults.results,
             searchMethod: "openrouter" as const,
             hasRealResults: true,
+            enrichment: openRouterResults.enrichment,
           };
         }
       } catch (error) {
@@ -161,6 +162,7 @@ export const searchWeb = action({
           hasRealResults: ddgResults.results.some(
             (r) => (r.relevanceScore ?? 0) > 0.6,
           ),
+          enrichment: ddgResults.enrichment,
         };
       }
     } catch (error) {
