@@ -84,6 +84,10 @@ const extractMainContent = ($: CheerioAPI): string => {
   return cleanText($("body").text());
 };
 
+/**
+ * Detect if a page likely needs JavaScript rendering for full content.
+ * Must be called BEFORE stripJunk() since it checks for noscript elements.
+ */
 export const needsJsRendering = (
   $: CheerioAPI,
   textLength: number,
@@ -196,6 +200,10 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     const $ = cheerio.load(html);
     const metadata = extractPageMetadata($);
+    // Check for JS rendering BEFORE stripJunk removes noscript elements
+    const bodyText = cleanText($("body").text());
+    const needsRender = needsJsRendering($, bodyText.length);
+    // Now extract content (which calls stripJunk and removes noscript)
     const extractedContent = extractMainContent($);
     const content =
       extractedContent.length > MAX_CONTENT_LENGTH
@@ -207,8 +215,6 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       metadata.ogTitle ||
       metadata.description ||
       new URL(url).hostname;
-
-    const needsRender = needsJsRendering($, content.length);
 
     // Filter out low-quality content
     if (content.length < 100) {
@@ -311,6 +317,7 @@ export const scrapeUrl = action({
     title: v.string(),
     content: v.string(),
     summary: v.optional(v.string()),
+    needsJsRendering: v.optional(v.boolean()),
   }),
   handler: async (_, args): Promise<ScrapeResult> => {
     return await scrapeWithCheerio(args.url);
