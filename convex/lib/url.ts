@@ -33,7 +33,10 @@ export function normalizeUrlForKey(rawUrl: string): string {
   const normalized = normalizeUrl(rawUrl);
   if (!normalized) {
     // Fallback for invalid URLs
-    return (rawUrl || "").trim();
+    // Ensure we still try to strip the hash if possible, even if it's not a valid URL
+    const trimmed = (rawUrl || "").trim();
+    const hashIndex = trimmed.indexOf("#");
+    return hashIndex !== -1 ? trimmed.slice(0, hashIndex) : trimmed;
   }
 
   try {
