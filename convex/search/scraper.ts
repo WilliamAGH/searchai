@@ -293,7 +293,10 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       summary: `Content unavailable from ${hostname}`,
       needsJsRendering: false,
     };
-    cache.set(url, { exp: Date.now() + CACHE_TTL.SCRAPE_MS, val });
+    // Short TTL for errors to allow retry while preventing hammering
+    const ERROR_CACHE_TTL_MS = 30_000; // 30 seconds
+    cache.set(url, { exp: Date.now() + ERROR_CACHE_TTL_MS, val });
+    enforceCapacity();
     return val;
   }
 }
