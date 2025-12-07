@@ -37,7 +37,11 @@ export const createChat = mutation({
     return await ctx.db.insert("chats", {
       title: args.title,
       userId: userId || undefined,
-      sessionId: !userId ? args.sessionId : undefined,
+      // CRITICAL: Always set sessionId if provided, even for authenticated users
+      // Reason: HTTP endpoints lack Convex auth context and validate via sessionId
+      // Having both userId and sessionId enables access via both Convex queries (userId)
+      // and HTTP actions (sessionId)
+      sessionId: args.sessionId,
       shareId,
       publicId,
       privacy: "private",
@@ -87,6 +91,10 @@ export const getUserChats = query({
 
 /**
  * Helper function to validate chat access
+ * Supports dual ownership: chats can have both userId AND sessionId
+ * This enables access via:
+ * 1. Convex queries/mutations (use userId from auth context)
+ * 2. HTTP endpoints (use sessionId, since httpAction has no auth context)
  */
 async function validateChatAccess(
   ctx: any,
@@ -98,21 +106,26 @@ async function validateChatAccess(
 
   if (!chat) return null;
 
-  // For authenticated users: check userId matches
-  if (chat.userId) {
-    if (chat.userId !== userId) return null;
-  }
-  // For anonymous chats: check sessionId matches
-  else if (chat.sessionId) {
-    if (!sessionId || chat.sessionId !== sessionId) return null;
-  }
-  // For shared/public chats: check privacy setting
-  else if (chat.privacy === "shared" || chat.privacy === "public") {
-    // Allow access to shared/public chats
+  // Shared and public chats are accessible regardless of owner or session
+  if (chat.privacy === "shared" || chat.privacy === "public") {
     return chat;
   }
 
-  return chat;
+  // For authenticated users: check userId matches (Convex queries/mutations)
+  if (chat.userId && userId && chat.userId === userId) {
+    return chat;
+  }
+
+  // For sessionId-based access: HTTP endpoints or anonymous users
+  // Note: HTTP actions don't have auth context, so they rely on sessionId
+  if (chat.sessionId && sessionId && chat.sessionId === sessionId) {
+    return chat;
+  }
+
+  // No valid access path
+  // SECURITY: Reject chats without proper ownership (userId or sessionId)
+  // If a chat has neither, it's a data integrity issue that should not grant access
+  return null;
 }
 
 /**
@@ -131,6 +144,50 @@ export const getChatById = query({
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
     return await validateChatAccess(ctx, args.chatId, args.sessionId);
+  },
+});
+
+/**
+ * Get chat by ID with direct database lookup (bypasses indexes)
+ * Use this immediately after creation to avoid index propagation delays
+ * @param chatId - Chat database ID
+ * @param sessionId - Optional session ID for anonymous users
+ * @returns Chat or null
+ */
+export const getChatByIdDirect = query({
+  args: {
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+  },
+  returns: v.union(v.any(), v.null()),
+  handler: async (ctx, args) => {
+    // Direct lookup bypasses index - use for immediate post-creation reads
+    const chat = await ctx.db.get(args.chatId);
+
+    if (!chat) return null;
+
+    const userId = await getAuthUserId(ctx);
+
+    // Shared and public chats are accessible regardless of owner or session
+    if (chat.privacy === "shared" || chat.privacy === "public") {
+      return chat;
+    }
+
+    // For authenticated users: check userId matches
+    if (chat.userId) {
+      if (chat.userId !== userId) return null;
+      return chat;
+    }
+
+    // For anonymous chats: check sessionId matches
+    if (chat.sessionId) {
+      if (!args.sessionId || chat.sessionId !== args.sessionId) return null;
+      return chat;
+    }
+
+    // SECURITY: Reject chats without proper ownership (userId or sessionId)
+    // Chat has no userId or sessionId - only accessible if public/shared (already checked above)
+    return null;
   },
 });
 
@@ -159,18 +216,13 @@ export const getChatByOpaqueId = query({
   },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
-    // Treat the opaque ID string as a Convex chat ID
-    // The try-catch will handle invalid IDs gracefully
-    const chatId = args.opaqueId as Id<"chats">;
+    const chatId = ctx.db.normalizeId("chats", args.opaqueId);
 
-    // Use try-catch to handle invalid IDs gracefully
-    try {
-      // Reuse validation logic
-      return await validateChatAccess(ctx, chatId, args.sessionId);
-    } catch {
-      // Invalid ID format will throw when accessing the database
+    if (!chatId) {
       return null;
     }
+
+    return await validateChatAccess(ctx, chatId, args.sessionId);
   },
 });
 

@@ -9,6 +9,7 @@
 
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SearchResult } from "./message";
+import { toConvexId as convertToConvexId } from "../utils/idValidation";
 
 /**
  * Unified Chat - Bridge type for local/Convex chats during migration
@@ -105,6 +106,9 @@ export interface UnifiedMessage {
 
   // Agent workflow tracking
   workflowId?: string;
+  workflowNonce?: string;
+  workflowSignature?: string;
+  persisted?: boolean;
 }
 
 /**
@@ -159,8 +163,7 @@ export const IdUtils = {
    * Check if an ID is a Convex ID
    */
   isConvexId: (id: string): boolean => {
-    // Convex IDs contain '|' character
-    return id.includes("|");
+    return !IdUtils.isLocalId(id);
   },
 
   /**
@@ -174,14 +177,26 @@ export const IdUtils = {
    * Convert string to Convex ID (unsafe - only use when certain)
    */
   toConvexChatId: (id: string): Id<"chats"> => {
-    return id as Id<"chats">;
+    const safeId = convertToConvexId<"chats">(id);
+    if (!safeId) {
+      throw new Error(
+        `Invalid Convex chat ID: "${id}" (expected format: j1234567890abcdef)`,
+      );
+    }
+    return safeId;
   },
 
   /**
    * Convert string to Convex Message ID (unsafe - only use when certain)
    */
   toConvexMessageId: (id: string): Id<"messages"> => {
-    return id as Id<"messages">;
+    const safeId = convertToConvexId<"messages">(id);
+    if (!safeId) {
+      throw new Error(
+        `Invalid Convex message ID: "${id}" (expected format: j1234567890abcdef)`,
+      );
+    }
+    return safeId;
   },
 
   /**
@@ -202,36 +217,14 @@ export const IdUtils = {
 };
 
 /**
- * Title Generation Utilities
- * Helper functions for generating and sanitizing titles
+ * Title Utilities
+ * CRITICAL: Title GENERATION is done ONLY by backend convex/chats/utils.ts:generateChatTitle
+ * This file contains ONLY sanitization utilities for the frontend.
  */
 export const TitleUtils = {
   /**
-   * Generate a title from content
-   */
-  generateFromContent: (content: string, maxLength: number = 50): string => {
-    const trimmed = content.trim();
-    if (!trimmed) return "New Chat";
-
-    if (trimmed.length <= maxLength) {
-      return trimmed;
-    }
-
-    // Try to break at word boundary
-    const truncated = trimmed.substring(0, maxLength);
-    const lastSpace = truncated.lastIndexOf(" ");
-
-    // Prefer word boundary if it's at least halfway into the truncated text
-    if (lastSpace >= Math.floor(maxLength / 2)) {
-      return truncated.substring(0, lastSpace) + "...";
-    }
-
-    // Otherwise just truncate
-    return truncated + "...";
-  },
-
-  /**
    * Sanitize title for display
+   * Used to clean titles received from backend before displaying
    */
   sanitize: (title: string): string => {
     return title

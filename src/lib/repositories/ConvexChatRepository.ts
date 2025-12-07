@@ -11,12 +11,17 @@ import {
   UnifiedChat,
   UnifiedMessage,
   StreamChunk,
-  PersistedPayload,
   ChatResponse,
   IdUtils,
   TitleUtils,
 } from "../types/unified";
 import { logger } from "../logger";
+import {
+  verifyPersistedPayload,
+  isSignatureVerificationAvailable,
+  type PersistedPayload,
+} from "../security/signature";
+import { env } from "../env";
 // Removed unused imports from errorHandling
 
 export class ConvexChatRepository extends BaseRepository {
@@ -64,6 +69,7 @@ export class ConvexChatRepository extends BaseRepository {
         rollingSummary: chat.rollingSummary,
         source: "convex",
         synced: true,
+        isLocal: false,
         lastSyncAt: Date.now(),
       }));
     } catch (error) {
@@ -117,7 +123,8 @@ export class ConvexChatRepository extends BaseRepository {
         sessionId: this.sessionId,
       });
 
-      const chat = await this.getChatById(IdUtils.toUnifiedId(chatId));
+      // Use direct lookup with retry to handle index propagation delay
+      const chat = await this.getChatByIdWithRetry(chatId);
       if (!chat) throw new Error("Failed to create chat");
 
       return { chat, isNew: true };
@@ -383,10 +390,12 @@ export class ConvexChatRepository extends BaseRepository {
     message: string,
   ): AsyncGenerator<StreamChunk> {
     try {
-      // Stream via HTTP SSE for live UI updates, then persist
+      // Stream via HTTP SSE for live UI updates (server now persists)
       const host = window.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
-      const apiUrl = isDev ? "/api/ai/agent/stream" : `/api/ai/agent/stream`;
+      const apiUrl = isDev
+        ? "/api/ai/agent/stream"
+        : `${env.convexUrl.replace(".convex.cloud", ".convex.site")}/api/ai/agent/stream`;
 
       // Build recent conversation context
       const recent = await this.getMessages(chatId);
@@ -399,6 +408,8 @@ export class ConvexChatRepository extends BaseRepository {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message,
+          chatId: IdUtils.toConvexChatId(chatId),
+          sessionId: this.sessionId,
           conversationContext: chatHistory
             .map(
               (m) =>
@@ -436,9 +447,51 @@ export class ConvexChatRepository extends BaseRepository {
               case "reasoning":
               case "content":
               case "metadata":
+              case "tool_result":
               case "error":
                 yield evt as StreamChunk;
                 break;
+              case "persisted": {
+                // Verify signature if available and enabled
+                // Note: Signature verification is optional in production since
+                // the signing key can't be safely embedded in frontend code.
+                // In dev, you can set VITE_AGENT_SIGNING_KEY for testing.
+                const signingKey = import.meta.env.VITE_AGENT_SIGNING_KEY;
+
+                if (
+                  signingKey &&
+                  isSignatureVerificationAvailable() &&
+                  evt.payload &&
+                  evt.nonce &&
+                  evt.signature
+                ) {
+                  const isValid = await verifyPersistedPayload(
+                    evt.payload as PersistedPayload,
+                    evt.nonce,
+                    evt.signature,
+                    signingKey,
+                  );
+
+                  if (!isValid) {
+                    logger.error(
+                      "🚫 Invalid signature detected on persisted event",
+                      {
+                        workflowId: evt.payload?.workflowId,
+                        nonce: evt.nonce,
+                      },
+                    );
+                    // Skip this event - possible tampering
+                    break;
+                  }
+
+                  logger.debug("✅ Signature verified for persisted event", {
+                    workflowId: evt.payload?.workflowId,
+                  });
+                }
+
+                yield evt as StreamChunk;
+                break;
+              }
               case "complete":
                 yield { type: "done" };
                 break;
@@ -448,44 +501,6 @@ export class ConvexChatRepository extends BaseRepository {
           }
         }
       }
-
-      // Persist to database and signal completion
-      const persistUrl = isDev
-        ? "/api/ai/agent/persist"
-        : `/api/ai/agent/persist`;
-      const persistResponse = await fetch(persistUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId: IdUtils.toConvexChatId(chatId), // Convert to Convex Id format
-          message,
-          sessionId: this.sessionId, // Pass sessionId for anonymous user chat access
-        }),
-      });
-
-      if (!persistResponse.ok) {
-        const failureBody = await persistResponse.text().catch(() => "");
-        throw new Error(
-          `Persist failed: ${persistResponse.status} ${persistResponse.statusText} ${failureBody}`,
-        );
-      }
-
-      const persistPayload = (await persistResponse
-        .json()
-        .catch(() => null)) as PersistedPayload | null;
-      if (
-        !persistPayload ||
-        typeof persistPayload !== "object" ||
-        !persistPayload.assistantMessageId
-      ) {
-        throw new Error("Persist response malformed");
-      }
-
-      // Signal persistence complete so UI can refresh with authoritative data
-      yield {
-        type: "persisted",
-        payload: persistPayload,
-      };
     } catch (error) {
       yield {
         type: "error",
@@ -549,6 +564,66 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Get chat by ID with retry logic for post-creation lookups
+   * Uses direct database lookup to bypass index propagation delays
+   * @param chatId - Convex chat ID
+   * @param maxAttempts - Maximum number of retry attempts (default: 5)
+   * @returns UnifiedChat or null
+   */
+  private async getChatByIdWithRetry(
+    chatId: Id<"chats">,
+    maxAttempts = 5,
+  ): Promise<UnifiedChat | null> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        // Use direct lookup query that bypasses indexes
+        const chat = await this.client.query(api.chats.getChatByIdDirect, {
+          chatId,
+          sessionId: this.sessionId,
+        });
+
+        if (chat) {
+          logger.debug("Chat retrieved successfully", {
+            chatId,
+            attempt,
+            sessionId: this.sessionId,
+          });
+          return this.convexToUnifiedChat(chat);
+        }
+
+        // Chat not found - wait before retrying
+        if (attempt < maxAttempts - 1) {
+          const delay = 50 * Math.pow(2, attempt); // Exponential backoff: 50ms, 100ms, 200ms, 400ms
+          logger.debug("Chat not found, retrying", {
+            chatId,
+            attempt,
+            delay,
+            sessionId: this.sessionId,
+          });
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      } catch (error) {
+        logger.error("Error fetching chat", {
+          chatId,
+          attempt,
+          error,
+          sessionId: this.sessionId,
+        });
+
+        // Don't retry on errors, only on null results
+        throw error;
+      }
+    }
+
+    logger.error("Failed to retrieve chat after retries", {
+      chatId,
+      maxAttempts,
+      sessionId: this.sessionId,
+    });
+    return null;
+  }
+
   // Helper methods
   private convexToUnifiedChat(chat: unknown): UnifiedChat {
     const c = chat as Record<string, unknown>;
@@ -563,6 +638,7 @@ export class ConvexChatRepository extends BaseRepository {
       rollingSummary: c.rollingSummary as string | undefined,
       source: "convex",
       synced: true,
+      isLocal: false,
       lastSyncAt: Date.now(),
     };
   }

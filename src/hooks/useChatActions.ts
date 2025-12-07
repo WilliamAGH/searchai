@@ -63,6 +63,7 @@ export interface ChatActions {
   setShowShareModal: (show: boolean) => void;
   setPendingMessage: (message: string) => void;
   addToHistory: (message: string) => void;
+  setError: (message: string) => void;
 
   // Utility
   refreshChats: () => Promise<void>;
@@ -307,6 +308,11 @@ export function createChatActions(
         ...prev,
         isGenerating: true,
         error: null,
+        // Immediately show a planning status to avoid initial empty gap
+        searchProgress: {
+          stage: "planning",
+          message: "Analyzing your question and planning research...",
+        },
         // Ensure currentChatId and currentChat match the chat we're sending to
         currentChatId: chatId,
         currentChat:
@@ -320,7 +326,8 @@ export function createChatActions(
 
         let fullContent = "";
         let accumulatedReasoning = "";
-        let persistedPayload: PersistedPayload | null = null;
+        let persistedDetails: PersistedPayload | null = null;
+        let persistedConfirmed = false;
 
         for await (const chunk of generator) {
           switch (chunk.type) {
@@ -387,39 +394,28 @@ export function createChatActions(
               }
               break;
 
-            case "metadata":
-              // Apply final metadata (sources, searchResults, etc.)
+            case "metadata": {
               if (chunk.metadata && typeof chunk.metadata === "object") {
                 const metadata = chunk.metadata as Record<string, unknown>;
-
-                // Convert contextReferences to searchResults for UI compatibility
-                const searchResults = Array.isArray(metadata.contextReferences)
-                  ? metadata.contextReferences.map((ref: unknown) => {
-                      const contextRef = ref as {
-                        title?: string;
-                        url?: string;
-                        relevanceScore?: number;
-                        relevance?: string;
-                        type?: string;
-                      };
-                      return {
-                        title:
-                          contextRef.title ||
-                          (contextRef.url
-                            ? new URL(contextRef.url).hostname
-                            : "Unknown"),
-                        url: contextRef.url || "",
-                        snippet: "",
-                        relevanceScore:
-                          contextRef.relevanceScore ||
-                          (contextRef.relevance === "high"
-                            ? 0.9
-                            : contextRef.relevance === "medium"
-                              ? 0.7
-                              : 0.5),
-                        kind: contextRef.type,
-                      };
-                    })
+                const workflowIdFromMetadata = metadata.workflowId as
+                  | string
+                  | undefined;
+                const contextRefs = Array.isArray(metadata.contextReferences)
+                  ? (metadata.contextReferences as UnifiedMessage["contextReferences"])
+                  : undefined;
+                const metadataSources = Array.isArray(metadata.sources)
+                  ? (metadata.sources as string[])
+                  : undefined;
+                const searchResults = contextRefs
+                  ? contextRefs.map((ref) => ({
+                      title:
+                        ref.title ||
+                        (ref.url ? new URL(ref.url).hostname : "Unknown"),
+                      url: ref.url || "",
+                      snippet: "",
+                      relevanceScore: ref.relevanceScore ?? 0.5,
+                      kind: ref.type,
+                    }))
                   : metadata.searchResults || [];
 
                 setState((prev) => ({
@@ -428,10 +424,17 @@ export function createChatActions(
                     index === prev.messages.length - 1 && m.role === "assistant"
                       ? {
                           ...m,
-                          ...metadata,
-                          searchResults,
-                          contextReferences: metadata.contextReferences,
-                          isStreaming: false,
+                          workflowId: workflowIdFromMetadata ?? m.workflowId,
+                          workflowNonce:
+                            (chunk as { nonce?: string }).nonce ??
+                            m.workflowNonce,
+                          contextReferences: contextRefs ?? m.contextReferences,
+                          sources: metadataSources ?? m.sources,
+                          searchResults:
+                            searchResults as UnifiedMessage["searchResults"],
+                          // CRITICAL: Keep isStreaming=true until persisted event fires
+                          // This prevents effectiveMessages from switching to paginatedMessages too early
+                          isStreaming: true,
                           thinking: undefined,
                         }
                       : m,
@@ -440,37 +443,44 @@ export function createChatActions(
               }
               logger.debug("Metadata received");
               break;
+            }
 
             case "error":
               throw new Error(chunk.error);
 
             case "done":
             case "complete":
-              // Stream completion - mark as not streaming but keep generating=true
-              // until persist completes (to prevent premature refresh)
+              // Indicate finalizing while waiting for persisted confirmation
               setState((prev) => ({
                 ...prev,
-                searchProgress: { stage: "idle" },
+                searchProgress: {
+                  stage: "finalizing",
+                  message: "Saving and securing results...",
+                },
                 messages: prev.messages.map((m, index) =>
                   index === prev.messages.length - 1 && m.role === "assistant"
-                    ? { ...m, isStreaming: false, thinking: undefined }
+                    ? { ...m, isStreaming: true, thinking: undefined }
                     : m,
                 ),
               }));
-              logger.debug("Stream complete, waiting for persist...");
+              logger.debug("Stream complete, awaiting persisted event...");
               break;
 
             case "persisted":
-              // Persistence complete - NOW we can safely refresh
-              persistedPayload = chunk.payload;
+              persistedConfirmed = true;
+              persistedDetails = chunk.payload;
               setState((prev) => ({
                 ...prev,
                 isGenerating: false,
+                searchProgress: { stage: "idle" },
                 messages: prev.messages.map((m, index) =>
                   index === prev.messages.length - 1 && m.role === "assistant"
                     ? {
                         ...m,
                         workflowId: chunk.payload.workflowId,
+                        workflowNonce: chunk.nonce ?? m.workflowNonce,
+                        workflowSignature:
+                          chunk.signature ?? m.workflowSignature,
                         sources: chunk.payload.sources,
                         contextReferences: chunk.payload.contextReferences,
                         searchResults:
@@ -487,11 +497,12 @@ export function createChatActions(
                             })) || m.searchResults,
                         isStreaming: false,
                         thinking: undefined,
+                        persisted: true,
                       }
                     : m,
                 ),
               }));
-              logger.debug("Persistence confirmed, triggering refresh", {
+              logger.debug("Persistence confirmed via SSE", {
                 chatId,
                 workflowId: chunk.payload.workflowId,
               });
@@ -499,19 +510,42 @@ export function createChatActions(
           }
         }
 
-        const refreshAfterPersist = async () => {
+        const refreshAfterPersist = async (shouldForce: boolean) => {
           if (!repository) {
             return;
           }
 
+          // CRITICAL FIX: For authenticated users, SKIP refresh entirely
+          // Optimistic state is already correct and refreshing causes flickering
+          // because DB messages have different IDs than optimistic messages
+          logger.debug(
+            "Skipping refresh - optimistic state is source of truth",
+            {
+              chatId,
+              shouldForce,
+            },
+          );
+          return;
+
+          // The code below is disabled to prevent flickering
+          // If needed in the future, we need to merge DB messages with optimistic state
+          // instead of replacing entirely
+
+          /*
+          if (!shouldForce) {
+            logger.debug("Skipping refresh - persistence not confirmed", { chatId });
+            return;
+          }
+          */
+
           const maxAttempts = 5;
           const delay = (ms: number) =>
             new Promise((resolve) => setTimeout(resolve, ms));
-          const targetAssistantId = persistedPayload
-            ? IdUtils.toUnifiedId(persistedPayload.assistantMessageId)
+          const targetAssistantId = persistedDetails
+            ? IdUtils.toUnifiedId(persistedDetails.assistantMessageId)
             : null;
           const trimmedAnswer = fullContent.trim();
-          if (!persistedPayload) {
+          if (!persistedDetails) {
             logger.warn(
               "Persist payload missing; relying on content match for refresh",
               { chatId },
@@ -530,30 +564,55 @@ export function createChatActions(
                   return true;
                 }
                 if (
-                  persistedPayload?.workflowId &&
-                  m.workflowId === persistedPayload.workflowId
+                  persistedDetails?.workflowId &&
+                  m.workflowId === persistedDetails.workflowId
                 ) {
                   return true;
                 }
-                return trimmedAnswer
-                  ? (m.content || "").trim() === trimmedAnswer
-                  : false;
+                const normalizedContent = (m.content || "").trim();
+                if (trimmedAnswer.length === 0) {
+                  return normalizedContent.length === 0;
+                }
+                return normalizedContent === trimmedAnswer;
               });
 
-              if (hasUserMessage && (hasAssistantMessage || !trimmedAnswer)) {
+              if (hasUserMessage && hasAssistantMessage) {
                 logger.debug("Messages refreshed after persistence", {
                   chatId,
                   messageCount: messages.length,
                   attempt,
                 });
 
-                setState((prev) => ({
-                  ...prev,
-                  messages,
-                  currentChatId: chatId,
-                  currentChat:
-                    prev.chats.find((c) => c.id === chatId) || prev.currentChat,
-                }));
+                // CRITICAL: Only update if DB messages are actually different
+                // This prevents flickering when optimistic state is already correct
+                setState((prev) => {
+                  // Check if we already have the correct messages (optimistic state)
+                  const hasOptimisticState = prev.messages.some(
+                    (m) =>
+                      m.role === "assistant" &&
+                      m.content === trimmedAnswer &&
+                      m.persisted === true,
+                  );
+
+                  if (hasOptimisticState) {
+                    logger.debug(
+                      "Skipping refresh - optimistic state already correct",
+                      { chatId },
+                    );
+                    // Don't replace messages - optimistic state is already good
+                    return prev;
+                  }
+
+                  // Messages from DB are different - do the update
+                  return {
+                    ...prev,
+                    messages,
+                    currentChatId: chatId,
+                    currentChat:
+                      prev.chats.find((c) => c.id === chatId) ||
+                      prev.currentChat,
+                  };
+                });
                 return;
               }
             } catch (error) {
@@ -572,7 +631,10 @@ export function createChatActions(
           );
         };
 
-        await refreshAfterPersist();
+        // CRITICAL FIX: Pass persistedConfirmed directly (not inverted)
+        // When persistence is confirmed (TRUE), we SHOULD refresh to sync with DB
+        // When persistence is not confirmed (FALSE), we SHOULD NOT refresh (keep optimistic state)
+        await refreshAfterPersist(persistedConfirmed);
       } catch (error) {
         logger.error("Failed to send message:", error);
         setState((prev) => ({
@@ -729,6 +791,10 @@ export function createChatActions(
         ...prev,
         userHistory: [...prev.userHistory, message],
       }));
+    },
+
+    setError(message: string) {
+      setState((prev) => ({ ...prev, error: message }));
     },
 
     // Utility

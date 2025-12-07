@@ -22,43 +22,37 @@ export function useAnonymousSession(): string | null {
     // This ensures sessionId is available on first render
     if (typeof window === "undefined") return null;
 
-    // If we're still loading auth state, check localStorage
-    // to see if we should prepare a session ID
+    // CRITICAL FIX: Always provide sessionId immediately, even during auth loading
+    // This prevents repository creation with undefined sessionId
     const existingId = localStorage.getItem(SESSION_KEY);
     if (existingId) return existingId;
 
-    // If no existing ID and not loading, create one immediately
-    // This prevents race conditions where repository is created without sessionId
-    if (!isLoading && !isAuthenticated) {
-      const newId = generateSessionId();
-      localStorage.setItem(SESSION_KEY, newId);
-      return newId;
-    }
-
-    return null;
+    // Create session ID immediately - don't wait for auth loading to complete
+    // Auth loading state will clean it up if user is authenticated
+    const newId = generateSessionId();
+    localStorage.setItem(SESSION_KEY, newId);
+    return newId;
   });
 
   useEffect(() => {
     // Skip if auth is still loading
     if (isLoading) return;
 
-    // Only need session ID for unauthenticated users
-    if (!isAuthenticated) {
-      // Check for existing session ID
-      let existingId = localStorage.getItem(SESSION_KEY);
+    // CRITICAL: Keep session ID for ALL users (authenticated and unauthenticated)
+    // Reason: HTTP endpoints don't have Convex auth context, so they rely on sessionId
+    // Backend mutations/queries prefer userId when available, but sessionId provides
+    // fallback auth for HTTP actions that can't access getAuthUserId(ctx)
 
-      if (!existingId) {
-        // Generate new session ID
-        existingId = generateSessionId();
-        localStorage.setItem(SESSION_KEY, existingId);
-      }
+    // Check for existing session ID
+    let existingId = localStorage.getItem(SESSION_KEY);
 
-      setSessionId(existingId);
-    } else {
-      // Clear session ID when authenticated
-      setSessionId(null);
-      localStorage.removeItem(SESSION_KEY);
+    if (!existingId) {
+      // Generate new session ID
+      existingId = generateSessionId();
+      localStorage.setItem(SESSION_KEY, existingId);
     }
+
+    setSessionId(existingId);
   }, [isAuthenticated, isLoading]);
 
   return sessionId;

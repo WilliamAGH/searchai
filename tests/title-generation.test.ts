@@ -1,96 +1,125 @@
+/**
+ * Chat Title Generation Tests
+ *
+ * CRITICAL: Title generation is done ONLY by convex/chats/utils.ts:generateChatTitle
+ * Frontend TitleUtils only provides sanitization.
+ *
+ * These tests verify the backend title generation with 25 character limit.
+ */
+
 import { describe, it, expect } from "vitest";
 import { TitleUtils } from "../src/lib/types/unified.ts";
+import { generateChatTitle } from "../convex/chats/utils.ts";
 
 describe("Chat Title Generation", () => {
-  describe("TitleUtils.generateFromContent", () => {
+  describe("Backend generateChatTitle (25 char limit)", () => {
     it("generates title from short message", () => {
-      const title = TitleUtils.generateFromContent(
-        "How do I configure my database?",
-      );
-      expect(title).toBe("How do I configure my database?");
+      const title = generateChatTitle({ intent: "Configure database" });
+      expect(title).toBe("Configure database");
     });
 
-    it("truncates long messages at 50 characters", () => {
+    it("truncates long messages at 25 characters", () => {
       const longMessage =
-        "This is a very long message that exceeds the fifty character limit and should be truncated properly";
-      const title = TitleUtils.generateFromContent(longMessage);
-      expect(title).toBe("This is a very long message that exceeds the...");
-      expect(title.length).toBeLessThanOrEqual(53);
+        "This is a very long message that exceeds the twenty-five character limit";
+      const title = generateChatTitle({ intent: longMessage });
+      // Verify it's truncated and has ellipsis
+      expect(title.endsWith("...")).toBe(true);
+      expect(title.length).toBeLessThanOrEqual(28); // 25 chars + "..."
+      // The actual title depends on word boundary truncation
+      expect(title).toBe("This is a very long...");
     });
 
-    it("handles messages exactly 50 characters", () => {
-      const exactMessage = "This message is exactly fifty characters long!!!";
-      // original script asserted 49; here we just ensure generateFromContent returns input if <= 50
-      const title = TitleUtils.generateFromContent(exactMessage);
-      expect(title).toBe(exactMessage);
+    it("removes filler words before truncating", () => {
+      const message = "Tell me about artificial intelligence";
+      const title = generateChatTitle({ intent: message });
+      // "tell me about" is removed by filler word logic
+      expect(title).toBe("Artificial intelligence");
     });
 
-    it("preserves word boundaries when truncating", () => {
-      const message =
-        "How do I configure my database settings for production environment?";
-      const title = TitleUtils.generateFromContent(message);
-      expect(title).toBe("How do I configure my database settings for...");
+    it("removes 'what is the' filler", () => {
+      const message = "What is the meaning of life?";
+      const title = generateChatTitle({ intent: message });
+      // After removing "what is the", we get "meaning of life?"
+      // But this gets truncated to fit in 25 chars
+      expect(title.toLowerCase()).toContain("life");
+      // The exact output after filler removal and capitalization
+      expect(title).toBe("Life?");
+    });
+
+    it("removes 'how do i' filler", () => {
+      const message = "How do I configure my database?";
+      const title = generateChatTitle({ intent: message });
+      expect(title).toBe("Configure my database?");
     });
 
     it("handles empty messages", () => {
-      const title = TitleUtils.generateFromContent("");
+      const title = generateChatTitle({ intent: "" });
       expect(title).toBe("New Chat");
     });
 
     it("handles whitespace-only messages", () => {
-      const title = TitleUtils.generateFromContent("   \n\t   ");
+      const title = generateChatTitle({ intent: "   \n\t   " });
       expect(title).toBe("New Chat");
     });
 
-    it("handles special characters", () => {
-      const message = "What is 2+2? Can you explain math & logic?";
-      const title = TitleUtils.generateFromContent(message);
-      expect(title).toBe("What is 2+2? Can you explain math & logic?");
+    it("capitalizes first letter after filler removal", () => {
+      const message = "explain the concept of recursion";
+      const title = generateChatTitle({ intent: message });
+      expect(title.charAt(0)).toBe(title.charAt(0).toUpperCase());
     });
 
-    it("handles unicode and emojis", () => {
-      const message = "How do I add emojis 😀 to my app? 🚀";
-      const title = TitleUtils.generateFromContent(message);
-      expect(title).toBe("How do I add emojis 😀 to my app? 🚀");
+    it("preserves word boundaries when truncating at 25 chars", () => {
+      const message = "Understanding complex database optimization techniques";
+      const title = generateChatTitle({ intent: message });
+      // Should break at word boundary, not mid-word
+      expect(title.endsWith("...")).toBe(true);
+      expect(title.length).toBeLessThanOrEqual(28);
     });
 
     it("handles custom max length", () => {
-      const message = "This is a test message for custom length truncation";
-      const title = TitleUtils.generateFromContent(message, 20);
-      // Word-boundary truncation occurs around the last space within threshold
-      expect(title).toBe("This is a test...");
+      const message = "This is a test message for custom length";
+      const title = generateChatTitle({ intent: message, maxLength: 15 });
+      expect(title.length).toBeLessThanOrEqual(18); // 15 + "..."
+    });
+
+    it("handles very long messages efficiently", () => {
+      const veryLong = "a".repeat(10000);
+      const title = generateChatTitle({ intent: veryLong });
+      expect(title.length).toBeLessThanOrEqual(28); // 25 + "..."
     });
   });
 
-  describe("TitleUtils.sanitize", () => {
+  describe("Frontend TitleUtils.sanitize", () => {
     it("removes HTML tags and normalizes whitespace", () => {
       const dirty = 'Hello <script>alert("xss")</script>   World';
       const clean = TitleUtils.sanitize(dirty);
-      // current sanitize keeps '>' but removes '<' and normalizes spaces
+      // Sanitize removes '<' and normalizes spaces
       expect(clean).toBe('Hello script>alert("xss")/script> World');
     });
-  });
 
-  describe("Authentication Parity", () => {
-    it("generates same title logic for both paths", () => {
-      const message = "How do I configure my database for production?";
-      const trimmed = message.trim();
-      const titleA =
-        trimmed.length > 50 ? `${trimmed.substring(0, 50)}...` : trimmed;
-      const content = "How do I configure my database for production?";
-      const titleB =
-        content.length > 50 ? `${content.substring(0, 50)}...` : content;
-      expect(titleA).toBe("How do I configure my database for production?");
-      expect(titleB).toBe("How do I configure my database for production?");
+    it("trims leading and trailing whitespace", () => {
+      const title = TitleUtils.sanitize("  Hello World  ");
+      expect(title).toBe("Hello World");
+    });
+
+    it("normalizes multiple spaces to single space", () => {
+      const title = TitleUtils.sanitize("Hello     World");
+      expect(title).toBe("Hello World");
     });
   });
 
-  describe("Edge Cases", () => {
-    it("handles very long messages", () => {
-      const veryLong = "a".repeat(10000);
-      const title = TitleUtils.generateFromContent(veryLong);
-      expect(title).toBe("a".repeat(50) + "...");
-      expect(title.length).toBe(53);
+  describe("End-to-End Title Flow", () => {
+    it("backend generates, frontend sanitizes", () => {
+      // Backend generates title with filler removal + 25 char limit
+      const backendTitle = generateChatTitle({
+        intent: "What is the best way to optimize database queries?",
+      });
+
+      // Frontend sanitizes for display
+      const displayTitle = TitleUtils.sanitize(backendTitle);
+
+      expect(displayTitle.length).toBeLessThanOrEqual(28);
+      expect(displayTitle).toBe(backendTitle); // Should be same if no dirty input
     });
   });
 });

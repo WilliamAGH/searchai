@@ -279,6 +279,7 @@ export function MessageInput({
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               aria-label="Message input"
+              data-testid="message-input"
               disabled={disabled}
               rows={1}
               autoComplete="off"

@@ -1,3 +1,5 @@
+"use node";
+
 /**
  * Agent Tools for Search and Research
  * Proper tool definitions with UUIDv7 context tracking
@@ -5,7 +7,7 @@
 
 import { z } from "zod";
 import { tool } from "@openai/agents";
-import type { FunctionTool } from "@openai/agents";
+import type { FunctionTool, RunContext } from "@openai/agents";
 import type { ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { generateMessageId } from "../lib/id_generator";
@@ -14,6 +16,20 @@ import { generateMessageId } from "../lib/id_generator";
  * Web Search Tool
  * Searches the web and returns results with context tracking
  */
+type AgentToolRunContext =
+  | RunContext<{ actionCtx?: ActionCtx } | undefined>
+  | undefined;
+
+const getActionCtx = (ctx?: AgentToolRunContext): ActionCtx => {
+  const actionCtx = ctx?.context?.actionCtx;
+  if (!actionCtx) {
+    throw new Error(
+      "Convex ActionCtx missing from tool run context. Ensure run() is called with context: { actionCtx }.",
+    );
+  }
+  return actionCtx;
+};
+
 export const searchWebTool: FunctionTool<any, any, unknown> = tool({
   name: "search_web",
   description: `Search the web for current information. Use this when you need to find:
@@ -22,7 +38,18 @@ export const searchWebTool: FunctionTool<any, any, unknown> = tool({
 - Product details
 - Current events
 - Location information
-Returns search results with titles, URLs, snippets, and relevance scores.`,
+Returns search results with titles, URLs, snippets, and relevance scores.
+
+OUTPUT FORMAT EXAMPLE:
+{
+  "contextId": "019a122e-....",
+  "query": "original search query",
+  "resultCount": 3,
+  "results": [
+    { "title": "Example", "url": "https://example.com", "snippet": "...", "relevanceScore": 0.82 }
+  ]
+}
+Always propagate the top-level contextId into every sourcesUsed entry you derive from these results.`,
   parameters: z.object({
     query: z
       .string()
@@ -42,9 +69,9 @@ Returns search results with titles, URLs, snippets, and relevance scores.`,
   }),
   execute: async (
     input: { query: string; maxResults?: number; reasoning: string },
-    ctx: any, // @openai/agents expects RunContext<unknown> but Convex runtime provides ActionCtx
+    ctx: AgentToolRunContext,
   ) => {
-    const actionCtx = ctx as ActionCtx;
+    const actionCtx = getActionCtx(ctx);
     const contextId = generateMessageId();
     const callStart = Date.now();
 
@@ -79,6 +106,7 @@ Returns search results with titles, URLs, snippets, and relevance scores.`,
         resultCount: results.results.length,
         searchMethod: results.searchMethod,
         hasRealResults: results.hasRealResults,
+        enrichment: results.enrichment,
         results: results.results.map(
           (r: {
             title: string;
@@ -141,11 +169,21 @@ export const scrapeWebpageTool: FunctionTool<any, any, unknown> = tool({
 - Content verification from official sources
 - In-depth article or page content
 - Information beyond search result snippets
-Returns the page title, full cleaned content, and a summary.`,
+Returns the page title, full cleaned content, and a summary.
+
+OUTPUT FORMAT EXAMPLE:
+{
+  "contextId": "019a122e-....",
+  "url": "https://example.com/page",
+  "title": "Example Page",
+  "content": "Full cleaned content...",
+  "summary": "Short synopsis..."
+}
+Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high", copying the contextId verbatim.`,
   parameters: z.object({
     url: z
       .string()
-      .url()
+      .regex(/^https?:\/\/\S+$/i, "Must be an http or https URL")
       .describe(
         "The complete URL to scrape. Must be http or https. Example: 'https://www.bananarepublic.com/about'",
       ),
@@ -157,9 +195,9 @@ Returns the page title, full cleaned content, and a summary.`,
   }),
   execute: async (
     input: { url: string; reasoning: string },
-    ctx: any, // @openai/agents expects RunContext<unknown> but Convex runtime provides ActionCtx
+    ctx: AgentToolRunContext,
   ) => {
-    const actionCtx = ctx as ActionCtx;
+    const actionCtx = getActionCtx(ctx);
     const contextId = generateMessageId();
     const callStart = Date.now();
 
@@ -171,9 +209,12 @@ Returns the page title, full cleaned content, and a summary.`,
     });
 
     try {
-      const content = await actionCtx.runAction(api.search.scrapeUrl, {
-        url: input.url,
-      });
+      const content = await actionCtx.runAction(
+        api.search.scraperAction.scrapeUrl,
+        {
+          url: input.url,
+        },
+      );
 
       const durationMs = Date.now() - callStart;
       console.info("✅ SCRAPE TOOL SUCCESS:", {
@@ -192,7 +233,7 @@ Returns the page title, full cleaned content, and a summary.`,
         content: content.content,
         summary: content.summary || content.content.substring(0, 500) + "...",
         contentLength: content.content.length,
-        timestamp: Date.now(),
+        scrapedAt: Date.now(),
         _toolCallMetadata: {
           toolName: "scrape_webpage",
           callStart,
@@ -226,7 +267,7 @@ Returns the page title, full cleaned content, and a summary.`,
         title: hostname,
         content: `Unable to fetch content from ${input.url}`,
         summary: `Content unavailable from ${hostname}`,
-        timestamp: Date.now(),
+        scrapedAt: Date.now(),
         _toolCallMetadata: {
           toolName: "scrape_webpage",
           callStart,

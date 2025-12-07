@@ -14,10 +14,44 @@ function getAllowedOrigins(): string[] | null {
     );
     return null;
   }
-  return raw
+  const origins = raw
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  return normalizeDevOrigins(origins);
+}
+
+/**
+ * Merge development convenience origins for Vite dev servers.
+ * Ensures both 5173 and 5174 ports are accepted when either is specified.
+ */
+const DEV_VITE_ORIGINS = new Set([
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://localhost:5173",
+  "https://localhost:5174",
+]);
+
+function normalizeDevOrigins(origins: string[]): string[] {
+  const set = new Set(origins);
+
+  // If any localhost Vite origin is present, ensure both ports are allowed.
+  if (
+    origins.some((origin) =>
+      [
+        "http://localhost:5173",
+        "https://localhost:5173",
+        "http://localhost:5174",
+        "https://localhost:5174",
+      ].includes(origin),
+    )
+  ) {
+    for (const devOrigin of DEV_VITE_ORIGINS) {
+      set.add(devOrigin);
+    }
+  }
+
+  return Array.from(set);
 }
 
 /**

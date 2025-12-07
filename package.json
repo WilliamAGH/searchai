@@ -1,8 +1,25 @@
 {
   "name": "searchai-io",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "description": "AI-powered search application",
   "type": "module",
+  "homepage": "https://search-ai.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WilliamAGH/searchai-io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/WilliamAGH/searchai-io/issues"
+  },
+  "author": "William Callahan",
+  "license": "UNLICENSED",
+  "keywords": [
+    "search",
+    "ai",
+    "convex",
+    "react"
+  ],
   "scripts": {
     "validate:quick": "oxlint && tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false && npm run -s test",
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
@@ -73,8 +90,9 @@
     "@vitejs/plugin-react": "4.4.1",
     "@vitest/coverage-v8": "^2.1.4",
     "autoprefixer": "~10",
+    "convex-test": "^0.0.38",
     "dotenv": "16.5.0",
-    "glob": "^11.0.3",
+    "glob": "^11.1.0",
     "globals": "^15.15.0",
     "husky": "^9.0.11",
     "jsdom": "^24.1.0",
@@ -86,7 +104,7 @@
     "tailwindcss": "~3",
     "tsx": "^4.20.3",
     "typescript": "5.9.2",
-    "vite": "6.3.5",
+    "vite": "6.4.1",
     "vitest": "^2.1.4"
   },
   "lint-staged": {

@@ -65,7 +65,7 @@ const CitationLink: React.FC<{
       target="_blank"
       rel="noopener noreferrer"
       className={`
-        inline-flex items-center gap-0.5 px-1 py-0.5 ml-0.5 -mr-[2px] rounded-md text-xs font-medium
+        inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-xs font-medium
         transition-all duration-200 no-underline
         ${
           isHighlighted
@@ -141,11 +141,12 @@ export function CitationRenderer({
     let keyIndex = 0;
 
     while ((match = citationRegex.exec(content)) !== null) {
-      // Add text before the citation
+      // Add text before the citation (trim trailing space)
       if (match.index > lastIndex) {
+        const textBefore = content.substring(lastIndex, match.index);
         parts.push(
           <span key={`text-${keyIndex++}`}>
-            {content.substring(lastIndex, match.index)}
+            {textBefore.replace(/\s+$/, " ")}
           </span>,
         );
       }
@@ -203,24 +204,25 @@ export function CitationRenderer({
           />,
         );
       } else {
-        // No matching source - render as plain text in brackets
-        parts.push(
-          <span
-            key={`plain-${keyIndex++}`}
-            className="text-gray-500 dark:text-gray-400"
-          >
-            [{citedDomain}]
-          </span>,
-        );
+        // No matching source - skip rendering to avoid bracket artifacts
+        // The unmatched citation pattern is simply removed from display
       }
 
+      // Move lastIndex past the citation, and skip any leading whitespace
       lastIndex = match.index + match[0].length;
+      // Skip one space character if present to avoid double spacing
+      if (content[lastIndex] === " ") {
+        lastIndex++;
+      }
     }
 
-    // Add remaining text after last citation
+    // Add remaining text after last citation (trim leading space)
     if (lastIndex < content.length) {
+      const textAfter = content.substring(lastIndex);
       parts.push(
-        <span key={`text-${keyIndex++}`}>{content.substring(lastIndex)}</span>,
+        <span key={`text-${keyIndex++}`}>
+          {textAfter.replace(/^\s+/, " ")}
+        </span>,
       );
     }
 

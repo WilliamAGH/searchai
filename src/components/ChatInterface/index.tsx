@@ -106,25 +106,22 @@ function ChatInterfaceComponent({
     // Convert from unified format to local format for compatibility
     if (chats && chats.length > 0) {
       baseChats = chats.map((chat) =>
-        createChatFromData(
-          {
-            _id: chat.id || chat._id,
-            title: chat.title,
-            createdAt: chat.createdAt,
-            updatedAt: chat.updatedAt,
-            privacy: chat.privacy,
-            shareId: chat.shareId,
-            publicId: chat.publicId,
-            userId: chat.userId,
-            _creationTime: chat._creationTime,
-          },
-          isAuthenticated,
-        ),
+        createChatFromData({
+          _id: chat.id || chat._id,
+          title: chat.title,
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
+          privacy: chat.privacy,
+          shareId: chat.shareId,
+          publicId: chat.publicId,
+          userId: chat.userId,
+          _creationTime: chat._creationTime,
+        }),
       );
     }
 
     return baseChats;
-  }, [isAuthenticated, chats]);
+  }, [chats]);
 
   const {
     navigateWithVerification,
@@ -196,16 +193,46 @@ function ChatInterfaceComponent({
     enabled: isAuthenticated && !!currentChatId && !currentChat?.isLocal,
   });
 
+  const handlePaginatedLoadMore = useCallback(async () => {
+    await loadMore();
+  }, [loadMore]);
+
   // Use paginated messages when available, fallback to regular messages
+  // CRITICAL: Prioritize unified messages during active generation (optimistic state)
   const effectiveMessages = useMemo(() => {
+    // Check if unified messages have optimistic state (isStreaming or unpersisted)
+    const hasOptimisticMessages = messages.some(
+      (m) => m.isStreaming === true || m.persisted === false,
+    );
+
+    // If we have optimistic messages, always use unified messages (source of truth during generation)
+    if (hasOptimisticMessages) {
+      logger.debug("Using unified messages - optimistic state present", {
+        count: messages.length,
+        chatId: currentChatId,
+      });
+      return messages;
+    }
+
+    // Otherwise, use paginated messages if available (for authenticated users with DB data)
     if (
       isAuthenticated &&
       currentChatId &&
       !currentChat?.isLocal &&
       paginatedMessages.length > 0
     ) {
+      logger.debug("Using paginated messages - no optimistic state", {
+        count: paginatedMessages.length,
+        chatId: currentChatId,
+      });
       return paginatedMessages;
     }
+
+    // Fallback to unified messages
+    logger.debug("Using unified messages - fallback", {
+      count: messages.length,
+      chatId: currentChatId,
+    });
     return messages;
   }, [
     isAuthenticated,
@@ -324,15 +351,16 @@ function ChatInterfaceComponent({
     planSearch,
     isTopicChange,
     generateResponse: async (args: { chatId: string; message: string }) => {
-      if (chatActions.sendMessage) {
-        await chatActions.sendMessage(args.chatId, args.message);
-      } else {
-        logger.error("generateResponse: sendMessage not available");
+      if (!chatActions.sendMessage) {
+        throw new Error("Message sending is currently unavailable.");
       }
+
+      await chatActions.sendMessage(args.chatId, args.message);
     },
     generateUnauthenticatedResponse,
     maybeShowFollowUpPrompt,
     chatActions,
+    setErrorMessage: chatActions.setError,
   });
 
   useEffect(() => {
@@ -432,7 +460,7 @@ function ChatInterfaceComponent({
     // Pagination props
     isLoadingMore,
     hasMore,
-    onLoadMore: loadMore,
+    onLoadMore: handlePaginatedLoadMore,
     isLoadingMessages,
     loadError,
     retryCount,

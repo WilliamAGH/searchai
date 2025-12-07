@@ -51,11 +51,11 @@ export const isServerChat = (chat: Chat): chat is Doc<"chats"> => {
 };
 
 /**
- * Type guard to check if ID is a Convex ID
- * Convex IDs contain '|' character
+ * Type guard to check if ID comes from Convex storage
+ * Local IDs always use explicit prefixes; anything else is treated as Convex
  */
 export const isConvexId = (id: string | Id<"chats">): id is Id<"chats"> => {
-  return typeof id === "string" && id.includes("|");
+  return typeof id === "string" ? !isLocalId(id) : true;
 };
 
 /**
@@ -147,30 +147,34 @@ export function toChat(obj: unknown): Chat | null {
 /**
  * Create a Chat object from partial data with defaults
  * Used for safe conversion from unified format
+ *
+ * Note: Detection of server vs local chat is based solely on data properties
+ * (_creationTime or ID format), supporting both authenticated and anonymous
+ * users with Convex-backed chats.
  */
-export function createChatFromData(
-  data: {
-    _id?: string;
-    id?: string;
-    title?: string;
-    createdAt?: number;
-    updatedAt?: number;
-    privacy?: string;
-    shareId?: string;
-    publicId?: string;
-    userId?: string;
-    _creationTime?: number;
-  },
-  isAuthenticated: boolean,
-): Chat {
+export function createChatFromData(data: {
+  _id?: string;
+  id?: string;
+  title?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  privacy?: string;
+  shareId?: string;
+  publicId?: string;
+  userId?: string;
+  _creationTime?: number;
+}): Chat {
   const id = data._id || data.id || "";
   const now = Date.now();
 
-  if (isAuthenticated && data._creationTime) {
+  // Detect Convex chat by presence of _creationTime OR if ID doesn't match local ID patterns
+  const isConvexChat = data._creationTime || (id && !isLocalId(id));
+
+  if (isConvexChat) {
     // Server chat (Doc<"chats">)
     return {
       _id: id as Id<"chats">,
-      _creationTime: data._creationTime,
+      _creationTime: data._creationTime || now,
       title: data.title || "Untitled Chat",
       createdAt: data.createdAt || now,
       updatedAt: data.updatedAt || now,

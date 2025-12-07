@@ -1,20 +1,323 @@
+"use node";
+
 /**
  * Web Scraping Module
- * Handles URL content extraction and cleaning
+ * Handles URL content extraction and cleaning with Cheerio,
+ * and optionally falls back to Playwright for JS-rendered pages.
  */
 
+import * as cheerio from "cheerio";
+import type { CheerioAPI } from "cheerio";
 import { v } from "convex/values";
 import { action } from "../_generated/server";
+import { CACHE_TTL } from "../lib/constants/cache";
+// NOTE: Playwright removed - not compatible with Convex's deployment environment
+// (requires native browser binaries that aren't available in Convex runtime)
+
+const MAX_CONTENT_LENGTH = 12000;
+
+export type ScrapeResult = {
+  title: string;
+  content: string;
+  summary?: string;
+  needsJsRendering?: boolean;
+};
+
+const cleanText = (text: string): string =>
+  text
+    .replace(/\s+/g, " ")
+    .replace(/\u00a0/g, " ")
+    .trim();
+
+const stripJunk = ($: CheerioAPI) => {
+  $("script, style, nav, footer, header, aside, noscript, iframe").remove();
+  $('[aria-hidden="true"]').remove();
+  $('[role="presentation"]').remove();
+  $(".ads, .ad, .advertisement, .promo, .sidebar").remove();
+};
+
+const extractPageMetadata = ($: CheerioAPI) => {
+  const fallbackTitle =
+    $("h1").first().text().trim() || $("h2").first().text().trim();
+  return {
+    title: $("title").text().trim() || fallbackTitle,
+    description: $('meta[name="description"]').attr("content"),
+    ogTitle: $('meta[property="og:title"]').attr("content"),
+    ogDescription: $('meta[property="og:description"]').attr("content"),
+    author: $('meta[name="author"]').attr("content"),
+    publishedDate: $('meta[property="article:published_time"]').attr("content"),
+    jsonLd: $('script[type="application/ld+json"]').first().html(),
+  };
+};
+
+const extractLargestTextBlock = ($: CheerioAPI): string => {
+  let bestNode: any = null;
+  let bestLen = 0;
+  $("p, article, section, div").each((_, el) => {
+    const text = cleanText($(el).text());
+    if (text.length > bestLen) {
+      bestLen = text.length;
+      bestNode = el;
+    }
+  });
+  if (bestNode) {
+    return cleanText($(bestNode).text());
+  }
+  return "";
+};
+
+const extractMainContent = ($: CheerioAPI): string => {
+  stripJunk($);
+  const main =
+    $("article").first().text() ||
+    $("main").first().text() ||
+    $('[role="main"]').first().text() ||
+    $(".content").first().text() ||
+    $(".post").first().text();
+
+  const cleaned = cleanText(main);
+  if (cleaned.length > 300) return cleaned;
+
+  const largest = extractLargestTextBlock($);
+  if (largest.length > 0) return largest;
+
+  return cleanText($("body").text());
+};
 
 /**
- * Scrape and clean web page content
- * - Extracts title from <title> or <h1>
- * - Removes scripts/styles/HTML
- * - Filters junk patterns
- * - Truncates to 5000 chars
- * - 10s timeout
- * @param url - Absolute URL to fetch
- * @returns {title, content, summary}
+ * Detect if a page likely needs JavaScript rendering for full content.
+ * Must be called BEFORE stripJunk() since it checks for noscript elements.
+ */
+export const needsJsRendering = (
+  $: CheerioAPI,
+  textLength: number,
+): boolean => {
+  const hasReactRoot = $("#root, #__next, #app").length > 0;
+  const hasNoscript = $("noscript").text().toLowerCase().includes("javascript");
+  const minimalContent = textLength < 500;
+  return (hasReactRoot && minimalContent) || hasNoscript;
+};
+
+const getScrapeCache = () => {
+  type CacheEntry = {
+    exp: number;
+    val: ScrapeResult;
+  };
+  const globalWithCache = globalThis as typeof globalThis & {
+    __scrapeCache?: Map<string, CacheEntry>;
+  };
+  if (!globalWithCache.__scrapeCache) {
+    globalWithCache.__scrapeCache = new Map<string, CacheEntry>();
+  }
+  return globalWithCache.__scrapeCache;
+};
+
+export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
+  const SCRAPE_TTL_MS = CACHE_TTL.SCRAPE_MS;
+  const SCRAPE_CACHE_MAX_ENTRIES = 100; // Prevent unbounded memory growth
+  const cache = getScrapeCache();
+  const now = Date.now();
+
+  // Remove expired entries
+  for (const [key, entry] of cache) {
+    if (entry.exp <= now) cache.delete(key);
+  }
+
+  const cached = cache.get(url);
+  if (cached && cached.exp > now) {
+    cache.delete(url);
+    cache.set(url, cached);
+    return cached.val;
+  }
+
+  console.info("🌐 Scraping URL initiated:", {
+    url,
+    timestamp: new Date().toISOString(),
+  });
+
+  const enforceCapacity = () => {
+    while (cache.size > SCRAPE_CACHE_MAX_ENTRIES) {
+      const oldestKey = cache.keys().next().value;
+      if (!oldestKey) break;
+      cache.delete(oldestKey);
+    }
+  };
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; SearchChat/1.0; Web Content Reader)",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate",
+        Connection: "keep-alive",
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+
+    console.info("📊 Scrape response received:", {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    });
+
+    if (!response.ok) {
+      const errorDetails = {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        timestamp: new Date().toISOString(),
+      };
+      console.error("❌ HTTP error during scraping:", errorDetails);
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    console.info("📄 Content type check:", {
+      url,
+      contentType: contentType,
+    });
+
+    if (!contentType.includes("text/html")) {
+      const errorDetails = {
+        url,
+        contentType: contentType,
+        timestamp: new Date().toISOString(),
+      };
+      console.error("❌ Non-HTML content type:", errorDetails);
+      throw new Error(`Not an HTML page. Content-Type: ${contentType}`);
+    }
+
+    const html = await response.text();
+    console.info("✅ HTML content fetched:", {
+      url,
+      contentLength: html.length,
+      timestamp: new Date().toISOString(),
+    });
+
+    const $ = cheerio.load(html);
+    const metadata = extractPageMetadata($);
+    // Check for JS rendering BEFORE stripJunk removes noscript elements
+    const bodyText = cleanText($("body").text());
+    const needsRender = needsJsRendering($, bodyText.length);
+    // Now extract content (which calls stripJunk and removes noscript)
+    const extractedContent = extractMainContent($);
+    const content =
+      extractedContent.length > MAX_CONTENT_LENGTH
+        ? `${extractedContent.substring(0, MAX_CONTENT_LENGTH)}...`
+        : extractedContent;
+
+    const title =
+      metadata.title ||
+      metadata.ogTitle ||
+      metadata.description ||
+      new URL(url).hostname;
+
+    // Remove common junk patterns before quality check
+    const junkPatterns = [
+      /cookie policy/gi,
+      /accept cookies/gi,
+      /privacy policy/gi,
+      /terms of service/gi,
+      /subscribe to newsletter/gi,
+      /follow us on/gi,
+      /share this article/gi,
+    ];
+
+    let cleanedContent = content;
+    let removedJunkCount = 0;
+    for (const pattern of junkPatterns) {
+      const matches = cleanedContent.match(pattern);
+      if (matches) {
+        removedJunkCount += matches.length;
+      }
+      cleanedContent = cleanedContent.replace(pattern, "");
+    }
+
+    // Trim whitespace after junk removal
+    cleanedContent = cleanedContent.trim();
+
+    console.log("🗑️ Junk content removed:", {
+      url,
+      removedCount: removedJunkCount,
+      contentLengthBefore: content.length,
+      contentLengthAfter: cleanedContent.length,
+    });
+
+    // Filter out low-quality content AFTER junk removal
+    if (cleanedContent.length < 100) {
+      const errorDetails = {
+        url,
+        contentLengthBefore: content.length,
+        contentLengthAfter: cleanedContent.length,
+        timestamp: new Date().toISOString(),
+      };
+      console.error("❌ Content too short after junk removal:", errorDetails);
+      throw new Error(
+        `Content too short after cleaning (${cleanedContent.length} characters)`,
+      );
+    }
+
+    const summaryLength = Math.min(500, cleanedContent.length);
+    const summary =
+      cleanedContent.substring(0, summaryLength) +
+      (cleanedContent.length > summaryLength ? "..." : "");
+
+    const result: ScrapeResult = {
+      title,
+      content: cleanedContent,
+      summary,
+      needsJsRendering: needsRender,
+    };
+
+    cache.set(url, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
+    enforceCapacity();
+    console.info("✅ Scraping completed successfully:", {
+      url,
+      resultLength: cleanedContent.length,
+      summaryLength: summary.length,
+      needsJsRendering: needsRender,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+  } catch (error) {
+    console.error("💥 Scraping failed with exception:", {
+      url,
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : "No stack trace",
+      timestamp: new Date().toISOString(),
+    });
+
+    let hostname = "";
+    try {
+      hostname = new URL(url).hostname;
+    } catch {
+      hostname = "unknown";
+    }
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+
+    const val: ScrapeResult = {
+      title: hostname,
+      content: `Unable to fetch content from ${url}: ${errorMessage}`,
+      summary: `Content unavailable from ${hostname}`,
+      needsJsRendering: false,
+    };
+    // Short TTL for errors to allow retry while preventing hammering
+    const ERROR_CACHE_TTL_MS = 30_000; // 30 seconds
+    cache.set(url, { exp: Date.now() + ERROR_CACHE_TTL_MS, val });
+    enforceCapacity();
+    return val;
+  }
+}
+
+/**
+ * Scrape and clean web page content (action entry)
+ * Uses Cheerio for HTML parsing - Playwright not available in Convex runtime
  */
 export const scrapeUrl = action({
   args: { url: v.string() },
@@ -22,219 +325,9 @@ export const scrapeUrl = action({
     title: v.string(),
     content: v.string(),
     summary: v.optional(v.string()),
+    needsJsRendering: v.optional(v.boolean()),
   }),
-  handler: async (
-    _,
-    args,
-  ): Promise<{
-    title: string;
-    content: string;
-    summary?: string;
-  }> => {
-    // Short-TTL in-process cache to avoid repeat scrapes across adjacent queries
-    const SCRAPE_TTL_MS = 2 * 60 * 1000; // 2 minutes
-    const globalAny: any = globalThis as any;
-    if (!globalAny.__scrapeCache)
-      globalAny.__scrapeCache = new Map<
-        string,
-        {
-          exp: number;
-          val: { title: string; content: string; summary?: string };
-        }
-      >();
-    const cache: Map<
-      string,
-      { exp: number; val: { title: string; content: string; summary?: string } }
-    > = globalAny.__scrapeCache;
-    const now = Date.now();
-    for (const [k, v] of cache) {
-      if (v.exp <= now) cache.delete(k);
-    }
-    const hit = cache.get(args.url);
-    if (hit && hit.exp > now) {
-      return hit.val;
-    }
-    console.info("🌐 Scraping URL initiated:", {
-      url: args.url,
-      timestamp: new Date().toISOString(),
-    });
-
-    try {
-      const response = await fetch(args.url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (compatible; SearchChat/1.0; Web Content Reader)",
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.5",
-          "Accept-Encoding": "gzip, deflate",
-          Connection: "keep-alive",
-        },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      });
-
-      console.info("📊 Scrape response received:", {
-        url: args.url,
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-
-      if (!response.ok) {
-        const errorDetails = {
-          url: args.url,
-          status: response.status,
-          statusText: response.statusText,
-          timestamp: new Date().toISOString(),
-        };
-        console.error("❌ HTTP error during scraping:", errorDetails);
-        throw new Error(`HTTP ${response.status} ${response.statusText}`);
-      }
-
-      const contentType = response.headers.get("content-type") || "";
-      console.info("📄 Content type check:", {
-        url: args.url,
-        contentType: contentType,
-      });
-
-      if (!contentType.includes("text/html")) {
-        const errorDetails = {
-          url: args.url,
-          contentType: contentType,
-          timestamp: new Date().toISOString(),
-        };
-        console.error("❌ Non-HTML content type:", errorDetails);
-        throw new Error(`Not an HTML page. Content-Type: ${contentType}`);
-      }
-
-      const html = await response.text();
-      console.info("✅ HTML content fetched:", {
-        url: args.url,
-        contentLength: html.length,
-        timestamp: new Date().toISOString(),
-      });
-
-      // Extract title using regex
-      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-      let title = titleMatch ? titleMatch[1].trim() : "";
-
-      // Try h1 if no title
-      const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-      if (!title) {
-        title = h1Match ? h1Match[1].trim() : new URL(args.url).hostname;
-      }
-
-      console.info("🏷️ Title extracted:", {
-        url: args.url,
-        title: title,
-        method: titleMatch ? "title tag" : h1Match ? "h1 tag" : "hostname",
-      });
-
-      // Remove script and style tags, then extract text content
-      let content = html
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      console.info("🧹 Content cleaned:", {
-        url: args.url,
-        originalLength: html.length,
-        cleanedLength: content.length,
-      });
-
-      // Filter out low-quality content
-      if (content.length < 100) {
-        const errorDetails = {
-          url: args.url,
-          contentLength: content.length,
-          timestamp: new Date().toISOString(),
-        };
-        console.error("❌ Content too short after cleaning:", errorDetails);
-        throw new Error(`Content too short (${content.length} characters)`);
-      }
-
-      // Remove common junk patterns
-      const junkPatterns = [
-        /cookie policy/gi,
-        /accept cookies/gi,
-        /privacy policy/gi,
-        /terms of service/gi,
-        /subscribe to newsletter/gi,
-        /follow us on/gi,
-        /share this article/gi,
-      ];
-
-      let removedJunkCount = 0;
-      for (const pattern of junkPatterns) {
-        const matches = content.match(pattern);
-        if (matches) {
-          removedJunkCount += matches.length;
-        }
-        content = content.replace(pattern, "");
-      }
-
-      console.log("🗑️ Junk content removed:", {
-        url: args.url,
-        removedCount: removedJunkCount,
-      });
-
-      // Limit content length
-      if (content.length > 5000) {
-        content = `${content.substring(0, 5000)}...`;
-        console.info("✂️ Content truncated:", {
-          url: args.url,
-          newLength: content.length,
-        });
-      }
-
-      // Generate summary (first few sentences)
-      const summaryLength = Math.min(500, content.length);
-      const summary =
-        content.substring(0, summaryLength) +
-        (content.length > summaryLength ? "..." : "");
-
-      const result = { title, content, summary };
-      cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
-      console.info("✅ Scraping completed successfully:", {
-        url: args.url,
-        resultLength: content.length,
-        summaryLength: summary.length,
-        timestamp: new Date().toISOString(),
-      });
-
-      return result;
-    } catch (error) {
-      console.error("💥 Scraping failed with exception:", {
-        url: args.url,
-        error: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : "No stack trace",
-        timestamp: new Date().toISOString(),
-      });
-
-      let hostname = "";
-      try {
-        hostname = new URL(args.url).hostname;
-      } catch {
-        hostname = "unknown";
-      }
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-
-      const val = {
-        title: hostname,
-        content: `Unable to fetch content from ${args.url}: ${errorMessage}`,
-        summary: `Content unavailable from ${hostname}`,
-      };
-      cache.set(args.url, { exp: Date.now() + SCRAPE_TTL_MS, val });
-      return val;
-    }
+  handler: async (_, args): Promise<ScrapeResult> => {
+    return await scrapeWithCheerio(args.url);
   },
 });

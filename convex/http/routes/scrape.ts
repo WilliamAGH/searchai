@@ -8,6 +8,7 @@ import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { corsPreflightResponse } from "../cors";
+import { checkIpRateLimit } from "../../lib/rateLimit";
 
 /**
  * Register scrape routes on the HTTP router
@@ -31,6 +32,20 @@ export function registerScrapeRoutes(http: HttpRouter) {
       // Enforce strict origin validation early
       const probe = corsResponse("{}", 204, origin);
       if (probe.status === 403) return probe;
+
+      // Rate limiting check
+      const rateLimit = checkIpRateLimit(request, "/api/scrape");
+      if (!rateLimit.allowed) {
+        return corsResponse(
+          JSON.stringify({
+            error: "Rate limit exceeded",
+            message: "Too many scrape requests. Please try again later.",
+            retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+          }),
+          429,
+          origin,
+        );
+      }
 
       let rawPayload: unknown;
       try {
@@ -64,10 +79,10 @@ export function registerScrapeRoutes(http: HttpRouter) {
         const hostname = urlObj.hostname.toLowerCase();
 
         // Allow localhost in development mode for testing
+        const deployment = process.env.CONVEX_DEPLOYMENT;
         const isDevelopment =
           process.env.NODE_ENV === "development" ||
-          process.env.CONVEX_DEPLOYMENT?.includes("dev") ||
-          !process.env.CONVEX_DEPLOYMENT;
+          Boolean(deployment && deployment.includes("dev"));
 
         // Block localhost and loopback (except in development)
         if (
@@ -170,7 +185,9 @@ export function registerScrapeRoutes(http: HttpRouter) {
       dlog("URL:", url);
 
       try {
-        const result = await ctx.runAction(api.search.scrapeUrl, { url });
+        const result = await ctx.runAction(api.search.scraperAction.scrapeUrl, {
+          url,
+        });
 
         dlog("🌐 SCRAPE RESULT:", JSON.stringify(result, null, 2));
 

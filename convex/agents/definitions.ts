@@ -1,3 +1,5 @@
+"use node";
+
 /**
  * Agent Definitions for Multi-Stage Reasoning and Research
  *
@@ -113,17 +115,22 @@ YOUR PROCESS:
    - Review the results carefully
    - Note the most relevant sources
 
-2. **Scrape Key URLs**: Use scrape_webpage tool for authoritative sources
+2. **Scrape Key URLs**: You MUST use scrape_webpage tool - THIS IS MANDATORY
+   - CRITICAL: You MUST scrape AT LEAST 2 URLs before completing research
+   - Do NOT skip this step - search snippets alone are insufficient for accurate answers
    - Prioritize official websites, news sources, and authoritative references
    - Focus on URLs that appear most relevant from search results
-   - Scrape 2-5 of the most promising URLs
    - Always explain WHY you're scraping each URL
+   - Capture the full content, summary, and metadata for each scrape in scrapedContent[]
+   - Preserve the tool-provided contextId on each scraped page entry
+   - If you complete research with 0 scraped pages, your output is INVALID
 
 3. **Build Context Summary**: Synthesize all gathered information
    - Organize findings by topic/category
    - Note which sources provided which information
    - Identify consensus vs. conflicting information
    - Flag any information gaps
+   - Store SERP enrichment data (knowledge graph, answer box, people also ask) in serpEnrichment when available
 
 TOOL USAGE GUIDELINES:
 - Always include reasoning in your tool calls
@@ -132,11 +139,105 @@ TOOL USAGE GUIDELINES:
 - Aim for comprehensive coverage but avoid redundancy
 - Track which URLs you've used
 
+CRITICAL TOOL OUTPUT HARVESTING:
+- Every tool call returns a \`contextId\` (UUIDv7). Capture it exactly as returned.
+- For \`search_web\` responses you receive an object shaped like:
+  {
+    contextId: "019a122e-....",
+    query: "original search query",
+    results: [
+      { title, url, snippet, relevanceScore }
+    ]
+  }
+  For each result, emit a \`sourcesUsed\` entry:
+  {
+    url: result.url,
+    title: result.title,
+    contextId: <top-level contextId>,
+    type: "search_result",
+    relevance: result.relevanceScore >= 0.75 ? "high" : result.relevanceScore >= 0.5 ? "medium" : "low"
+  }
+- For \`scrape_webpage\` responses shaped like:
+  {
+    contextId,
+    url,
+    title,
+    content,
+    summary
+  }
+  emit exactly one \`sourcesUsed\` entry with type "scraped_page" and relevance "high".
+  also add an entry in scrapedContent[]:
+  {
+    url,
+    title,
+    content,
+    summary,
+    contentLength: content.length,
+    scrapedAt: <use the scrapedAt value from the tool response>,
+    contextId
+  }
+- NEVER omit sources when tools were used. If no authoritative data is found, explicitly list the attempted searches and explain the gap.
+
+KEY FINDINGS CONSTRUCTION:
+- Every \`keyFindings[i].sources\` array must list the precise URLs you included in \`sourcesUsed\`.
+- Use the captured \`contextId\` to keep findings aligned with the supporting evidence.
+
+OUTPUT EXAMPLE:
+{
+  researchSummary: "Banana Republic is headquartered in San Francisco...",
+  keyFindings: [
+    {
+      finding: "Banana Republic is headquartered in San Francisco, California.",
+      sources: ["https://bananarepublic.gap.com/about"],
+      confidence: "high"
+    }
+  ],
+  sourcesUsed: [
+    {
+      url: "https://bananarepublic.gap.com/about",
+      title: "About Banana Republic",
+      contextId: "019a122e-c507-7851-99f7-b8f5d7345b40",
+      type: "search_result",
+      relevance: "high"
+    },
+    {
+      url: "https://gap.com/corporate",
+      title: "Gap Inc Corporate Information",
+      contextId: "019a122e-c507-7851-99f7-b8f5d7345b40",
+      type: "search_result",
+      relevance: "medium"
+    }
+  ],
+  researchQuality: "comprehensive"
+}
+
 IMPORTANT:
 - Be systematic and thorough
 - Cross-reference information from multiple sources
 - Note the quality and authority of sources
-- If information is missing or unclear, acknowledge that`,
+- If information is missing or unclear, acknowledge that
+
+═══════════════════════════════════════════════════════════════════════
+MANDATORY DATA CAPTURE - YOUR OUTPUT WILL BE INVALID WITHOUT THESE
+═══════════════════════════════════════════════════════════════════════
+
+1. **scrapedContent[] MUST be populated** when you use scrape_webpage:
+   - Copy ALL fields from the tool response into scrapedContent[]
+   - Include: url, title, content, summary, contentLength, scrapedAt, contextId
+   - This is the PRIMARY source data for answer synthesis
+   - If scrapedContent[] is empty but you called scrape_webpage, your output is WRONG
+
+2. **serpEnrichment MUST be populated** when search_web returns enrichment:
+   - Check if the search_web response has an "enrichment" field
+   - Copy knowledgeGraph, answerBox, peopleAlsoAsk, relatedSearches as present
+   - This provides instant answers and factual data to synthesis
+
+3. **VERIFY before submitting your output**:
+   - Count your scrape_webpage calls
+   - scrapedContent[] length MUST equal the number of successful scrapes
+   - If search_web returned enrichment, serpEnrichment MUST NOT be empty
+
+FAILURE TO POPULATE THESE FIELDS = LOST CONTEXT = POOR ANSWERS`,
 
   tools: toolsList as any, // Tool<unknown>[] type mismatch with FunctionTool<any>
 
@@ -177,6 +278,69 @@ IMPORTANT:
       .nullable()
       .optional()
       .describe("Any information that couldn't be found"),
+    scrapedContent: z
+      .array(
+        z.object({
+          url: z.string(),
+          title: z.string(),
+          content: z
+            .string()
+            .describe(
+              "Full scraped text content (truncate to budget before returning if needed)",
+            ),
+          summary: z.string().describe("Summary or first 500 characters"),
+          contentLength: z.number().describe("Length of the scraped content"),
+          scrapedAt: z.number().describe("Timestamp when the page was scraped"),
+          contextId: z.string().describe("UUIDv7 context ID from tool output"),
+          relevanceScore: z.number().nullable(),
+        }),
+      )
+      .nullable()
+      .describe(
+        "Raw scraped content from webpages - MUST be populated when scrape_webpage tool is used",
+      ),
+    serpEnrichment: z
+      .object({
+        knowledgeGraph: z
+          .object({
+            title: z.string().nullable(),
+            type: z.string().nullable(),
+            description: z.string().nullable(),
+            attributes: z.record(z.string()).nullable(),
+            url: z.string().nullable(),
+          })
+          .nullable(),
+        answerBox: z
+          .object({
+            type: z.string().nullable(),
+            answer: z.string().nullable(),
+            snippet: z.string().nullable(),
+            source: z.string().nullable(),
+            url: z.string().nullable(),
+          })
+          .nullable(),
+        relatedQuestions: z
+          .array(
+            z.object({
+              question: z.string(),
+              snippet: z.string().nullable(),
+            }),
+          )
+          .nullable(),
+        peopleAlsoAsk: z
+          .array(
+            z.object({
+              question: z.string(),
+              snippet: z.string().nullable(),
+            }),
+          )
+          .nullable(),
+        relatedSearches: z.array(z.string()).nullable(),
+      })
+      .nullable()
+      .describe(
+        "Enriched SERP data - MUST be populated when search_web returns enrichment data",
+      ),
     researchQuality: z
       .enum(["comprehensive", "adequate", "limited"])
       .describe("Overall quality of research results"),
@@ -185,7 +349,7 @@ IMPORTANT:
   modelSettings: {
     ...env.defaultModelSettings,
     temperature: 0.4,
-    reasoning: { effort: "medium" }, // Enable reasoning for tool selection
+    reasoning: { effort: "high" as const }, // Allocate more deliberate steps for tool orchestration
   },
 });
 

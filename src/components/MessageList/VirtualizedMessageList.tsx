@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo } from "react";
 import type { Message } from "../../lib/types/message";
+import { resolveMessageKey } from "./messageKey";
 
 export interface VirtualizedMessageListProps {
   messages: Message[];
@@ -70,10 +71,10 @@ export function VirtualizedMessageList({
           {group.map((message, index) => {
             const actualIndex = groupIndex * 10 + index;
             // Generate stable key that never evaluates to undefined
-            const messageKey =
-              message._id ||
-              message.id ||
-              `msg-${actualIndex}-${message.role || "unknown"}`;
+            const messageKey = resolveMessageKey(
+              message,
+              `virtual-group-${groupIndex}-${index}`,
+            );
             return (
               <div
                 key={messageKey}

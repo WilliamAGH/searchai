@@ -107,6 +107,14 @@ const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
   const orderRaw = process.env.LLM_PROVIDER_ORDER;
   const allowFallbacks = process.env.LLM_PROVIDER_ALLOW_FALLBACKS;
 
+  // Only configure provider routing if we have any provider settings
+  // Empty objects {} are not supported by Convex
+  const hasProviderConfig = sort || orderRaw || allowFallbacks !== undefined;
+
+  if (!hasProviderConfig) {
+    return undefined;
+  }
+
   const provider: OpenRouterProvider = {};
 
   if (sort) {
@@ -174,6 +182,36 @@ const parseReasoningSettings = (): ModelSettings["reasoning"] | undefined => {
  * Wrap the native fetch to inject IDs for function_call_output items
  * and optionally dump payloads when debugging
  */
+const SENSITIVE_HEADER_PATTERN =
+  /^(authorization|x[-_]api[-_]key|api[-_]key)$/i;
+
+const redactSensitiveHeaders = (
+  headers: HeadersInit | undefined | null,
+): Record<string, string> | undefined => {
+  if (!headers) {
+    return undefined;
+  }
+
+  const entries: Array<[string, string]> = (() => {
+    if (headers instanceof Headers) {
+      return Array.from(headers.entries());
+    }
+    if (Array.isArray(headers)) {
+      // Only process inner arrays with at least 2 elements; skip or warn on malformed entries
+      return headers
+        .filter((arr) => Array.isArray(arr) && arr.length >= 2)
+        .map(([key, value]) => [key, String(value)]);
+    }
+    return Object.entries(headers).map(([key, value]) => [key, String(value)]);
+  })();
+
+  const redacted: Record<string, string> = {};
+  for (const [key, value] of entries) {
+    redacted[key] = SENSITIVE_HEADER_PATTERN.test(key) ? "REDACTED" : value;
+  }
+  return redacted;
+};
+
 const createInstrumentedFetch = (debugLogging: boolean): typeof fetch => {
   const instrumented = async (
     ...args: Parameters<typeof fetch>
@@ -227,7 +265,11 @@ const createInstrumentedFetch = (debugLogging: boolean): typeof fetch => {
         console.error("[llm-debug] URL:", input);
         console.error(
           "[llm-debug] Headers:",
-          JSON.stringify(clonedInit.headers, null, 2),
+          JSON.stringify(
+            redactSensitiveHeaders(clonedInit.headers) ?? {},
+            null,
+            2,
+          ),
         );
         console.error(
           "[llm-debug] Body:",
@@ -254,7 +296,9 @@ const createInstrumentedFetch = (debugLogging: boolean): typeof fetch => {
         console.error(
           "[llm-debug] Headers:",
           JSON.stringify(
-            Object.fromEntries(response.headers.entries()),
+            redactSensitiveHeaders(
+              Object.fromEntries(response.headers.entries()),
+            ) ?? {},
             null,
             2,
           ),
@@ -304,6 +348,13 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   const isOpenAIEndpoint = normalizedBase
     ? normalizedBase.includes("api.openai.com")
     : true;
+  // Detect OpenRouter and other non-OpenAI providers that use Chat Completions API
+  const isOpenRouter = normalizedBase?.includes("openrouter") ?? false;
+  const isChatCompletionsEndpoint =
+    normalizedBase?.includes("/chat/completions") ?? false;
+  // Use Chat Completions API for OpenRouter and any endpoint with /chat/completions
+  // OpenAI's Responses API is only supported by api.openai.com
+  const useChatCompletionsAPI = isOpenRouter || isChatCompletionsEndpoint;
   const debugLogging = process.env.LLM_DEBUG_FETCH === "1";
 
   const client = new OpenAI({
@@ -313,10 +364,17 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   });
 
   // Configure API type based on endpoint
-  if (normalizedBase?.includes("/chat/completions")) {
+  // CRITICAL: OpenRouter only supports Chat Completions API, NOT Responses API
+  // Using the wrong API format causes tool definitions to be ignored/malformed
+  if (useChatCompletionsAPI) {
     setOpenAIAPI("chat_completions");
+    console.info(
+      "🔧 API Mode: chat_completions",
+      isOpenRouter ? "(OpenRouter detected)" : "(explicit endpoint)",
+    );
   } else {
     setOpenAIAPI("responses");
+    console.info("🔧 API Mode: responses (OpenAI endpoint)");
   }
 
   // Configure tracing (only for OpenAI endpoints)
@@ -331,12 +389,21 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   setDefaultOpenAIClient(client);
 
   // CRITICAL: Create and set the default model provider
-  // This is required for @openai/agents to use our configured client with OpenRouter
+  // useResponses must be FALSE for OpenRouter - it only supports Chat Completions API
+  // Using useResponses:true with OpenRouter causes tool definitions to be sent incorrectly,
+  // resulting in the model hallucinating tool outputs instead of actually calling tools
   const modelProvider = new OpenAIProvider({
     openAIClient: client,
-    useResponses: true, // Force Responses API mode (not Chat Completions)
+    useResponses: !useChatCompletionsAPI, // Only use Responses API with OpenAI
   });
   setDefaultModelProvider(modelProvider);
+  console.info(
+    "🔧 ModelProvider useResponses:",
+    !useChatCompletionsAPI,
+    useChatCompletionsAPI
+      ? "(disabled for Chat Completions)"
+      : "(enabled for Responses API)",
+  );
 
   // Build default model settings
   const temperature = process.env.LLM_TEMPERATURE
@@ -347,6 +414,15 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
     : undefined;
   const provider = parseOpenRouterProvider();
   const reasoning = parseReasoningSettings();
+
+  console.info(
+    "🔍 parseOpenRouterProvider returned:",
+    JSON.stringify(provider),
+  );
+  console.info(
+    "🔍 parseReasoningSettings returned:",
+    JSON.stringify(reasoning),
+  );
 
   const defaultModelSettings: Partial<ModelSettings> = {
     temperature,
@@ -372,6 +448,11 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
       provider,
     };
   }
+
+  console.info(
+    "🔍 Final defaultModelSettings:",
+    JSON.stringify(defaultModelSettings),
+  );
 
   return {
     client,

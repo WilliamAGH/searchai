@@ -6,6 +6,7 @@ import { Fragment, useRef, useCallback } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
+import { isLocalId as isLocalChatId } from "../lib/types/chat";
 import { logger } from "../lib/logger";
 
 interface MobileSidebarProps {
@@ -73,10 +74,10 @@ export function MobileSidebar({
         if (onRequestDeleteChat) {
           onRequestDeleteChat(chatId);
         } else {
-          // Infer local vs server by ID shape (Convex IDs contain '|')
-          const isConvexId =
-            typeof chatId === "string" ? chatId.includes("|") : true;
-          if (!isConvexId) {
+          // Infer local vs server using our shared local ID prefixes
+          const isLocal =
+            typeof chatId === "string" ? isLocalChatId(chatId) : false;
+          if (isLocal) {
             onDeleteLocalChat?.(chatId as string);
           } else {
             await deleteChat({ chatId: chatId as Id<"chats"> });
@@ -277,10 +278,10 @@ export function MobileSidebar({
                                   : ""
                               }`}
                             >
-                              <div className="font-medium truncate text-sm min-w-0">
+                              <div className="text-xs font-medium truncate min-w-0 leading-tight">
                                 {chat.title}
                               </div>
-                              <div className="text-xs text-gray-500 flex items-center gap-1 min-w-0">
+                              <div className="text-[11px] text-gray-500 flex items-center gap-1 min-w-0 mt-0.5">
                                 {"isLocal" in chat && chat.isLocal && (
                                   <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
                                     Local

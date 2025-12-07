@@ -99,10 +99,8 @@ export function MessageSources({
         relevanceScore: r.relevanceScore,
       }));
 
-  const hostnames = displaySources
-    .map((s) => getSafeHostname(s.url) || s.url)
-    .filter(Boolean);
-  const summary = hostnames.slice(0, 3).join(" · ");
+  // Keep track of sources for pills (first 3)
+  const previewSources = displaySources.slice(0, 3);
 
   const handleToggleClick = React.useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -168,9 +166,35 @@ export function MessageSources({
           </svg>
         </div>
         {collapsed && (
-          <div className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
-            {summary}
-            {hostnames.length > 3 && ` +${hostnames.length - 3} more`}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {previewSources.map((source, i) => {
+              const hostname = getSafeHostname(source.url);
+              return (
+                <a
+                  key={`${messageId}-preview-${i}`}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors"
+                >
+                  <img
+                    src={getFaviconUrl(source.url)}
+                    alt=""
+                    className="w-3 h-3 rounded"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                  <span className="max-w-[120px] truncate">{hostname}</span>
+                </a>
+              );
+            })}
+            {displaySources.length > 3 && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                +{displaySources.length - 3} more
+              </span>
+            )}
           </div>
         )}
       </button>

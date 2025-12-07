@@ -112,6 +112,43 @@ const applicationTables = {
     .index("by_threadId", ["threadId"]),
 
   /**
+   * Agent workflow tokens
+   * - Tracks per-workflow nonce/signature for replay prevention
+   */
+  workflowTokens: defineTable({
+    workflowId: v.string(),
+    nonce: v.string(),
+    signature: v.string(),
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+    status: v.union(
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("invalidated"),
+    ),
+    issuedAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_workflow", ["workflowId"])
+    .index("by_chat", ["chatId"]),
+
+  /**
+   * Agent workflow events
+   * - Streaming events for real-time workflow progress
+   * - Polled by HTTP handler to stream to client
+   * - Auto-cleaned after completion
+   */
+  workflowEvents: defineTable({
+    workflowId: v.string(),
+    sequence: v.number(), // Event order
+    type: v.string(), // "progress", "reasoning", "tool_call", "complete", "error"
+    data: v.any(), // Event payload
+    timestamp: v.number(),
+  })
+    .index("by_workflow_sequence", ["workflowId", "sequence"])
+    .index("by_workflow", ["workflowId"]),
+
+  /**
    * Metrics table
    * - Daily aggregated counters
    * - Planner events

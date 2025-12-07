@@ -79,6 +79,8 @@ interface UseMessageHandlerDeps {
     /** Send a message in the current chat */
     sendMessage?: (chatId: string, message: string) => Promise<void>;
   };
+  /** Surface user-visible errors when message sending fails */
+  setErrorMessage?: (message: string) => void;
 }
 
 /**
@@ -149,23 +151,23 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
         // Use unified chat action for ALL users (authenticated and anonymous)
         // This ensures messages are always persisted to Convex
-        if (deps.chatActions.sendMessage) {
-          await deps.chatActions.sendMessage(activeChatId, message.trim());
-        } else {
-          // Direct generation fallback - always use unified Convex flow
-          // Both authenticated and anonymous users should use the same pipeline
-          await deps.generateResponse({
-            chatId: activeChatId,
-            message: message.trim(),
-          });
+        if (!deps.chatActions.sendMessage) {
+          throw new Error("Message sending is currently unavailable.");
         }
 
-        // Title update now handled by backend in runAgentWorkflowAndPersist
-        // This ensures title persists to Convex and survives page refresh
+        await deps.chatActions.sendMessage(activeChatId, message.trim());
+
+        // Title updates handled server-side during streaming persistence
+        // This ensures titles persist to Convex and survive page refresh
 
         deps.maybeShowFollowUpPrompt();
       } catch (error) {
         logger.error("Failed to send message", error);
+        if (deps.setErrorMessage) {
+          const message =
+            error instanceof Error ? error.message : "Failed to send message";
+          deps.setErrorMessage(message);
+        }
       } finally {
         deps.setIsGenerating(false);
       }

@@ -3,6 +3,10 @@
  * Consolidates all search provider functions
  */
 
-export { searchWithSerpApiDuckDuckGo, type SearchResult } from "./serpapi";
+export { searchWithSerpApiDuckDuckGo } from "./serpapi";
+export type {
+  SearchResult,
+  SearchProviderResult,
+} from "../../lib/types/search";
 export { searchWithOpenRouter } from "./openrouter";
 export { searchWithDuckDuckGo } from "./duckduckgo";

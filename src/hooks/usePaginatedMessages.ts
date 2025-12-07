@@ -111,7 +111,29 @@ export function usePaginatedMessages({
         initialLoadStartRef.current = undefined;
       }
 
-      setMessages(unifiedMessages);
+      // CRITICAL FIX: Don't replace messages if we have optimistic state
+      // Check if we currently have messages with isStreaming=true or persisted=false
+      // These are optimistic messages that shouldn't be replaced by DB fetch
+      setMessages((prev) => {
+        const hasOptimisticMessages = prev.some(
+          (m) => m.isStreaming === true || m.persisted === false,
+        );
+
+        if (hasOptimisticMessages) {
+          logger.debug(
+            "Skipping initial messages load - preserving optimistic state",
+            {
+              chatId,
+              optimisticCount: prev.length,
+              dbCount: unifiedMessages.length,
+            },
+          );
+          return prev; // Keep optimistic state
+        }
+
+        // No optimistic state - safe to load from DB
+        return unifiedMessages;
+      });
       setCursor(initialMessages.nextCursor);
       setHasMore(initialMessages.hasMore);
       setError(null);

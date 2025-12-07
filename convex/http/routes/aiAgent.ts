@@ -1,3 +1,5 @@
+"use node";
+
 /**
  * Agent-based AI generation route handlers
  * Uses multi-stage agentic workflow: Planning → Research → Synthesis
@@ -6,10 +8,69 @@
  */
 
 import { httpAction } from "../../_generated/server";
+import type { Id } from "../../_generated/dataModel";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { corsPreflightResponse } from "../cors";
+import { checkIpRateLimit } from "../../lib/rateLimit";
+import { streamResearchWorkflow } from "../../agents/orchestration";
+// Types come from the Node-free module so HTTP routes (and other V8 code) never import
+// the helpers that depend on `node:crypto`.
+import type { ResearchContextReference } from "../../agents/types";
+
+export function sanitizeContextReferences(
+  input: unknown,
+): ResearchContextReference[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+
+  return input
+    .slice(0, 12)
+    .map((refRaw) => {
+      if (typeof refRaw !== "object" || refRaw === null) return null;
+      const ref = refRaw as Record<string, unknown>;
+      const contextId = typeof ref.contextId === "string" ? ref.contextId : "";
+      const type = ref.type;
+      if (
+        !contextId ||
+        (type !== "search_result" &&
+          type !== "scraped_page" &&
+          type !== "research_summary")
+      ) {
+        return null;
+      }
+
+      const sanitized: ResearchContextReference = {
+        contextId,
+        type,
+        timestamp:
+          typeof ref.timestamp === "number" ? ref.timestamp : Date.now(),
+      };
+
+      if (typeof ref.url === "string") {
+        sanitized.url = ref.url.slice(0, 2000);
+      }
+      if (typeof ref.title === "string") {
+        sanitized.title = ref.title.slice(0, 500);
+      }
+      if (typeof ref.relevanceScore === "number") {
+        sanitized.relevanceScore = ref.relevanceScore;
+      }
+      if (
+        ref.metadata !== null &&
+        ref.metadata !== undefined &&
+        !(
+          typeof ref.metadata === "object" &&
+          Object.keys(ref.metadata).length === 0
+        )
+      ) {
+        sanitized.metadata = ref.metadata;
+      }
+
+      return sanitized;
+    })
+    .filter((ref): ref is ResearchContextReference => !!ref);
+}
 
 /**
  * Register agent-based AI routes on the HTTP router
@@ -84,10 +145,18 @@ export function registerAgentAIRoutes(http: HttpRouter) {
             .slice(0, 5000)
         : undefined;
 
+      const contextReferences = sanitizeContextReferences(
+        (payload as Record<string, unknown>).contextReferences,
+      );
+
       dlog("🤖 AGENT AI ENDPOINT CALLED:");
       dlog("Message length:", message.length);
       dlog("Has context:", !!conversationContext);
       dlog("Context length:", conversationContext?.length || 0);
+      dlog(
+        "Context references provided:",
+        contextReferences ? contextReferences.length : 0,
+      );
       dlog("Environment Variables Available:");
       dlog(
         "- OPENROUTER_API_KEY:",
@@ -104,6 +173,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
           {
             userQuery: message,
             conversationContext,
+            contextReferences,
           },
         );
 
@@ -233,6 +303,19 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       const allowedOrigin =
         probe.headers.get("Access-Control-Allow-Origin") || "*";
 
+      const rateLimit = checkIpRateLimit(request, "/api/ai/agent/stream");
+      if (!rateLimit.allowed) {
+        return corsResponse(
+          JSON.stringify({
+            error: "Rate limit exceeded",
+            message: "Too many requests. Please try again later.",
+            retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+          }),
+          429,
+          origin,
+        );
+      }
+
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
@@ -263,153 +346,82 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       const message = String(payload.message)
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
         .slice(0, 10000);
+      if (!payload.chatId || typeof payload.chatId !== "string") {
+        return corsResponse(
+          JSON.stringify({ error: "chatId is required" }),
+          400,
+          origin,
+        );
+      }
+
+      const chatId = payload.chatId as Id<"chats">;
+      const sessionId =
+        typeof payload.sessionId === "string" ? payload.sessionId : undefined;
       const conversationContext = payload.conversationContext
         ? String(payload.conversationContext)
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
             .slice(0, 5000)
         : undefined;
+      const contextReferences = sanitizeContextReferences(
+        payload.contextReferences,
+      );
 
-      try {
-        // Create SSE stream that wraps the non-streaming workflow
-        const encoder = new TextEncoder();
-        const stream = new ReadableStream<Uint8Array>({
-          async start(controller) {
-            const sendEvent = (data: any) => {
-              try {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
-                );
-              } catch (error) {
-                console.error("Failed to send SSE event:", error);
-              }
-            };
-
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const sendEvent = (data: unknown) => {
             try {
-              // Stage 1: Planning
-              sendEvent({
-                type: "progress",
-                stage: "planning",
-                message:
-                  "Analyzing your question and planning research strategy...",
-                timestamp: Date.now(),
-              });
-
-              // Execute the full workflow
-              const workflowResult = await ctx.runAction(
-                api.agents.orchestration.orchestrateResearchWorkflow,
-                { userQuery: message, conversationContext },
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
               );
-
-              // Stage 2: Research (emit tool calls)
-              if (
-                workflowResult.toolCallLog &&
-                workflowResult.toolCallLog.length > 0
-              ) {
-                sendEvent({
-                  type: "progress",
-                  stage: "searching",
-                  message: `Executing ${workflowResult.toolCallLog.length} research ${workflowResult.toolCallLog.length === 1 ? "operation" : "operations"}...`,
-                  timestamp: Date.now(),
-                });
-
-                // Send individual tool results
-                for (const toolCall of workflowResult.toolCallLog) {
-                  sendEvent({
-                    type: "tool_result",
-                    toolName: toolCall.toolName,
-                    result: toolCall.resultSummary,
-                    durationMs: toolCall.durationMs,
-                    timestamp: toolCall.timestamp,
-                  });
-                }
-              }
-
-              // Stage 3: Synthesis
-              sendEvent({
-                type: "progress",
-                stage: "generating",
-                message: "Synthesizing final answer with citations...",
-                timestamp: Date.now(),
-              });
-
-              // Send answer content
-              sendEvent({
-                type: "content",
-                content: workflowResult.answer.answer,
-                timestamp: Date.now(),
-              });
-
-              // Send metadata
-              sendEvent({
-                type: "metadata",
-                metadata: {
-                  workflowId: workflowResult.workflowId,
-                  sources: workflowResult.answer.sourcesUsed,
-                  contextReferences: workflowResult.research.sourcesUsed.map(
-                    (src: any) => ({
-                      contextId: src.contextId,
-                      type: src.type,
-                      url: src.url,
-                      title: src.title,
-                      timestamp: Date.now(),
-                      relevance: src.relevance,
-                    }),
-                  ),
-                  hasLimitations: workflowResult.answer.hasLimitations,
-                  limitations: workflowResult.answer.limitations,
-                  completeness: workflowResult.answer.answerCompleteness,
-                  confidence: workflowResult.answer.confidence,
-                  totalDuration: workflowResult.metadata.totalDuration,
-                },
-                timestamp: Date.now(),
-              });
-
-              // Send completion
-              sendEvent({
-                type: "complete",
-                workflow: {
-                  id: workflowResult.workflowId,
-                  totalDuration: workflowResult.metadata.totalDuration,
-                },
-                timestamp: Date.now(),
-              });
-
-              dlog("✅ STREAMING AGENT WORKFLOW COMPLETE");
-            } catch (e) {
-              console.error("💥 STREAMING WORKFLOW ERROR:", e);
-              sendEvent({
-                type: "error",
-                error:
-                  e instanceof Error ? e.message : "Unknown streaming error",
-                timestamp: Date.now(),
-              });
-            } finally {
-              try {
-                controller.close();
-              } catch {}
+            } catch (error) {
+              console.error("Failed to send SSE event:", error);
             }
-          },
-        });
+          };
 
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "text/event-stream; charset=utf-8",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": allowedOrigin,
-            "Access-Control-Allow-Headers": "Content-Type",
-            Vary: "Origin",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          },
-        });
-      } catch (error) {
-        const body = JSON.stringify({
-          error: "Agent streaming workflow failed",
-          details: error instanceof Error ? error.message : String(error),
-        });
-        return corsResponse(body, 500, origin);
-      }
+          try {
+            const eventStream = streamResearchWorkflow(ctx, {
+              chatId,
+              sessionId,
+              userQuery: message,
+              conversationContext,
+              contextReferences,
+            });
+
+            for await (const event of eventStream) {
+              sendEvent(event);
+            }
+
+            dlog("✅ STREAMING AGENT WORKFLOW COMPLETE");
+          } catch (error) {
+            console.error("💥 STREAMING WORKFLOW ERROR:", error);
+            sendEvent({
+              type: "error",
+              error: error instanceof Error ? error.message : String(error),
+              timestamp: Date.now(),
+            });
+          } finally {
+            try {
+              controller.close();
+            } catch {
+              // Ignore double-close attempts
+            }
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+          "Access-Control-Allow-Origin": allowedOrigin,
+          "Access-Control-Allow-Headers": "Content-Type",
+          Vary: "Origin",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        },
+      });
     }),
   });
 

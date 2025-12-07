@@ -23,10 +23,45 @@ export async function ensureSidebarOpen(page: Page): Promise<void> {
 
     if (isMenuVisible) {
       await menuButton.click();
-      // Wait for mobile sidebar dialog to appear
-      await expect(page.locator('[role="dialog"]').first()).toBeVisible({
-        timeout: 5000,
-      });
+      // Wait for mobile sidebar dialog panel to appear (the actual content, not the container)
+      // HeadlessUI Dialog container might be hidden while the panel inside is visible
+      const dialogPanel = page
+        .locator('[role="dialog"].mobile-sidebar-dialog [role="dialog"]')
+        .first();
+
+      // First try to find the panel, if not found, try the container
+      const panelExists = await dialogPanel.count().catch(() => 0);
+      const dialogToCheck =
+        panelExists > 0
+          ? dialogPanel
+          : page.locator('[role="dialog"].mobile-sidebar-dialog').first();
+
+      // Wait for it to be attached
+      await dialogToCheck.waitFor({ state: "attached", timeout: 2000 });
+
+      // Wait for transition to complete - check for New Chat button which is inside the panel
+      await page.waitForFunction(
+        () => {
+          // Check if New Chat button is visible (inside the dialog)
+          // Find all buttons in dialogs and check their text content
+          const buttons = document.querySelectorAll('[role="dialog"] button');
+          for (const btn of buttons) {
+            const text = btn.textContent || "";
+            if (text.includes("New Chat")) {
+              const style = window.getComputedStyle(btn);
+              return style.display !== "none" && style.visibility !== "hidden";
+            }
+          }
+          return false;
+        },
+        { timeout: 5000 },
+      );
+
+      // Verify New Chat button is visible (this confirms the dialog is open)
+      const newChatButton = page
+        .locator('[role="dialog"] button:has-text("New Chat")')
+        .first();
+      await expect(newChatButton).toBeVisible({ timeout: 3000 });
     }
   } else {
     // Desktop: Check if sidebar is already visible

@@ -30,13 +30,37 @@ export const addMessage = internalMutation({
       v.array(require("./lib/validators").vContextReference),
     ),
     workflowId: v.optional(v.string()),
+    // CRITICAL: Add sessionId for HTTP action auth (when userId not available)
+    sessionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
 
     if (!chat) throw new Error("Chat not found");
-    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+
+    // Dual ownership validation (matches validateChatAccess pattern)
+    // Supports both authenticated (userId) and HTTP action (sessionId) contexts
+    let authorized = false;
+
+    // Method 1: Validate via userId (Convex queries/mutations with auth)
+    if (chat.userId && userId && chat.userId === userId) {
+      authorized = true;
+    }
+
+    // Method 2: Validate via sessionId (HTTP actions without auth context)
+    if (chat.sessionId && args.sessionId && chat.sessionId === args.sessionId) {
+      authorized = true;
+    }
+
+    // Method 3: Allow if chat has no ownership yet (newly created)
+    if (!chat.userId && !chat.sessionId && args.sessionId) {
+      authorized = true;
+    }
+
+    if (!authorized) {
+      throw new Error("Unauthorized");
+    }
 
     // Generate UUID v7 for message tracking
     const messageId = generateMessageId();
@@ -49,7 +73,8 @@ export const addMessage = internalMutation({
       await ctx.db.patch(args.chatId, { threadId });
     }
 
-    const { chatId, ...rest } = args;
+    // Destructure sessionId out - it's only for validation, not storage
+    const { chatId, sessionId: _sessionId, ...rest } = args;
     return await ctx.db.insert("messages", {
       chatId: chatId,
       messageId, // UUID v7 for unique message tracking
@@ -274,10 +299,9 @@ export const addMessageWithTransaction = internalMutation({
 
       // Update title only for first user message
       if (userMessageCount === 0 && !args.isReplyToAssistant) {
-        const title =
-          args.userMessage.length > 50
-            ? `${args.userMessage.substring(0, 50)}...`
-            : args.userMessage;
+        // Import the smart title generation function
+        const { generateChatTitle } = await import("./chats/utils");
+        const title = generateChatTitle({ intent: args.userMessage });
 
         await ctx.db.patch(args.chatId, {
           title,

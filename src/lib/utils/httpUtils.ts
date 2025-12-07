@@ -2,8 +2,18 @@
 // These do NOT duplicate Convex functionality - they're for non-Convex HTTP operations
 
 export function buildApiBase(convexUrl: string): string {
-  // For non-Convex API endpoints
-  return convexUrl.replace("/api", "");
+  // Derive the Convex HTTP base (https://<deployment>.convex.site) from the
+  // Convex client URL (typically https://<deployment>.convex.cloud).
+  // Returns the origin without a trailing slash; caller should append paths.
+  try {
+    if (!convexUrl) return "";
+    const url = new URL(convexUrl);
+    const siteHost = url.host.replace(".convex.cloud", ".convex.site");
+    return `${url.protocol}//${siteHost}`.replace(/\/$/, "");
+  } catch {
+    // Fallback: return input without trailing /api if parsing fails
+    return convexUrl.replace("/api", "");
+  }
 }
 
 export function resolveApiPath(base: string, path: string): string {

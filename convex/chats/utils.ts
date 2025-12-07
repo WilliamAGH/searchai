@@ -55,11 +55,27 @@ export function buildContextSummary(params: {
   return lines.join("\n").slice(0, maxChars);
 }
 
-const DEFAULT_TITLE_MAX_LENGTH = 60;
+/**
+ * CRITICAL: This is the ONLY place where chat titles are generated.
+ * All chat titles in the entire application use this 25 character limit.
+ * DO NOT create alternative title generation functions.
+ */
+const DEFAULT_TITLE_MAX_LENGTH = 25;
 
 /**
  * Generate a concise chat title from user intent/message
- * Mirrors frontend TitleUtils logic but keeps server dependency isolation.
+ *
+ * SINGLE SOURCE OF TRUTH for all chat title generation.
+ * - Default max length: 25 characters (used everywhere in the app)
+ * - Removes filler words ("what is the", "tell me about", etc.)
+ * - Smart word-boundary truncation
+ * - Capitalizes first letter
+ *
+ * Called by:
+ * - convex/messages.ts:addMessageWithTransaction (on first user message)
+ *
+ * Frontend (src/lib/types/unified.ts:TitleUtils) only provides sanitization,
+ * NOT generation. All title generation happens here.
  */
 export function generateChatTitle(params: {
   intent: string;
@@ -71,9 +87,36 @@ export function generateChatTitle(params: {
   const sanitized = intent.replace(/<+/g, "").replace(/\s+/g, " ").trim();
   if (!sanitized) return "New Chat";
 
-  if (sanitized.length <= maxLength) return sanitized;
+  // Remove common filler words/phrases to make titles more concise
+  const fillerWords = [
+    "understand the",
+    "explain the",
+    "what is the",
+    "tell me about",
+    "how do i",
+    "can you",
+    "please",
+    "definition of",
+    "meaning of",
+  ];
 
-  const truncated = sanitized.slice(0, maxLength);
+  let compressed = sanitized.toLowerCase();
+  for (const filler of fillerWords) {
+    compressed = compressed.replace(new RegExp(`^${filler}\\s+`, "i"), "");
+  }
+  compressed = compressed.trim();
+
+  // Capitalize first letter
+  if (compressed) {
+    compressed = compressed.charAt(0).toUpperCase() + compressed.slice(1);
+  } else {
+    compressed = sanitized;
+  }
+
+  if (compressed.length <= maxLength) return compressed;
+
+  // Smart truncation at word boundary
+  const truncated = compressed.slice(0, maxLength);
   const lastSpace = truncated.lastIndexOf(" ");
   if (lastSpace >= Math.floor(maxLength / 2)) {
     return `${truncated.slice(0, lastSpace)}...`;

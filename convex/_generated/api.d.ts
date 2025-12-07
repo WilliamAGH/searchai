@@ -17,7 +17,9 @@ import type * as agents_answerParser from "../agents/answerParser.js";
 import type * as agents_definitions from "../agents/definitions.js";
 import type * as agents_index from "../agents/index.js";
 import type * as agents_orchestration from "../agents/orchestration.js";
+import type * as agents_orchestration_helpers from "../agents/orchestration_helpers.js";
 import type * as agents_tools from "../agents/tools.js";
+import type * as agents_types from "../agents/types.js";
 import type * as auth from "../auth.js";
 import type * as chats_anonymous from "../chats/anonymous.js";
 import type * as chats_claim from "../chats/claim.js";
@@ -43,11 +45,16 @@ import type * as http_routes_scrape from "../http/routes/scrape.js";
 import type * as http_routes_search from "../http/routes/search.js";
 import type * as http_utils from "../http/utils.js";
 import type * as http from "../http.js";
+import type * as lib_constants_cache from "../lib/constants/cache.js";
+import type * as lib_dateTime from "../lib/dateTime.js";
+import type * as lib_debugUtils from "../lib/debugUtils.js";
 import type * as lib_id_generator from "../lib/id_generator.js";
 import type * as lib_providers_openai from "../lib/providers/openai.js";
+import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_security_patterns from "../lib/security/patterns.js";
 import type * as lib_security_sanitization from "../lib/security/sanitization.js";
 import type * as lib_security_webContent from "../lib/security/webContent.js";
+import type * as lib_types_search from "../lib/types/search.js";
 import type * as lib_url from "../lib/url.js";
 import type * as lib_uuid from "../lib/uuid.js";
 import type * as lib_validators from "../lib/validators.js";
@@ -65,8 +72,13 @@ import type * as search_providers_index from "../search/providers/index.js";
 import type * as search_providers_openrouter from "../search/providers/openrouter.js";
 import type * as search_providers_serpapi from "../search/providers/serpapi.js";
 import type * as search_scraper from "../search/scraper.js";
+import type * as search_scraperAction from "../search/scraperAction.js";
+import type * as search_scraperUnified from "../search/scraperUnified.js";
 import type * as search_utils from "../search/utils.js";
 import type * as search from "../search.js";
+import type * as workflowEvents from "../workflowEvents.js";
+import type * as workflowTokens from "../workflowTokens.js";
+import type * as workflowTokensActions from "../workflowTokensActions.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -81,7 +93,9 @@ declare const fullApi: ApiFromModules<{
   "agents/definitions": typeof agents_definitions;
   "agents/index": typeof agents_index;
   "agents/orchestration": typeof agents_orchestration;
+  "agents/orchestration_helpers": typeof agents_orchestration_helpers;
   "agents/tools": typeof agents_tools;
+  "agents/types": typeof agents_types;
   auth: typeof auth;
   "chats/anonymous": typeof chats_anonymous;
   "chats/claim": typeof chats_claim;
@@ -107,11 +121,16 @@ declare const fullApi: ApiFromModules<{
   "http/routes/search": typeof http_routes_search;
   "http/utils": typeof http_utils;
   http: typeof http;
+  "lib/constants/cache": typeof lib_constants_cache;
+  "lib/dateTime": typeof lib_dateTime;
+  "lib/debugUtils": typeof lib_debugUtils;
   "lib/id_generator": typeof lib_id_generator;
   "lib/providers/openai": typeof lib_providers_openai;
+  "lib/rateLimit": typeof lib_rateLimit;
   "lib/security/patterns": typeof lib_security_patterns;
   "lib/security/sanitization": typeof lib_security_sanitization;
   "lib/security/webContent": typeof lib_security_webContent;
+  "lib/types/search": typeof lib_types_search;
   "lib/url": typeof lib_url;
   "lib/uuid": typeof lib_uuid;
   "lib/validators": typeof lib_validators;
@@ -129,8 +148,13 @@ declare const fullApi: ApiFromModules<{
   "search/providers/openrouter": typeof search_providers_openrouter;
   "search/providers/serpapi": typeof search_providers_serpapi;
   "search/scraper": typeof search_scraper;
+  "search/scraperAction": typeof search_scraperAction;
+  "search/scraperUnified": typeof search_scraperUnified;
   "search/utils": typeof search_utils;
   search: typeof search;
+  workflowEvents: typeof workflowEvents;
+  workflowTokens: typeof workflowTokens;
+  workflowTokensActions: typeof workflowTokensActions;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

@@ -11,6 +11,7 @@ import { MessageInput } from "../MessageInput";
 import { FollowUpPrompt } from "../FollowUpPrompt";
 import { UndoBanner } from "../UndoBanner";
 import { ShareModalContainer } from "../ShareModalContainer";
+// Global agent status overlay removed; inline statuses handle all feedback
 import type { Chat } from "../../lib/types/chat";
 import type { ChatState, ChatActions } from "../../hooks/types";
 
@@ -103,7 +104,7 @@ export function ChatLayout({
   resolveApi,
 }: ChatLayoutProps) {
   return (
-    <div className="flex-1 flex h-full overflow-hidden">
+    <div className="flex-1 flex h-full overflow-hidden relative">
       {/* Desktop Sidebar */}
       {sidebarOpen && (
         <div className="hidden lg:block w-80 flex-shrink-0">
@@ -156,6 +157,8 @@ export function ChatLayout({
         chatActions={chatActions}
         resolveApi={resolveApi}
       />
+
+      {/* Global agent status overlay removed to prevent overlap and duplication */}
     </div>
   );
 }

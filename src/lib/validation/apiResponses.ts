@@ -5,6 +5,7 @@
  */
 
 import type { SearchResult } from "../types/message";
+import type { SerpEnrichment } from "../../../convex/lib/types/search";
 
 /**
  * Validate search API response
@@ -13,6 +14,7 @@ export function validateSearchResponse(data: unknown): {
   results: SearchResult[];
   searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback";
   hasRealResults: boolean;
+  enrichment?: SerpEnrichment;
 } {
   if (!data || typeof data !== "object") {
     return {
@@ -66,6 +68,10 @@ export function validateSearchResponse(data: unknown): {
     results,
     searchMethod,
     hasRealResults,
+    enrichment:
+      response.enrichment && typeof response.enrichment === "object"
+        ? (response.enrichment as SerpEnrichment)
+        : undefined,
   };
 }
 

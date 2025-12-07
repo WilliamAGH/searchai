@@ -5,7 +5,7 @@
 
 import { v } from "convex/values";
 import { action, internalAction, internalMutation } from "./_generated/server";
-import { vSearchResult } from "./lib/validators";
+import { vSearchResult, vSerpEnrichment } from "./lib/validators";
 import { api } from "./_generated/api";
 
 // Import search providers
@@ -47,6 +47,7 @@ import {
   DEFAULT_TEMPERATURE,
   DEFAULT_MAX_TOKENS,
 } from "./search/prompts";
+import { applyEnhancements } from "./enhancements";
 
 // Re-export test utilities for backward compatibility
 export { __extractKeywordsForTest, __augmentQueryForTest };
@@ -86,6 +87,7 @@ export const searchWeb = action({
       v.literal("fallback"),
     ),
     hasRealResults: v.boolean(),
+    enrichment: v.optional(vSerpEnrichment),
   }),
   handler: async (_ctx, args) => {
     const maxResults = args.maxResults || 5;
@@ -114,11 +116,12 @@ export const searchWeb = action({
           args.query,
           maxResults,
         );
-        if (serpResults.length > 0) {
+        if (serpResults.results.length > 0) {
           const result = {
-            results: serpResults,
+            results: serpResults.results,
             searchMethod: "serp" as const,
             hasRealResults: true,
+            enrichment: serpResults.enrichment,
           };
           // Cache the successful result
           setCachedSearchResults(cacheKey, result);
@@ -136,11 +139,12 @@ export const searchWeb = action({
           args.query,
           maxResults,
         );
-        if (openRouterResults.length > 0) {
+        if (openRouterResults.results.length > 0) {
           return {
-            results: openRouterResults,
+            results: openRouterResults.results,
             searchMethod: "openrouter" as const,
             hasRealResults: true,
+            enrichment: openRouterResults.enrichment,
           };
         }
       } catch (error) {
@@ -151,11 +155,14 @@ export const searchWeb = action({
     // Try DuckDuckGo direct API as backup
     try {
       const ddgResults = await searchWithDuckDuckGo(args.query, maxResults);
-      if (ddgResults.length > 0) {
+      if (ddgResults.results.length > 0) {
         return {
-          results: ddgResults,
+          results: ddgResults.results,
           searchMethod: "duckduckgo" as const,
-          hasRealResults: ddgResults.some((r) => r.relevanceScore > 0.6),
+          hasRealResults: ddgResults.results.some(
+            (r) => (r.relevanceScore ?? 0) > 0.6,
+          ),
+          enrichment: ddgResults.enrichment,
         };
       }
     } catch (error) {
@@ -367,12 +374,19 @@ export const planSearch = action({
     }
 
     try {
+      const enh = applyEnhancements(args.newMessage, {
+        enhanceSystemPrompt: true,
+      });
+      const systemPrompt = enh.enhancedSystemPrompt
+        ? `${SEARCH_PLANNER_SYSTEM_PROMPT}\n\n${enh.enhancedSystemPrompt}`
+        : SEARCH_PLANNER_SYSTEM_PROMPT;
+
       const prompt = {
         model: DEFAULT_MODEL,
         messages: [
           {
             role: "system",
-            content: SEARCH_PLANNER_SYSTEM_PROMPT,
+            content: systemPrompt,
           },
           {
             role: "user",
@@ -508,5 +522,5 @@ export const recordMetric = internalMutation({
 // Import and re-export client metrics
 export { recordClientMetric } from "./search/metrics";
 
-// Import scraping functionality
-export { scrapeUrl } from "./search/scraper";
+// NOTE: scrapeUrl action is available at api.search.scraper_action.scrapeUrl
+// It's a Node.js action and cannot be re-exported from this V8-runtime module

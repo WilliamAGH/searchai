@@ -3,6 +3,23 @@
  */
 
 /**
+ * Normalize URLs for comparison/deduplication.
+ * - Returns null for invalid/missing inputs
+ * - Strips hash fragments
+ * - Preserves protocol and path
+ */
+export function normalizeUrl(rawUrl: string | undefined): string | null {
+  if (!rawUrl || typeof rawUrl !== "string") return null;
+  try {
+    const parsed = new URL(rawUrl);
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Normalize URLs for stable deduplication and deterministic ranking
  * - Lowercases hostname
  * - Removes www. prefix
@@ -13,8 +30,17 @@
  * @returns Normalized URL string
  */
 export function normalizeUrlForKey(rawUrl: string): string {
+  const normalized = normalizeUrl(rawUrl);
+  if (!normalized) {
+    // Fallback for invalid URLs
+    // Ensure we still try to strip the hash if possible, even if it's not a valid URL
+    const trimmed = (rawUrl || "").trim();
+    const hashIndex = trimmed.indexOf("#");
+    return hashIndex !== -1 ? trimmed.slice(0, hashIndex) : trimmed;
+  }
+
   try {
-    const u = new URL(rawUrl);
+    const u = new URL(normalized);
     u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
 
     // Strip common tracking params
@@ -30,15 +56,12 @@ export function normalizeUrlForKey(rawUrl: string): string {
     ];
     paramsToStrip.forEach((p) => u.searchParams.delete(p));
 
-    u.hash = "";
-
     if (u.pathname !== "/" && u.pathname.endsWith("/")) {
       u.pathname = u.pathname.slice(0, -1);
     }
 
     return u.toString();
   } catch {
-    // Fallback for invalid URLs
-    return (rawUrl || "").trim();
+    return normalized;
   }
 }

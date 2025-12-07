@@ -46,4 +46,3 @@ This rule consolidates the Chat Architecture overview and the Refactoring Plan i
 
 - rehype-sanitize for HTML content.
 - Strict URL and length checks in HTTP routes.
-
