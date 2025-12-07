@@ -68,8 +68,8 @@ test.describe("Debug Mobile Sidebar", () => {
       .count();
     console.log("Headless UI transition elements:", transitionElements);
 
-    // Check the actual sidebar open state
-    const sidebarState = await page.evaluate(() => {
+    // Check the actual sidebar open state (captured for debugging, console.log is commented out)
+    const _sidebarState = await page.evaluate(() => {
       // Try to find React fiber to check state
       const button = document.querySelector(
         'button[aria-label="Toggle sidebar"]',
