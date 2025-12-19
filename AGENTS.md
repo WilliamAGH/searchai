@@ -15,7 +15,7 @@ alwaysApply: true
 
 - [ZT1a-c] Evidence-first / zero assumptions
 - [GT1a-i] Git, history safety, hooks/signing, lock files, and clean commits
-- [CX1a-e] Convex runtimes: `"use node";` boundaries for Node-only imports
+- [CX1a-h] Convex runtimes: `"use node";` boundaries for Node-only imports
 - [ED1a-b] Editing discipline: never undo another engineer’s edits
 - [FS1a-b] File creation policy (existing-first; explicit approval for new files)
 - [DR1a-c] Convention-over-configuration + DRY (no duplicate wrappers; keep files small)
@@ -46,11 +46,14 @@ alwaysApply: true
 
 ## [CX1] Convex Runtimes: Node-only Helpers Must Live in `"use node";` Modules
 
-- [CX1a] Any helper that imports Node built-ins (e.g., `node:crypto`) must be in a file that starts with `"use node";`.
-- [CX1b] Keep `"use node";` modules limited to the actions/utilities that actually require Node.
-- [CX1c] Only import Node-only helpers from other `"use node";` actions. If a V8-runtime file (query/mutation/default runtime) imports it, bundling will fail.
-- [CX1d] If you see `Could not resolve "node:crypto"`, Node APIs are being bundled for the V8 runtime—move that code into a `"use node";` module and fix the import graph.
-- [CX1e] Do not rip out other engineers’ code to “fix” runtime issues; follow the layering/import rules and make minimal, compatible changes.
+- [CX1a] Convex actions run in the V8 runtime by default.
+- [CX1b] Any helper that imports Node built-ins (e.g., `node:crypto`) must be in a file that starts with `"use node";`.
+- [CX1c] Directive placement note: `"use node";` must be at the top of the file; it may appear before or after comments (exact line position doesn’t matter).
+- [CX1d] Keep `"use node";` modules limited to the actions/utilities that actually require Node.
+- [CX1e] Only import Node-only helpers from other `"use node";` actions. If a V8-runtime file (query/mutation/default runtime) imports it, bundling will fail.
+- [CX1f] If you see `Could not resolve "node:crypto"`, Node APIs are being bundled for the V8 runtime—move that code into a `"use node";` module and fix the import graph.
+- [CX1g] Per Convex, only **actions** may run in the Node.js runtime; Node-only helpers must live alongside (and be imported only by) Node-runtime actions.
+- [CX1h] Do not rip out other engineers’ code to “fix” runtime issues; follow the layering/import rules and make minimal, compatible changes.
 
 References:
 
