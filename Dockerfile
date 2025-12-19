@@ -7,9 +7,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including dev) for build
-# Use npm install to resolve semver ranges from package.json
-# This allows patched versions (e.g., CVE fixes) to be picked up automatically
-RUN npm install --ignore-scripts
+# Use npm ci for reproducible builds from package-lock.json
+RUN npm ci
 
 # Stage 2: Builder
 FROM node:22-alpine AS builder
