@@ -81,25 +81,48 @@ fi
 # 5. Playwright smoke test (fail on console errors)
 echo "🕵️ Smoke test: ensuring no console errors..."
 if npx --no-install playwright --version > /dev/null 2>&1; then
-  # Run only the smoke test for speed. Playwright config starts a preview server.
-  PW_LOG="$(mktemp -t playwright-smoke.XXXXXX.log)"
-  if ! npx --no-install playwright test -g smoke --reporter=line > "$PW_LOG" 2>&1; then
-    echo "❌ Smoke test failed (console errors or network failures)."
-    echo "📄 Log: $PW_LOG"
-    # Surface the key error lines
-    grep -nE "(ReferenceError|TypeError|Error: |pageerror|requestfailed)" "$PW_LOG" | head -n 10 || true
-    # Show available artifacts
-    TRACE_ZIP=$(find test-results -name trace.zip -type f -print -quit 2>/dev/null || true)
-    SCREENSHOT=$(find test-results -name 'test-failed-*.png' -type f -print -quit 2>/dev/null || true)
-    if [ -n "$TRACE_ZIP" ]; then
-      echo "🧭 Trace: $TRACE_ZIP"
-      echo "   Open with: npx playwright show-trace \"$TRACE_ZIP\""
+  # Check if browser binaries are installed (not just the CLI)
+  # Playwright stores browsers in ~/Library/Caches/ms-playwright (macOS) or ~/.cache/ms-playwright (Linux)
+  PW_CACHE_DIR="${PLAYWRIGHT_BROWSERS_PATH:-${HOME}/Library/Caches/ms-playwright}"
+  if [ ! -d "$PW_CACHE_DIR" ] || [ -z "$(ls -A "$PW_CACHE_DIR" 2>/dev/null)" ]; then
+    # Try Linux path
+    PW_CACHE_DIR="${HOME}/.cache/ms-playwright"
+  fi
+  
+  if [ ! -d "$PW_CACHE_DIR" ] || [ -z "$(ls -A "$PW_CACHE_DIR" 2>/dev/null)" ]; then
+    echo "⚠️  Playwright browsers not installed. Skipping smoke test."
+    echo "   Install with: npx playwright install"
+    echo "   Or install all browsers: npx playwright install --with-deps"
+  else
+    # Run only the smoke test for speed. Playwright config starts a preview server.
+    PW_LOG="$(mktemp -t playwright-smoke.XXXXXX.log)"
+    if ! npx --no-install playwright test -g smoke --reporter=line > "$PW_LOG" 2>&1; then
+      # Check if the failure is due to missing browser binaries
+      if grep -qE "Executable doesn't exist|browserType.launch" "$PW_LOG"; then
+        echo "❌ Playwright browsers missing or outdated!"
+        echo ""
+        echo "   Run: npx playwright install"
+        echo ""
+        echo "   This installs the browser binaries required for E2E tests."
+        exit 1
+      fi
+      echo "❌ Smoke test failed (console errors or network failures)."
+      echo "📄 Log: $PW_LOG"
+      # Surface the key error lines
+      grep -nE "(ReferenceError|TypeError|Error: |pageerror|requestfailed)" "$PW_LOG" | head -n 10 || true
+      # Show available artifacts
+      TRACE_ZIP=$(find test-results -name trace.zip -type f -print -quit 2>/dev/null || true)
+      SCREENSHOT=$(find test-results -name 'test-failed-*.png' -type f -print -quit 2>/dev/null || true)
+      if [ -n "$TRACE_ZIP" ]; then
+        echo "🧭 Trace: $TRACE_ZIP"
+        echo "   Open with: npx playwright show-trace \"$TRACE_ZIP\""
+      fi
+      if [ -n "$SCREENSHOT" ]; then
+        echo "🖼️  Screenshot: $SCREENSHOT"
+      fi
+      echo "💡 Reproduce: npx playwright test -g smoke --reporter=line"
+      exit 1
     fi
-    if [ -n "$SCREENSHOT" ]; then
-      echo "🖼️  Screenshot: $SCREENSHOT"
-    fi
-    echo "💡 Reproduce: npx playwright test -g smoke --reporter=line"
-    exit 1
   fi
 else
   echo "ℹ️  Playwright not installed. Skipping smoke test."
