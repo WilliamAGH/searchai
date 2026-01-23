@@ -170,17 +170,15 @@ test.describe("Message Validation", () => {
     await messageInput.fill("");
     await messageInput.press("Enter");
 
-    // Wait briefly and verify no message is created
-    await page.waitForTimeout(500);
-    expect(await page.locator('[data-testid="message-user"]').count()).toBe(0);
+    // Verify no message is created (deterministic polling assertion)
+    await expect(page.locator('[data-testid="message-user"]')).toHaveCount(0);
 
     // Try whitespace only
     await messageInput.fill("   ");
     await messageInput.press("Enter");
 
-    // Wait briefly and verify no message is created
-    await page.waitForTimeout(500);
-    expect(await page.locator('[data-testid="message-user"]').count()).toBe(0);
+    // Verify no message is created (deterministic polling assertion)
+    await expect(page.locator('[data-testid="message-user"]')).toHaveCount(0);
 
     // Send valid message
     await messageInput.fill("Valid message");
