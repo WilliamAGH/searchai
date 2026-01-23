@@ -1067,52 +1067,72 @@ export async function* streamResearchWorkflow(
       );
     }
 
-    // RECONSTRUCT researchOutput if we had to fallback
-    // We need to ensure the synthesis step sees the harvested data
-    if (harvested.scrapedContent.length > 0) {
-      // Ensure scrapedContent is populated from harvested data
-      // This overwrites any hallucinated content or fills empty content
-      researchOutput.scrapedContent = harvested.scrapedContent;
+    // Reconstruct researchOutput only when agent output is missing.
+    const shouldReconstructScraped =
+      harvested.scrapedContent.length > 0 &&
+      (!researchOutput.scrapedContent ||
+        researchOutput.scrapedContent.length === 0);
+    const shouldRebuildSources =
+      harvested.searchResults.length > 0 &&
+      (!researchOutput.sourcesUsed || researchOutput.sourcesUsed.length === 0);
+    const shouldMergeEnrichment =
+      Object.keys(harvested.serpEnrichment).length > 0 &&
+      (!researchOutput.serpEnrichment ||
+        Object.keys(researchOutput.serpEnrichment).length === 0);
 
-      // Map scraped content by URL for quick lookup to ensure contextId consistency
-      const scrapedUrlMap = new Map(
-        harvested.scrapedContent.map((s) => [s.url, s]),
-      );
+    if (
+      shouldReconstructScraped ||
+      shouldRebuildSources ||
+      shouldMergeEnrichment
+    ) {
+      if (shouldReconstructScraped) {
+        researchOutput.scrapedContent = harvested.scrapedContent;
+      }
 
-      // Rebuild sourcesUsed from harvested data to ensure consistency
-      const newSources = [
-        ...harvested.searchResults.map((r) => {
-          const existing = scrapedUrlMap.get(r.url);
-          return {
-            url: r.url,
-            title: r.title,
-            contextId: existing ? existing.contextId : generateMessageId(),
-            type: "search_result" as const,
-            relevance:
-              r.relevanceScore > 0.7 ? ("high" as const) : ("medium" as const),
-          };
-        }),
-        ...harvested.scrapedContent.map((s) => ({
-          url: s.url,
-          title: s.title,
-          contextId: s.contextId,
-          type: "scraped_page" as const,
-          relevance: "high" as const,
-        })),
-      ];
+      if (shouldRebuildSources) {
+        // Map scraped content by URL for quick lookup to ensure contextId consistency
+        const scrapedUrlMap = new Map(
+          harvested.scrapedContent.map((s) => [s.url, s]),
+        );
 
-      // Dedup sources by URL
-      const uniqueSources = Array.from(
-        new Map(newSources.map((s) => [s.url, s])).values(),
-      );
-      researchOutput.sourcesUsed = uniqueSources;
+        // Rebuild sourcesUsed from harvested data to ensure consistency
+        const newSources = [
+          ...harvested.searchResults.map((r) => {
+            const existing = scrapedUrlMap.get(r.url);
+            return {
+              url: r.url,
+              title: r.title,
+              contextId: existing ? existing.contextId : generateMessageId(),
+              type: "search_result" as const,
+              relevance:
+                r.relevanceScore > 0.7
+                  ? ("high" as const)
+                  : ("medium" as const),
+            };
+          }),
+          ...harvested.scrapedContent.map((s) => ({
+            url: s.url,
+            title: s.title,
+            contextId: s.contextId,
+            type: "scraped_page" as const,
+            relevance: "high" as const,
+          })),
+        ];
 
-      // Also assign serpEnrichment if harvested (consistency with scrapedContent/sourcesUsed)
-      if (Object.keys(harvested.serpEnrichment).length > 0) {
+        // Dedup sources by URL
+        const uniqueSources = Array.from(
+          new Map(newSources.map((s) => [s.url, s])).values(),
+        );
+        researchOutput.sourcesUsed = uniqueSources;
+      }
+
+      if (shouldMergeEnrichment) {
         researchOutput.serpEnrichment = harvested.serpEnrichment;
       }
 
-      console.log("🔄 RECONSTRUCTED researchOutput with real harvested data");
+      console.log(
+        "🔄 RECONSTRUCTED researchOutput with harvested data (missing fields)",
+      );
     }
 
     yield writeEvent("progress", {
