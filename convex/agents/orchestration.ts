@@ -1226,7 +1226,10 @@ export async function* streamResearchWorkflow(
       .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
       .slice(0, 4); // Scrape top 4 URLs max
 
-    if (uniqueUrls.length > 0 && planningOutput.needsWebScraping) {
+    // Always scrape when URLs are available - planner's needsWebScraping prediction
+    // can be wrong, and skipping scraping when search returns good URLs degrades answer quality.
+    // The research agent instructions mandate "MUST scrape AT LEAST 2 URLs".
+    if (uniqueUrls.length > 0) {
       yield writeEvent("progress", {
         stage: "scraping",
         message: `Reading ${uniqueUrls.length} sources in parallel...`,
@@ -1298,13 +1301,32 @@ export async function* streamResearchWorkflow(
       `⚡ TOTAL PARALLEL EXECUTION: ${totalParallelTime}ms (searches + scrapes)`,
     );
 
+    // Build synthetic key findings from scraped content summaries.
+    // This provides structured context for synthesis without an additional LLM call.
+    const syntheticKeyFindings = harvested.scrapedContent
+      .filter((scraped) => scraped.summary && scraped.summary.length > 50)
+      .slice(0, 5) // Limit to top 5 to avoid overwhelming synthesis
+      .map((scraped) => ({
+        finding:
+          scraped.summary.length > 300
+            ? scraped.summary.substring(0, 297) + "..."
+            : scraped.summary,
+        sources: [scraped.url],
+        confidence:
+          (scraped.relevanceScore ?? 0) >= 0.8
+            ? "high"
+            : (scraped.relevanceScore ?? 0) >= 0.5
+              ? "medium"
+              : "low",
+      }));
+
     // Build research output directly from harvested data (skip research agent entirely)
     const researchOutput: any = {
       researchSummary:
         harvested.searchResults.length > 0
           ? `Found ${harvested.searchResults.length} search results and scraped ${harvested.scrapedContent.length} pages.`
           : "No search results found.",
-      keyFindings: [],
+      keyFindings: syntheticKeyFindings,
       sourcesUsed: [],
       informationGaps: undefined,
       scrapedContent: harvested.scrapedContent,
