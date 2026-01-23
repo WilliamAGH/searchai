@@ -61,9 +61,12 @@ function parseIpv6ToBigInt(hostname: string): bigint | null {
 
   const expandParts = (partsRaw: string[]) => {
     const parts: string[] = [];
-    for (const part of partsRaw) {
+    for (let i = 0; i < partsRaw.length; i++) {
+      const part = partsRaw[i];
       if (!part) return null;
       if (part.includes(".")) {
+        // RFC 4291 §2.2.3: IPv4-embedded address must have IPv4 as the final segment
+        if (i !== partsRaw.length - 1) return null;
         const ipv4Parts = parseIpv4Parts(part);
         if (!ipv4Parts) return null;
         const part1 = ((ipv4Parts[0] << 8) | ipv4Parts[1]).toString(16);
