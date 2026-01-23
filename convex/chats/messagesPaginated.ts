@@ -79,8 +79,11 @@ export const getChatMessagesPaginated = query({
       const docs = await q.take(pageSize + 1);
       const hasMorePage = docs.length > pageSize;
       const pageDocs = docs.slice(0, pageSize);
-      const reversed = pageDocs.reverse();
-      const formatted = reversed.map((m: any) => ({
+      const nextCursorPage =
+        hasMorePage && pageDocs.length > 0
+          ? pageDocs[pageDocs.length - 1]._id
+          : undefined;
+      const formatted = [...pageDocs].reverse().map((m: any) => ({
         _id: m._id,
         role: m.role,
         content: m.content,
@@ -92,10 +95,6 @@ export const getChatMessagesPaginated = query({
         sources: m.sources || [],
         reasoning: m.reasoning,
       }));
-      const nextCursorPage =
-        hasMorePage && pageDocs.length > 0
-          ? pageDocs[pageDocs.length - 1]._id
-          : undefined;
       return {
         messages: formatted,
         nextCursor: nextCursorPage,

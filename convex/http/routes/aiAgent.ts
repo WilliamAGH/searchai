@@ -15,6 +15,24 @@ import { corsResponse, dlog } from "../utils";
 import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { streamResearchWorkflow } from "../../agents/orchestration";
+
+/**
+ * Build a standardized rate limit exceeded response
+ */
+function rateLimitExceededResponse(
+  resetAt: number,
+  origin: string | null,
+): Response {
+  return corsResponse(
+    JSON.stringify({
+      error: "Rate limit exceeded",
+      message: "Too many requests. Please try again later.",
+      retryAfter: Math.ceil((resetAt - Date.now()) / 1000),
+    }),
+    429,
+    origin,
+  );
+}
 // Types come from the Node-free module so HTTP routes (and other V8 code) never import
 // the helpers that depend on `node:crypto`.
 import type { ResearchContextReference } from "../../agents/types";
@@ -94,6 +112,11 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       // Enforce strict origin validation early
       const probe = corsResponse("{}", 204, origin);
       if (probe.status === 403) return probe;
+
+      const rateLimit = checkIpRateLimit(request, "/api/ai/agent");
+      if (!rateLimit.allowed) {
+        return rateLimitExceededResponse(rateLimit.resetAt, origin);
+      }
 
       let rawPayload: unknown;
       try {
@@ -305,15 +328,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
 
       const rateLimit = checkIpRateLimit(request, "/api/ai/agent/stream");
       if (!rateLimit.allowed) {
-        return corsResponse(
-          JSON.stringify({
-            error: "Rate limit exceeded",
-            message: "Too many requests. Please try again later.",
-            retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
-          }),
-          429,
-          origin,
-        );
+        return rateLimitExceededResponse(rateLimit.resetAt, origin);
       }
 
       let rawPayload: unknown;
@@ -443,6 +458,11 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       // Enforce strict origin validation early
       const probe = corsResponse("{}", 204, origin);
       if (probe.status === 403) return probe;
+
+      const rateLimit = checkIpRateLimit(request, "/api/ai/agent/persist");
+      if (!rateLimit.allowed) {
+        return rateLimitExceededResponse(rateLimit.resetAt, origin);
+      }
 
       let rawPayload: unknown;
       try {

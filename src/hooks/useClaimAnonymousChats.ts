@@ -22,14 +22,18 @@ export function useClaimAnonymousChats() {
 
         if (sessionId) {
           try {
-            await claimChats({ sessionId });
+            const result = await claimChats({ sessionId });
             // Successfully claimed anonymous chats
 
             // CRITICAL: Keep sessionId in localStorage for HTTP endpoint access
             // Reason: HTTP actions lack Convex auth context and validate via sessionId
-            // The sessionId is now associated with both anonymous chats (now claimed)
-            // and will be used for future HTTP requests from this authenticated user
-            // Do NOT remove: localStorage.removeItem(SESSION_KEY);
+            // The sessionId may be rotated during claim to prevent cross-user access.
+            const nextSessionId =
+              (result as { newSessionId?: string })?.newSessionId ?? sessionId;
+            if (nextSessionId && nextSessionId !== sessionId) {
+              localStorage.setItem(SESSION_KEY, nextSessionId);
+              window.dispatchEvent(new Event("searchai:session-id-updated"));
+            }
 
             hasClaimedRef.current = true;
           } catch {
@@ -41,4 +45,10 @@ export function useClaimAnonymousChats() {
 
     claim();
   }, [isAuthenticated, claimChats]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      hasClaimedRef.current = false;
+    }
+  }, [isAuthenticated]);
 }

@@ -185,6 +185,7 @@ export class ConvexChatRepository extends BaseRepository {
     try {
       await this.client.mutation(api.chats.deleteChat, {
         chatId: IdUtils.toConvexChatId(id),
+        sessionId: this.sessionId,
       });
     } catch (error) {
       logger.error("Failed to delete chat from Convex:", error);
@@ -356,6 +357,7 @@ export class ConvexChatRepository extends BaseRepository {
           sources: updates.sources,
           searchMethod: updates.searchMethod,
           hasRealResults: updates.hasRealResults,
+          sessionId: this.sessionId,
         });
       }
 

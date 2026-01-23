@@ -1,11 +1,10 @@
-import { useMutation } from "convex/react";
 import React from "react";
-import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 import { logger } from "../lib/logger";
 import { isLocalChat } from "../lib/types/chat";
 import { toConvexId } from "../lib/utils/idValidation";
+import { useSessionAwareDeleteChat } from "../hooks/useSessionAwareDeleteChat";
 
 /**
  * Props for the ChatSidebar component
@@ -57,7 +56,7 @@ export function ChatSidebar({
   onToggle,
   isCreatingChat = false,
 }: ChatSidebarProps) {
-  const deleteChat = useMutation(api.chats.deleteChat);
+  const deleteChat = useSessionAwareDeleteChat();
 
   const handleSelectChat = React.useCallback(
     (chatId: Id<"chats"> | string) => {
@@ -112,7 +111,7 @@ export function ChatSidebar({
             // Safely validate before calling mutation
             const chatId = toConvexId<"chats">(String(resolvedId ?? attr));
             if (chatId) {
-              await deleteChat({ chatId });
+              await deleteChat(chatId);
             } else {
               logger.warn(
                 "Invalid Convex ID format for chat deletion:",
@@ -124,7 +123,7 @@ export function ChatSidebar({
           // Fallback: safely validate before deciding local vs Convex
           const convexId = toConvexId<"chats">(attr);
           if (convexId) {
-            await deleteChat({ chatId: convexId });
+            await deleteChat(convexId);
           } else {
             onDeleteLocalChat?.(attr);
           }

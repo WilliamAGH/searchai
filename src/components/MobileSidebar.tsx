@@ -1,13 +1,12 @@
 // Refactored to use stable callbacks; no inline function props
 
 import { Dialog, Transition } from "@headlessui/react";
-import { useMutation } from "convex/react";
 import { Fragment, useRef, useCallback } from "react";
-import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "../lib/types/chat";
 import { isLocalId as isLocalChatId } from "../lib/types/chat";
 import { logger } from "../lib/logger";
+import { useSessionAwareDeleteChat } from "../hooks/useSessionAwareDeleteChat";
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -32,7 +31,7 @@ export function MobileSidebar({
   onRequestDeleteChat,
   isCreatingChat = false,
 }: MobileSidebarProps) {
-  const deleteChat = useMutation(api.chats.deleteChat);
+  const deleteChat = useSessionAwareDeleteChat();
   // Ensure Headless UI Dialog has a stable initial focusable element on open
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -80,7 +79,7 @@ export function MobileSidebar({
           if (isLocal) {
             onDeleteLocalChat?.(chatId as string);
           } else {
-            await deleteChat({ chatId: chatId as Id<"chats"> });
+            await deleteChat(chatId as Id<"chats">);
           }
         }
 

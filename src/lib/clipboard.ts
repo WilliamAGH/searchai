@@ -50,11 +50,11 @@ export function extractPlainText(content: string): string {
   // Remove bold/italic markers
   text = text.replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1");
 
+  // Remove code blocks
+  text = text.replace(/```[\s\S]*?```/g, "");
+
   // Remove inline code markers
   text = text.replace(/`([^`]+)`/g, "$1");
-
-  // Remove code blocks
-  text = text.replace(/```[^`]*```/g, "");
 
   // Remove HTML tags if any
   text = text.replace(/<[^>]*>/g, "");

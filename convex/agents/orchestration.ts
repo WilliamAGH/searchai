@@ -51,6 +51,144 @@ import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { RunToolCallItem, RunToolCallOutputItem, run } from "@openai/agents";
+
+// ============================================
+// Timeout Utilities
+// ============================================
+// Agent calls have no built-in timeout, so we wrap them to prevent indefinite hangs.
+
+const AGENT_TIMEOUT_MS = 60_000; // 60 seconds per agent stage
+const TOOL_EXECUTION_TIMEOUT_MS = 120_000; // 120 seconds for research stage (includes tool calls)
+
+// ============================================
+// Instant Response Detection
+// ============================================
+// Skip ALL LLM calls for obvious conversational messages that don't need research.
+// These patterns match greetings, tests, and simple chat messages.
+
+const INSTANT_RESPONSES: Record<string, string> = {
+  greeting:
+    "Hello! I'm ready to help you search and research any topic. What would you like to know?",
+  test: "Test confirmed! This chat is working. What would you like to research?",
+  thanks: "You're welcome! Let me know if you need anything else.",
+  goodbye: "Goodbye! Feel free to start a new chat anytime.",
+  confirm: "Got it. What would you like to know?",
+  help: "I'm a research assistant that can search the web and find information for you. Just ask me a question about any topic!",
+};
+
+function detectInstantResponse(query: string): string | null {
+  const trimmed = query.trim().toLowerCase();
+
+  // Greeting patterns
+  if (/^(hi|hello|hey|howdy|greetings|yo)[\s!.,?]*$/i.test(trimmed)) {
+    return INSTANT_RESPONSES.greeting;
+  }
+  if (/^(good\s*(morning|afternoon|evening|night))[\s!.,?]*$/i.test(trimmed)) {
+    return INSTANT_RESPONSES.greeting;
+  }
+
+  // Test patterns
+  if (
+    /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/i.test(trimmed)
+  ) {
+    return INSTANT_RESPONSES.test;
+  }
+  if (/^this is a new chat[\s!.,?]*$/i.test(trimmed)) {
+    return INSTANT_RESPONSES.test;
+  }
+
+  // Thanks patterns
+  if (/^(thanks|thank you|thx|ty)[\s!.,?]*$/i.test(trimmed)) {
+    return INSTANT_RESPONSES.thanks;
+  }
+
+  // Goodbye patterns
+  if (/^(bye|goodbye|see you|later|cya)[\s!.,?]*$/i.test(trimmed)) {
+    return INSTANT_RESPONSES.goodbye;
+  }
+
+  // Confirmation patterns
+  if (/^(ok|okay|sure|yes|no|yep|nope|yeah|nah)[\s!.,?]*$/i.test(trimmed)) {
+    return INSTANT_RESPONSES.confirm;
+  }
+
+  // Help patterns
+  if (/^(help|help me|\?)[\s!.,?]*$/i.test(trimmed)) {
+    return INSTANT_RESPONSES.help;
+  }
+
+  return null;
+}
+
+// ============================================
+// Error Stage Detection
+// ============================================
+// Maps error message patterns to workflow stages for error reporting.
+
+const ERROR_STAGE_PATTERNS: ReadonlyArray<{ pattern: string; stage: string }> =
+  [
+    { pattern: "Planning failed", stage: "planning" },
+    { pattern: "Research failed", stage: "research" },
+    { pattern: "Synthesis failed", stage: "synthesis" },
+  ];
+
+/**
+ * Detect which workflow stage an error occurred in based on context.
+ * Returns "instant" if in instant response path, otherwise matches error message patterns.
+ */
+function detectErrorStage(
+  error: unknown,
+  isInstantPath: string | null,
+): string {
+  if (isInstantPath) {
+    return "instant";
+  }
+
+  if (error instanceof Error) {
+    const match = ERROR_STAGE_PATTERNS.find(({ pattern }) =>
+      error.message.includes(pattern),
+    );
+    if (match) {
+      return match.stage;
+    }
+  }
+
+  return "unknown";
+}
+
+class AgentTimeoutError extends Error {
+  constructor(stage: string, timeoutMs: number) {
+    super(`Agent ${stage} timed out after ${timeoutMs}ms`);
+    this.name = "AgentTimeoutError";
+  }
+}
+
+/**
+ * Wrap an async operation with a timeout.
+ * Properly cleans up the timer when the operation completes to prevent resource leaks.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  stage: string,
+): Promise<T> {
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timerId = setTimeout(() => {
+      reject(new AgentTimeoutError(stage, timeoutMs));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    // Always clear the timer to prevent resource leaks
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+  }
+}
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
 import { generateChatTitle } from "../chats/utils";
@@ -340,9 +478,13 @@ export const orchestrateResearchWorkflow = action({
       args.conversationContext,
     );
     const planningStart = Date.now();
-    const planningResult = await run(agents.queryPlanner, planningInput, {
-      context: { actionCtx: ctx },
-    });
+    const planningResult = await withTimeout(
+      run(agents.queryPlanner, planningInput, {
+        context: { actionCtx: ctx },
+      }),
+      AGENT_TIMEOUT_MS,
+      "planning",
+    );
     const planningDuration = Date.now() - planningStart;
     if (!planningResult.finalOutput)
       throw new Error("Planning failed: no final output");
@@ -395,9 +537,13 @@ export const orchestrateResearchWorkflow = action({
         enhancedContext: researchEnhancements.enhancedContext || undefined,
       });
 
-      const researchResult = await run(agents.research, researchInstructions, {
-        context: { actionCtx: ctx },
-      });
+      const researchResult = await withTimeout(
+        run(agents.research, researchInstructions, {
+          context: { actionCtx: ctx },
+        }),
+        TOOL_EXECUTION_TIMEOUT_MS,
+        "research",
+      );
       researchDuration = Date.now() - researchStart;
       if (!researchResult.finalOutput)
         throw new Error("Research failed: no final output");
@@ -454,12 +600,12 @@ export const orchestrateResearchWorkflow = action({
         synthesisEnhancements.enhancedSystemPrompt || undefined,
     });
 
-    const synthesisResult = await run(
-      agents.answerSynthesis,
-      synthesisInstructions,
-      {
+    const synthesisResult = await withTimeout(
+      run(agents.answerSynthesis, synthesisInstructions, {
         context: { actionCtx: ctx },
-      },
+      }),
+      AGENT_TIMEOUT_MS,
+      "synthesis",
     );
     const synthesisDuration = Date.now() - synthesisStart;
     const totalDuration = Date.now() - startTime;
@@ -645,12 +791,131 @@ export async function* streamResearchWorkflow(
     streamingContextReferences,
   );
 
+  const instantResponse = detectInstantResponse(args.userQuery);
+
   try {
+    // ============================================
+    // INSTANT RESPONSE PATH (No LLM calls)
+    // ============================================
+    // For obvious greetings/tests, respond instantly without any agent calls.
+    // This reduces response time from 5-16 seconds to <500ms.
+
+    if (instantResponse) {
+      console.log(
+        "⚡ INSTANT RESPONSE: Skipping all agent calls for simple message",
+      );
+
+      yield writeEvent("progress", {
+        stage: "generating",
+        message: "Responding...",
+      });
+
+      yield writeEvent("content", { delta: instantResponse });
+
+      yield writeEvent("complete", {
+        workflow: {
+          workflowId,
+          planning: {
+            userIntent: "Simple conversational message - no research needed",
+            informationNeeded: [],
+            searchQueries: [],
+            needsWebScraping: false,
+            confidenceLevel: 1,
+          },
+          research: {
+            researchSummary: "No research required.",
+            keyFindings: [],
+            sourcesUsed: [],
+            researchQuality: "adequate",
+          },
+          answer: {
+            answer: instantResponse,
+            hasLimitations: false,
+            sourcesUsed: [],
+            answerCompleteness: "complete",
+            confidence: 1,
+          },
+          metadata: {
+            totalDuration: Date.now() - startTime,
+            timestamp: Date.now(),
+          },
+        },
+      });
+
+      yield writeEvent("metadata", {
+        metadata: {
+          workflowId,
+          contextReferences: [],
+          hasLimitations: false,
+          confidence: 1,
+          answerLength: instantResponse.length,
+        },
+        nonce,
+      });
+
+      // Update chat title
+      const generatedTitle = generateChatTitle({ intent: args.userQuery });
+      if (chat.title === "New Chat" || !chat.title) {
+        await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
+          chatId: args.chatId,
+          title: generatedTitle,
+        });
+      }
+
+      // Save assistant message
+      const instantMessageId: Id<"messages"> = (await ctx.runMutation(
+        internal.messages.addMessage,
+        {
+          chatId: args.chatId,
+          role: "assistant",
+          content: instantResponse,
+          searchResults: [],
+          sources: [],
+          contextReferences: [],
+          workflowId,
+          isStreaming: false,
+          sessionId: args.sessionId,
+        },
+      )) as Id<"messages">;
+
+      const instantPayload: StreamingPersistPayload = {
+        assistantMessageId: instantMessageId,
+        workflowId,
+        answer: instantResponse,
+        sources: [],
+        contextReferences: [],
+      };
+
+      const instantSignature = await ctx.runAction(
+        internal.workflowTokensActions.signPersistedPayload,
+        { payload: instantPayload, nonce },
+      );
+
+      if (workflowTokenId) {
+        await ctx.runMutation(internal.workflowTokens.completeToken, {
+          tokenId: workflowTokenId,
+          signature: instantSignature,
+        });
+      }
+
+      yield writeEvent("persisted", {
+        payload: instantPayload,
+        nonce,
+        signature: instantSignature,
+      });
+
+      return; // Exit - no agent calls needed
+    }
+
+    // ============================================
+    // MAIN WORKFLOW PATH (Full agent orchestration)
+    // ============================================
     yield writeEvent("progress", {
       stage: "planning",
       message: "Analyzing your question and planning research strategy...",
     });
 
+    const planningStart = Date.now();
     const planningInput = buildPlanningInput(
       args.userQuery,
       conversationSource,
@@ -674,37 +939,13 @@ export async function* streamResearchWorkflow(
     }
 
     // CRITICAL: Await stream completion before accessing finalOutput
-    // StreamedRunResult.finalOutput is only available after the stream fully completes
+    await withTimeout(planningResult.completed, AGENT_TIMEOUT_MS, "planning");
+    const planningDuration = Date.now() - planningStart;
     console.log(
-      "🔍 DEBUG: Planning stream consumed, calling await planningResult.completed...",
-    );
-    console.log(
-      "🔍 DEBUG: planningResult.finalOutput BEFORE await:",
-      planningResult.finalOutput,
-    );
-    await planningResult.completed;
-    console.log(
-      "🔍 DEBUG: planningResult.finalOutput AFTER await:",
-      planningResult.finalOutput,
-    );
-    console.log(
-      "🔍 DEBUG: planningResult.finalOutput type:",
-      typeof planningResult.finalOutput,
-    );
-    console.log(
-      "🔍 DEBUG: planningResult.finalOutput keys:",
-      planningResult.finalOutput
-        ? Object.keys(planningResult.finalOutput)
-        : "null/undefined",
+      `⚡ PLANNING COMPLETE: ${planningDuration}ms | queries: ${planningResult.finalOutput?.searchQueries?.length || 0}`,
     );
 
     planningOutput = planningResult.finalOutput;
-
-    // Debug: Log the actual planning output structure
-    console.log(
-      "🔍 DEBUG: Full planningOutput object:",
-      JSON.stringify(planningOutput, null, 2),
-    );
 
     // Check for errors in the stream
     if (planningResult.error) {
@@ -757,279 +998,303 @@ export async function* streamResearchWorkflow(
     }
 
     const searchQueriesCount = planningOutput.searchQueries.length;
-    if (searchQueriesCount > 0) {
+    const informationNeededCount =
+      planningOutput.informationNeeded?.length || 0;
+    const needsResearch =
+      searchQueriesCount > 0 ||
+      informationNeededCount > 0 ||
+      planningOutput.needsWebScraping;
+
+    // FAST PATH: Simple conversational messages that don't need research
+    // Skip research stage entirely when planning indicates no information gathering needed
+    if (!needsResearch && planningOutput.confidenceLevel >= 0.9) {
+      console.log("⚡ FAST PATH: Skipping research stage for simple message");
+
       yield writeEvent("progress", {
-        stage: "searching",
-        message: `Executing ${searchQueriesCount} search ${searchQueriesCount === 1 ? "query" : "queries"}...`,
-        queries: planningOutput.searchQueries.map((q: any) => q.query),
+        stage: "generating",
+        message: "Generating response...",
       });
-    } else {
-      yield writeEvent("progress", {
-        stage: "analyzing",
-        message: "Analyzing your question without web search...",
+
+      // Apply enhancement rules for synthesis
+      const synthesisEnhancements = applyEnhancements(args.userQuery, {
+        enhanceContext: true,
+        enhanceSystemPrompt: true,
       });
+
+      const fastSynthesisInstructions = buildSynthesisInstructions({
+        userQuery: args.userQuery,
+        userIntent: planningOutput.userIntent,
+        researchSummary:
+          "No research required for this conversational message.",
+        keyFindings: [],
+        sourcesUsed: [],
+        informationGaps: undefined,
+        scrapedContent: undefined,
+        serpEnrichment: undefined,
+        enhancedContext: synthesisEnhancements.enhancedContext || undefined,
+        enhancedSystemPrompt:
+          synthesisEnhancements.enhancedSystemPrompt || undefined,
+      });
+
+      const fastSynthesisResult = await run(
+        agents.answerSynthesis,
+        fastSynthesisInstructions,
+        { stream: true, context: { actionCtx: ctx } },
+      );
+
+      let fastAccumulatedAnswer = "";
+      for await (const event of fastSynthesisResult) {
+        if (event.type === "run_item_stream_event") {
+          const item = event.item as any;
+          const eventName = (event as any).name;
+          if (eventName === "message_output_created") continue;
+          const delta =
+            item?.delta?.content || item?.content_delta || item?.text_delta;
+          if (delta && typeof delta === "string" && delta.length > 0) {
+            fastAccumulatedAnswer += delta;
+            yield writeEvent("content", { delta });
+          }
+        }
+      }
+
+      await withTimeout(
+        fastSynthesisResult.completed,
+        AGENT_TIMEOUT_MS,
+        "synthesis",
+      );
+      const fastSynthesisOutput = fastSynthesisResult.finalOutput as string;
+
+      if (!fastSynthesisOutput || fastSynthesisOutput.trim().length === 0) {
+        throw new Error("Fast synthesis failed: agent returned empty output.");
+      }
+
+      const fastParsedAnswer = parseAnswerText(fastSynthesisOutput);
+      const fastFinalAnswerText =
+        fastParsedAnswer.answer || fastAccumulatedAnswer;
+
+      if (
+        fastAccumulatedAnswer.length === 0 &&
+        fastFinalAnswerText.length > 0
+      ) {
+        yield writeEvent("content", { delta: fastFinalAnswerText });
+      }
+
+      yield writeEvent("complete", {
+        workflow: {
+          workflowId,
+          planning: planningOutput,
+          research: {
+            researchSummary:
+              "No research required for this conversational message.",
+            keyFindings: [],
+            sourcesUsed: [],
+            researchQuality: "adequate",
+          },
+          answer: { ...fastParsedAnswer, answer: fastFinalAnswerText },
+          metadata: {
+            totalDuration: Date.now() - startTime,
+            timestamp: Date.now(),
+          },
+        },
+      });
+
+      yield writeEvent("metadata", {
+        metadata: {
+          workflowId,
+          contextReferences: [],
+          hasLimitations: fastParsedAnswer.hasLimitations,
+          confidence: fastParsedAnswer.confidence,
+          answerLength: fastFinalAnswerText.length,
+        },
+        nonce,
+      });
+
+      // Update chat title if needed
+      const generatedTitle = generateChatTitle({
+        intent: planningOutput?.userIntent || args.userQuery,
+      });
+      if (chat.title === "New Chat" || !chat.title) {
+        await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
+          chatId: args.chatId,
+          title: generatedTitle,
+        });
+      }
+
+      // Save assistant message
+      const fastAssistantMessageId: Id<"messages"> = (await ctx.runMutation(
+        internal.messages.addMessage,
+        {
+          chatId: args.chatId,
+          role: "assistant",
+          content: fastFinalAnswerText,
+          searchResults: [],
+          sources: fastParsedAnswer.sourcesUsed || [],
+          contextReferences: [],
+          workflowId,
+          isStreaming: false,
+          sessionId: args.sessionId,
+        },
+      )) as Id<"messages">;
+
+      const fastPersistedPayload: StreamingPersistPayload = {
+        assistantMessageId: fastAssistantMessageId,
+        workflowId,
+        answer: fastFinalAnswerText,
+        sources: fastParsedAnswer.sourcesUsed || [],
+        contextReferences: [],
+      };
+
+      const fastSignature = await ctx.runAction(
+        internal.workflowTokensActions.signPersistedPayload,
+        { payload: fastPersistedPayload, nonce },
+      );
+
+      if (workflowTokenId) {
+        await ctx.runMutation(internal.workflowTokens.completeToken, {
+          tokenId: workflowTokenId,
+          signature: fastSignature,
+        });
+      }
+
+      yield writeEvent("persisted", {
+        payload: fastPersistedPayload,
+        nonce,
+        signature: fastSignature,
+      });
+
+      return; // Exit early - don't run full research path
     }
 
-    // Apply enhancement rules to inject authoritative context for research
-    const researchEnhancements = applyEnhancements(args.userQuery, {
-      enhanceContext: true,
-    });
+    // ============================================
+    // PARALLEL EXECUTION PATH (FAST)
+    // ============================================
+    // Execute ALL searches and scrapes in parallel upfront.
+    // This eliminates the 8-13 second LLM "thinking" gaps between tool calls.
+    // Total research phase should complete in ~2-3 seconds instead of 30-60 seconds.
 
-    const researchInstructions = buildResearchInstructions({
-      userQuery: args.userQuery,
-      userIntent: planningOutput.userIntent,
-      conversationBlock,
-      referenceBlock,
-      informationNeeded: planningOutput.informationNeeded,
-      searchQueries: planningOutput.searchQueries,
-      needsWebScraping: planningOutput.needsWebScraping,
-      enhancedContext: researchEnhancements.enhancedContext || undefined,
-    });
-
-    const researchResult = await run(agents.research, researchInstructions, {
-      stream: true,
-      context: { actionCtx: ctx },
-    });
-
-    const urlsBeingScrapped: string[] = [];
-
-    // Initialize harvested data container for programmatic tool output capture
+    // Initialize harvested data container
     const harvested: HarvestedToolData = {
       scrapedContent: [],
       serpEnrichment: {},
       searchResults: [],
     };
 
-    for await (const event of researchResult) {
-      if (event.type === "run_item_stream_event") {
-        if (event.name === "tool_called") {
-          const item = event.item as any;
-          const toolName = item.toolCall?.name || item.name;
+    const parallelStartTime = Date.now();
 
-          if (toolName === "search_web") {
-            yield writeEvent("progress", {
-              stage: "searching",
-              message: "Searching the web...",
-            });
-          } else if (toolName === "scrape_webpage") {
-            const url = item.toolCall?.arguments?.url || item.arguments?.url;
-            if (url) {
-              urlsBeingScrapped.push(url);
-              try {
-                const hostname = new URL(url).hostname;
-                yield writeEvent("progress", {
-                  stage: "scraping",
-                  message: `Reading content from ${hostname}...`,
-                  currentUrl: url,
-                  urls: [...urlsBeingScrapped],
-                });
-              } catch {
-                yield writeEvent("progress", {
-                  stage: "scraping",
-                  message: "Reading web content...",
-                  currentUrl: url,
-                  urls: [...urlsBeingScrapped],
-                });
-              }
-            }
-          }
-        }
-
-        if (event.name === "tool_output") {
-          const item = event.item as any;
-          const toolName = item.toolCall?.name || item.name;
-          const rawResult = item.output || item.result;
-          if (
-            !rawResult ||
-            (typeof rawResult === "object" &&
-              !Array.isArray(rawResult) &&
-              Object.keys(rawResult).length === 0)
-          ) {
-            continue;
-          }
-
-          // Programmatically harvest tool outputs to ensure data flows to synthesis
-          harvestToolOutput(toolName, rawResult, harvested);
-
-          yield writeEvent("tool_result", { toolName, result: rawResult });
-        }
-      }
-    }
-
-    // CRITICAL: Await stream completion before accessing finalOutput
-    console.log(
-      "🔍 DEBUG: Research stream consumed, calling await researchResult.completed...",
-    );
-    console.log(
-      "🔍 DEBUG: researchResult.finalOutput BEFORE await:",
-      researchResult.finalOutput,
-    );
-    await researchResult.completed;
-    console.log(
-      "🔍 DEBUG: researchResult.finalOutput AFTER await:",
-      researchResult.finalOutput,
-    );
-    console.log(
-      "🔍 DEBUG: researchResult.finalOutput type:",
-      typeof researchResult.finalOutput,
-    );
-    console.log(
-      "🔍 DEBUG: researchResult.finalOutput keys:",
-      researchResult.finalOutput
-        ? Object.keys(researchResult.finalOutput)
-        : "null/undefined",
-    );
-
-    const researchOutput = researchResult.finalOutput;
-
-    // Debug: Log the actual research output structure
-    console.log(
-      "🔍 DEBUG: Full researchOutput object:",
-      JSON.stringify(researchOutput, null, 2),
-    );
-
-    if (!researchOutput || typeof researchOutput !== "object") {
-      console.error("❌ Research failed: output is null or not an object", {
-        researchOutput,
+    if (searchQueriesCount > 0) {
+      yield writeEvent("progress", {
+        stage: "searching",
+        message: `Searching ${searchQueriesCount} ${searchQueriesCount === 1 ? "query" : "queries"} in parallel...`,
+        queries: planningOutput.searchQueries.map((q: any) => q.query),
       });
-      throw new Error(
-        "Research failed: agent returned null or invalid output type.",
-      );
-    }
 
-    const researchKeys = Object.keys(researchOutput);
-    if (researchKeys.length === 0) {
-      console.error("❌ Research failed: output is empty object {}", {
-        researchOutput,
-        researchResult,
-      });
-      throw new Error("Research failed: agent returned empty object {}.");
-    }
-
-    // ------------------------------------------------------------
-    // CRITICAL HALLUCINATION CHECK & FALLBACK
-    // ------------------------------------------------------------
-    // If the agent didn't actually run tools (harvested data is empty),
-    // we MUST NOT trust its output, as it's likely hallucinated.
-    // We trigger an emergency search and scrape flow.
-    // ------------------------------------------------------------
-
-    const hasRealToolExecution =
-      harvested.scrapedContent.length > 0 || harvested.searchResults.length > 0;
-
-    if (!hasRealToolExecution) {
-      console.warn(
-        "⚠️ DETECTED HALLUCINATION RISK: Agent produced output but executed NO tools.",
-      );
-      console.warn("⚠️ Discarding potentially hallucinated research output.");
-
-      // Clear potentially hallucinated content
-      researchOutput.scrapedContent = [];
-      researchOutput.sourcesUsed = [];
-      researchOutput.keyFindings = [];
-      researchOutput.researchSummary =
-        "Research agent failed to execute tools. Performing emergency fallback search.";
-
-      // EMERGENCY SEARCH
-      if (
-        planningOutput.searchQueries &&
-        planningOutput.searchQueries.length > 0
-      ) {
-        const fallbackQuery = planningOutput.searchQueries[0].query;
-        console.log(`🚑 EMERGENCY SEARCH: Running query "${fallbackQuery}"...`);
-        yield writeEvent("progress", {
-          stage: "searching",
-          message: "Agent failed to search. Retrying search...",
-        });
-
-        try {
-          // @ts-ignore - ActionCtx type mismatch in some convex versions
-          const searchResult = await ctx.runAction(api.search.searchWeb, {
-            query: fallbackQuery,
-            maxResults: 4,
-          });
-
-          if (searchResult && searchResult.results) {
-            console.log(
-              `✅ EMERGENCY SEARCH SUCCESS: Found ${searchResult.results.length} results`,
-            );
-
-            // Add to harvested results
-            for (const r of searchResult.results) {
-              harvested.searchResults.push({
-                title: r.title,
-                url: r.url,
-                snippet: r.snippet,
-                relevanceScore: r.relevanceScore || 0.5,
-              });
-            }
-
-            // Add enrichment if present
-            if (searchResult.enrichment) {
-              const enrich = searchResult.enrichment;
-              if (enrich.knowledgeGraph)
-                harvested.serpEnrichment.knowledgeGraph = enrich.knowledgeGraph;
-              if (enrich.answerBox)
-                harvested.serpEnrichment.answerBox = enrich.answerBox;
-              if (enrich.peopleAlsoAsk)
-                harvested.serpEnrichment.peopleAlsoAsk = enrich.peopleAlsoAsk;
-              if (enrich.relatedSearches)
-                harvested.serpEnrichment.relatedSearches =
-                  enrich.relatedSearches;
-            }
-          }
-        } catch (err) {
-          console.error("❌ EMERGENCY SEARCH FAILED:", err);
-        }
-      }
-    }
-
-    // FALLBACK: Programmatic scraping if we have no scraped content
-    // (either because agent didn't scrape, or we just did an emergency search)
-    const noScrapedContent = harvested.scrapedContent.length === 0;
-    const hasAvailableUrls = harvested.searchResults.length > 0;
-
-    console.log("🔍 FALLBACK CHECK:", {
-      harvestedScrapedCount: harvested.scrapedContent.length,
-      noScrapedContent,
-      harvestedSearchResultsCount: harvested.searchResults.length,
-      hasAvailableUrls,
-      willTriggerFallback: noScrapedContent && hasAvailableUrls,
-    });
-
-    if (noScrapedContent && hasAvailableUrls) {
+      // Execute ALL searches in parallel
       console.log(
-        "⚠️ FALLBACK SCRAPING: Programmatically scraping top available URLs...",
+        `⚡ PARALLEL SEARCH: Executing ${searchQueriesCount} searches simultaneously...`,
       );
 
-      // Get unique URLs from harvested search results
-      const urlsToScrape = harvested.searchResults
-        .filter((r) => r.url && r.url.startsWith("http"))
-        .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
-        .slice(0, 3) // Scrape top 3 URLs
-        .map((r) => r.url);
+      const searchPromises = planningOutput.searchQueries.map(
+        async (sq: { query: string; reasoning: string; priority: number }) => {
+          const searchStart = Date.now();
+          try {
+            // @ts-ignore - ActionCtx type mismatch
+            const result = await ctx.runAction(api.search.searchWeb, {
+              query: sq.query,
+              maxResults: 8,
+            });
+            console.log(
+              `✅ PARALLEL SEARCH [${Date.now() - searchStart}ms]: "${sq.query}" → ${result.results?.length || 0} results`,
+            );
+            return { query: sq.query, result, error: null };
+          } catch (error) {
+            console.error(`❌ PARALLEL SEARCH FAILED: "${sq.query}"`, error);
+            return { query: sq.query, result: null, error };
+          }
+        },
+      );
 
-      console.log("🔍 urlsToScrape:", urlsToScrape);
+      const searchResults = await Promise.all(searchPromises);
 
-      if (urlsToScrape.length === 0) {
-        console.log("⚠️ No valid URLs to scrape after filtering");
+      // Harvest all search results
+      for (const { query, result } of searchResults) {
+        if (!result?.results) continue;
+
+        for (const r of result.results) {
+          harvested.searchResults.push({
+            title: r.title,
+            url: r.url,
+            snippet: r.snippet,
+            relevanceScore: r.relevanceScore || 0.5,
+          });
+        }
+
+        // Harvest enrichment from first successful search with enrichment
+        if (
+          result.enrichment &&
+          Object.keys(harvested.serpEnrichment).length === 0
+        ) {
+          const enrich = result.enrichment;
+          if (enrich.knowledgeGraph)
+            harvested.serpEnrichment.knowledgeGraph = enrich.knowledgeGraph;
+          if (enrich.answerBox)
+            harvested.serpEnrichment.answerBox = enrich.answerBox;
+          if (enrich.peopleAlsoAsk)
+            harvested.serpEnrichment.peopleAlsoAsk = enrich.peopleAlsoAsk;
+          if (enrich.relatedSearches)
+            harvested.serpEnrichment.relatedSearches = enrich.relatedSearches;
+        }
       }
 
+      console.log(
+        `📊 PARALLEL SEARCH COMPLETE [${Date.now() - parallelStartTime}ms]: ${harvested.searchResults.length} total results`,
+      );
+    }
+
+    // Deduplicate URLs and select top candidates for scraping
+    const uniqueUrls = Array.from(
+      new Map(harvested.searchResults.map((r) => [r.url, r])).values(),
+    )
+      .filter((r) => r.url && r.url.startsWith("http"))
+      .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+      .slice(0, 4); // Scrape top 4 URLs max
+
+    // Always scrape when URLs are available - planner's needsWebScraping prediction
+    // can be wrong, and skipping scraping when search returns good URLs degrades answer quality.
+    // The research agent instructions mandate "MUST scrape AT LEAST 2 URLs".
+    if (uniqueUrls.length > 0) {
       yield writeEvent("progress", {
         stage: "scraping",
-        message: `Reading content from ${urlsToScrape.length} sources (fallback)...`,
-        urls: urlsToScrape,
+        message: `Reading ${uniqueUrls.length} sources in parallel...`,
+        urls: uniqueUrls.map((u) => u.url),
       });
 
-      // Scrape URLs in parallel
-      const scrapePromises = urlsToScrape.map(async (url: string) => {
-        try {
-          const contextId = generateMessageId();
-          console.log(`🌐 FALLBACK SCRAPE: ${url}`);
+      console.log(
+        `⚡ PARALLEL SCRAPE: Fetching ${uniqueUrls.length} URLs simultaneously...`,
+      );
+      const scrapeStart = Date.now();
 
+      // Execute ALL scrapes in parallel
+      const scrapePromises = uniqueUrls.map(async (urlInfo) => {
+        const url = urlInfo.url;
+        const contextId = generateMessageId();
+        const singleScrapeStart = Date.now();
+
+        try {
           const content = await ctx.runAction(
             api.search.scraperAction.scrapeUrl,
             { url },
+          );
+
+          // Skip if we got an error response or minimal content
+          if (content.content.length < 100) {
+            console.log(
+              `⚠️ PARALLEL SCRAPE SKIP [${Date.now() - singleScrapeStart}ms]: ${url} (too short: ${content.content.length} chars)`,
+            );
+            return null;
+          }
+
+          console.log(
+            `✅ PARALLEL SCRAPE [${Date.now() - singleScrapeStart}ms]: ${url} → ${content.content.length} chars`,
           );
 
           const scraped: ScrapedContent = {
@@ -1040,16 +1305,14 @@ export async function* streamResearchWorkflow(
             contentLength: content.content.length,
             scrapedAt: Date.now(),
             contextId,
-            relevanceScore: 0.85,
+            relevanceScore: urlInfo.relevanceScore || 0.85,
           };
-
-          console.log(`✅ FALLBACK SCRAPE SUCCESS: ${url}`, {
-            contentLength: scraped.contentLength,
-          });
-
           return scraped;
         } catch (error) {
-          console.error(`❌ FALLBACK SCRAPE FAILED: ${url}`, error);
+          console.error(
+            `❌ PARALLEL SCRAPE FAILED [${Date.now() - singleScrapeStart}ms]: ${url}`,
+            error,
+          );
           return null;
         }
       });
@@ -1058,62 +1321,78 @@ export async function* streamResearchWorkflow(
       const successfulScrapes = scrapeResults.filter(
         (r): r is ScrapedContent => r !== null,
       );
-
-      // Add to harvested content
       harvested.scrapedContent.push(...successfulScrapes);
 
       console.log(
-        `📊 FALLBACK SCRAPING COMPLETE: ${successfulScrapes.length}/${urlsToScrape.length} pages scraped`,
+        `📊 PARALLEL SCRAPE COMPLETE [${Date.now() - scrapeStart}ms]: ${successfulScrapes.length}/${uniqueUrls.length} pages`,
       );
     }
 
-    // RECONSTRUCT researchOutput if we had to fallback
-    // We need to ensure the synthesis step sees the harvested data
-    if (harvested.scrapedContent.length > 0) {
-      // Ensure scrapedContent is populated from harvested data
-      // This overwrites any hallucinated content or fills empty content
-      researchOutput.scrapedContent = harvested.scrapedContent;
+    const totalParallelTime = Date.now() - parallelStartTime;
+    console.log(
+      `⚡ TOTAL PARALLEL EXECUTION: ${totalParallelTime}ms (searches + scrapes)`,
+    );
 
-      // Map scraped content by URL for quick lookup to ensure contextId consistency
-      const scrapedUrlMap = new Map(
-        harvested.scrapedContent.map((s) => [s.url, s]),
-      );
+    // Build synthetic key findings from scraped content summaries.
+    // This provides structured context for synthesis without an additional LLM call.
+    const syntheticKeyFindings = harvested.scrapedContent
+      .filter((scraped) => scraped.summary && scraped.summary.length > 50)
+      .slice(0, 5) // Limit to top 5 to avoid overwhelming synthesis
+      .map((scraped) => ({
+        finding:
+          scraped.summary.length > 300
+            ? scraped.summary.substring(0, 297) + "..."
+            : scraped.summary,
+        sources: [scraped.url],
+        confidence:
+          (scraped.relevanceScore ?? 0) >= 0.8
+            ? "high"
+            : (scraped.relevanceScore ?? 0) >= 0.5
+              ? "medium"
+              : "low",
+      }));
 
-      // Rebuild sourcesUsed from harvested data to ensure consistency
-      const newSources = [
-        ...harvested.searchResults.map((r) => {
-          const existing = scrapedUrlMap.get(r.url);
-          return {
-            url: r.url,
-            title: r.title,
-            contextId: existing ? existing.contextId : generateMessageId(),
-            type: "search_result" as const,
-            relevance:
-              r.relevanceScore > 0.7 ? ("high" as const) : ("medium" as const),
-          };
-        }),
-        ...harvested.scrapedContent.map((s) => ({
-          url: s.url,
-          title: s.title,
-          contextId: s.contextId,
-          type: "scraped_page" as const,
-          relevance: "high" as const,
-        })),
-      ];
+    // Build research output directly from harvested data (skip research agent entirely)
+    const researchOutput: any = {
+      researchSummary:
+        harvested.searchResults.length > 0
+          ? `Found ${harvested.searchResults.length} search results and scraped ${harvested.scrapedContent.length} pages.`
+          : "No search results found.",
+      keyFindings: syntheticKeyFindings,
+      sourcesUsed: [],
+      informationGaps: undefined,
+      scrapedContent: harvested.scrapedContent,
+      serpEnrichment:
+        Object.keys(harvested.serpEnrichment).length > 0
+          ? harvested.serpEnrichment
+          : undefined,
+      researchQuality:
+        harvested.scrapedContent.length >= 2
+          ? "comprehensive"
+          : harvested.scrapedContent.length >= 1
+            ? "adequate"
+            : "limited",
+    };
 
-      // Dedup sources by URL
-      const uniqueSources = Array.from(
-        new Map(newSources.map((s) => [s.url, s])).values(),
-      );
-      researchOutput.sourcesUsed = uniqueSources;
-
-      // Also assign serpEnrichment if harvested (consistency with scrapedContent/sourcesUsed)
-      if (Object.keys(harvested.serpEnrichment).length > 0) {
-        researchOutput.serpEnrichment = harvested.serpEnrichment;
-      }
-
-      console.log("🔄 RECONSTRUCTED researchOutput with real harvested data");
-    }
+    // Build sourcesUsed from harvested data
+    const scrapedUrlMap = new Map(
+      harvested.scrapedContent.map((s) => [s.url, s]),
+    );
+    const sources = harvested.searchResults.map((r) => {
+      const scraped = scrapedUrlMap.get(r.url);
+      return {
+        url: r.url,
+        title: r.title,
+        contextId: scraped ? scraped.contextId : generateMessageId(),
+        type: scraped ? ("scraped_page" as const) : ("search_result" as const),
+        relevance:
+          r.relevanceScore > 0.7 ? ("high" as const) : ("medium" as const),
+      };
+    });
+    // Dedup by URL
+    researchOutput.sourcesUsed = Array.from(
+      new Map(sources.map((s) => [s.url, s])).values(),
+    );
 
     yield writeEvent("progress", {
       stage: "analyzing",
@@ -1186,65 +1465,37 @@ export async function* streamResearchWorkflow(
       { stream: true, context: { actionCtx: ctx } },
     );
     let accumulatedAnswer = "";
+    const synthesisStreamStart = Date.now();
     for await (const event of synthesisResult) {
-      // TypeScript tells us event.type can only be:
-      // - "run_item_stream_event"
-      // - "agent_updated_stream_event"
-
       if (event.type === "run_item_stream_event") {
         const item = event.item as any;
         const eventName = (event as any).name;
 
-        // Only capture DELTA events, not full content events
-        // 'message_output_created' contains the full message - skip it
-        // We want 'text_content_delta' or similar incremental events
-        if (eventName === "message_output_created") {
-          console.log("🔍 Skipping message_output_created (full content)");
-          continue; // Skip full message events
-        }
-
-        // Debug: Log event details to find delta events
-        console.log("🔍 SYNTHESIS RUN_ITEM EVENT:", eventName);
-        console.log("🔍 Item keys:", item ? Object.keys(item) : "no item");
-        console.log("🔍 Item type:", item?.type);
+        // Skip full content events, only capture deltas
+        if (eventName === "message_output_created") continue;
 
         // Look for actual streaming deltas
-        // Common delta event patterns:
-        // - item.delta.content (incremental text)
-        // - item.content_delta (alternative structure)
         const delta =
-          item?.delta?.content || // OpenAI Agents SDK delta structure
-          item?.content_delta || // Alternative delta field
-          item?.text_delta || // Text delta field
-          (eventName?.includes("delta") && item?.content); // Any delta event with content
+          item?.delta?.content ||
+          item?.content_delta ||
+          item?.text_delta ||
+          (eventName?.includes("delta") && item?.content);
 
         if (delta && typeof delta === "string" && delta.length > 0) {
-          console.log(
-            "🔍 CAPTURED DELTA:",
-            delta.substring(0, 50) + (delta.length > 50 ? "..." : ""),
-          );
           accumulatedAnswer += delta;
           yield writeEvent("content", { delta });
         }
       }
     }
+    console.log(
+      `⚡ SYNTHESIS STREAMING: ${Date.now() - synthesisStreamStart}ms`,
+    );
 
     // CRITICAL: Await stream completion before accessing finalOutput
+    const synthesisCompleteStart = Date.now();
+    await withTimeout(synthesisResult.completed, AGENT_TIMEOUT_MS, "synthesis");
     console.log(
-      "🔍 DEBUG: Synthesis stream consumed, calling await synthesisResult.completed...",
-    );
-    console.log(
-      "🔍 DEBUG: synthesisResult.finalOutput BEFORE await:",
-      synthesisResult.finalOutput,
-    );
-    await synthesisResult.completed;
-    console.log(
-      "🔍 DEBUG: synthesisResult.finalOutput AFTER await:",
-      synthesisResult.finalOutput,
-    );
-    console.log(
-      "🔍 DEBUG: synthesisResult.finalOutput type:",
-      typeof synthesisResult.finalOutput,
+      `⚡ SYNTHESIS COMPLETE: ${Date.now() - synthesisCompleteStart}ms`,
     );
 
     const synthesisOutput = synthesisResult.finalOutput as string;
@@ -1252,34 +1503,18 @@ export async function* streamResearchWorkflow(
       throw new Error("Synthesis failed: agent returned empty or null output.");
     }
 
-    console.log("🔍 DEBUG: About to parse answer text...");
-    console.log(
-      "🔍 DEBUG: accumulatedAnswer length:",
-      accumulatedAnswer.length,
-    );
-    console.log("🔍 DEBUG: synthesisOutput length:", synthesisOutput.length);
-
     const parsedAnswer = parseAnswerText(synthesisOutput);
-    console.log(
-      "🔍 DEBUG: Parsed answer:",
-      JSON.stringify(parsedAnswer, null, 2),
-    );
-
     const finalAnswerText = parsedAnswer.answer || accumulatedAnswer;
-    console.log("🔍 DEBUG: Final answer text length:", finalAnswerText.length);
 
-    // CRITICAL FIX: If no content was streamed, send the final answer now
+    // If no content was streamed, send the final answer now
     if (accumulatedAnswer.length === 0 && finalAnswerText.length > 0) {
       console.log(
-        "⚠️ No streaming deltas were captured! Sending final answer as single content event...",
+        "⚠️ No streaming deltas captured, sending final answer as single event",
       );
       yield writeEvent("content", { delta: finalAnswerText });
     }
 
     // Validate outputs before yielding to Convex
-    // Convex rejects empty objects {} as "not a supported Convex type"
-    console.log("🔍 DEBUG: Validating outputs before yielding...");
-
     if (
       !planningOutput ||
       typeof planningOutput !== "object" ||
@@ -1302,8 +1537,6 @@ export async function* streamResearchWorkflow(
       throw new Error("Parsed answer is empty or invalid");
     }
 
-    console.log("🔍 DEBUG: All validations passed, yielding complete event...");
-
     yield writeEvent("complete", {
       workflow: {
         workflowId,
@@ -1317,7 +1550,6 @@ export async function* streamResearchWorkflow(
       },
     });
 
-    console.log("🔍 DEBUG: Converting context references...");
     const contextReferences = convertToContextReferences(
       (researchOutput.sourcesUsed || []) as Array<{
         contextId: string;
@@ -1326,11 +1558,6 @@ export async function* streamResearchWorkflow(
         title: string;
         relevance: "high" | "medium" | "low";
       }>,
-    );
-    console.log(
-      "🔍 DEBUG: Converted",
-      contextReferences.length,
-      "context references",
     );
 
     yield writeEvent("metadata", {
@@ -1358,7 +1585,6 @@ export async function* streamResearchWorkflow(
       });
     }
 
-    console.log("🔍 DEBUG: Saving assistant message...");
     const assistantMessageId: Id<"messages"> = (await ctx.runMutation(
       internal.messages.addMessage,
       {
@@ -1406,20 +1632,19 @@ export async function* streamResearchWorkflow(
       });
     }
 
+    const totalDuration = Date.now() - startTime;
+    console.log(
+      `🏁 WORKFLOW COMPLETE: ${totalDuration}ms total | ${harvested.searchResults.length} results | ${harvested.scrapedContent.length} pages | ${finalAnswerText.length} chars`,
+    );
+
     yield writeEvent("persisted", {
       payload: persistedPayload,
       nonce,
       signature,
     });
   } catch (error) {
-    const stage =
-      error instanceof Error && error.message.includes("Planning failed")
-        ? "planning"
-        : error instanceof Error && error.message.includes("Research failed")
-          ? "research"
-          : error instanceof Error && error.message.includes("Synthesis failed")
-            ? "synthesis"
-            : "unknown";
+    // Determine which stage failed based on context
+    const stage = detectErrorStage(error, instantResponse);
 
     await handleError(
       error instanceof Error ? error : new Error("An unknown error occurred"),

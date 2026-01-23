@@ -21,6 +21,7 @@ import { useEnhancedFollowUpPrompt } from "../../hooks/useEnhancedFollowUpPrompt
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useComponentProps } from "../../hooks/useComponentProps";
 import { useDeletionHandlers } from "../../hooks/useDeletionHandlers";
+import { useAnonymousSession } from "../../hooks/useAnonymousSession";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useUrlStateSync } from "../../hooks/useUrlStateSync";
 import { useMetaTags } from "../../hooks/useMetaTags";
@@ -93,6 +94,7 @@ function ChatInterfaceComponent({
     setShowShareModal(true);
   }, []);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const sessionId = useAnonymousSession();
 
   const userSelectedChatAtRef = useRef<number | null>(null);
   const deleteChat = useMutation(api.chats.deleteChat);
@@ -159,6 +161,7 @@ function ChatInterfaceComponent({
     chatActions,
     deleteChat,
     deleteMessage,
+    sessionId: sessionId || undefined,
   });
 
   const [lastPlannerCallAtByChat, setLastPlannerCallAtByChat] = useState<
@@ -205,8 +208,36 @@ function ChatInterfaceComponent({
       (m) => m.isStreaming === true || m.persisted === false,
     );
 
-    // If we have optimistic messages, always use unified messages (source of truth during generation)
-    if (hasOptimisticMessages) {
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    // Extract stable ID from the last assistant message (prefer messageId > _id > id)
+    const lastAssistantKey =
+      lastAssistantMessage?.messageId ??
+      lastAssistantMessage?._id ??
+      lastAssistantMessage?.id ??
+      null;
+    const persistedAssistantMissingInPaginated =
+      !!lastAssistantMessage &&
+      lastAssistantMessage.persisted === true &&
+      !lastAssistantMessage.isStreaming &&
+      typeof lastAssistantMessage.content === "string" &&
+      lastAssistantMessage.content.length > 0 &&
+      // Use ID-based comparison when available, fall back to content comparison
+      (lastAssistantKey
+        ? !paginatedMessages.some(
+            (m) => (m.messageId ?? m._id ?? m.id ?? null) === lastAssistantKey,
+          )
+        : !paginatedMessages.some(
+            (m) =>
+              m.role === "assistant" &&
+              typeof m.content === "string" &&
+              m.content === lastAssistantMessage.content,
+          ));
+
+    // If we have optimistic messages (or a just-persisted message not yet in paginated),
+    // always use unified messages (source of truth during generation)
+    if (hasOptimisticMessages || persistedAssistantMissingInPaginated) {
       logger.debug("Using unified messages - optimistic state present", {
         count: messages.length,
         chatId: currentChatId,

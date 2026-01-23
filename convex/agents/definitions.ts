@@ -349,7 +349,8 @@ FAILURE TO POPULATE THESE FIELDS = LOST CONTEXT = POOR ANSWERS`,
   modelSettings: {
     ...env.defaultModelSettings,
     temperature: 0.4,
-    reasoning: { effort: "high" as const }, // Allocate more deliberate steps for tool orchestration
+    // NOTE: Removed reasoning: { effort: "high" } which was causing 60+ second delays
+    // Tool orchestration doesn't need extensive reasoning - just execute the plan
   },
 });
 

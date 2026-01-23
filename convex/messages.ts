@@ -139,10 +139,11 @@ export const updateMessageMetadata = mutation({
       ),
     ),
     hasRealResults: v.optional(v.boolean()),
+    sessionId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { messageId, ...metadata } = args;
+    const { messageId, sessionId, ...metadata } = args;
     const message = await ctx.db.get(messageId);
     if (!message) {
       // Silently fail
@@ -155,7 +156,16 @@ export const updateMessageMetadata = mutation({
     // Check authorization - only the chat owner can update message metadata
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(message.chatId);
-    if (!chat || (chat.userId && chat.userId !== userId)) {
+    if (!chat) {
+      throw new Error("Chat not found");
+    }
+    const hasUserAccess = !!(chat.userId && userId && chat.userId === userId);
+    const hasSessionAccess = !!(
+      chat.sessionId &&
+      sessionId &&
+      chat.sessionId === sessionId
+    );
+    if (!hasUserAccess && !hasSessionAccess) {
       throw new Error(
         "Unauthorized: You can only update messages in your own chats",
       );

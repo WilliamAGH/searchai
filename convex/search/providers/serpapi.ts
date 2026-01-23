@@ -66,6 +66,7 @@ export async function searchWithSerpApiDuckDuckGo(
       headers: {
         "User-Agent": "SearchChat/1.0 (Web Search Assistant)",
       },
+      signal: AbortSignal.timeout(30000), // 30 second timeout
     });
 
     const safeLog = {
