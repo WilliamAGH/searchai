@@ -5,6 +5,7 @@
 
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { generateSessionId } from "../lib/uuid";
 
@@ -37,22 +38,25 @@ export const claimAnonymousChats = mutation({
     let claimed = 0;
 
     for (const chat of chatsForSession) {
-      if (!chat.userId) {
-        claimed += 1;
-        await ctx.db.patch(chat._id, {
-          userId,
-          sessionId: newSessionId,
-          updatedAt: Date.now(),
-        });
-        continue;
-      }
+      const isUnclaimed = !chat.userId;
+      const isOwnedByUser = chat.userId === userId;
 
-      if (chat.userId === userId) {
-        await ctx.db.patch(chat._id, {
-          sessionId: newSessionId,
-          updatedAt: Date.now(),
-        });
+      if (!isUnclaimed && !isOwnedByUser) continue;
+
+      // Single patch: rotate sessionId; claim ownership if unclaimed
+      const patchData: {
+        sessionId: string;
+        updatedAt: number;
+        userId?: Id<"users">;
+      } = {
+        sessionId: newSessionId,
+        updatedAt: Date.now(),
+      };
+      if (isUnclaimed) {
+        patchData.userId = userId;
+        claimed += 1;
       }
+      await ctx.db.patch(chat._id, patchData);
     }
 
     return { claimed, newSessionId };
