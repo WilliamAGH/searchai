@@ -33,4 +33,18 @@ export const RELEVANCE_SCORES = {
   HIGH_THRESHOLD: 0.8,
   /** Threshold for "medium" relevance classification */
   MEDIUM_THRESHOLD: 0.5,
+  /** Score for "high" relevance label in structured output */
+  HIGH_LABEL: 0.9,
+  /** Score for "medium" relevance label in structured output */
+  MEDIUM_LABEL: 0.7,
+  /** Score for "low" relevance label in structured output */
+  LOW_LABEL: 0.5,
+} as const;
+
+/**
+ * Planning confidence thresholds for workflow routing decisions.
+ */
+export const CONFIDENCE_THRESHOLDS = {
+  /** Minimum confidence to skip research stage (fast path) */
+  SKIP_RESEARCH: 0.9,
 } as const;

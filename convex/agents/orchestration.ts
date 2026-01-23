@@ -197,7 +197,11 @@ import {
   vScrapedContent,
   vSerpEnrichment,
 } from "../lib/validators";
-import { CACHE_TTL, RELEVANCE_SCORES } from "../lib/constants/cache";
+import {
+  CACHE_TTL,
+  RELEVANCE_SCORES,
+  CONFIDENCE_THRESHOLDS,
+} from "../lib/constants/cache";
 import {
   buildPlanningInput,
   buildResearchInstructions,
@@ -1440,7 +1444,10 @@ export async function* streamResearchWorkflow(
 
     // FAST PATH: Simple conversational messages that don't need research
     // Skip research stage entirely when planning indicates no information gathering needed
-    if (!needsResearch && planningOutput.confidenceLevel >= 0.9) {
+    if (
+      !needsResearch &&
+      planningOutput.confidenceLevel >= CONFIDENCE_THRESHOLDS.SKIP_RESEARCH
+    ) {
       console.log("⚡ FAST PATH: Skipping research stage for simple message");
 
       yield writeEvent("progress", {

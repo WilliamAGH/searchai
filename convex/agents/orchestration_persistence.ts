@@ -21,6 +21,18 @@ import type {
 // ============================================
 // Types
 // ============================================
+// Design Decision: Parameter Objects
+// -----------------------------------
+// These interfaces use parameter objects instead of positional arguments because:
+// 1. Functions have 4+ parameters, making positional calls error-prone
+// 2. Named parameters are self-documenting at call sites
+// 3. Optional fields (sessionId, searchResults, etc.) are cleaner with objects
+// 4. Adding new optional parameters doesn't break existing callers
+// 5. TypeScript provides full autocomplete and type checking
+//
+// The PersistAssistantMessageParams interface has 7 fields because message
+// persistence requires all this data - the alternative would be multiple
+// function calls or a less type-safe approach.
 
 /** Minimal context needed for persistence operations */
 type PersistenceCtx = {
@@ -37,20 +49,31 @@ export interface UpdateChatTitleParams {
   intent: string;
 }
 
-/** Parameters for assistant message persistence */
+/**
+ * Parameters for assistant message persistence.
+ * Fields map directly to internal.messages.addMessage arguments.
+ */
 export interface PersistAssistantMessageParams {
+  /** Convex action context for running mutations */
   ctx: PersistenceCtx;
+  /** Target chat for the message */
   chatId: Id<"chats">;
+  /** Message content (markdown text) */
   content: string;
+  /** Workflow ID for tracing */
   workflowId: string;
+  /** Optional session ID for HTTP action auth */
   sessionId?: string;
+  /** Search results with relevance scores for citation UI */
   searchResults?: Array<{
     title: string;
     url: string;
     snippet: string;
     relevanceScore: number;
   }>;
+  /** Source URLs referenced in the response */
   sources?: string[];
+  /** Structured context references for provenance tracking */
   contextReferences?: ResearchContextReference[];
 }
 

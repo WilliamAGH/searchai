@@ -4,6 +4,7 @@ import type { ResearchContextReference } from "./schema";
 import { buildTemporalHeader } from "../lib/dateTime";
 import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
 import { normalizeUrl as normalizeUrlUtil } from "../lib/url";
+import { RELEVANCE_SCORES } from "../lib/constants/cache";
 
 /**
  * Shared helper functions for agent orchestration
@@ -410,7 +411,11 @@ export function convertToContextReferences(
     title: src.title,
     timestamp: Date.now(),
     relevanceScore:
-      src.relevance === "high" ? 0.9 : src.relevance === "medium" ? 0.7 : 0.5,
+      src.relevance === "high"
+        ? RELEVANCE_SCORES.HIGH_LABEL
+        : src.relevance === "medium"
+          ? RELEVANCE_SCORES.MEDIUM_LABEL
+          : RELEVANCE_SCORES.LOW_LABEL,
   }));
 }
 
