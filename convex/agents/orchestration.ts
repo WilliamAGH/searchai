@@ -93,7 +93,7 @@ function detectInstantResponse(query: string): string | null {
   ) {
     return INSTANT_RESPONSES.test;
   }
-  if (/this is a new chat/i.test(trimmed)) {
+  if (/^this is a new chat[\s!.,?]*$/i.test(trimmed)) {
     return INSTANT_RESPONSES.test;
   }
 
