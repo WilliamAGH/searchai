@@ -208,7 +208,6 @@ import {
   buildSynthesisInstructions,
   formatContextReferencesForPrompt,
   buildConversationContext,
-  extractContextReferencesFromMessages,
   buildConversationBlock,
   processToolCalls,
   buildToolCallLog,
@@ -1217,25 +1216,9 @@ export async function* streamResearchWorkflow(
   const conversationContextFromDb = buildConversationContext(
     recentMessages || [],
   );
-  const priorContextReferences = extractContextReferencesFromMessages(
-    recentMessages || [],
-  );
-  const historyReferences = priorContextReferences.slice(-8);
-  const streamingContextReferences = [
-    ...historyReferences,
-    ...(args.contextReferences ?? []),
-  ].slice(-12);
 
   const conversationSource =
     conversationContextFromDb || args.conversationContext || "";
-  // Note: These are prepared for potential future use but the parallel workflow
-  // builds research instructions differently. Prefixed to satisfy linter.
-  const _conversationBlock = buildConversationBlock(conversationSource);
-  const _referenceBlock = formatContextReferencesForPrompt(
-    streamingContextReferences,
-  );
-  void _conversationBlock;
-  void _referenceBlock;
 
   const instantResponse = detectInstantResponse(args.userQuery);
 
