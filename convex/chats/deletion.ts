@@ -15,7 +15,7 @@ import { mutation } from "../_generated/server";
  * @param chatId - Chat database ID
  */
 export const deleteChat = mutation({
-  args: { chatId: v.id("chats") },
+  args: { chatId: v.id("chats"), sessionId: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -23,7 +23,15 @@ export const deleteChat = mutation({
 
     // Silently succeed if chat already deleted (idempotent operation)
     if (!chat) return null;
-    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+    const hasUserAccess = !!(chat.userId && userId && chat.userId === userId);
+    const hasSessionAccess = !!(
+      chat.sessionId &&
+      args.sessionId &&
+      chat.sessionId === args.sessionId
+    );
+    if (!hasUserAccess && !hasSessionAccess) {
+      throw new Error("Unauthorized");
+    }
 
     // Delete all messages in the chat via async iteration to reduce memory usage
     const q = ctx.db

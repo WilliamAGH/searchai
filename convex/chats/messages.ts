@@ -49,22 +49,13 @@ export const getChatMessages = query({
 
     if (!chat) return [];
 
-    // Check authorization:
-    // For authenticated users: check userId matches
-    if (chat.userId) {
-      if (chat.userId !== userId) {
-        // Allow access to shared/public chats
-        const isSharedOrPublic =
-          chat.privacy === "shared" || chat.privacy === "public";
-        if (!isSharedOrPublic) return [];
-      }
-    }
-    // For anonymous chats: check sessionId matches
-    else if (chat.sessionId) {
-      if (!args.sessionId || chat.sessionId !== args.sessionId) return [];
-    }
-    // For shared/public chats without userId or sessionId: allow access
-    else if (chat.privacy !== "shared" && chat.privacy !== "public") {
+    const isSharedOrPublic =
+      chat.privacy === "shared" || chat.privacy === "public";
+    const isUserOwner = chat.userId && userId && chat.userId === userId;
+    const isSessionOwner =
+      chat.sessionId && args.sessionId && chat.sessionId === args.sessionId;
+
+    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner) {
       return [];
     }
 

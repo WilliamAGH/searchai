@@ -168,25 +168,17 @@ export const getChatByIdDirect = query({
 
     const userId = await getAuthUserId(ctx);
 
-    // Shared and public chats are accessible regardless of owner or session
-    if (chat.privacy === "shared" || chat.privacy === "public") {
-      return chat;
-    }
+    const isSharedOrPublic =
+      chat.privacy === "shared" || chat.privacy === "public";
+    const isUserOwner = chat.userId && userId && chat.userId === userId;
+    const isSessionOwner =
+      chat.sessionId && args.sessionId && chat.sessionId === args.sessionId;
 
-    // For authenticated users: check userId matches
-    if (chat.userId) {
-      if (chat.userId !== userId) return null;
-      return chat;
-    }
-
-    // For anonymous chats: check sessionId matches
-    if (chat.sessionId) {
-      if (!args.sessionId || chat.sessionId !== args.sessionId) return null;
+    if (isSharedOrPublic || isUserOwner || isSessionOwner) {
       return chat;
     }
 
     // SECURITY: Reject chats without proper ownership (userId or sessionId)
-    // Chat has no userId or sessionId - only accessible if public/shared (already checked above)
     return null;
   },
 });

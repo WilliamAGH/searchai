@@ -13,8 +13,12 @@ interface UseDeletionHandlersProps {
     deleteMessage: (id: string) => Promise<void>;
     addMessage: (msg: { id: string }) => void;
   };
-  deleteChat: (args: { chatId: Id<"chats"> }) => Promise<void>;
+  deleteChat: (args: {
+    chatId: Id<"chats">;
+    sessionId?: string;
+  }) => Promise<void>;
   deleteMessage: (args: { messageId: Id<"messages"> }) => Promise<void>;
+  sessionId?: string;
 }
 
 interface UndoBannerState {
@@ -31,6 +35,7 @@ export function useDeletionHandlers({
   chatActions,
   deleteChat,
   deleteMessage,
+  sessionId,
 }: UseDeletionHandlersProps) {
   const [undoBanner, setUndoBanner] = useState<UndoBannerState | null>(null);
   const timeoutsRef = useRef<number[]>([]);
@@ -89,7 +94,7 @@ export function useDeletionHandlers({
   const handleRequestDeleteChat = useCallback(
     async (chatId: Id<"chats">) => {
       try {
-        await deleteChat({ chatId });
+        await deleteChat({ chatId, sessionId });
 
         // Show success banner
         setUndoBanner({
@@ -116,7 +121,7 @@ export function useDeletionHandlers({
         }
       }
     },
-    [deleteChat, clearAllTimeouts],
+    [deleteChat, sessionId, clearAllTimeouts],
   );
 
   const handleDeleteLocalMessage = useCallback(

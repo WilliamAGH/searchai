@@ -5,6 +5,7 @@
  */
 
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, action } from "../_generated/server";
 import { buildContextSummary } from "./utils";
 
@@ -13,10 +14,30 @@ import { buildContextSummary } from "./utils";
  * - Returns a compact bullet summary for bootstrapping a new chat
  */
 export const summarizeRecent = query({
-  args: { chatId: v.id("chats"), limit: v.optional(v.number()) },
+  args: {
+    chatId: v.id("chats"),
+    limit: v.optional(v.number()),
+    sessionId: v.optional(v.string()),
+  },
   returns: v.string(),
   handler: async (ctx, args) => {
     const limit = Math.max(1, Math.min(args.limit ?? 14, 40));
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) return "";
+
+    const userId = await getAuthUserId(ctx);
+
+    // Shared and public chats are accessible regardless of owner or session
+    if (chat.privacy !== "shared" && chat.privacy !== "public") {
+      const isUserOwner = chat.userId && userId && chat.userId === userId;
+      const isSessionOwner =
+        chat.sessionId && args.sessionId && chat.sessionId === args.sessionId;
+
+      if (!isUserOwner && !isSessionOwner) {
+        return "";
+      }
+    }
+
     const q = ctx.db
       .query("messages")
       .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
@@ -31,7 +52,6 @@ export const summarizeRecent = query({
       if (buf.length >= limit) break;
     }
     const ordered = buf.reverse();
-    const chat = await ctx.db.get(args.chatId);
     return buildContextSummary({
       messages: ordered,
       rollingSummary: (chat as unknown as { rollingSummary?: string })
