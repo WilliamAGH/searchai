@@ -664,6 +664,70 @@ type StreamingWorkflowCtx = Pick<
 type WorkflowStreamEvent = Record<string, unknown>;
 
 // ============================================
+// Shared Workflow Utilities
+// ============================================
+// Extracted per DR1a to avoid duplication between workflow functions.
+
+/**
+ * Create a cleaned SSE event object, filtering out undefined/null/empty values.
+ * Convex cannot serialize empty objects {}, so we strip them.
+ */
+function createWorkflowEvent(
+  type: string,
+  data: Record<string, unknown>,
+): WorkflowStreamEvent {
+  const cleaned: Record<string, unknown> = { type };
+  for (const [k, v] of Object.entries(data)) {
+    if (v === undefined || v === null) continue;
+    if (
+      typeof v === "object" &&
+      !Array.isArray(v) &&
+      Object.keys(v).length === 0
+    )
+      continue;
+    cleaned[k] = v;
+  }
+  return cleaned;
+}
+
+/**
+ * Create an error handler for workflow functions.
+ * Logs the error, invalidates the workflow token if present, and re-throws.
+ */
+function createWorkflowErrorHandler(
+  ctx: StreamingWorkflowCtx,
+  workflowId: string,
+  getTokenId: () => Id<"workflowTokens"> | null,
+) {
+  return async (error: Error, stage: string): Promise<never> => {
+    console.error(`💥 WORKFLOW ERROR [${stage}]`, {
+      workflowId,
+      error: error.message,
+    });
+
+    const tokenId = getTokenId();
+    if (tokenId) {
+      try {
+        await ctx.runMutation(internal.workflowTokens.invalidateToken, {
+          tokenId,
+        });
+      } catch (invalidationError) {
+        // Log but don't mask the original error
+        console.error("Failed to invalidate workflow token", {
+          tokenId,
+          error:
+            invalidationError instanceof Error
+              ? invalidationError.message
+              : "Unknown invalidation error",
+        });
+      }
+    }
+
+    throw error;
+  };
+}
+
+// ============================================
 // CONVERSATIONAL WORKFLOW (Single-Agent Architecture)
 // ============================================
 // This is the new, faster workflow that uses a single agent with tools.
@@ -679,48 +743,16 @@ export async function* streamConversationalWorkflow(
   const startTime = Date.now();
   const nonce = generateMessageId();
 
-  const writeEvent = (
-    type: string,
-    data: Record<string, unknown>,
-  ): WorkflowStreamEvent => {
-    const cleaned: Record<string, unknown> = { type };
-    for (const [k, v] of Object.entries(data)) {
-      if (v === undefined || v === null) continue;
-      if (
-        typeof v === "object" &&
-        !Array.isArray(v) &&
-        Object.keys(v).length === 0
-      )
-        continue;
-      cleaned[k] = v;
-    }
-    return cleaned;
-  };
+  // Use shared utilities (extracted per DR1a)
+  const writeEvent = (type: string, data: Record<string, unknown>) =>
+    createWorkflowEvent(type, data);
 
   let workflowTokenId: Id<"workflowTokens"> | null = null;
-
-  const handleError = async (error: Error, stage: string) => {
-    console.error(`💥 CONVERSATIONAL WORKFLOW ERROR [${stage}]`, {
-      workflowId,
-      error: error.message,
-    });
-    if (workflowTokenId) {
-      try {
-        await ctx.runMutation(internal.workflowTokens.invalidateToken, {
-          tokenId: workflowTokenId,
-        });
-      } catch (invalidationError) {
-        console.error("Failed to invalidate workflow token", {
-          tokenId: workflowTokenId,
-          error:
-            invalidationError instanceof Error
-              ? invalidationError.message
-              : "Unknown invalidation error",
-        });
-      }
-    }
-    throw error;
-  };
+  const handleError = createWorkflowErrorHandler(
+    ctx,
+    workflowId,
+    () => workflowTokenId,
+  );
 
   try {
     // Create workflow token
@@ -986,48 +1018,16 @@ export async function* streamResearchWorkflow(
   const nonce = generateMessageId();
   const issuedAt = Date.now();
 
-  const writeEvent = (
-    type: string,
-    data: Record<string, unknown>,
-  ): WorkflowStreamEvent => {
-    const cleaned: Record<string, unknown> = { type };
-    for (const [k, v] of Object.entries(data)) {
-      if (v === undefined || v === null) continue;
-      if (
-        typeof v === "object" &&
-        !Array.isArray(v) &&
-        Object.keys(v).length === 0
-      )
-        continue;
-      cleaned[k] = v;
-    }
-    return cleaned;
-  };
+  // Use shared utilities (extracted per DR1a)
+  const writeEvent = (type: string, data: Record<string, unknown>) =>
+    createWorkflowEvent(type, data);
 
   let workflowTokenId: Id<"workflowTokens"> | null = null;
-
-  const handleError = async (error: Error, stage: string) => {
-    console.error(`💥 WORKFLOW ERROR [${stage}]`, {
-      workflowId,
-      error: error.message,
-    });
-    if (workflowTokenId) {
-      try {
-        await ctx.runMutation(internal.workflowTokens.invalidateToken, {
-          tokenId: workflowTokenId,
-        });
-      } catch (invalidationError) {
-        console.error("Failed to invalidate workflow token", {
-          tokenId: workflowTokenId,
-          error:
-            invalidationError instanceof Error
-              ? invalidationError.message
-              : "Unknown invalidation error",
-        });
-      }
-    }
-    throw error;
-  };
+  const handleError = createWorkflowErrorHandler(
+    ctx,
+    workflowId,
+    () => workflowTokenId,
+  );
 
   const workflowTokenPayload: {
     workflowId: string;
