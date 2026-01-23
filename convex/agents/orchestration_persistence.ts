@@ -102,7 +102,7 @@ export async function updateChatTitleIfNeeded(
 
   if (currentTitle === "New Chat" || !currentTitle) {
     const generatedTitle = generateChatTitle({ intent });
-    // @ts-expect-error - Convex TS2589: deeply nested type inference
+    // @ts-ignore - Known Convex TS2589 issue with complex type inference in ctx.runMutation
     await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
       chatId,
       title: generatedTitle,
