@@ -1,6 +1,6 @@
 "use node";
 
-import type { ResearchContextReference } from "./types";
+import type { ResearchContextReference } from "./schema";
 import { buildTemporalHeader } from "../lib/dateTime";
 import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
 import { normalizeUrl as normalizeUrlUtil } from "../lib/url";

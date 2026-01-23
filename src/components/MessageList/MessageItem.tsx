@@ -51,16 +51,29 @@ function getProgressHeader(stage: string): string {
 }
 
 function getProgressDescription(stage: string, message?: string): string {
-  // If message is provided and different from stage, use it
-  if (
-    message &&
-    message.toLowerCase() !== stage.toLowerCase() &&
-    !message.toLowerCase().includes(stage.toLowerCase().replace("ing", ""))
-  ) {
-    return message;
+  // Priority 1: Use custom message if it's meaningfully different from the stage
+  if (message) {
+    const normalizedMessage = message.toLowerCase();
+    const normalizedStage = stage.toLowerCase();
+    const stageRoot = normalizedStage.replace("ing", "");
+
+    const isRedundant =
+      normalizedMessage === normalizedStage ||
+      normalizedMessage.includes(stageRoot);
+
+    if (!isRedundant) {
+      return message;
+    }
   }
-  // Otherwise use our distinct descriptions
-  return PROGRESS_DISPLAY[stage]?.description || "Processing...";
+
+  // Priority 2: Use predefined description for known stages
+  const predefined = PROGRESS_DISPLAY[stage]?.description;
+  if (predefined) {
+    return predefined;
+  }
+
+  // Priority 3: Generic fallback for unknown stages
+  return "Processing...";
 }
 
 interface MessageItemProps {
@@ -75,6 +88,7 @@ interface MessageItemProps {
   searchProgress?: {
     stage:
       | "idle"
+      | "thinking"
       | "planning"
       | "searching"
       | "scraping"

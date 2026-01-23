@@ -11,6 +11,7 @@ import type { FunctionTool, RunContext } from "@openai/agents";
 import type { ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { generateMessageId } from "../lib/id_generator";
+import { AGENT_LIMITS } from "../lib/constants/cache";
 
 /**
  * Web Search Tool
@@ -249,12 +250,15 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
         durationMs,
       });
 
-      // Extract hostname for fallback
-      let hostname = "";
+      // Extract hostname for display purposes only (not business logic).
+      // Silent catch is acceptable here because: (1) URL parsing failure doesn't affect
+      // the error response structure, (2) "unknown" is a safe fallback for UI display,
+      // (3) the actual error is already logged and preserved in errorMessage field.
+      let hostname = "unknown";
       try {
         hostname = new URL(input.url).hostname;
       } catch {
-        hostname = "unknown";
+        // URL parsing failed - use "unknown" fallback for display
       }
 
       return {
@@ -282,6 +286,11 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
  * Research Planning Tool
  * Uses LLM to generate targeted search queries when research is needed.
  * This is called by the conversational agent when it determines research is required.
+ *
+ * NOTE: Parameters are intentionally flat (not nested) because:
+ * 1. LLMs generate tool calls more reliably with flat schemas
+ * 2. OpenAI's function calling API prefers flat parameter objects
+ * 3. The three parameters form a cohesive "research plan" unit together
  */
 export const planResearchTool: FunctionTool<any, any, unknown> = tool({
   name: "plan_research",
@@ -316,9 +325,11 @@ The tool returns search queries you should then execute with search_web.`,
             .describe("1=critical, 2=important, 3=supplementary"),
         }),
       )
-      .min(1)
-      .max(3)
-      .describe("1-3 targeted search queries"),
+      .min(AGENT_LIMITS.MIN_SEARCH_QUERIES)
+      .max(AGENT_LIMITS.MAX_SEARCH_QUERIES)
+      .describe(
+        `${AGENT_LIMITS.MIN_SEARCH_QUERIES}-${AGENT_LIMITS.MAX_SEARCH_QUERIES} targeted search queries`,
+      ),
   }),
   execute: async (
     input: {

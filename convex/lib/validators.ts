@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id, TableNames } from "../_generated/dataModel";
-import type { ResearchContextReference as ResearchContextReferenceType } from "../agents/types";
+import type { ResearchContextReference as ResearchContextReferenceType } from "../agents/schema";
 
 // Shared validators for backend-only usage
 // Note: Do not re-export Convex-generated types from _generated/*

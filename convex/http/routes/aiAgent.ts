@@ -35,7 +35,7 @@ function rateLimitExceededResponse(
 }
 // Types come from the Node-free module so HTTP routes (and other V8 code) never import
 // the helpers that depend on `node:crypto`.
-import type { ResearchContextReference } from "../../agents/types";
+import type { ResearchContextReference } from "../../agents/schema";
 
 export function sanitizeContextReferences(
   input: unknown,
