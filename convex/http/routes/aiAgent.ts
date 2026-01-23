@@ -14,7 +14,7 @@ import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
-import { streamResearchWorkflow } from "../../agents/orchestration";
+import { streamConversationalWorkflow } from "../../agents/orchestration";
 
 /**
  * Build a standardized rate limit exceeded response
@@ -395,7 +395,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
           };
 
           try {
-            const eventStream = streamResearchWorkflow(ctx, {
+            const eventStream = streamConversationalWorkflow(ctx, {
               chatId,
               sessionId,
               userQuery: message,
@@ -407,7 +407,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
               sendEvent(event);
             }
 
-            dlog("✅ STREAMING AGENT WORKFLOW COMPLETE");
+            dlog("✅ STREAMING CONVERSATIONAL WORKFLOW COMPLETE");
           } catch (error) {
             console.error("💥 STREAMING WORKFLOW ERROR:", error);
             sendEvent({
