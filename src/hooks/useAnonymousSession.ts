@@ -55,5 +55,21 @@ export function useAnonymousSession(): string | null {
     setSessionId(existingId);
   }, [isAuthenticated, isLoading]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleSessionUpdate = () => {
+      const currentId = localStorage.getItem(SESSION_KEY);
+      setSessionId(currentId);
+    };
+
+    window.addEventListener("searchai:session-id-updated", handleSessionUpdate);
+    return () => {
+      window.removeEventListener(
+        "searchai:session-id-updated",
+        handleSessionUpdate,
+      );
+    };
+  }, []);
+
   return sessionId;
 }

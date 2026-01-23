@@ -6,6 +6,7 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { generateSessionId } from "../lib/uuid";
 
 /**
  * Claim anonymous chats when user signs up or logs in
@@ -19,31 +20,41 @@ export const claimAnonymousChats = mutation({
   },
   returns: v.object({
     claimed: v.number(),
+    newSessionId: v.string(),
   }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Must be authenticated to claim chats");
 
-    // Find all chats with this sessionId that don't already have a userId
-    // Filter ensures idempotency - we don't re-claim already claimed chats
-    const anonymousChats = await ctx.db
+    const newSessionId = generateSessionId();
+
+    // Find all chats with this sessionId to rotate access for this session.
+    const chatsForSession = await ctx.db
       .query("chats")
       .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
-      .filter((q) => q.eq(q.field("userId"), undefined))
       .collect();
 
-    // Update each chat to belong to the user
-    // CRITICAL: Keep sessionId for HTTP endpoint access
-    // Reason: HTTP actions don't have Convex auth context, so they validate via sessionId
-    for (const chat of anonymousChats) {
-      await ctx.db.patch(chat._id, {
-        userId,
-        // sessionId deliberately NOT removed - needed for HTTP endpoint validation
-        // Chat now has BOTH userId (for Convex queries) and sessionId (for HTTP actions)
-        updatedAt: Date.now(),
-      });
+    let claimed = 0;
+
+    for (const chat of chatsForSession) {
+      if (!chat.userId) {
+        claimed += 1;
+        await ctx.db.patch(chat._id, {
+          userId,
+          sessionId: newSessionId,
+          updatedAt: Date.now(),
+        });
+        continue;
+      }
+
+      if (chat.userId === userId) {
+        await ctx.db.patch(chat._id, {
+          sessionId: newSessionId,
+          updatedAt: Date.now(),
+        });
+      }
     }
 
-    return { claimed: anonymousChats.length };
+    return { claimed, newSessionId };
   },
 });
