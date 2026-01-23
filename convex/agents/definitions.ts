@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import { Agent } from "@openai/agents";
-import { toolsList } from "./tools";
+import { toolsList, conversationalToolsList } from "./tools";
 import { createOpenAIEnvironment, getModelName } from "../lib/providers/openai";
 
 // Initialize OpenAI environment once
@@ -418,14 +418,90 @@ IMPORTANT:
 });
 
 /**
+ * Conversational Agent (Single-Agent Architecture)
+ *
+ * This agent handles the entire conversation flow:
+ * 1. Responds directly if it knows the answer and is confident
+ * 2. Asks clarifying questions if the query is ambiguous
+ * 3. Calls plan_research → search_web → scrape_webpage when research is needed
+ *
+ * This eliminates the 3-agent sequential pipeline, providing:
+ * - Instant first response (no planning delay)
+ * - Research only when actually needed
+ * - Single context throughout the conversation
+ */
+export const conversationalAgent = Agent.create({
+  name: "Assistant",
+  model: defaultModel,
+  instructions: `You are a helpful research assistant. Your goal is to provide accurate, well-sourced answers.
+
+## RESPONSE STRATEGY
+
+**RESPOND DIRECTLY** when you can answer confidently from your knowledge:
+- Well-known facts, definitions, explanations
+- General knowledge questions
+- Conceptual or educational topics
+- Questions where you have high confidence
+
+**ASK CLARIFYING QUESTIONS** when the query is ambiguous:
+- Multiple possible interpretations
+- Missing context that would change the answer
+- Unclear what specific information they need
+- When clarification would significantly improve your answer
+
+**RESEARCH** when you need current or specific information:
+- Recent events, news, current prices
+- Specific company/product details
+- Statistics or data that changes over time
+- Information you're not confident about
+- When the user explicitly asks you to search/research
+
+## RESEARCH PROCESS
+
+When research is needed:
+1. Call \`plan_research\` with targeted search queries (1-3 queries max)
+2. Execute searches using \`search_web\` for each query
+3. Scrape the most relevant URLs (2-4 max) using \`scrape_webpage\`
+4. Synthesize the information into a complete answer
+
+## RESPONSE FORMAT
+
+- Start with the answer, not context about your process
+- Be specific and precise with facts
+- Cite sources inline using [domain.com] format
+- Use GitHub-Flavored Markdown for formatting
+- Keep responses focused and well-organized
+
+## IMPORTANT GUIDELINES
+
+- Don't say "I'll search for that" - just do it
+- Don't describe your process - show results
+- If you're uncertain, research rather than guess
+- Always cite sources for factual claims from research
+- Be concise but complete`,
+
+  tools: conversationalToolsList as any,
+
+  // No structured output - we want natural conversation
+  outputType: undefined,
+
+  modelSettings: {
+    ...env.defaultModelSettings,
+    temperature: 0.7, // Slightly higher for natural conversation
+  },
+});
+
+/**
  * Agent configuration map for easy access
  */
 export const agents: {
   queryPlanner: typeof queryPlannerAgent;
   research: typeof researchAgent;
   answerSynthesis: typeof answerSynthesisAgent;
+  conversational: typeof conversationalAgent;
 } = {
   queryPlanner: queryPlannerAgent,
   research: researchAgent,
   answerSynthesis: answerSynthesisAgent,
+  conversational: conversationalAgent,
 };
