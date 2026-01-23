@@ -42,19 +42,34 @@ export function SignInModal({
       setSubmitting(true);
       const formData = new FormData(e.target as HTMLFormElement);
       formData.set("flow", "signIn");
-      const result = await signIn("password", formData, {
-        redirect: false,
-      } as unknown as Record<string, unknown>);
-      if ((result as { error?: unknown })?.error) {
-        const msg = String((result as { error?: unknown }).error || "");
-        const toastTitle = msg.includes("Invalid password")
+      try {
+        const result = await signIn("password", formData, {
+          redirect: false,
+        } as unknown as Record<string, unknown>);
+        if ((result as { error?: unknown })?.error) {
+          const msg = String((result as { error?: unknown }).error || "");
+          const toastTitle = msg.includes("Invalid password")
+            ? "Invalid password. Please try again."
+            : "Could not sign in. Please check your credentials.";
+          toast.error(toastTitle);
+        } else {
+          onClose();
+        }
+      } catch (error: unknown) {
+        const maybeMessage =
+          typeof error === "object" &&
+          error &&
+          "message" in error &&
+          typeof (error as { message?: unknown }).message === "string"
+            ? (error as { message: string }).message
+            : "";
+        const toastTitle = maybeMessage.includes("Invalid password")
           ? "Invalid password. Please try again."
           : "Could not sign in. Please check your credentials.";
         toast.error(toastTitle);
-      } else {
-        onClose();
+      } finally {
+        setSubmitting(false);
       }
-      setSubmitting(false);
     },
     [onClose, signIn],
   );
