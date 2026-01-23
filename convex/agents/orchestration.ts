@@ -763,110 +763,118 @@ export async function* streamResearchWorkflow(
 
   const instantResponse = detectInstantResponse(args.userQuery);
   if (instantResponse) {
-    console.log(
-      "⚡ INSTANT RESPONSE: Skipping all agent calls for simple message",
-    );
+    try {
+      console.log(
+        "⚡ INSTANT RESPONSE: Skipping all agent calls for simple message",
+      );
 
-    yield writeEvent("progress", {
-      stage: "generating",
-      message: "Responding...",
-    });
-
-    yield writeEvent("content", { delta: instantResponse });
-
-    yield writeEvent("complete", {
-      workflow: {
-        workflowId,
-        planning: {
-          userIntent: "Simple conversational message - no research needed",
-          informationNeeded: [],
-          searchQueries: [],
-          needsWebScraping: false,
-          confidenceLevel: 1,
-        },
-        research: {
-          researchSummary: "No research required.",
-          keyFindings: [],
-          sourcesUsed: [],
-          researchQuality: "adequate",
-        },
-        answer: {
-          answer: instantResponse,
-          hasLimitations: false,
-          sourcesUsed: [],
-          answerCompleteness: "complete",
-          confidence: 1,
-        },
-        metadata: {
-          totalDuration: Date.now() - startTime,
-          timestamp: Date.now(),
-        },
-      },
-    });
-
-    yield writeEvent("metadata", {
-      metadata: {
-        workflowId,
-        contextReferences: [],
-        hasLimitations: false,
-        confidence: 1,
-        answerLength: instantResponse.length,
-      },
-      nonce,
-    });
-
-    // Update chat title
-    const generatedTitle = generateChatTitle({ intent: args.userQuery });
-    if (chat.title === "New Chat" || !chat.title) {
-      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-        chatId: args.chatId,
-        title: generatedTitle,
+      yield writeEvent("progress", {
+        stage: "generating",
+        message: "Responding...",
       });
-    }
 
-    // Save assistant message
-    const instantMessageId: Id<"messages"> = (await ctx.runMutation(
-      internal.messages.addMessage,
-      {
-        chatId: args.chatId,
-        role: "assistant",
-        content: instantResponse,
-        searchResults: [],
+      yield writeEvent("content", { delta: instantResponse });
+
+      yield writeEvent("complete", {
+        workflow: {
+          workflowId,
+          planning: {
+            userIntent: "Simple conversational message - no research needed",
+            informationNeeded: [],
+            searchQueries: [],
+            needsWebScraping: false,
+            confidenceLevel: 1,
+          },
+          research: {
+            researchSummary: "No research required.",
+            keyFindings: [],
+            sourcesUsed: [],
+            researchQuality: "adequate",
+          },
+          answer: {
+            answer: instantResponse,
+            hasLimitations: false,
+            sourcesUsed: [],
+            answerCompleteness: "complete",
+            confidence: 1,
+          },
+          metadata: {
+            totalDuration: Date.now() - startTime,
+            timestamp: Date.now(),
+          },
+        },
+      });
+
+      yield writeEvent("metadata", {
+        metadata: {
+          workflowId,
+          contextReferences: [],
+          hasLimitations: false,
+          confidence: 1,
+          answerLength: instantResponse.length,
+        },
+        nonce,
+      });
+
+      // Update chat title
+      const generatedTitle = generateChatTitle({ intent: args.userQuery });
+      if (chat.title === "New Chat" || !chat.title) {
+        await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
+          chatId: args.chatId,
+          title: generatedTitle,
+        });
+      }
+
+      // Save assistant message
+      const instantMessageId: Id<"messages"> = (await ctx.runMutation(
+        internal.messages.addMessage,
+        {
+          chatId: args.chatId,
+          role: "assistant",
+          content: instantResponse,
+          searchResults: [],
+          sources: [],
+          contextReferences: [],
+          workflowId,
+          isStreaming: false,
+          sessionId: args.sessionId,
+        },
+      )) as Id<"messages">;
+
+      const instantPayload: StreamingPersistPayload = {
+        assistantMessageId: instantMessageId,
+        workflowId,
+        answer: instantResponse,
         sources: [],
         contextReferences: [],
-        workflowId,
-        isStreaming: false,
-        sessionId: args.sessionId,
-      },
-    )) as Id<"messages">;
+      };
 
-    const instantPayload: StreamingPersistPayload = {
-      assistantMessageId: instantMessageId,
-      workflowId,
-      answer: instantResponse,
-      sources: [],
-      contextReferences: [],
-    };
+      const instantSignature = await ctx.runAction(
+        internal.workflowTokensActions.signPersistedPayload,
+        { payload: instantPayload, nonce },
+      );
 
-    const instantSignature = await ctx.runAction(
-      internal.workflowTokensActions.signPersistedPayload,
-      { payload: instantPayload, nonce },
-    );
+      if (workflowTokenId) {
+        await ctx.runMutation(internal.workflowTokens.completeToken, {
+          tokenId: workflowTokenId,
+          signature: instantSignature,
+        });
+      }
 
-    if (workflowTokenId) {
-      await ctx.runMutation(internal.workflowTokens.completeToken, {
-        tokenId: workflowTokenId,
+      yield writeEvent("persisted", {
+        payload: instantPayload,
+        nonce,
         signature: instantSignature,
       });
+
+      return; // Exit - no agent calls needed
+    } catch (error) {
+      // Ensure workflow token is invalidated on failure
+      await handleError(
+        error instanceof Error ? error : new Error("Instant response failed"),
+        "instant",
+      );
     }
-
-    yield writeEvent("persisted", {
-      payload: instantPayload,
-      nonce,
-      signature: instantSignature,
-    });
-
-    return; // Exit - no agent calls needed
   }
 
   try {
