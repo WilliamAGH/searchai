@@ -13,6 +13,7 @@ import { z } from "zod";
 import { Agent } from "@openai/agents";
 import { toolsList, conversationalToolsList } from "./tools";
 import { createOpenAIEnvironment, getModelName } from "../lib/providers/openai";
+import { AGENT_LIMITS } from "../lib/constants/cache";
 
 // Initialize OpenAI environment once
 const env = createOpenAIEnvironment();
@@ -445,10 +446,12 @@ WHEN TO RESEARCH:
 Use the research tools for recent events, current prices, specific company/product details, statistics, or any information you are not confident about.
 
 RESEARCH STEPS:
-1. Call plan_research with 1-3 targeted search queries
+1. Call plan_research with ${AGENT_LIMITS.MIN_SEARCH_QUERIES}-${AGENT_LIMITS.MAX_SEARCH_QUERIES} targeted search queries
 2. Execute searches using search_web
-3. Scrape 2-4 relevant URLs using scrape_webpage
+3. Scrape ${AGENT_LIMITS.MIN_SCRAPE_URLS}-${AGENT_LIMITS.MAX_SCRAPE_URLS} relevant URLs using scrape_webpage
 4. Synthesize findings into your answer
+
+IMPORTANT: Never scrape the same URL twice in a single conversation. Track which URLs you have already scraped and skip duplicates.
 
 RESPONSE GUIDELINES:
 - Start with the answer directly, not process description
