@@ -251,14 +251,19 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
       });
 
       // Extract hostname for display purposes only (not business logic).
-      // Silent catch is acceptable here because: (1) URL parsing failure doesn't affect
-      // the error response structure, (2) "unknown" is a safe fallback for UI display,
-      // (3) the actual error is already logged and preserved in errorMessage field.
+      // "unknown" is a safe fallback for UI display; the actual error is already
+      // logged and preserved in errorMessage field.
       let hostname = "unknown";
       try {
         hostname = new URL(input.url).hostname;
-      } catch {
-        // URL parsing failed - use "unknown" fallback for display
+      } catch (parseError) {
+        console.warn("URL parse failed in scrape error handler", {
+          url: input.url,
+          error:
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError),
+        });
       }
 
       return {
