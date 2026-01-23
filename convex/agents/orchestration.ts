@@ -191,14 +191,13 @@ async function withTimeout<T>(
 }
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
-import { generateChatTitle } from "../chats/utils";
 import { parseAnswerText } from "./answerParser";
 import {
   vContextReference,
   vScrapedContent,
   vSerpEnrichment,
 } from "../lib/validators";
-import { CACHE_TTL } from "../lib/constants/cache";
+import { CACHE_TTL, RELEVANCE_SCORES } from "../lib/constants/cache";
 import {
   buildPlanningInput,
   buildResearchInstructions,
@@ -220,124 +219,16 @@ import {
 import type {
   ResearchContextReference,
   StreamingPersistPayload,
-} from "./types";
+} from "./schema";
+import { createEmptyHarvestedData } from "./schema";
 import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
 import { applyEnhancements } from "../enhancements";
-export type { ResearchContextReference } from "./types";
-
-// ============================================
-// Tool Output Harvesting
-// ============================================
-// Programmatically capture tool outputs to ensure scraped content
-// and SERP enrichment reach synthesis even if the LLM fails to
-// populate these fields in its structured output.
-
-interface HarvestedToolData {
-  scrapedContent: ScrapedContent[];
-  serpEnrichment: SerpEnrichment;
-  searchResults: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    relevanceScore: number;
-  }>;
-}
-
-/**
- * Harvest tool output programmatically
- * This ensures data flows to synthesis regardless of LLM compliance
- */
-function harvestToolOutput(
-  toolName: string,
-  output: unknown,
-  harvested: HarvestedToolData,
-): void {
-  if (!output || typeof output !== "object") return;
-
-  const out = output as Record<string, unknown>;
-
-  if (toolName === "scrape_webpage" && out.content) {
-    // Ensure contextId is a valid UUIDv7, generate one if missing or invalid
-    const rawContextId = typeof out.contextId === "string" ? out.contextId : "";
-    const contextId = isUuidV7(rawContextId)
-      ? rawContextId
-      : generateMessageId();
-
-    const scraped: ScrapedContent = {
-      url: String(out.url || ""),
-      title: String(out.title || ""),
-      content: String(out.content || ""),
-      summary: String(out.summary || ""),
-      contentLength:
-        typeof out.contentLength === "number"
-          ? out.contentLength
-          : String(out.content || "").length,
-      scrapedAt: typeof out.scrapedAt === "number" ? out.scrapedAt : Date.now(),
-      contextId,
-      relevanceScore: 0.9, // Scraped content is high relevance
-    };
-    harvested.scrapedContent.push(scraped);
-    console.log("📥 HARVESTED scrape_webpage:", {
-      url: scraped.url,
-      contentLength: scraped.contentLength,
-      contextId: scraped.contextId,
-      generatedContextId: !isUuidV7(rawContextId),
-    });
-  }
-
-  if (toolName === "search_web") {
-    // Harvest search results
-    if (Array.isArray(out.results)) {
-      const results = out.results as Array<any>;
-      for (const r of results) {
-        if (r.url && r.title) {
-          harvested.searchResults.push({
-            title: r.title,
-            url: r.url,
-            snippet: r.snippet || "",
-            relevanceScore: r.relevanceScore || 0.5,
-          });
-        }
-      }
-      console.log("📥 HARVESTED search_web results:", results.length);
-    }
-
-    // Harvest enrichment
-    if (out.enrichment) {
-      const enrich = out.enrichment as Partial<SerpEnrichment>;
-      if (enrich.knowledgeGraph) {
-        harvested.serpEnrichment.knowledgeGraph = enrich.knowledgeGraph;
-        console.log(
-          "📥 HARVESTED knowledgeGraph:",
-          enrich.knowledgeGraph.title,
-        );
-      }
-      if (enrich.answerBox) {
-        harvested.serpEnrichment.answerBox = enrich.answerBox;
-        console.log(
-          "📥 HARVESTED answerBox:",
-          enrich.answerBox.answer?.slice(0, 50),
-        );
-      }
-      if (enrich.peopleAlsoAsk?.length) {
-        harvested.serpEnrichment.peopleAlsoAsk = enrich.peopleAlsoAsk;
-        console.log(
-          "📥 HARVESTED peopleAlsoAsk:",
-          enrich.peopleAlsoAsk.length,
-          "questions",
-        );
-      }
-      if (enrich.relatedSearches?.length) {
-        harvested.serpEnrichment.relatedSearches = enrich.relatedSearches;
-        console.log(
-          "📥 HARVESTED relatedSearches:",
-          enrich.relatedSearches.length,
-          "searches",
-        );
-      }
-    }
-  }
-}
+import {
+  updateChatTitleIfNeeded,
+  persistAssistantMessage,
+  completeWorkflowWithSignature,
+} from "./orchestration_persistence";
+export type { ResearchContextReference } from "./schema";
 
 type CustomEventParams<T> = {
   detail?: T;
@@ -691,14 +582,35 @@ function createWorkflowEvent(
 }
 
 /**
+ * Wrap a Convex call with explicit error context.
+ * Adds operation context to errors for better debugging.
+ */
+async function withErrorContext<T>(
+  operation: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
+    throw new Error(`${operation}: ${message}`);
+  }
+}
+
+/** Configuration for workflow error handler */
+interface WorkflowErrorHandlerConfig {
+  ctx: StreamingWorkflowCtx;
+  workflowId: string;
+  getTokenId: () => Id<"workflowTokens"> | null;
+}
+
+/**
  * Create an error handler for workflow functions.
  * Logs the error, invalidates the workflow token if present, and re-throws.
  */
-function createWorkflowErrorHandler(
-  ctx: StreamingWorkflowCtx,
-  workflowId: string,
-  getTokenId: () => Id<"workflowTokens"> | null,
-) {
+function createWorkflowErrorHandler(config: WorkflowErrorHandlerConfig) {
+  const { ctx, workflowId, getTokenId } = config;
   return async (error: Error, stage: string): Promise<never> => {
     console.error(`💥 WORKFLOW ERROR [${stage}]`, {
       workflowId,
@@ -748,11 +660,14 @@ export async function* streamConversationalWorkflow(
     createWorkflowEvent(type, data);
 
   let workflowTokenId: Id<"workflowTokens"> | null = null;
-  const handleError = createWorkflowErrorHandler(
+  const handleError = createWorkflowErrorHandler({
     ctx,
     workflowId,
-    () => workflowTokenId,
-  );
+    getTokenId: () => workflowTokenId,
+  });
+
+  // Initialize tool output harvesting using unified HarvestedData type
+  const harvested = createEmptyHarvestedData();
 
   try {
     // Create workflow token
@@ -776,10 +691,13 @@ export async function* streamConversationalWorkflow(
       workflowTokenPayload.sessionId = args.sessionId;
     }
 
-    workflowTokenId = await ctx.runMutation(
-      // @ts-expect-error - Convex TS2589: deeply nested type inference
-      internal.workflowTokens.createToken,
-      workflowTokenPayload,
+    workflowTokenId = await withErrorContext(
+      "Failed to create workflow token",
+      () =>
+        ctx.runMutation(
+          internal.workflowTokens.createToken,
+          workflowTokenPayload,
+        ),
     );
 
     // Get chat and verify access
@@ -788,18 +706,22 @@ export async function* streamConversationalWorkflow(
     };
     if (args.sessionId) getChatArgs.sessionId = args.sessionId;
 
-    const chat = await ctx.runQuery(api.chats.getChatById, getChatArgs);
+    const chat = await withErrorContext("Failed to retrieve chat", () =>
+      ctx.runQuery(api.chats.getChatById, getChatArgs),
+    );
     if (!chat) throw new Error("Chat not found or access denied");
 
     yield writeEvent("workflow_start", { workflowId, nonce });
 
     // Add user message
-    await ctx.runMutation(internal.messages.addMessage, {
-      chatId: args.chatId,
-      role: "user",
-      content: args.userQuery,
-      sessionId: args.sessionId,
-    });
+    await withErrorContext("Failed to save user message", () =>
+      ctx.runMutation(internal.messages.addMessage, {
+        chatId: args.chatId,
+        role: "user",
+        content: args.userQuery,
+        sessionId: args.sessionId,
+      }),
+    );
 
     // Get recent messages for conversation context
     const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
@@ -807,9 +729,9 @@ export async function* streamConversationalWorkflow(
     };
     if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
 
-    const recentMessages = (await ctx.runQuery(
-      api.chats.getChatMessages,
-      getMessagesArgs,
+    const recentMessages = (await withErrorContext(
+      "Failed to retrieve chat messages",
+      () => ctx.runQuery(api.chats.getChatMessages, getMessagesArgs),
     )) as Array<{
       role: "user" | "assistant" | "system";
       content?: string;
@@ -843,6 +765,7 @@ export async function* streamConversationalWorkflow(
     let accumulatedResponse = "";
     let hasStartedStreaming = false;
     let toolCallCount = 0;
+    let lastProgressStage = "thinking";
 
     // Process streaming events
     for await (const event of agentResult) {
@@ -850,26 +773,138 @@ export async function* streamConversationalWorkflow(
         const item = event.item as any;
         const eventName = (event as any).name;
 
-        // Handle tool calls - emit progress events
-        if (eventName === "tool_call_created" || item?.type === "tool_call") {
-          toolCallCount++;
-          const toolName = item?.name || item?.tool?.name || "tool";
+        // Detect tool calls via multiple patterns (OpenAI Agents SDK compatibility)
+        // Pattern 1: item is a RunToolCallItem (has rawItem.type === "function_call")
+        // Pattern 2: eventName contains "tool" or "function"
+        // Pattern 3: item.type === "tool_call" or "function_call"
+        const isToolCall =
+          item instanceof RunToolCallItem ||
+          item?.rawItem?.type === "function_call" ||
+          item?.type === "tool_call" ||
+          item?.type === "function_call" ||
+          eventName === "tool_call_created" ||
+          eventName === "function_call_item_created";
 
-          if (toolName === "plan_research") {
+        if (isToolCall) {
+          toolCallCount++;
+          const toolName =
+            item?.name ||
+            item?.rawItem?.name ||
+            item?.tool?.name ||
+            item?.function?.name ||
+            "tool";
+
+          console.log(`🔧 TOOL CALL DETECTED: ${toolName}`, {
+            eventName,
+            itemType: item?.type,
+            rawItemType: item?.rawItem?.type,
+          });
+
+          // Emit progress events for tool calls
+          if (
+            toolName === "plan_research" &&
+            lastProgressStage !== "planning"
+          ) {
+            lastProgressStage = "planning";
             yield writeEvent("progress", {
               stage: "planning",
               message: "Planning research strategy...",
             });
-          } else if (toolName === "search_web") {
+          } else if (
+            toolName === "search_web" &&
+            lastProgressStage !== "searching"
+          ) {
+            lastProgressStage = "searching";
             yield writeEvent("progress", {
               stage: "searching",
               message: "Searching the web...",
             });
-          } else if (toolName === "scrape_webpage") {
+          } else if (
+            toolName === "scrape_webpage" &&
+            lastProgressStage !== "scraping"
+          ) {
+            lastProgressStage = "scraping";
             yield writeEvent("progress", {
               stage: "scraping",
               message: "Reading sources...",
             });
+          }
+        }
+
+        // Detect tool call outputs and harvest data
+        // Pattern 1: item is a RunToolCallOutputItem
+        // Pattern 2: eventName contains "output"
+        const isToolOutput =
+          item instanceof RunToolCallOutputItem ||
+          item?.type === "tool_call_output" ||
+          item?.type === "function_call_output" ||
+          eventName === "tool_call_output_created" ||
+          eventName === "function_call_output_item_created";
+
+        if (isToolOutput) {
+          const output = item?.output || item?.rawItem?.output;
+          const outputToolName = item?.toolName || item?.rawItem?.name || "";
+
+          // Skip if output is missing or indicates an error
+          if (!output || typeof output !== "object") continue;
+          if ("error" in output && output.error) {
+            console.log(`⚠️ SKIPPED failed tool output: ${outputToolName}`);
+            continue;
+          }
+
+          // Harvest search results
+          if (outputToolName === "search_web" || output.results) {
+            const results = output.results as Array<any> | undefined;
+            if (Array.isArray(results)) {
+              for (const r of results) {
+                if (r.url && r.title) {
+                  harvested.searchResults.push({
+                    title: r.title,
+                    url: r.url,
+                    snippet: r.snippet || "",
+                    relevanceScore:
+                      r.relevanceScore || RELEVANCE_SCORES.SEARCH_RESULT,
+                  });
+                }
+              }
+              console.log(
+                `📥 HARVESTED search results: ${results.length} items`,
+              );
+            }
+          }
+
+          // Harvest scraped content with URL deduplication
+          // Dedup is needed because: (1) LLM may call scrape_webpage twice for same URL,
+          // (2) the same URL may appear in multiple search results
+          if (
+            (outputToolName === "scrape_webpage" || output.scrapedAt) &&
+            output.url &&
+            output.content
+          ) {
+            // Normalize URL before dedup check to handle trailing slashes, query params, etc.
+            const rawUrl = String(output.url);
+            const normalizedUrl = normalizeUrl(rawUrl) ?? rawUrl;
+            if (!harvested.scrapedUrls.has(normalizedUrl)) {
+              harvested.scrapedUrls.add(normalizedUrl);
+              const contextId =
+                typeof output.contextId === "string" &&
+                isUuidV7(output.contextId)
+                  ? output.contextId
+                  : generateMessageId();
+              harvested.scrapedContent.push({
+                url: rawUrl, // Store original URL for display
+                title: String(output.title || ""),
+                content: String(output.content || ""),
+                summary: String(output.summary || ""),
+                contentLength: output.content?.length || 0,
+                scrapedAt: output.scrapedAt || Date.now(),
+                contextId,
+                relevanceScore: RELEVANCE_SCORES.SCRAPED_PAGE,
+              });
+              console.log(`📥 HARVESTED scraped page: ${rawUrl}`);
+            } else {
+              console.log(`⚠️ SKIPPED duplicate scrape: ${rawUrl}`);
+            }
           }
         }
 
@@ -907,6 +942,13 @@ export async function* streamConversationalWorkflow(
       (agentResult.finalOutput as string) || accumulatedResponse;
     const totalDuration = Date.now() - startTime;
 
+    // Validate output is not empty (consistent with streamResearchWorkflow validation)
+    if (!finalOutput || finalOutput.trim().length === 0) {
+      throw new Error(
+        "Conversational agent produced empty output - no content to save",
+      );
+    }
+
     console.log(
       `🏁 CONVERSATIONAL WORKFLOW COMPLETE: ${totalDuration}ms | tools: ${toolCallCount} | chars: ${finalOutput.length}`,
     );
@@ -917,58 +959,144 @@ export async function* streamConversationalWorkflow(
     }
 
     // Update chat title if needed
-    const generatedTitle = generateChatTitle({ intent: args.userQuery });
-    if (chat.title === "New Chat" || !chat.title) {
-      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-        chatId: args.chatId,
-        title: generatedTitle,
+    await updateChatTitleIfNeeded({
+      ctx,
+      chatId: args.chatId,
+      currentTitle: chat.title,
+      intent: args.userQuery,
+    });
+
+    // Build context references from harvested data
+    const contextReferences: ResearchContextReference[] = [];
+    const now = Date.now();
+
+    // Add scraped pages as high-relevance sources
+    for (const scraped of harvested.scrapedContent) {
+      contextReferences.push({
+        contextId: scraped.contextId,
+        type: "scraped_page",
+        url: scraped.url,
+        title: scraped.title,
+        timestamp: scraped.scrapedAt || now,
+        relevanceScore: scraped.relevanceScore ?? RELEVANCE_SCORES.SCRAPED_PAGE,
       });
     }
 
-    // Save assistant message
-    const assistantMessageId: Id<"messages"> = (await ctx.runMutation(
-      internal.messages.addMessage,
-      {
-        chatId: args.chatId,
-        role: "assistant",
-        content: finalOutput,
-        searchResults: [],
-        sources: [],
-        contextReferences: [],
-        workflowId,
-        isStreaming: false,
-        sessionId: args.sessionId,
-      },
-    )) as Id<"messages">;
+    // Add search results as medium-relevance sources (if not already scraped)
+    // Use normalized URLs for dedup check to avoid duplicates with trailing slashes
+    const scrapedNormalizedUrls = new Set(
+      harvested.scrapedContent
+        .map((s) => normalizeUrl(s.url))
+        .filter((url): url is string => url !== null),
+    );
+    for (const result of harvested.searchResults) {
+      const normalizedResultUrl = normalizeUrl(result.url) ?? result.url;
+      if (!scrapedNormalizedUrls.has(normalizedResultUrl)) {
+        contextReferences.push({
+          contextId: generateMessageId(),
+          type: "search_result",
+          url: result.url,
+          title: result.title,
+          timestamp: now,
+          relevanceScore:
+            result.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
+        });
+      }
+    }
+
+    // Deduplicate by normalized URL, keeping first occurrence (typically higher relevance)
+    const uniqueContextRefs = Array.from(
+      new Map(
+        contextReferences.map((ref) => {
+          const rawUrl = ref.url || "";
+          return [normalizeUrl(rawUrl) ?? rawUrl, ref];
+        }),
+      ).values(),
+    );
+
+    // Build searchResults for the message (used by frontend MessageSources dropdown)
+    const searchResults = uniqueContextRefs
+      .filter(
+        (ref): ref is ResearchContextReference & { url: string } =>
+          typeof ref.url === "string" && ref.url.length > 0,
+      )
+      .map((ref) => ({
+        title: ref.title || ref.url || "",
+        url: ref.url,
+        snippet: "",
+        relevanceScore: ref.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
+      }));
+
+    // Extract source URLs for the sources array
+    const sources = uniqueContextRefs
+      .filter((ref) => ref.url)
+      .map((ref) => ref.url as string);
+
+    console.log(
+      `📊 CONVERSATIONAL SOURCES: ${uniqueContextRefs.length} refs, ${searchResults.length} results, ${sources.length} URLs`,
+    );
+
+    // Save assistant message (extracted per DR1a)
+    const assistantMessageId = await withErrorContext(
+      "Failed to save assistant message",
+      () =>
+        persistAssistantMessage({
+          ctx,
+          chatId: args.chatId,
+          content: finalOutput,
+          workflowId,
+          sessionId: args.sessionId,
+          searchResults,
+          sources,
+          contextReferences: uniqueContextRefs,
+        }),
+    );
 
     // Build persisted payload
     const persistedPayload: StreamingPersistPayload = {
       assistantMessageId,
       workflowId,
       answer: finalOutput,
-      sources: [],
-      contextReferences: [],
+      sources,
+      contextReferences: uniqueContextRefs,
     };
 
-    const signature = await ctx.runAction(
-      internal.workflowTokensActions.signPersistedPayload,
-      { payload: persistedPayload, nonce },
+    // Complete workflow and sign payload (extracted per DR1a)
+    const signature = await withErrorContext(
+      "Failed to complete workflow",
+      () =>
+        completeWorkflowWithSignature({
+          ctx,
+          workflowTokenId,
+          payload: persistedPayload,
+          nonce,
+        }),
     );
 
-    // Complete workflow token
-    if (workflowTokenId) {
-      await ctx.runMutation(internal.workflowTokens.completeToken, {
-        tokenId: workflowTokenId,
-        signature,
-      });
-    }
-
-    // Emit completion events
+    // Emit completion events with harvested sources
     yield writeEvent("complete", {
       workflow: {
         workflowId,
         planning: { userIntent: args.userQuery, searchQueries: [] },
-        research: { researchSummary: "", keyFindings: [], sourcesUsed: [] },
+        research: {
+          researchSummary:
+            harvested.searchResults.length > 0
+              ? `Found ${harvested.searchResults.length} search results and scraped ${harvested.scrapedContent.length} pages.`
+              : "",
+          keyFindings: [],
+          sourcesUsed: uniqueContextRefs.map((ref) => ({
+            url: ref.url || "",
+            title: ref.title || "",
+            contextId: ref.contextId,
+            type: ref.type,
+            relevance:
+              (ref.relevanceScore ?? 0) >= RELEVANCE_SCORES.HIGH_THRESHOLD
+                ? "high"
+                : (ref.relevanceScore ?? 0) >= RELEVANCE_SCORES.MEDIUM_THRESHOLD
+                  ? "medium"
+                  : "low",
+          })),
+        },
         answer: { answer: finalOutput, confidence: 1 },
         metadata: { totalDuration, timestamp: Date.now() },
       },
@@ -977,7 +1105,7 @@ export async function* streamConversationalWorkflow(
     yield writeEvent("metadata", {
       metadata: {
         workflowId,
-        contextReferences: [],
+        contextReferences: uniqueContextRefs,
         hasLimitations: false,
         confidence: 1,
         answerLength: finalOutput.length,
@@ -1023,11 +1151,11 @@ export async function* streamResearchWorkflow(
     createWorkflowEvent(type, data);
 
   let workflowTokenId: Id<"workflowTokens"> | null = null;
-  const handleError = createWorkflowErrorHandler(
+  const handleError = createWorkflowErrorHandler({
     ctx,
     workflowId,
-    () => workflowTokenId,
-  );
+    getTokenId: () => workflowTokenId,
+  });
 
   const workflowTokenPayload: {
     workflowId: string;
@@ -1096,10 +1224,14 @@ export async function* streamResearchWorkflow(
 
   const conversationSource =
     conversationContextFromDb || args.conversationContext || "";
-  const conversationBlock = buildConversationBlock(conversationSource);
-  const referenceBlock = formatContextReferencesForPrompt(
+  // Note: These are prepared for potential future use but the parallel workflow
+  // builds research instructions differently. Prefixed to satisfy linter.
+  const _conversationBlock = buildConversationBlock(conversationSource);
+  const _referenceBlock = formatContextReferencesForPrompt(
     streamingContextReferences,
   );
+  void _conversationBlock;
+  void _referenceBlock;
 
   const instantResponse = detectInstantResponse(args.userQuery);
 
@@ -1163,30 +1295,25 @@ export async function* streamResearchWorkflow(
         nonce,
       });
 
-      // Update chat title
-      const generatedTitle = generateChatTitle({ intent: args.userQuery });
-      if (chat.title === "New Chat" || !chat.title) {
-        await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-          chatId: args.chatId,
-          title: generatedTitle,
-        });
-      }
+      // Update chat title (extracted per DR1a)
+      await updateChatTitleIfNeeded({
+        ctx,
+        chatId: args.chatId,
+        currentTitle: chat.title,
+        intent: args.userQuery,
+      });
 
-      // Save assistant message
-      const instantMessageId: Id<"messages"> = (await ctx.runMutation(
-        internal.messages.addMessage,
-        {
-          chatId: args.chatId,
-          role: "assistant",
-          content: instantResponse,
-          searchResults: [],
-          sources: [],
-          contextReferences: [],
-          workflowId,
-          isStreaming: false,
-          sessionId: args.sessionId,
-        },
-      )) as Id<"messages">;
+      // Save assistant message (extracted per DR1a)
+      const instantMessageId = await persistAssistantMessage({
+        ctx,
+        chatId: args.chatId,
+        content: instantResponse,
+        workflowId,
+        sessionId: args.sessionId,
+        searchResults: [],
+        sources: [],
+        contextReferences: [],
+      });
 
       const instantPayload: StreamingPersistPayload = {
         assistantMessageId: instantMessageId,
@@ -1196,17 +1323,13 @@ export async function* streamResearchWorkflow(
         contextReferences: [],
       };
 
-      const instantSignature = await ctx.runAction(
-        internal.workflowTokensActions.signPersistedPayload,
-        { payload: instantPayload, nonce },
-      );
-
-      if (workflowTokenId) {
-        await ctx.runMutation(internal.workflowTokens.completeToken, {
-          tokenId: workflowTokenId,
-          signature: instantSignature,
-        });
-      }
+      // Complete workflow (extracted per DR1a)
+      const instantSignature = await completeWorkflowWithSignature({
+        ctx,
+        workflowTokenId,
+        payload: instantPayload,
+        nonce,
+      });
 
       yield writeEvent("persisted", {
         payload: instantPayload,
@@ -1419,32 +1542,25 @@ export async function* streamResearchWorkflow(
         nonce,
       });
 
-      // Update chat title if needed
-      const generatedTitle = generateChatTitle({
+      // Update chat title if needed (extracted per DR1a)
+      await updateChatTitleIfNeeded({
+        ctx,
+        chatId: args.chatId,
+        currentTitle: chat.title,
         intent: planningOutput?.userIntent || args.userQuery,
       });
-      if (chat.title === "New Chat" || !chat.title) {
-        await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-          chatId: args.chatId,
-          title: generatedTitle,
-        });
-      }
 
-      // Save assistant message
-      const fastAssistantMessageId: Id<"messages"> = (await ctx.runMutation(
-        internal.messages.addMessage,
-        {
-          chatId: args.chatId,
-          role: "assistant",
-          content: fastFinalAnswerText,
-          searchResults: [],
-          sources: fastParsedAnswer.sourcesUsed || [],
-          contextReferences: [],
-          workflowId,
-          isStreaming: false,
-          sessionId: args.sessionId,
-        },
-      )) as Id<"messages">;
+      // Save assistant message (extracted per DR1a)
+      const fastAssistantMessageId = await persistAssistantMessage({
+        ctx,
+        chatId: args.chatId,
+        content: fastFinalAnswerText,
+        workflowId,
+        sessionId: args.sessionId,
+        searchResults: [],
+        sources: fastParsedAnswer.sourcesUsed || [],
+        contextReferences: [],
+      });
 
       const fastPersistedPayload: StreamingPersistPayload = {
         assistantMessageId: fastAssistantMessageId,
@@ -1454,17 +1570,13 @@ export async function* streamResearchWorkflow(
         contextReferences: [],
       };
 
-      const fastSignature = await ctx.runAction(
-        internal.workflowTokensActions.signPersistedPayload,
-        { payload: fastPersistedPayload, nonce },
-      );
-
-      if (workflowTokenId) {
-        await ctx.runMutation(internal.workflowTokens.completeToken, {
-          tokenId: workflowTokenId,
-          signature: fastSignature,
-        });
-      }
+      // Complete workflow (extracted per DR1a)
+      const fastSignature = await completeWorkflowWithSignature({
+        ctx,
+        workflowTokenId,
+        payload: fastPersistedPayload,
+        nonce,
+      });
 
       yield writeEvent("persisted", {
         payload: fastPersistedPayload,
@@ -1482,11 +1594,10 @@ export async function* streamResearchWorkflow(
     // This eliminates the 8-13 second LLM "thinking" gaps between tool calls.
     // Total research phase should complete in ~2-3 seconds instead of 30-60 seconds.
 
-    // Initialize harvested data container
-    const harvested: HarvestedToolData = {
-      scrapedContent: [],
-      serpEnrichment: {},
-      searchResults: [],
+    // Initialize harvested data container (legacy workflow needs serpEnrichment as object)
+    const harvested = {
+      ...createEmptyHarvestedData(),
+      serpEnrichment: {} as SerpEnrichment,
     };
 
     const parallelStartTime = Date.now();
@@ -1526,7 +1637,7 @@ export async function* streamResearchWorkflow(
       const searchResults = await Promise.all(searchPromises);
 
       // Harvest all search results
-      for (const { query, result } of searchResults) {
+      for (const { result } of searchResults) {
         if (!result?.results) continue;
 
         for (const r of result.results) {
@@ -1881,44 +1992,38 @@ export async function* streamResearchWorkflow(
       nonce,
     });
 
-    // Generate and update chat title using refined intent from planning
-    // The 25-char limit is enforced by generateChatTitle utility
-    const generatedTitle = generateChatTitle({
+    // Update chat title using refined intent from planning (extracted per DR1a)
+    await updateChatTitleIfNeeded({
+      ctx,
+      chatId: args.chatId,
+      currentTitle: chat.title,
       intent: planningOutput?.userIntent || args.userQuery,
     });
 
-    // Only update if title hasn't been customized (still default or matches generated)
-    if (chat.title === "New Chat" || !chat.title) {
-      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-        chatId: args.chatId,
-        title: generatedTitle,
-      });
-    }
+    // Build search results from context references
+    const searchResults = contextReferences
+      .filter(
+        (ref): ref is ResearchContextReference & { url: string } =>
+          typeof ref.url === "string" && ref.url.length > 0,
+      )
+      .map((ref) => ({
+        title: ref.title || ref.url || "",
+        url: ref.url,
+        snippet: "",
+        relevanceScore: ref.relevanceScore ?? 0.5,
+      }));
 
-    const assistantMessageId: Id<"messages"> = (await ctx.runMutation(
-      internal.messages.addMessage,
-      {
-        chatId: args.chatId,
-        role: "assistant",
-        content: finalAnswerText,
-        searchResults: contextReferences
-          .filter(
-            (ref): ref is ResearchContextReference & { url: string } =>
-              typeof ref.url === "string" && ref.url.length > 0,
-          )
-          .map((ref) => ({
-            title: ref.title || ref.url || "",
-            url: ref.url,
-            snippet: "",
-            relevanceScore: ref.relevanceScore ?? 0.5,
-          })),
-        sources: parsedAnswer.sourcesUsed || [],
-        contextReferences,
-        workflowId,
-        isStreaming: false,
-        sessionId: args.sessionId, // Pass sessionId for HTTP action auth
-      },
-    )) as Id<"messages">;
+    // Save assistant message (extracted per DR1a)
+    const assistantMessageId = await persistAssistantMessage({
+      ctx,
+      chatId: args.chatId,
+      content: finalAnswerText,
+      workflowId,
+      sessionId: args.sessionId,
+      searchResults,
+      sources: parsedAnswer.sourcesUsed || [],
+      contextReferences,
+    });
 
     const persistedPayload: StreamingPersistPayload = {
       assistantMessageId,
@@ -1928,19 +2033,13 @@ export async function* streamResearchWorkflow(
       contextReferences,
     };
 
-    const signature = await ctx.runAction(
-      internal.workflowTokensActions.signPersistedPayload,
-      {
-        payload: persistedPayload,
-        nonce,
-      },
-    );
-    if (workflowTokenId) {
-      await ctx.runMutation(internal.workflowTokens.completeToken, {
-        tokenId: workflowTokenId,
-        signature,
-      });
-    }
+    // Complete workflow (extracted per DR1a)
+    const signature = await completeWorkflowWithSignature({
+      ctx,
+      workflowTokenId,
+      payload: persistedPayload,
+      nonce,
+    });
 
     const totalDuration = Date.now() - startTime;
     console.log(
