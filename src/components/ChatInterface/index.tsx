@@ -211,18 +211,29 @@ function ChatInterfaceComponent({
     const lastAssistantMessage = [...messages]
       .reverse()
       .find((m) => m.role === "assistant");
+    // Extract stable ID from the last assistant message (prefer messageId > _id > id)
+    const lastAssistantKey =
+      lastAssistantMessage?.messageId ??
+      lastAssistantMessage?._id ??
+      lastAssistantMessage?.id ??
+      null;
     const persistedAssistantMissingInPaginated =
       !!lastAssistantMessage &&
       lastAssistantMessage.persisted === true &&
       !lastAssistantMessage.isStreaming &&
       typeof lastAssistantMessage.content === "string" &&
       lastAssistantMessage.content.length > 0 &&
-      !paginatedMessages.some(
-        (m) =>
-          m.role === "assistant" &&
-          typeof m.content === "string" &&
-          m.content === lastAssistantMessage.content,
-      );
+      // Use ID-based comparison when available, fall back to content comparison
+      (lastAssistantKey
+        ? !paginatedMessages.some(
+            (m) => (m.messageId ?? m._id ?? m.id ?? null) === lastAssistantKey,
+          )
+        : !paginatedMessages.some(
+            (m) =>
+              m.role === "assistant" &&
+              typeof m.content === "string" &&
+              m.content === lastAssistantMessage.content,
+          ));
 
     // If we have optimistic messages (or a just-persisted message not yet in paginated),
     // always use unified messages (source of truth during generation)
