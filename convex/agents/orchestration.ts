@@ -128,28 +128,30 @@ class AgentTimeoutError extends Error {
 }
 
 /**
- * Create a timeout promise that rejects after the specified duration
- */
-function createTimeoutPromise(
-  timeoutMs: number,
-  stage: string,
-): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => {
-      reject(new AgentTimeoutError(stage, timeoutMs));
-    }, timeoutMs);
-  });
-}
-
-/**
- * Wrap an async operation with a timeout
+ * Wrap an async operation with a timeout.
+ * Properly cleans up the timer when the operation completes to prevent resource leaks.
  */
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
   stage: string,
 ): Promise<T> {
-  return Promise.race([promise, createTimeoutPromise(timeoutMs, stage)]);
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timerId = setTimeout(() => {
+      reject(new AgentTimeoutError(stage, timeoutMs));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    // Always clear the timer to prevent resource leaks
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+  }
 }
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
