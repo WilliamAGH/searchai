@@ -663,6 +663,317 @@ type StreamingWorkflowCtx = Pick<
 
 type WorkflowStreamEvent = Record<string, unknown>;
 
+// ============================================
+// CONVERSATIONAL WORKFLOW (Single-Agent Architecture)
+// ============================================
+// This is the new, faster workflow that uses a single agent with tools.
+// It eliminates the 3-agent sequential pipeline for most queries.
+
+export async function* streamConversationalWorkflow(
+  ctx: StreamingWorkflowCtx,
+  args: StreamingWorkflowArgs,
+): AsyncGenerator<WorkflowStreamEvent> {
+  const { agents } = require("./definitions");
+
+  const workflowId = generateMessageId();
+  const startTime = Date.now();
+  const nonce = generateMessageId();
+
+  const writeEvent = (
+    type: string,
+    data: Record<string, unknown>,
+  ): WorkflowStreamEvent => {
+    const cleaned: Record<string, unknown> = { type };
+    for (const [k, v] of Object.entries(data)) {
+      if (v === undefined || v === null) continue;
+      if (
+        typeof v === "object" &&
+        !Array.isArray(v) &&
+        Object.keys(v).length === 0
+      )
+        continue;
+      cleaned[k] = v;
+    }
+    return cleaned;
+  };
+
+  let workflowTokenId: Id<"workflowTokens"> | null = null;
+
+  const handleError = async (error: Error, stage: string) => {
+    console.error(`💥 CONVERSATIONAL WORKFLOW ERROR [${stage}]`, {
+      workflowId,
+      error: error.message,
+    });
+    if (workflowTokenId) {
+      try {
+        await ctx.runMutation(internal.workflowTokens.invalidateToken, {
+          tokenId: workflowTokenId,
+        });
+      } catch (invalidationError) {
+        console.error("Failed to invalidate workflow token", {
+          tokenId: workflowTokenId,
+          error:
+            invalidationError instanceof Error
+              ? invalidationError.message
+              : "Unknown invalidation error",
+        });
+      }
+    }
+    throw error;
+  };
+
+  try {
+    // Create workflow token
+    const issuedAt = Date.now();
+    const workflowTokenPayload: {
+      workflowId: string;
+      nonce: string;
+      chatId: Id<"chats">;
+      sessionId?: string;
+      issuedAt: number;
+      expiresAt: number;
+    } = {
+      workflowId,
+      nonce,
+      chatId: args.chatId,
+      issuedAt,
+      expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
+    };
+
+    if (args.sessionId) {
+      workflowTokenPayload.sessionId = args.sessionId;
+    }
+
+    workflowTokenId = await ctx.runMutation(
+      // @ts-expect-error - Convex TS2589: deeply nested type inference
+      internal.workflowTokens.createToken,
+      workflowTokenPayload,
+    );
+
+    // Get chat and verify access
+    const getChatArgs: { chatId: Id<"chats">; sessionId?: string } = {
+      chatId: args.chatId,
+    };
+    if (args.sessionId) getChatArgs.sessionId = args.sessionId;
+
+    const chat = await ctx.runQuery(api.chats.getChatById, getChatArgs);
+    if (!chat) throw new Error("Chat not found or access denied");
+
+    yield writeEvent("workflow_start", { workflowId, nonce });
+
+    // Add user message
+    await ctx.runMutation(internal.messages.addMessage, {
+      chatId: args.chatId,
+      role: "user",
+      content: args.userQuery,
+      sessionId: args.sessionId,
+    });
+
+    // Get recent messages for conversation context
+    const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
+      chatId: args.chatId,
+    };
+    if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
+
+    const recentMessages = (await ctx.runQuery(
+      api.chats.getChatMessages,
+      getMessagesArgs,
+    )) as Array<{
+      role: "user" | "assistant" | "system";
+      content?: string;
+    }>;
+
+    const conversationContext =
+      buildConversationContext(recentMessages || []) ||
+      args.conversationContext ||
+      "";
+
+    // Build the input for the conversational agent
+    const agentInput = conversationContext
+      ? `Previous conversation:\n${conversationContext}\n\nUser: ${args.userQuery}`
+      : args.userQuery;
+
+    console.log(
+      `🚀 CONVERSATIONAL WORKFLOW START: "${args.userQuery.substring(0, 50)}..."`,
+    );
+
+    yield writeEvent("progress", {
+      stage: "thinking",
+      message: "Thinking...",
+    });
+
+    // Run the conversational agent with streaming
+    const agentResult = await run(agents.conversational, agentInput, {
+      stream: true,
+      context: { actionCtx: ctx },
+    });
+
+    let accumulatedResponse = "";
+    let hasStartedStreaming = false;
+    let toolCallCount = 0;
+
+    // Process streaming events
+    for await (const event of agentResult) {
+      if (event.type === "run_item_stream_event") {
+        const item = event.item as any;
+        const eventName = (event as any).name;
+
+        // Handle tool calls - emit progress events
+        if (eventName === "tool_call_created" || item?.type === "tool_call") {
+          toolCallCount++;
+          const toolName = item?.name || item?.tool?.name || "tool";
+
+          if (toolName === "plan_research") {
+            yield writeEvent("progress", {
+              stage: "planning",
+              message: "Planning research strategy...",
+            });
+          } else if (toolName === "search_web") {
+            yield writeEvent("progress", {
+              stage: "searching",
+              message: "Searching the web...",
+            });
+          } else if (toolName === "scrape_webpage") {
+            yield writeEvent("progress", {
+              stage: "scraping",
+              message: "Reading sources...",
+            });
+          }
+        }
+
+        // Handle streaming text deltas
+        if (eventName === "message_output_created") continue; // Skip full content events
+
+        const delta =
+          item?.delta?.content ||
+          item?.content_delta ||
+          item?.text_delta ||
+          (eventName?.includes("delta") && item?.content);
+
+        if (delta && typeof delta === "string" && delta.length > 0) {
+          if (!hasStartedStreaming) {
+            hasStartedStreaming = true;
+            yield writeEvent("progress", {
+              stage: "generating",
+              message: "Generating response...",
+            });
+          }
+          accumulatedResponse += delta;
+          yield writeEvent("content", { delta });
+        }
+      }
+    }
+
+    // Wait for completion
+    await withTimeout(
+      agentResult.completed,
+      AGENT_TIMEOUT_MS * 2,
+      "conversational",
+    );
+
+    const finalOutput =
+      (agentResult.finalOutput as string) || accumulatedResponse;
+    const totalDuration = Date.now() - startTime;
+
+    console.log(
+      `🏁 CONVERSATIONAL WORKFLOW COMPLETE: ${totalDuration}ms | tools: ${toolCallCount} | chars: ${finalOutput.length}`,
+    );
+
+    // If no content was streamed, send the final output
+    if (accumulatedResponse.length === 0 && finalOutput.length > 0) {
+      yield writeEvent("content", { delta: finalOutput });
+    }
+
+    // Update chat title if needed
+    const generatedTitle = generateChatTitle({ intent: args.userQuery });
+    if (chat.title === "New Chat" || !chat.title) {
+      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
+        chatId: args.chatId,
+        title: generatedTitle,
+      });
+    }
+
+    // Save assistant message
+    const assistantMessageId: Id<"messages"> = (await ctx.runMutation(
+      internal.messages.addMessage,
+      {
+        chatId: args.chatId,
+        role: "assistant",
+        content: finalOutput,
+        searchResults: [],
+        sources: [],
+        contextReferences: [],
+        workflowId,
+        isStreaming: false,
+        sessionId: args.sessionId,
+      },
+    )) as Id<"messages">;
+
+    // Build persisted payload
+    const persistedPayload: StreamingPersistPayload = {
+      assistantMessageId,
+      workflowId,
+      answer: finalOutput,
+      sources: [],
+      contextReferences: [],
+    };
+
+    const signature = await ctx.runAction(
+      internal.workflowTokensActions.signPersistedPayload,
+      { payload: persistedPayload, nonce },
+    );
+
+    // Complete workflow token
+    if (workflowTokenId) {
+      await ctx.runMutation(internal.workflowTokens.completeToken, {
+        tokenId: workflowTokenId,
+        signature,
+      });
+    }
+
+    // Emit completion events
+    yield writeEvent("complete", {
+      workflow: {
+        workflowId,
+        planning: { userIntent: args.userQuery, searchQueries: [] },
+        research: { researchSummary: "", keyFindings: [], sourcesUsed: [] },
+        answer: { answer: finalOutput, confidence: 1 },
+        metadata: { totalDuration, timestamp: Date.now() },
+      },
+    });
+
+    yield writeEvent("metadata", {
+      metadata: {
+        workflowId,
+        contextReferences: [],
+        hasLimitations: false,
+        confidence: 1,
+        answerLength: finalOutput.length,
+      },
+      nonce,
+    });
+
+    yield writeEvent("persisted", {
+      payload: persistedPayload,
+      nonce,
+      signature,
+    });
+  } catch (error) {
+    await handleError(
+      error instanceof Error
+        ? error
+        : new Error("Conversational workflow failed"),
+      "conversational",
+    );
+  }
+}
+
+// ============================================
+// LEGACY RESEARCH WORKFLOW (3-Agent Pipeline)
+// ============================================
+// This is the original workflow with planning → research → synthesis.
+// Kept for comparison and fallback.
+
 export async function* streamResearchWorkflow(
   ctx: StreamingWorkflowCtx,
   args: StreamingWorkflowArgs,
@@ -738,7 +1049,6 @@ export async function* streamResearchWorkflow(
   }
 
   workflowTokenId = await ctx.runMutation(
-    // @ts-expect-error - Convex TS2589: deeply nested type inference
     internal.workflowTokens.createToken,
     workflowTokenPayload,
   );
