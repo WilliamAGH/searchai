@@ -51,15 +51,20 @@ function getProgressHeader(stage: string): string {
 }
 
 function getProgressDescription(stage: string, message?: string): string {
-  // Priority 1: Use custom message if it's meaningfully different from the stage
+  // Priority 1: Use custom message if it's meaningfully different from the stage AND header
   if (message) {
-    const normalizedMessage = message.toLowerCase();
+    const normalizedMessage = message.toLowerCase().replace(/\.*$/, "").trim();
     const normalizedStage = stage.toLowerCase();
-    const stageRoot = normalizedStage.replace("ing", "");
+    const stageRoot = normalizedStage.replace(/ing$/, "");
+    const header = PROGRESS_DISPLAY[stage]?.header?.toLowerCase() || "";
 
+    // Check for redundancy against stage name, root, and header
     const isRedundant =
       normalizedMessage === normalizedStage ||
-      normalizedMessage.includes(stageRoot);
+      normalizedMessage === stageRoot ||
+      normalizedMessage === header ||
+      // Also check if message is essentially the header with different punctuation
+      normalizedMessage.replace(/\s+/g, "") === header.replace(/\s+/g, "");
 
     if (!isRedundant) {
       return message;
