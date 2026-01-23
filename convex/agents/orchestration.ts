@@ -120,6 +120,42 @@ function detectInstantResponse(query: string): string | null {
   return null;
 }
 
+// ============================================
+// Error Stage Detection
+// ============================================
+// Maps error message patterns to workflow stages for error reporting.
+
+const ERROR_STAGE_PATTERNS: ReadonlyArray<{ pattern: string; stage: string }> =
+  [
+    { pattern: "Planning failed", stage: "planning" },
+    { pattern: "Research failed", stage: "research" },
+    { pattern: "Synthesis failed", stage: "synthesis" },
+  ];
+
+/**
+ * Detect which workflow stage an error occurred in based on context.
+ * Returns "instant" if in instant response path, otherwise matches error message patterns.
+ */
+function detectErrorStage(
+  error: unknown,
+  isInstantPath: string | null,
+): string {
+  if (isInstantPath) {
+    return "instant";
+  }
+
+  if (error instanceof Error) {
+    const match = ERROR_STAGE_PATTERNS.find(({ pattern }) =>
+      error.message.includes(pattern),
+    );
+    if (match) {
+      return match.stage;
+    }
+  }
+
+  return "unknown";
+}
+
 class AgentTimeoutError extends Error {
   constructor(stage: string, timeoutMs: number) {
     super(`Agent ${stage} timed out after ${timeoutMs}ms`);
@@ -1608,15 +1644,7 @@ export async function* streamResearchWorkflow(
     });
   } catch (error) {
     // Determine which stage failed based on context
-    const stage = instantResponse
-      ? "instant" // Error occurred in instant response path
-      : error instanceof Error && error.message.includes("Planning failed")
-        ? "planning"
-        : error instanceof Error && error.message.includes("Research failed")
-          ? "research"
-          : error instanceof Error && error.message.includes("Synthesis failed")
-            ? "synthesis"
-            : "unknown";
+    const stage = detectErrorStage(error, instantResponse);
 
     await handleError(
       error instanceof Error ? error : new Error("An unknown error occurred"),
