@@ -27,21 +27,34 @@ export const claimAnonymousChats = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Must be authenticated to claim chats");
 
-    const newSessionId = generateSessionId();
-
-    // Find all chats with this sessionId to rotate access for this session.
+    // Find all chats with this sessionId
     const chatsForSession = await ctx.db
       .query("chats")
       .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
       .collect();
 
-    let claimed = 0;
-
-    for (const chat of chatsForSession) {
+    // Filter to chats we can process: unclaimed OR already owned by this user
+    const processableChats = chatsForSession.filter((chat) => {
       const isUnclaimed = !chat.userId;
       const isOwnedByUser = chat.userId === userId;
+      return isUnclaimed || isOwnedByUser;
+    });
 
-      if (!isUnclaimed && !isOwnedByUser) continue;
+    // Check if there are any unclaimed chats that need claiming
+    const unclaimedChats = processableChats.filter((chat) => !chat.userId);
+
+    // If no unclaimed chats, skip rotation entirely to avoid redundant writes
+    // This prevents session rotation on every login for users with no new chats to claim
+    if (unclaimedChats.length === 0) {
+      return { claimed: 0, newSessionId: args.sessionId };
+    }
+
+    // Only generate new sessionId when we actually need to claim chats
+    const newSessionId = generateSessionId();
+    let claimed = 0;
+
+    for (const chat of processableChats) {
+      const isUnclaimed = !chat.userId;
 
       // Single patch: rotate sessionId; claim ownership if unclaimed
       const patchData: {
