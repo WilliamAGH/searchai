@@ -755,15 +755,16 @@ export async function* streamResearchWorkflow(
     streamingContextReferences,
   );
 
-  // ============================================
-  // INSTANT RESPONSE PATH (No LLM calls)
-  // ============================================
-  // For obvious greetings/tests, respond instantly without any agent calls.
-  // This reduces response time from 5-16 seconds to <500ms.
-
   const instantResponse = detectInstantResponse(args.userQuery);
-  if (instantResponse) {
-    try {
+
+  try {
+    // ============================================
+    // INSTANT RESPONSE PATH (No LLM calls)
+    // ============================================
+    // For obvious greetings/tests, respond instantly without any agent calls.
+    // This reduces response time from 5-16 seconds to <500ms.
+
+    if (instantResponse) {
       console.log(
         "⚡ INSTANT RESPONSE: Skipping all agent calls for simple message",
       );
@@ -868,16 +869,11 @@ export async function* streamResearchWorkflow(
       });
 
       return; // Exit - no agent calls needed
-    } catch (error) {
-      // Ensure workflow token is invalidated on failure
-      await handleError(
-        error instanceof Error ? error : new Error("Instant response failed"),
-        "instant",
-      );
     }
-  }
 
-  try {
+    // ============================================
+    // MAIN WORKFLOW PATH (Full agent orchestration)
+    // ============================================
     yield writeEvent("progress", {
       stage: "planning",
       message: "Analyzing your question and planning research strategy...",
@@ -1611,8 +1607,10 @@ export async function* streamResearchWorkflow(
       signature,
     });
   } catch (error) {
-    const stage =
-      error instanceof Error && error.message.includes("Planning failed")
+    // Determine which stage failed based on context
+    const stage = instantResponse
+      ? "instant" // Error occurred in instant response path
+      : error instanceof Error && error.message.includes("Planning failed")
         ? "planning"
         : error instanceof Error && error.message.includes("Research failed")
           ? "research"
