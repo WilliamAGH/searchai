@@ -13,7 +13,7 @@ import { generateSessionId } from "../lib/uuid";
  * Claim anonymous chats when user signs up or logs in
  * Transfers ownership of session chats to authenticated user
  * @param sessionId - Anonymous session to claim
- * @returns Number of chats claimed
+ * @returns Object containing claimed count and newSessionId for session rotation
  */
 export const claimAnonymousChats = mutation({
   args: {
