@@ -9,11 +9,13 @@
  */
 export function serializeError(error: unknown) {
   if (error instanceof Error) {
+    // Safely extract cause as string to avoid circular references in JSON.stringify
+    const cause = (error as Error & { cause?: unknown }).cause;
     return {
       name: error.name,
       message: error.message,
       stack: error.stack,
-      cause: (error as Error & { cause?: unknown }).cause,
+      cause: cause ? String(cause) : undefined,
     };
   }
   return { message: String(error) };
