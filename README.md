@@ -244,6 +244,7 @@ Set these using `npx convex env set` (append `--prod` for production):
 - `SITE_URL` - Your app's public URL (used in headers and auth callbacks); set per environment
 - `LLM_HEALTHCHECK` - Set to `0` to disable startup health checks (default: enabled)
 - `LLM_HEALTHCHECK_TIMEOUT_MS` - Health check timeout in ms (default: 8000)
+- `CONVEX_TRUST_PROXY` - Set to `1` to trust proxy headers (e.g. `X-Forwarded-For`) for rate limiting (optional)
 
 Notes:
 
