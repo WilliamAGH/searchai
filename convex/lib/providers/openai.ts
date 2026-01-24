@@ -410,6 +410,13 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
     (isOpenRouter
       ? process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY
       : process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY);
+
+  if (!apiKey) {
+    throw new Error(
+      "No API key configured. Set LLM_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY",
+    );
+  }
+
   const isChatCompletionsEndpoint =
     normalizedBase?.includes("/chat/completions") ?? false;
   // Use Chat Completions API for OpenRouter and any endpoint with /chat/completions
