@@ -16,15 +16,17 @@ export {
   createChat,
   getUserChats,
   getChatById,
+  getChatByIdHttp,
   getChatByIdDirect,
   getChat,
   getChatByOpaqueId,
   getChatByShareId,
+  getChatByShareIdHttp,
   getChatByPublicId,
 } from "./chats/core";
 
 // Re-export message operations
-export { getChatMessages } from "./chats/messages";
+export { getChatMessages, getChatMessagesHttp } from "./chats/messages";
 
 // Re-export update operations
 export {

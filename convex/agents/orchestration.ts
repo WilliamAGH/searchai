@@ -693,6 +693,101 @@ function createWorkflowErrorHandler(config: WorkflowErrorHandlerConfig) {
 // This is the new, faster workflow that uses a single agent with tools.
 // It eliminates the 3-agent sequential pipeline for most queries.
 
+/**
+ * Initialize workflow session: create token, verify chat, fetch history, add user message.
+ * Extracted per Clean Code [WRN1] to reduce function size and duplication.
+ */
+async function initializeWorkflowSession(
+  ctx: StreamingWorkflowCtx,
+  args: StreamingWorkflowArgs,
+  workflowId: string,
+  nonce: string,
+) {
+  // 1. Create workflow token
+  const issuedAt = Date.now();
+  const workflowTokenPayload: {
+    workflowId: string;
+    nonce: string;
+    chatId: Id<"chats">;
+    sessionId?: string;
+    issuedAt: number;
+    expiresAt: number;
+  } = {
+    workflowId,
+    nonce,
+    chatId: args.chatId,
+    issuedAt,
+    expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
+  };
+
+  if (args.sessionId) {
+    workflowTokenPayload.sessionId = args.sessionId;
+  }
+
+  const workflowTokenId = await withErrorContext(
+    "Failed to create workflow token",
+    () =>
+      ctx.runMutation(
+        internal.workflowTokens.createToken,
+        workflowTokenPayload,
+      ),
+  );
+
+  // 2. Get chat and verify access
+  const getChatArgs: { chatId: Id<"chats">; sessionId?: string } = {
+    chatId: args.chatId,
+  };
+  if (args.sessionId) getChatArgs.sessionId = args.sessionId;
+
+  const chat = await withErrorContext("Failed to retrieve chat", () =>
+    ctx.runQuery(api.chats.getChatByIdHttp, getChatArgs),
+  );
+  if (!chat) throw new Error("Chat not found or access denied");
+
+  // 3. Get recent messages (Fetch FIRST to exclude current query)
+  const getMessagesArgs: {
+    chatId: Id<"chats">;
+    sessionId?: string;
+    limit?: number;
+  } = {
+    chatId: args.chatId,
+    limit: 20,
+  };
+  if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
+
+  const recentMessages = (await withErrorContext(
+    "Failed to retrieve chat messages",
+    () => ctx.runQuery(api.chats.getChatMessagesHttp, getMessagesArgs),
+  )) as Array<{
+    role: "user" | "assistant" | "system";
+    content?: string;
+  }>;
+
+  // 4. Add user message
+  await withErrorContext("Failed to save user message", () =>
+    ctx.runMutation(internal.messages.addMessageHttp, {
+      chatId: args.chatId,
+      role: "user",
+      content: args.userQuery,
+      sessionId: args.sessionId,
+    }),
+  );
+
+  // 5. Build context
+  let conversationContext = buildConversationContext(recentMessages || []);
+  if (!conversationContext && args.conversationContext) {
+    console.warn(
+      "buildConversationContext returned empty; using args.conversationContext",
+    );
+    conversationContext = args.conversationContext;
+  }
+  if (!conversationContext) {
+    conversationContext = "";
+  }
+
+  return { workflowTokenId, chat, conversationContext };
+}
+
 export async function* streamConversationalWorkflow(
   ctx: StreamingWorkflowCtx,
   args: StreamingWorkflowArgs,
@@ -718,93 +813,16 @@ export async function* streamConversationalWorkflow(
   const harvested = createEmptyHarvestedData();
 
   try {
-    // Create workflow token
-    const issuedAt = Date.now();
-    const workflowTokenPayload: {
-      workflowId: string;
-      nonce: string;
-      chatId: Id<"chats">;
-      sessionId?: string;
-      issuedAt: number;
-      expiresAt: number;
-    } = {
+    const session = await initializeWorkflowSession(
+      ctx,
+      args,
       workflowId,
       nonce,
-      chatId: args.chatId,
-      issuedAt,
-      expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
-    };
-
-    if (args.sessionId) {
-      workflowTokenPayload.sessionId = args.sessionId;
-    }
-
-    workflowTokenId = await withErrorContext(
-      "Failed to create workflow token",
-      () =>
-        ctx.runMutation(
-          internal.workflowTokens.createToken,
-          workflowTokenPayload,
-        ),
     );
-
-    // Get chat and verify access
-    const getChatArgs: { chatId: Id<"chats">; sessionId?: string } = {
-      chatId: args.chatId,
-    };
-    if (args.sessionId) getChatArgs.sessionId = args.sessionId;
-
-    const chat = await withErrorContext("Failed to retrieve chat", () =>
-      ctx.runQuery(api.chats.getChatById, getChatArgs),
-    );
-    if (!chat) throw new Error("Chat not found or access denied");
+    workflowTokenId = session.workflowTokenId;
+    const { chat, conversationContext } = session;
 
     yield writeEvent("workflow_start", { workflowId, nonce });
-
-    // Get recent messages for conversation context BEFORE adding the current user message
-    // This prevents the user query from appearing twice in the agent input
-    // Limit to 20 messages to bound memory/latency for large chats while maintaining context
-    const getMessagesArgs: {
-      chatId: Id<"chats">;
-      sessionId?: string;
-      limit?: number;
-    } = {
-      chatId: args.chatId,
-      limit: 20,
-    };
-    if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
-
-    const recentMessages = (await withErrorContext(
-      "Failed to retrieve chat messages",
-      () => ctx.runQuery(api.chats.getChatMessages, getMessagesArgs),
-    )) as Array<{
-      role: "user" | "assistant" | "system";
-      content?: string;
-    }>;
-
-    // Add user message AFTER fetching history to avoid duplication
-    await withErrorContext("Failed to save user message", () =>
-      ctx.runMutation(internal.messages.addMessage, {
-        chatId: args.chatId,
-        role: "user",
-        content: args.userQuery,
-        sessionId: args.sessionId,
-      }),
-    );
-
-    let conversationContext = buildConversationContext(recentMessages || []);
-    if (!conversationContext && args.conversationContext) {
-      console.warn(
-        "buildConversationContext returned empty; using args.conversationContext",
-      );
-      conversationContext = args.conversationContext;
-    }
-    if (!conversationContext) {
-      console.warn(
-        "No conversationContext available from messages or args; proceeding with empty context",
-      );
-      conversationContext = "";
-    }
 
     // Build the input for the conversational agent
     const agentInput = conversationContext
@@ -1137,89 +1155,31 @@ export async function* streamResearchWorkflow(
   const startTime = Date.now();
 
   const nonce = generateMessageId();
-  const issuedAt = Date.now();
 
   // Use shared utilities (extracted per DR1a)
   const writeEvent = (type: string, data: Record<string, unknown>) =>
     createWorkflowEvent(type, data);
 
   let workflowTokenId: Id<"workflowTokens"> | null = null;
+  let instantResponse: string | null = null;
   const handleError = createWorkflowErrorHandler({
     ctx,
     workflowId,
     getTokenId: () => workflowTokenId,
   });
 
-  const workflowTokenPayload: {
-    workflowId: string;
-    nonce: string;
-    chatId: Id<"chats">;
-    sessionId?: string;
-    issuedAt: number;
-    expiresAt: number;
-  } = {
-    workflowId,
-    nonce,
-    chatId: args.chatId,
-    issuedAt,
-    expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
-  };
-
-  if (args.sessionId) {
-    workflowTokenPayload.sessionId = args.sessionId;
-  }
-
-  workflowTokenId = await ctx.runMutation(
-    internal.workflowTokens.createToken,
-    workflowTokenPayload,
-  );
-
-  const getChatArgs: { chatId: Id<"chats">; sessionId?: string } = {
-    chatId: args.chatId,
-  };
-  if (args.sessionId) getChatArgs.sessionId = args.sessionId;
-
-  const chat = await ctx.runQuery(api.chats.getChatById, getChatArgs);
-  if (!chat) throw new Error("Chat not found or access denied");
-
-  // Limit to 20 messages to bound memory/latency for large chats while maintaining context
-  const getMessagesArgs: {
-    chatId: Id<"chats">;
-    sessionId?: string;
-    limit?: number;
-  } = {
-    chatId: args.chatId,
-    limit: 20,
-  };
-  if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
-
-  const recentMessages = (await ctx.runQuery(
-    api.chats.getChatMessages,
-    getMessagesArgs,
-  )) as Array<{
-    role: "user" | "assistant" | "system";
-    content?: string;
-    contextReferences?: ResearchContextReference[];
-  }>;
-
-  // Add user message AFTER fetching history to avoid duplication
-  await ctx.runMutation(internal.messages.addMessage, {
-    chatId: args.chatId,
-    role: "user",
-    content: args.userQuery,
-    sessionId: args.sessionId, // Pass sessionId for HTTP action auth
-  });
-
-  const conversationContextFromDb = buildConversationContext(
-    recentMessages || [],
-  );
-
-  const conversationSource =
-    conversationContextFromDb || args.conversationContext || "";
-
-  const instantResponse = detectInstantResponse(args.userQuery);
-
   try {
+    const session = await initializeWorkflowSession(
+      ctx,
+      args,
+      workflowId,
+      nonce,
+    );
+    workflowTokenId = session.workflowTokenId;
+    const { chat, conversationContext: conversationSource } = session;
+
+    instantResponse = detectInstantResponse(args.userQuery);
+
     // ============================================
     // INSTANT RESPONSE PATH (No LLM calls)
     // ============================================
