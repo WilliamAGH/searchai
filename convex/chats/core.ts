@@ -238,7 +238,7 @@ export const getChatByShareId = query({
     // Only return shared or public chats
     if (chat.privacy !== "shared" && chat.privacy !== "public") {
       const userId = await getAuthUserId(ctx);
-      if (chat.userId !== userId) return null;
+      if (!hasUserAccess(chat, userId)) return null;
     }
 
     return chat;

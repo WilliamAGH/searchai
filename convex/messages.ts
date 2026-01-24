@@ -196,7 +196,8 @@ export const deleteMessage = mutation({
     const chat = await ctx.db.get(message.chatId);
     const userId = await getAuthUserId(ctx);
     if (!chat) throw new Error("Chat not found");
-    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+    if (!hasUserAccess(chat, userId) && chat.userId)
+      throw new Error("Unauthorized");
 
     await ctx.db.delete(args.messageId);
 
