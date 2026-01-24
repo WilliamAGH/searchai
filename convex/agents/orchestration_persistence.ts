@@ -11,6 +11,7 @@
  */
 
 import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { generateChatTitle } from "../chats/utils";
 import type {
@@ -34,12 +35,12 @@ import type {
 // persistence requires all this data - the alternative would be multiple
 // function calls or a less type-safe approach.
 
-/** Minimal context needed for persistence operations */
-type PersistenceCtx = {
-  runMutation: (fn: any, args: any) => Promise<any>;
-  runQuery: (fn: any, args: any) => Promise<any>;
-  runAction: (fn: any, args: any) => Promise<any>;
-};
+/**
+ * Minimal context needed for persistence operations.
+ * Uses Pick<ActionCtx, ...> pattern matching StreamingWorkflowCtx in orchestration.ts
+ * for proper type inference on Convex mutation/query/action calls.
+ */
+type PersistenceCtx = Pick<ActionCtx, "runMutation" | "runQuery" | "runAction">;
 
 /** Parameters for chat title update */
 export interface UpdateChatTitleParams {
@@ -130,7 +131,7 @@ export async function persistAssistantMessage(
     contextReferences = [],
   } = params;
 
-  const messageId = (await ctx.runMutation(internal.messages.addMessage, {
+  const messageId = await ctx.runMutation(internal.messages.addMessage, {
     chatId,
     role: "assistant",
     content,
@@ -140,7 +141,7 @@ export async function persistAssistantMessage(
     workflowId,
     isStreaming: false,
     sessionId,
-  })) as Id<"messages">;
+  });
 
   return messageId;
 }
