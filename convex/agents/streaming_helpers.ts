@@ -163,6 +163,7 @@ export function getProgressMessage(stage: ProgressStage): string {
 /**
  * Harvest search results from a tool output.
  * Returns the number of results harvested.
+ * Preserves tool contextId for provenance tracking if present.
  */
 export function harvestSearchResults(
   output: Record<string, unknown>,
@@ -179,6 +180,12 @@ export function harvestSearchResults(
 
   if (!Array.isArray(results)) return 0;
 
+  // Capture tool-level contextId for provenance (shared across all results from this call)
+  const toolContextId =
+    typeof output.contextId === "string" && isUuidV7(output.contextId)
+      ? output.contextId
+      : undefined;
+
   let count = 0;
   for (const r of results) {
     if (r.url && r.title) {
@@ -187,6 +194,7 @@ export function harvestSearchResults(
         url: r.url,
         snippet: r.snippet || "",
         relevanceScore: r.relevanceScore || RELEVANCE_SCORES.SEARCH_RESULT,
+        contextId: toolContextId, // Preserve provenance back to tool call
       });
       count++;
     }
