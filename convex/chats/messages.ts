@@ -7,6 +7,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
 import { vContextReference, vSearchResult } from "../lib/validators";
+import { hasUserAccess, hasSessionAccess } from "../lib/auth";
 
 /**
  * Get chat messages
@@ -51,9 +52,8 @@ export const getChatMessages = query({
 
     const isSharedOrPublic =
       chat.privacy === "shared" || chat.privacy === "public";
-    const isUserOwner = chat.userId && userId && chat.userId === userId;
-    const isSessionOwner =
-      chat.sessionId && args.sessionId && chat.sessionId === args.sessionId;
+    const isUserOwner = hasUserAccess(chat, userId);
+    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
 
     if (!isSharedOrPublic && !isUserOwner && !isSessionOwner) {
       return [];

@@ -7,6 +7,10 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
+import {
+  hasUserAccess as checkUserAccess,
+  hasSessionAccess as checkSessionAccess,
+} from "../lib/auth";
 
 /**
  * Delete chat and messages
@@ -23,13 +27,11 @@ export const deleteChat = mutation({
 
     // Silently succeed if chat already deleted (idempotent operation)
     if (!chat) return null;
-    const hasUserAccess = !!(chat.userId && userId && chat.userId === userId);
-    const hasSessionAccess = !!(
-      chat.sessionId &&
-      args.sessionId &&
-      chat.sessionId === args.sessionId
-    );
-    if (!hasUserAccess && !hasSessionAccess) {
+
+    if (
+      !checkUserAccess(chat, userId) &&
+      !checkSessionAccess(chat, args.sessionId)
+    ) {
       throw new Error("Unauthorized");
     }
 

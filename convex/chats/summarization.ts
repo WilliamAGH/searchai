@@ -8,6 +8,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, action } from "../_generated/server";
 import { buildContextSummary } from "./utils";
+import { hasUserAccess, hasSessionAccess } from "../lib/auth";
 
 /**
  * Summarize last N messages (cheap, server-side)
@@ -29,9 +30,8 @@ export const summarizeRecent = query({
 
     // Shared and public chats are accessible regardless of owner or session
     if (chat.privacy !== "shared" && chat.privacy !== "public") {
-      const isUserOwner = chat.userId && userId && chat.userId === userId;
-      const isSessionOwner =
-        chat.sessionId && args.sessionId && chat.sessionId === args.sessionId;
+      const isUserOwner = hasUserAccess(chat, userId);
+      const isSessionOwner = hasSessionAccess(chat, args.sessionId);
 
       if (!isUserOwner && !isSessionOwner) {
         return "";

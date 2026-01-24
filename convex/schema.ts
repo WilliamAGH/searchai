@@ -9,6 +9,7 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { vSearchMethod } from "./lib/validators";
 
 const applicationTables = {
   /**
@@ -73,14 +74,7 @@ const applicationTables = {
     ),
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.any()),
-    searchMethod: v.optional(
-      v.union(
-        v.literal("serp"),
-        v.literal("openrouter"),
-        v.literal("duckduckgo"),
-        v.literal("fallback"),
-      ),
-    ),
+    searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
     isStreaming: v.optional(v.boolean()),
     streamedContent: v.optional(v.string()),
