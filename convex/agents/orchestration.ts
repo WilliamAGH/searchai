@@ -77,6 +77,18 @@ import {
 // Skip ALL LLM calls for obvious conversational messages that don't need research.
 // These patterns match greetings, tests, and simple chat messages.
 
+/** Regex patterns for instant response detection (BLK8: extract magic literals) */
+const INSTANT_PATTERNS = {
+  GREETING: /^(hi|hello|hey|howdy|greetings|yo)[\s!.,?]*$/i,
+  GREETING_TIME: /^(good\s*(morning|afternoon|evening|night))[\s!.,?]*$/i,
+  TEST: /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/i,
+  NEW_CHAT: /^this is a new chat[\s!.,?]*$/i,
+  THANKS: /^(thanks|thank you|thx|ty)[\s!.,?]*$/i,
+  GOODBYE: /^(bye|goodbye|see you|later|cya)[\s!.,?]*$/i,
+  CONFIRM: /^(ok|okay|sure|yes|no|yep|nope|yeah|nah)[\s!.,?]*$/i,
+  HELP: /^(help|help me|\?)[\s!.,?]*$/i,
+} as const;
+
 const INSTANT_RESPONSES: Record<string, string> = {
   greeting:
     "Hello! I'm ready to help you search and research any topic. What would you like to know?",
@@ -90,41 +102,28 @@ const INSTANT_RESPONSES: Record<string, string> = {
 function detectInstantResponse(query: string): string | null {
   const trimmed = query.trim().toLowerCase();
 
-  // Greeting patterns
-  if (/^(hi|hello|hey|howdy|greetings|yo)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.GREETING.test(trimmed)) {
     return INSTANT_RESPONSES.greeting;
   }
-  if (/^(good\s*(morning|afternoon|evening|night))[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.GREETING_TIME.test(trimmed)) {
     return INSTANT_RESPONSES.greeting;
   }
-
-  // Test patterns
-  if (
-    /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/i.test(trimmed)
-  ) {
+  if (INSTANT_PATTERNS.TEST.test(trimmed)) {
     return INSTANT_RESPONSES.test;
   }
-  if (/^this is a new chat[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.NEW_CHAT.test(trimmed)) {
     return INSTANT_RESPONSES.test;
   }
-
-  // Thanks patterns
-  if (/^(thanks|thank you|thx|ty)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.THANKS.test(trimmed)) {
     return INSTANT_RESPONSES.thanks;
   }
-
-  // Goodbye patterns
-  if (/^(bye|goodbye|see you|later|cya)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.GOODBYE.test(trimmed)) {
     return INSTANT_RESPONSES.goodbye;
   }
-
-  // Confirmation patterns
-  if (/^(ok|okay|sure|yes|no|yep|nope|yeah|nah)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.CONFIRM.test(trimmed)) {
     return INSTANT_RESPONSES.confirm;
   }
-
-  // Help patterns
-  if (/^(help|help me|\?)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.HELP.test(trimmed)) {
     return INSTANT_RESPONSES.help;
   }
 
@@ -213,6 +212,7 @@ import {
   RELEVANCE_SCORES,
   CONFIDENCE_THRESHOLDS,
   AGENT_TIMEOUTS,
+  AGENT_LIMITS,
 } from "../lib/constants/cache";
 import {
   buildPlanningInput,
@@ -936,7 +936,7 @@ export async function* streamConversationalWorkflow(
       const normalizedResultUrl = normalizeUrl(result.url) ?? result.url;
       if (!scrapedNormalizedUrls.has(normalizedResultUrl)) {
         contextReferences.push({
-          contextId: generateMessageId(),
+          contextId: result.contextId ?? generateMessageId(),
           type: "search_result",
           url: result.url,
           title: result.title,
@@ -1611,7 +1611,7 @@ export async function* streamResearchWorkflow(
     )
       .filter((r) => r.url && r.url.startsWith("http"))
       .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
-      .slice(0, 4); // Scrape top 4 URLs max
+      .slice(0, AGENT_LIMITS.MAX_SCRAPE_URLS);
 
     // Always scrape when URLs are available - planner's needsWebScraping prediction
     // can be wrong, and skipping scraping when search returns good URLs degrades answer quality.
