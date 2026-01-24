@@ -70,6 +70,23 @@ import {
 // Timeout Utilities
 // ============================================
 // Agent calls have no built-in timeout, so we wrap them to prevent indefinite hangs.
+const MAX_AGENT_TURNS = 6;
+const MAX_TOOL_ERRORS = 3;
+
+/**
+ * Throws if tool error count exceeds threshold. Centralizes error-threshold logic
+ * to avoid duplicated check-and-throw blocks across workflows.
+ */
+function assertToolErrorThreshold(
+  errorCount: number,
+  workflowName: string,
+): void {
+  if (errorCount >= MAX_TOOL_ERRORS) {
+    throw new Error(
+      `${workflowName} failed: too many tool errors (${errorCount})`,
+    );
+  }
+}
 
 // ============================================
 // Instant Response Detection
@@ -392,6 +409,7 @@ export const orchestrateResearchWorkflow = action({
     const planningResult = await withTimeout(
       run(agents.queryPlanner, planningInput, {
         context: { actionCtx: ctx },
+        maxTurns: MAX_AGENT_TURNS,
       }),
       AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "planning",
@@ -451,6 +469,7 @@ export const orchestrateResearchWorkflow = action({
       const researchResult = await withTimeout(
         run(agents.research, researchInstructions, {
           context: { actionCtx: ctx },
+          maxTurns: MAX_AGENT_TURNS,
         }),
         AGENT_TIMEOUTS.TOOL_EXECUTION_MS,
         "research",
@@ -466,6 +485,14 @@ export const orchestrateResearchWorkflow = action({
         RunToolCallItem,
         RunToolCallOutputItem,
       );
+      const toolErrorCount = Array.from(entries.values()).filter(
+        (entry) =>
+          entry.output &&
+          typeof entry.output === "object" &&
+          "error" in (entry.output as Record<string, unknown>) &&
+          (entry.output as Record<string, unknown>).error,
+      ).length;
+      assertToolErrorThreshold(toolErrorCount, "Research");
       toolCallLog = buildToolCallLog(entries, summarizeToolResult);
 
       const urlContextMap = buildUrlContextMap(
@@ -514,6 +541,7 @@ export const orchestrateResearchWorkflow = action({
     const synthesisResult = await withTimeout(
       run(agents.answerSynthesis, synthesisInstructions, {
         context: { actionCtx: ctx },
+        maxTurns: MAX_AGENT_TURNS,
       }),
       AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "synthesis",
@@ -796,11 +824,13 @@ export async function* streamConversationalWorkflow(
     const agentResult = await run(agents.conversational, agentInput, {
       stream: true,
       context: { actionCtx: ctx },
+      maxTurns: MAX_AGENT_TURNS,
     });
 
     let accumulatedResponse = "";
     let hasStartedStreaming = false;
     let toolCallCount = 0;
+    let toolErrorCount = 0;
     let lastProgressStage = "thinking";
 
     // Process streaming events using extracted helpers (per WRN1)
@@ -848,6 +878,8 @@ export async function* streamConversationalWorkflow(
           if (!output || typeof output !== "object") continue;
           if ("error" in output && output.error) {
             console.log(`⚠️ SKIPPED failed tool output: ${outputToolName}`);
+            toolErrorCount += 1;
+            assertToolErrorThreshold(toolErrorCount, "Conversational workflow");
             continue;
           }
 
@@ -1150,8 +1182,14 @@ export async function* streamResearchWorkflow(
   const chat = await ctx.runQuery(api.chats.getChatById, getChatArgs);
   if (!chat) throw new Error("Chat not found or access denied");
 
-  const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
+  // Limit to 20 messages to bound memory/latency for large chats while maintaining context
+  const getMessagesArgs: {
+    chatId: Id<"chats">;
+    sessionId?: string;
+    limit?: number;
+  } = {
     chatId: args.chatId,
+    limit: 20,
   };
   if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
 
@@ -1302,6 +1340,7 @@ export async function* streamResearchWorkflow(
     const planningResult = await run(agents.queryPlanner, planningInput, {
       stream: true,
       context: { actionCtx: ctx },
+      maxTurns: MAX_AGENT_TURNS,
     });
 
     let planningOutput: any = null;
@@ -1425,7 +1464,11 @@ export async function* streamResearchWorkflow(
       const fastSynthesisResult = await run(
         agents.answerSynthesis,
         fastSynthesisInstructions,
-        { stream: true, context: { actionCtx: ctx } },
+        {
+          stream: true,
+          context: { actionCtx: ctx },
+          maxTurns: MAX_AGENT_TURNS,
+        },
       );
 
       let fastAccumulatedAnswer = "";
@@ -1836,7 +1879,7 @@ export async function* streamResearchWorkflow(
     const synthesisResult = await run(
       agents.answerSynthesis,
       synthesisInstructions,
-      { stream: true, context: { actionCtx: ctx } },
+      { stream: true, context: { actionCtx: ctx }, maxTurns: MAX_AGENT_TURNS },
     );
     let accumulatedAnswer = "";
     const synthesisStreamStart = Date.now();
@@ -2018,3 +2061,65 @@ export async function* streamResearchWorkflow(
     );
   }
 }
+
+// --------------------------------------------
+// Non-streaming workflow with persistence
+// --------------------------------------------
+export const runAgentWorkflowAndPersist = action({
+  args: {
+    chatId: v.id("chats"),
+    message: v.string(),
+    sessionId: v.optional(v.string()),
+  },
+  returns: v.object({
+    assistantMessageId: v.string(),
+    workflowId: v.string(),
+    answer: v.string(),
+    sources: v.array(v.string()),
+    contextReferences: v.array(vContextReference),
+    signature: v.string(),
+  }),
+  // @ts-ignore deep generics
+  handler: async (ctx, args) => {
+    const eventStream = streamConversationalWorkflow(ctx, {
+      chatId: args.chatId,
+      sessionId: args.sessionId,
+      userQuery: args.message,
+      conversationContext: undefined,
+      contextReferences: undefined,
+    });
+
+    let persisted: {
+      payload: StreamingPersistPayload;
+      signature: string;
+    } | null = null;
+
+    for await (const event of eventStream) {
+      if (event.type === "persisted") {
+        const candidate = event as {
+          payload?: StreamingPersistPayload;
+          signature?: string;
+        };
+        if (candidate.payload && candidate.signature) {
+          persisted = {
+            payload: candidate.payload,
+            signature: candidate.signature,
+          };
+        }
+      }
+    }
+
+    if (!persisted) {
+      throw new Error("Workflow did not persist payload");
+    }
+
+    return {
+      assistantMessageId: persisted.payload.assistantMessageId,
+      workflowId: persisted.payload.workflowId,
+      answer: persisted.payload.answer,
+      sources: persisted.payload.sources,
+      contextReferences: persisted.payload.contextReferences,
+      signature: persisted.signature,
+    };
+  },
+});
