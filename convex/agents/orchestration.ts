@@ -740,8 +740,11 @@ async function initializeWorkflowSession(
   };
   if (args.sessionId) getChatArgs.sessionId = args.sessionId;
 
-  // Use auth-aware queries if sessionId is missing (authenticated user context)
-  // Use HTTP-optimized queries if sessionId is provided (anonymous/HTTP context)
+  // Select query variant based on sessionId presence:
+  // - When sessionId is missing: use auth-aware queries that call getAuthUserId(ctx).
+  //   Note: If this is called from an HTTP action, getAuthUserId returns null,
+  //   so only shared/public chats will be accessible (not private user chats).
+  // - When sessionId is provided: use HTTP-optimized queries with session-based access.
   const useAuthVariant = !args.sessionId;
 
   let chat: any;
