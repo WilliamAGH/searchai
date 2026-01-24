@@ -129,9 +129,10 @@ export function ChatLayout({
         className={`flex-1 flex flex-col h-full overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
         {...swipeHandlers}
       >
-        {/* Centered content wrapper */}
+        {/* Content wrapper: grow to fill when content is small, don't shrink when content is large */}
+        {/* grow = flex-grow:1, shrink-0 = flex-shrink:0, combined with default flex-basis:auto */}
         <div
-          className={`flex-1 flex flex-col min-h-0 w-full ${!showDesktopSidebar ? "max-w-4xl mx-auto" : ""}`}
+          className={`grow shrink-0 flex flex-col w-full ${!showDesktopSidebar ? "max-w-4xl mx-auto" : ""}`}
         >
           <MessageList
             key={String(currentChatId)}
@@ -139,9 +140,9 @@ export function ChatLayout({
             scrollContainerRef={scrollContainerRef}
           />
         </div>
-        {/* Input area - sticky at bottom */}
+        {/* Input area - sticky at bottom, relative for absolute-positioned children */}
         <div
-          className={`flex-shrink-0 sticky bottom-0 bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 ${!showDesktopSidebar ? "max-w-4xl mx-auto w-full" : ""}`}
+          className={`flex-shrink-0 sticky bottom-0 relative bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 pb-[env(safe-area-inset-bottom)] ${!showDesktopSidebar ? "max-w-4xl mx-auto w-full" : ""}`}
         >
           <FollowUpPrompt
             isOpen={showFollowUpPrompt}
