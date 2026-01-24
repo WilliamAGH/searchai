@@ -11,6 +11,7 @@ import type { CheerioAPI } from "cheerio";
 import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { CACHE_TTL } from "../lib/constants/cache";
+import { validateScrapeUrl } from "../lib/url";
 // NOTE: Playwright removed - not compatible with Convex's deployment environment
 // (requires native browser binaries that aren't available in Convex runtime)
 
@@ -113,6 +114,16 @@ const getScrapeCache = () => {
 };
 
 export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
+  const validation = validateScrapeUrl(url);
+  if (!validation.ok) {
+    return {
+      title: "invalid_url",
+      content: `Unable to fetch content from ${url}: ${validation.error}`,
+      summary: validation.error,
+      needsJsRendering: false,
+    };
+  }
+  const validatedUrl = validation.url;
   const SCRAPE_TTL_MS = CACHE_TTL.SCRAPE_MS;
   const SCRAPE_CACHE_MAX_ENTRIES = 100; // Prevent unbounded memory growth
   const cache = getScrapeCache();
@@ -123,15 +134,15 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     if (entry.exp <= now) cache.delete(key);
   }
 
-  const cached = cache.get(url);
+  const cached = cache.get(validatedUrl);
   if (cached && cached.exp > now) {
-    cache.delete(url);
-    cache.set(url, cached);
+    cache.delete(validatedUrl);
+    cache.set(validatedUrl, cached);
     return cached.val;
   }
 
   console.info("🌐 Scraping URL initiated:", {
-    url,
+    url: validatedUrl,
     timestamp: new Date().toISOString(),
   });
 
@@ -144,7 +155,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
   };
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(validatedUrl, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; SearchChat/1.0; Web Content Reader)",
@@ -158,7 +169,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     });
 
     console.info("📊 Scrape response received:", {
-      url,
+      url: validatedUrl,
       status: response.status,
       statusText: response.statusText,
       ok: response.ok,
@@ -166,7 +177,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     if (!response.ok) {
       const errorDetails = {
-        url,
+        url: validatedUrl,
         status: response.status,
         statusText: response.statusText,
         timestamp: new Date().toISOString(),
@@ -183,7 +194,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     if (!contentType.includes("text/html")) {
       const errorDetails = {
-        url,
+        url: validatedUrl,
         contentType: contentType,
         timestamp: new Date().toISOString(),
       };
@@ -193,7 +204,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     const html = await response.text();
     console.info("✅ HTML content fetched:", {
-      url,
+      url: validatedUrl,
       contentLength: html.length,
       timestamp: new Date().toISOString(),
     });
@@ -214,7 +225,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       metadata.title ||
       metadata.ogTitle ||
       metadata.description ||
-      new URL(url).hostname;
+      new URL(validatedUrl).hostname;
 
     // Remove common junk patterns before quality check
     const junkPatterns = [
@@ -241,7 +252,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     cleanedContent = cleanedContent.trim();
 
     console.log("🗑️ Junk content removed:", {
-      url,
+      url: validatedUrl,
       removedCount: removedJunkCount,
       contentLengthBefore: content.length,
       contentLengthAfter: cleanedContent.length,
@@ -250,7 +261,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     // Filter out low-quality content AFTER junk removal
     if (cleanedContent.length < 100) {
       const errorDetails = {
-        url,
+        url: validatedUrl,
         contentLengthBefore: content.length,
         contentLengthAfter: cleanedContent.length,
         timestamp: new Date().toISOString(),
@@ -273,10 +284,10 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       needsJsRendering: needsRender,
     };
 
-    cache.set(url, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
+    cache.set(validatedUrl, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
     enforceCapacity();
     console.info("✅ Scraping completed successfully:", {
-      url,
+      url: validatedUrl,
       resultLength: cleanedContent.length,
       summaryLength: summary.length,
       needsJsRendering: needsRender,
@@ -286,7 +297,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     return result;
   } catch (error) {
     console.error("💥 Scraping failed with exception:", {
-      url,
+      url: validatedUrl,
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : "No stack trace",
       timestamp: new Date().toISOString(),
@@ -294,7 +305,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     let hostname = "";
     try {
-      hostname = new URL(url).hostname;
+      hostname = new URL(validatedUrl).hostname;
     } catch {
       hostname = "unknown";
     }
@@ -303,13 +314,13 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     const val: ScrapeResult = {
       title: hostname,
-      content: `Unable to fetch content from ${url}: ${errorMessage}`,
+      content: `Unable to fetch content from ${validatedUrl}: ${errorMessage}`,
       summary: `Content unavailable from ${hostname}`,
       needsJsRendering: false,
     };
     // Short TTL for errors to allow retry while preventing hammering
     const ERROR_CACHE_TTL_MS = 30_000; // 30 seconds
-    cache.set(url, { exp: Date.now() + ERROR_CACHE_TTL_MS, val });
+    cache.set(validatedUrl, { exp: Date.now() + ERROR_CACHE_TTL_MS, val });
     enforceCapacity();
     return val;
   }
