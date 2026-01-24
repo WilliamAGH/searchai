@@ -9,7 +9,7 @@ import {
 } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
-import { hasUserAccess, hasSessionAccess, isUnownedChat } from "./lib/auth";
+import { isAuthorized, isUnownedChat } from "./lib/auth";
 
 export const addMessage = internalMutation({
   args: {
@@ -39,9 +39,9 @@ export const addMessage = internalMutation({
 
     // Dual ownership validation (matches validateChatAccess pattern)
     // Supports both authenticated (userId) and HTTP action (sessionId) contexts
+    // Also allows claiming unowned chats with a valid sessionId
     const authorized =
-      hasUserAccess(chat, userId) ||
-      hasSessionAccess(chat, args.sessionId) ||
+      isAuthorized(chat, userId, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
 
     if (!authorized) {
@@ -138,7 +138,7 @@ export const updateMessageMetadata = mutation({
     if (!chat) {
       throw new Error("Chat not found");
     }
-    if (!hasUserAccess(chat, userId) && !hasSessionAccess(chat, sessionId)) {
+    if (!isAuthorized(chat, userId, sessionId)) {
       throw new Error(
         "Unauthorized: You can only update messages in your own chats",
       );
@@ -188,47 +188,51 @@ export const countMessages = internalMutation({
 });
 
 export const deleteMessage = mutation({
-  args: { messageId: v.id("messages") },
+  args: {
+    messageId: v.id("messages"),
+    sessionId: v.optional(v.string()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     if (!message) return null;
+
     const chat = await ctx.db.get(message.chatId);
-    const userId = await getAuthUserId(ctx);
     if (!chat) throw new Error("Chat not found");
-    if (!hasUserAccess(chat, userId) && chat.userId)
+
+    const userId = await getAuthUserId(ctx);
+    if (!isAuthorized(chat, userId, args.sessionId)) {
       throw new Error("Unauthorized");
+    }
 
     await ctx.db.delete(args.messageId);
 
-    // Best-effort: invalidate planner cache (decoupled internal action)
+    // Schedule cache invalidation - fire-and-forget with explicit error handling
+    // Scheduling failures should not fail the delete operation
     try {
-      // @ts-ignore - Known Convex TS2589 type instantiation issue; alias to avoid deep generic instantiation
+      // @ts-ignore - Known Convex TS2589 type instantiation issue
       const invalidatePlan: any = internal.search.invalidatePlanCacheForChat;
       await ctx.scheduler.runAfter(0, invalidatePlan, {
         chatId: message.chatId,
       });
-    } catch (e) {
-      console.warn("Failed to schedule plan cache invalidation", {
+    } catch (schedulerError) {
+      // Log but don't propagate - the delete succeeded, cache invalidation is best-effort
+      console.error("Failed to schedule plan cache invalidation", {
         chatId: message.chatId,
-        error: e instanceof Error ? e.message : String(e),
+        error:
+          schedulerError instanceof Error
+            ? schedulerError.message
+            : String(schedulerError),
       });
     }
 
-    // Clear rolling summary directly to avoid circular dependency
-    try {
-      await ctx.db.patch(message.chatId, {
-        rollingSummary: "",
-        rollingSummaryUpdatedAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-    } catch (e) {
-      console.warn("Failed to clear rolling summary after message delete", {
-        chatId: message.chatId,
-        messageId: args.messageId,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
+    // Clear rolling summary - part of the same transaction, errors should propagate
+    await ctx.db.patch(message.chatId, {
+      rollingSummary: "",
+      rollingSummaryUpdatedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
     return null;
   },
 });

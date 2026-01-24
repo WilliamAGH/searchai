@@ -496,6 +496,8 @@ function ChatInterfaceComponent({
     loadError,
     retryCount,
     onClearError: clearError,
+    // Session ID for authorization (anonymous users)
+    sessionId: sessionId || undefined,
   });
 
   return (

@@ -51,6 +51,8 @@ interface MessageListProps {
   loadError?: Error | null;
   retryCount?: number;
   onClearError?: () => void;
+  // Session ID for authorization (anonymous users)
+  sessionId?: string;
 }
 
 /**
@@ -76,6 +78,7 @@ export function MessageList({
   loadError,
   retryCount = 0,
   onClearError,
+  sessionId,
 }: MessageListProps) {
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -157,14 +160,17 @@ export function MessageList({
           ) {
             onDeleteLocalMessage?.(String(messageId));
           } else {
-            await deleteMessage({ messageId: messageId as Id<"messages"> });
+            await deleteMessage({
+              messageId: messageId as Id<"messages">,
+              sessionId,
+            });
           }
         }
       } catch (err) {
         logger.error("Failed to delete message", err);
       }
     },
-    [onRequestDeleteMessage, onDeleteLocalMessage, deleteMessage],
+    [onRequestDeleteMessage, onDeleteLocalMessage, deleteMessage, sessionId],
   );
 
   // Intelligent auto-scroll: scroll when near bottom or actively generating

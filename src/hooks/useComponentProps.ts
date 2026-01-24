@@ -40,6 +40,8 @@ interface UseComponentPropsArgs {
   loadError?: Error | null;
   retryCount?: number;
   onClearError?: () => void;
+  // Session ID for authorization (anonymous users)
+  sessionId?: string;
 }
 
 /**
@@ -75,6 +77,7 @@ export function useComponentProps({
   loadError,
   retryCount,
   onClearError,
+  sessionId,
 }: UseComponentPropsArgs) {
   const chatSidebarProps = useMemo(
     () => ({
@@ -142,6 +145,8 @@ export function useComponentProps({
       loadError,
       retryCount,
       onClearError,
+      // Session ID for authorization (anonymous users)
+      sessionId,
     }),
     [
       currentMessages,
@@ -158,6 +163,7 @@ export function useComponentProps({
       loadError,
       retryCount,
       onClearError,
+      sessionId,
     ],
   );
 

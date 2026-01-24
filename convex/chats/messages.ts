@@ -60,10 +60,16 @@ export const getChatMessages = query({
       return [];
     }
 
+    // Validate limit if provided - reject non-positive values to prevent
+    // surprising unbounded fetches when caller expects bounded results
+    if (args.limit !== undefined && args.limit <= 0) {
+      throw new Error("limit must be a positive number");
+    }
+
     // When limit is specified, fetch most recent N messages by querying desc and reversing
     // This keeps memory bounded for large chats while preserving chronological order
     let docs;
-    if (args.limit && args.limit > 0) {
+    if (args.limit) {
       const descDocs = await ctx.db
         .query("messages")
         .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))

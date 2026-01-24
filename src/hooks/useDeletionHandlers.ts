@@ -17,7 +17,10 @@ interface UseDeletionHandlersProps {
     chatId: Id<"chats">;
     sessionId?: string;
   }) => Promise<void>;
-  deleteMessage: (args: { messageId: Id<"messages"> }) => Promise<void>;
+  deleteMessage: (args: {
+    messageId: Id<"messages">;
+    sessionId?: string;
+  }) => Promise<void>;
   sessionId?: string;
 }
 
@@ -162,7 +165,7 @@ export function useDeletionHandlers({
   const handleRequestDeleteMessage = useCallback(
     async (messageId: Id<"messages">) => {
       try {
-        await deleteMessage({ messageId });
+        await deleteMessage({ messageId, sessionId });
 
         // Show success banner
         setUndoBanner({
@@ -184,7 +187,7 @@ export function useDeletionHandlers({
         });
       }
     },
-    [deleteMessage, clearAllTimeouts],
+    [deleteMessage, sessionId, clearAllTimeouts],
   );
 
   return {
