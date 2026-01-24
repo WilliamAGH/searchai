@@ -64,6 +64,7 @@ export const HarvestedSearchResultSchema = z.object({
   url: z.string(),
   snippet: z.string(),
   relevanceScore: z.number(),
+  contextId: z.string().optional(), // Preserved from tool output for provenance tracking
 });
 
 export type HarvestedSearchResult = z.infer<typeof HarvestedSearchResultSchema>;
