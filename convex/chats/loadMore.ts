@@ -6,6 +6,7 @@
 import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
+import { getErrorMessage } from "../lib/errors";
 
 /**
  * Load more messages for a chat
@@ -70,8 +71,7 @@ export const loadMoreMessages = action({
 
       return result;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const errorMessage = getErrorMessage(error);
       console.error("Failed to load more messages:", {
         chatId: args.chatId,
         cursor: args.cursor,

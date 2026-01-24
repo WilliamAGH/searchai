@@ -8,6 +8,7 @@ import type {
   SearchProviderResult,
   SerpEnrichment,
 } from "../../lib/types/search";
+import { getErrorMessage } from "../../lib/errors";
 export type { SearchResult } from "../../lib/types/search";
 
 interface SerpApiResponse {
@@ -179,7 +180,7 @@ export async function searchWithSerpApiDuckDuckGo(
     return { results: [] };
   } catch (error) {
     console.error("💥 SERP API Exception:", {
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
       stack: error instanceof Error ? error.stack : "No stack trace",
       queryLength: query.length,
       timestamp: new Date().toISOString(),

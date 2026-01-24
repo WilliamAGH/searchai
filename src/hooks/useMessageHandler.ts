@@ -7,6 +7,7 @@
 
 import { useCallback, useRef } from "react";
 import { logger } from "../lib/logger";
+import { getErrorMessage } from "../lib/utils/errorUtils";
 import type { Message } from "../lib/types/message";
 import type { Chat } from "../lib/types/chat";
 
@@ -164,9 +165,9 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
       } catch (error) {
         logger.error("Failed to send message", error);
         if (deps.setErrorMessage) {
-          const message =
-            error instanceof Error ? error.message : "Failed to send message";
-          deps.setErrorMessage(message);
+          deps.setErrorMessage(
+            getErrorMessage(error, "Failed to send message"),
+          );
         }
       } finally {
         deps.setIsGenerating(false);

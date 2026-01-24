@@ -12,6 +12,7 @@ import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { CACHE_TTL } from "../lib/constants/cache";
 import { validateScrapeUrl } from "../lib/url";
+import { getErrorMessage } from "../lib/errors";
 // NOTE: Playwright removed - not compatible with Convex's deployment environment
 // (requires native browser binaries that aren't available in Convex runtime)
 
@@ -301,8 +302,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     return result;
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = getErrorMessage(error);
 
     // Classify the error for better diagnostics
     let errorCode = "SCRAPE_FAILED";

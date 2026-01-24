@@ -8,6 +8,7 @@ import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import type { ChatState } from "./useChatState";
 import type { UnifiedChat, UnifiedMessage } from "../lib/types/unified";
 import { TitleUtils, IdUtils } from "../lib/types/unified";
+import { getErrorMessage } from "../lib/utils/errorUtils";
 import type { PersistedPayload } from "../lib/types/message";
 import { logger } from "../lib/logger";
 // Minimal fallback to avoid missing StorageService import during build
@@ -122,8 +123,7 @@ export function createChatActions(
         setState((prev) => ({
           ...prev,
           isLoading: false,
-          error:
-            error instanceof Error ? error.message : "Failed to create chat",
+          error: getErrorMessage(error, "Failed to create chat"),
         }));
         throw error;
       }
@@ -183,8 +183,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to select chat",
+          error: getErrorMessage(error, "Failed to select chat"),
         }));
       }
     },
@@ -211,8 +210,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to delete chat",
+          error: getErrorMessage(error, "Failed to delete chat"),
         }));
         throw error;
       }
@@ -238,8 +236,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to update title",
+          error: getErrorMessage(error, "Failed to update title"),
         }));
       }
     },
@@ -647,8 +644,7 @@ export function createChatActions(
         setState((prev) => ({
           ...prev,
           isGenerating: false,
-          error:
-            error instanceof Error ? error.message : "Failed to send message",
+          error: getErrorMessage(error, "Failed to send message"),
           searchProgress: { stage: "idle" },
         }));
       }
@@ -668,8 +664,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to delete message",
+          error: getErrorMessage(error, "Failed to delete message"),
         }));
       }
     },
@@ -715,8 +710,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to share chat",
+          error: getErrorMessage(error, "Failed to share chat"),
         }));
         throw error;
       }
@@ -821,8 +815,7 @@ export function createChatActions(
         setState((prev) => ({
           ...prev,
           isLoading: false,
-          error:
-            error instanceof Error ? error.message : "Failed to refresh chats",
+          error: getErrorMessage(error, "Failed to refresh chats"),
         }));
       }
     },

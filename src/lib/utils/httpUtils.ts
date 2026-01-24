@@ -1,6 +1,8 @@
 // Minimal HTTP utilities for frontend operations
 // These do NOT duplicate Convex functionality - they're for non-Convex HTTP operations
 
+import { getErrorMessage } from "./errorUtils";
+
 export function buildApiBase(convexUrl: string): string {
   // Derive the Convex HTTP base (https://<deployment>.convex.site) from the
   // Convex client URL (typically https://<deployment>.convex.cloud).
@@ -37,8 +39,7 @@ export async function readResponseBody(response: Response): Promise<string> {
   try {
     return await response.text();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return `Failed to read response body: ${message}`;
+    return `Failed to read response body: ${getErrorMessage(error)}`;
   }
 }
 
@@ -84,9 +85,8 @@ export async function fetchJsonWithRetry(
       try {
         return JSON.parse(body) as unknown;
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         throw new Error(
-          `Failed to parse JSON response from ${url}: ${message}. Body: ${body}`,
+          `Failed to parse JSON response from ${url}: ${getErrorMessage(error)}. Body: ${body}`,
         );
       }
     } catch (error) {

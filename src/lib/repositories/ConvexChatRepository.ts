@@ -17,6 +17,7 @@ import {
 } from "../types/unified";
 import { logger } from "../logger";
 import { buildHttpError, readResponseBody } from "../utils/httpUtils";
+import { getErrorMessage } from "../utils/errorUtils";
 import {
   verifyPersistedPayload,
   isSignatureVerificationAvailable,
@@ -511,8 +512,7 @@ export class ConvexChatRepository extends BaseRepository {
                 break;
             }
           } catch (error) {
-            const message =
-              error instanceof Error ? error.message : String(error);
+            const message = getErrorMessage(error);
             logger.error("Failed to parse SSE frame", {
               error: message,
               raw: data,
@@ -528,7 +528,7 @@ export class ConvexChatRepository extends BaseRepository {
     } catch (error) {
       yield {
         type: "error",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: getErrorMessage(error),
       };
     }
   }

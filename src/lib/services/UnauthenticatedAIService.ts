@@ -11,6 +11,7 @@
 // This file is kept temporarily to avoid import churn; will be deleted after confirming no references remain.
 import { logger } from "../logger";
 import { buildHttpError, readResponseBody } from "../utils/httpUtils";
+import { getErrorMessage } from "../utils/errorUtils";
 import type { MessageStreamChunk } from "../types/message";
 
 /**
@@ -317,7 +318,7 @@ export class UnauthenticatedAIService {
         );
         onChunk?.({
           type: "error",
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: getErrorMessage(error),
         });
       }
     } finally {

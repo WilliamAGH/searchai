@@ -12,6 +12,7 @@ import type { ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { generateMessageId } from "../lib/id_generator";
 import { AGENT_LIMITS } from "../lib/constants/cache";
+import { getErrorMessage } from "../lib/errors";
 
 /**
  * Web Search Tool
@@ -134,7 +135,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
       const durationMs = Date.now() - callStart;
       console.error("❌ SEARCH TOOL ERROR:", {
         contextId,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: getErrorMessage(error),
         durationMs,
       });
 
@@ -143,8 +144,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
         query: input.query,
         reasoning: input.reasoning,
         error: "Search failed",
-        errorMessage:
-          error instanceof Error ? error.message : "Unknown search error",
+        errorMessage: getErrorMessage(error, "Unknown search error"),
         results: [],
         resultCount: 0,
         hasRealResults: false,
@@ -246,7 +246,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
       console.error("❌ SCRAPE TOOL ERROR:", {
         contextId,
         url: input.url,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: getErrorMessage(error),
         durationMs,
       });
 
@@ -259,10 +259,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
       } catch (parseError) {
         console.warn("URL parse failed in scrape error handler", {
           url: input.url,
-          error:
-            parseError instanceof Error
-              ? parseError.message
-              : String(parseError),
+          error: getErrorMessage(parseError),
         });
       }
 
@@ -271,8 +268,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
         url: input.url,
         reasoning: input.reasoning,
         error: "Scrape failed",
-        errorMessage:
-          error instanceof Error ? error.message : "Unknown scrape error",
+        errorMessage: getErrorMessage(error, "Unknown scrape error"),
         title: hostname,
         content: `Unable to fetch content from ${input.url}`,
         summary: `Content unavailable from ${hostname}`,

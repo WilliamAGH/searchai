@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { logger } from "../lib/logger";
+import { getErrorMessage } from "../lib/utils/errorUtils";
 import type { Id } from "../../convex/_generated/dataModel";
 
 interface UseDeletionHandlersProps {
@@ -113,8 +114,7 @@ export function useDeletionHandlers({
         timeoutsRef.current.push(timeoutId);
       } catch (error) {
         // Only show error banner if it's not a "not found" error (already deleted)
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = getErrorMessage(error);
         if (!errorMessage.includes("Chat not found")) {
           logger.error("Failed to delete chat:", error);
           setUndoBanner({

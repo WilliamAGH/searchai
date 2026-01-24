@@ -1,6 +1,7 @@
 "use node";
 import { v } from "convex/values";
 import { action } from "./_generated/server";
+import { getErrorMessage } from "./lib/errors";
 
 // Helper function to send emails via MailPit
 async function sendEmailToMailPit(args: {
@@ -72,9 +73,7 @@ async function sendEmailToMailPit(args: {
     return { success: true, messageId: result.ID };
   } catch (error) {
     console.error("Failed to send email:", error);
-    throw new Error(
-      `Failed to send email: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    throw new Error(`Failed to send email: ${getErrorMessage(error)}`);
   }
 }
 

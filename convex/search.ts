@@ -18,6 +18,7 @@ import {
   searchWithSerpApiDuckDuckGo,
   searchWithDuckDuckGo,
 } from "./search/providers";
+import { getErrorMessage } from "./lib/errors";
 
 // Import utilities
 import {
@@ -135,7 +136,7 @@ export const searchWeb = action({
           return result;
         }
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorMsg = getErrorMessage(error);
         console.warn("SERP API failed:", {
           error: errorMsg,
           query: args.query,
@@ -160,7 +161,7 @@ export const searchWeb = action({
           };
         }
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorMsg = getErrorMessage(error);
         console.warn("OpenRouter search failed:", {
           error: errorMsg,
           query: args.query,
@@ -183,7 +184,7 @@ export const searchWeb = action({
         };
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorMsg = getErrorMessage(error);
       console.warn("DuckDuckGo search failed:", {
         error: errorMsg,
         query: args.query,

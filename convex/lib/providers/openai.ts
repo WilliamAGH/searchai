@@ -25,6 +25,7 @@ import {
 } from "@openai/agents-core";
 import OpenAI from "openai";
 import { generateMessageId } from "../id_generator";
+import { getErrorMessage } from "../errors";
 
 /**
  * OpenRouter provider routing configuration
@@ -362,7 +363,7 @@ const scheduleOpenAIHealthCheck = (params: {
     } catch (error) {
       console.error("❌ OpenAI health check failed", {
         model: params.model,
-        error: error instanceof Error ? error.message : String(error),
+        error: getErrorMessage(error),
       });
     }
   };

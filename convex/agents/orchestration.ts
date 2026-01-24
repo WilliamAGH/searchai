@@ -51,6 +51,7 @@ import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { run } from "@openai/agents";
+import { getErrorMessage } from "../lib/errors";
 import {
   RunToolCallItem,
   RunToolCallOutputItem,
@@ -642,9 +643,9 @@ async function withErrorContext<T>(
   try {
     return await fn();
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error occurred";
-    throw new Error(`${operation}: ${message}`);
+    throw new Error(
+      `${operation}: ${getErrorMessage(error, "Unknown error occurred")}`,
+    );
   }
 }
 
