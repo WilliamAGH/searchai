@@ -39,7 +39,15 @@ export const summarizeToolResult = (output: unknown): string => {
     return json.length > TOOL_RESULT_MAX_LENGTH
       ? `${json.slice(0, TOOL_RESULT_MAX_LENGTH)}…`
       : json;
-  } catch {
+  } catch (serializeError) {
+    // Log serialization failure for debugging (circular refs, BigInt, etc.)
+    console.warn("Tool result serialization failed", {
+      outputType: typeof output,
+      error:
+        serializeError instanceof Error
+          ? serializeError.message
+          : String(serializeError),
+    });
     return "[unserializable output]";
   }
 };
@@ -437,24 +445,6 @@ export function buildConversationContext(
     )
     .join("\n")
     .slice(0, 4000);
-}
-
-export function extractContextReferencesFromMessages<
-  T extends { contextReferences?: Array<{ contextId: string }> },
->(
-  messages: T[],
-): Array<T["contextReferences"] extends Array<infer U> ? U : never> {
-  const refs: any[] = [];
-  for (const msg of messages || []) {
-    if (Array.isArray(msg.contextReferences)) {
-      for (const ref of msg.contextReferences) {
-        if (!refs.find((existing) => existing.contextId === ref.contextId)) {
-          refs.push(ref);
-        }
-      }
-    }
-  }
-  return refs;
 }
 
 export function buildConversationBlock(
