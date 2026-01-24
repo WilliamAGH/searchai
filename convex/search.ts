@@ -5,7 +5,11 @@
 
 import { v } from "convex/values";
 import { action, internalAction, internalMutation } from "./_generated/server";
-import { vSearchResult, vSerpEnrichment } from "./lib/validators";
+import {
+  vSearchResult,
+  vSerpEnrichment,
+  vSearchMethod,
+} from "./lib/validators";
 import { api } from "./_generated/api";
 
 // Import search providers
@@ -80,12 +84,7 @@ export const searchWeb = action({
   },
   returns: v.object({
     results: v.array(vSearchResult),
-    searchMethod: v.union(
-      v.literal("serp"),
-      v.literal("openrouter"),
-      v.literal("duckduckgo"),
-      v.literal("fallback"),
-    ),
+    searchMethod: vSearchMethod,
     hasRealResults: v.boolean(),
     enrichment: v.optional(vSerpEnrichment),
   }),
