@@ -95,21 +95,34 @@ export function registerScrapeRoutes(http: HttpRouter) {
 
         return corsResponse(JSON.stringify(result), 200, origin);
       } catch (error) {
-        console.error("❌ SCRAPE API ERROR:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error("❌ SCRAPE API ERROR:", {
+          url: url.substring(0, 200),
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+        });
 
         let hostname = "";
         try {
           hostname = new URL(url).hostname;
         } catch {
-          hostname = "unknown";
+          hostname = url.substring(0, 50);
         }
+
         const errorResponse = {
-          title: hostname,
-          content: `Unable to fetch content from ${url}.`,
-          summary: `Content unavailable from ${hostname}`,
+          error: "Scrape service failed",
+          errorCode: "SCRAPE_FAILED",
           errorDetails: {
+            message: errorMessage,
+            url: url.substring(0, 200),
             timestamp: new Date().toISOString(),
           },
+          // Include placeholder content for graceful degradation
+          title: hostname,
+          content: `Unable to fetch content from ${url}: ${errorMessage}`,
+          summary: `Content unavailable from ${hostname}`,
         };
 
         dlog(
@@ -117,7 +130,8 @@ export function registerScrapeRoutes(http: HttpRouter) {
           JSON.stringify(errorResponse, null, 2),
         );
 
-        return corsResponse(JSON.stringify(errorResponse), 200, origin);
+        // Return 502 Bad Gateway - we're proxying external content that failed
+        return corsResponse(JSON.stringify(errorResponse), 502, origin);
       }
     }),
   });

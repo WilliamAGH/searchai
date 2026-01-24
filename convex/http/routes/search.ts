@@ -170,35 +170,43 @@ export function registerSearchRoutes(http: HttpRouter) {
 
         return corsResponse(JSON.stringify(enhancedResult), 200, origin);
       } catch (error) {
-        console.error("❌ SEARCH API ERROR:", error);
-
-        // Create fallback search results
-        const fallbackResults = [
-          {
-            title: `Search for: ${query}`,
-            url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-            snippet:
-              "Search results temporarily unavailable. Click to search manually.",
-            relevanceScore: 0.3,
-          },
-        ];
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error("❌ SEARCH API ERROR:", {
+          query: query.substring(0, 100),
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+        });
 
         const errorResponse = {
-          results: fallbackResults,
-          searchMethod: "fallback",
-          hasRealResults: false,
-          error: "Search failed",
+          error: "Search service temporarily unavailable",
+          errorCode: "SEARCH_FAILED",
           errorDetails: {
+            message: errorMessage,
             timestamp: new Date().toISOString(),
           },
+          // Include fallback results for graceful degradation, but with 500 status
+          results: [
+            {
+              title: `Search for: ${query}`,
+              url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+              snippet:
+                "Search results temporarily unavailable. Click to search manually.",
+              relevanceScore: 0.3,
+            },
+          ],
+          searchMethod: "fallback",
+          hasRealResults: false,
         };
 
         dlog(
-          "🔍 SEARCH FALLBACK RESPONSE:",
+          "🔍 SEARCH ERROR RESPONSE:",
           JSON.stringify(errorResponse, null, 2),
         );
 
-        return corsResponse(JSON.stringify(errorResponse), 200, origin);
+        // Return 500 to indicate server error - clients can still use fallback results
+        return corsResponse(JSON.stringify(errorResponse), 500, origin);
       }
     }),
   });
