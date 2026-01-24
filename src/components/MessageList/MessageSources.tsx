@@ -8,7 +8,8 @@
 
 import React from "react";
 import type { SearchResult } from "../../lib/types/message";
-import { getFaviconUrl } from "../../lib/utils/favicon";
+import { getFaviconUrl, getSafeHostname } from "../../lib/utils/favicon";
+import { logger } from "../../lib/logger";
 
 type ContextReference = {
   contextId: string;
@@ -30,21 +31,6 @@ interface MessageSourcesProps {
   onSourceHover: (url: string | null) => void;
   // New: Support contextReferences from agent workflow
   contextReferences?: ContextReference[];
-}
-
-/**
- * Extract hostname from URL safely
- */
-function getSafeHostname(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    try {
-      return new URL(`https://${url}`).hostname;
-    } catch {
-      return "";
-    }
-  }
 }
 
 export function MessageSources({
@@ -80,7 +66,11 @@ export function MessageSources({
           if (!inferredTitle) {
             try {
               inferredTitle = new URL(safeUrl).hostname;
-            } catch {
+            } catch (error) {
+              logger.warn("Failed to infer title from source URL", {
+                url: safeUrl,
+                error,
+              });
               inferredTitle = safeUrl;
             }
           }

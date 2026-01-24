@@ -17,7 +17,8 @@ const deriveConvexSite = (val = "") => {
     const u = new URL(val);
     const host = u.host.replace(".convex.cloud", ".convex.site");
     return `${u.protocol}//${host}`.replace(/\/+$/, "");
-  } catch {
+  } catch (error) {
+    console.error("Failed to derive Convex site URL", { value: val, error });
     return (val || "").replace(/\/+$/, "");
   }
 };
@@ -90,7 +91,8 @@ function sendFile(res, filePath) {
         : "no-cache",
     });
     createReadStream(filePath).pipe(res);
-  } catch {
+  } catch (error) {
+    console.error("Failed to serve file", { filePath, error });
     res.writeHead(404);
     res.end("Not found");
   }
@@ -189,7 +191,12 @@ const server = http.createServer(async (req, res) => {
       const target = `${CONVEX_SITE_URL}/api/chatTextMarkdown?${qp}`;
       return void forwardTo(target, req, res);
     }
-  } catch {}
+  } catch (error) {
+    console.error("Failed to rewrite share/public route", {
+      url: req.url,
+      error,
+    });
+  }
 
   // Static file try
   const safeRaw = typeof req.url === "string" ? req.url : "/";

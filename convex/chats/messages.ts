@@ -107,3 +107,92 @@ export const getChatMessages = query({
     }));
   },
 });
+
+/**
+ * Get chat messages for HTTP routes (no auth context).
+ * - Allows shared/public chats
+ * - Allows sessionId ownership
+ */
+export const getChatMessagesHttp = query({
+  args: {
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("messages"),
+      _creationTime: v.number(),
+      chatId: v.id("chats"),
+      role: v.union(
+        v.literal("user"),
+        v.literal("assistant"),
+        v.literal("system"),
+      ),
+      content: v.optional(v.string()),
+      timestamp: v.optional(v.number()),
+      isStreaming: v.optional(v.boolean()),
+      streamedContent: v.optional(v.string()),
+      thinking: v.optional(v.string()),
+      searchResults: v.optional(v.array(vSearchResult)),
+      sources: v.optional(v.array(v.string())),
+      reasoning: v.optional(v.string()),
+      contextReferences: v.optional(v.array(vContextReference)),
+      workflowId: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const chat = await ctx.db.get(args.chatId);
+
+    if (!chat) return [];
+
+    const isSharedOrPublic =
+      chat.privacy === "shared" || chat.privacy === "public";
+    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
+
+    if (!isSharedOrPublic && !isSessionOwner) {
+      return [];
+    }
+
+    if (args.limit !== undefined && args.limit <= 0) {
+      throw new Error("limit must be a positive number");
+    }
+
+    let docs;
+    if (args.limit) {
+      const descDocs = await ctx.db
+        .query("messages")
+        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+        .order("desc")
+        .take(args.limit);
+      docs = descDocs.reverse();
+    } else {
+      docs = await ctx.db
+        .query("messages")
+        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+        .order("asc")
+        .collect();
+    }
+
+    return docs.map((m) => ({
+      _id: m._id,
+      _creationTime: m._creationTime,
+      chatId: m.chatId,
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp,
+      isStreaming: m.isStreaming,
+      streamedContent: m.streamedContent,
+      thinking: m.thinking,
+      searchResults: Array.isArray(m.searchResults)
+        ? m.searchResults
+        : undefined,
+      sources: Array.isArray(m.sources) ? m.sources : undefined,
+      reasoning: m.reasoning,
+      contextReferences: Array.isArray(m.contextReferences)
+        ? m.contextReferences
+        : undefined,
+      workflowId: m.workflowId,
+    }));
+  },
+});

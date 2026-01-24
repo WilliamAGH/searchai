@@ -70,6 +70,23 @@ import {
 // Timeout Utilities
 // ============================================
 // Agent calls have no built-in timeout, so we wrap them to prevent indefinite hangs.
+const MAX_AGENT_TURNS = 6;
+const MAX_TOOL_ERRORS = 3;
+
+/**
+ * Throws if tool error count exceeds threshold. Centralizes error-threshold logic
+ * to avoid duplicated check-and-throw blocks across workflows.
+ */
+function assertToolErrorThreshold(
+  errorCount: number,
+  workflowName: string,
+): void {
+  if (errorCount >= MAX_TOOL_ERRORS) {
+    throw new Error(
+      `${workflowName} failed: too many tool errors (${errorCount})`,
+    );
+  }
+}
 
 // ============================================
 // Instant Response Detection
@@ -268,10 +285,11 @@ const ensureCustomEventPolyfill = () => {
       }
     }
     globalAny.CustomEvent = NodeCustomEvent;
-  } catch {
+  } catch (error) {
     // Fallback for environments where Event is not extendable (e.g., older Node.js)
     console.warn(
       "CustomEvent polyfill: Event not extendable, using standalone fallback class",
+      { error },
     );
     class NodeCustomEvent<T = any> {
       type: string;
@@ -392,6 +410,7 @@ export const orchestrateResearchWorkflow = action({
     const planningResult = await withTimeout(
       run(agents.queryPlanner, planningInput, {
         context: { actionCtx: ctx },
+        maxTurns: MAX_AGENT_TURNS,
       }),
       AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "planning",
@@ -451,6 +470,7 @@ export const orchestrateResearchWorkflow = action({
       const researchResult = await withTimeout(
         run(agents.research, researchInstructions, {
           context: { actionCtx: ctx },
+          maxTurns: MAX_AGENT_TURNS,
         }),
         AGENT_TIMEOUTS.TOOL_EXECUTION_MS,
         "research",
@@ -466,6 +486,14 @@ export const orchestrateResearchWorkflow = action({
         RunToolCallItem,
         RunToolCallOutputItem,
       );
+      const toolErrorCount = Array.from(entries.values()).filter(
+        (entry) =>
+          entry.output &&
+          typeof entry.output === "object" &&
+          "error" in (entry.output as Record<string, unknown>) &&
+          (entry.output as Record<string, unknown>).error,
+      ).length;
+      assertToolErrorThreshold(toolErrorCount, "Research");
       toolCallLog = buildToolCallLog(entries, summarizeToolResult);
 
       const urlContextMap = buildUrlContextMap(
@@ -514,6 +542,7 @@ export const orchestrateResearchWorkflow = action({
     const synthesisResult = await withTimeout(
       run(agents.answerSynthesis, synthesisInstructions, {
         context: { actionCtx: ctx },
+        maxTurns: MAX_AGENT_TURNS,
       }),
       AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "synthesis",
@@ -665,6 +694,101 @@ function createWorkflowErrorHandler(config: WorkflowErrorHandlerConfig) {
 // This is the new, faster workflow that uses a single agent with tools.
 // It eliminates the 3-agent sequential pipeline for most queries.
 
+/**
+ * Initialize workflow session: create token, verify chat, fetch history, add user message.
+ * Extracted per Clean Code [WRN1] to reduce function size and duplication.
+ */
+async function initializeWorkflowSession(
+  ctx: StreamingWorkflowCtx,
+  args: StreamingWorkflowArgs,
+  workflowId: string,
+  nonce: string,
+) {
+  // 1. Create workflow token
+  const issuedAt = Date.now();
+  const workflowTokenPayload: {
+    workflowId: string;
+    nonce: string;
+    chatId: Id<"chats">;
+    sessionId?: string;
+    issuedAt: number;
+    expiresAt: number;
+  } = {
+    workflowId,
+    nonce,
+    chatId: args.chatId,
+    issuedAt,
+    expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
+  };
+
+  if (args.sessionId) {
+    workflowTokenPayload.sessionId = args.sessionId;
+  }
+
+  const workflowTokenId = await withErrorContext(
+    "Failed to create workflow token",
+    () =>
+      ctx.runMutation(
+        internal.workflowTokens.createToken,
+        workflowTokenPayload,
+      ),
+  );
+
+  // 2. Get chat and verify access
+  const getChatArgs: { chatId: Id<"chats">; sessionId?: string } = {
+    chatId: args.chatId,
+  };
+  if (args.sessionId) getChatArgs.sessionId = args.sessionId;
+
+  const chat = await withErrorContext("Failed to retrieve chat", () =>
+    ctx.runQuery(api.chats.getChatByIdHttp, getChatArgs),
+  );
+  if (!chat) throw new Error("Chat not found or access denied");
+
+  // 3. Get recent messages (Fetch FIRST to exclude current query)
+  const getMessagesArgs: {
+    chatId: Id<"chats">;
+    sessionId?: string;
+    limit?: number;
+  } = {
+    chatId: args.chatId,
+    limit: 20,
+  };
+  if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
+
+  const recentMessages = (await withErrorContext(
+    "Failed to retrieve chat messages",
+    () => ctx.runQuery(api.chats.getChatMessagesHttp, getMessagesArgs),
+  )) as Array<{
+    role: "user" | "assistant" | "system";
+    content?: string;
+  }>;
+
+  // 4. Add user message
+  await withErrorContext("Failed to save user message", () =>
+    ctx.runMutation(internal.messages.addMessageHttp, {
+      chatId: args.chatId,
+      role: "user",
+      content: args.userQuery,
+      sessionId: args.sessionId,
+    }),
+  );
+
+  // 5. Build context
+  let conversationContext = buildConversationContext(recentMessages || []);
+  if (!conversationContext && args.conversationContext) {
+    console.warn(
+      "buildConversationContext returned empty; using args.conversationContext",
+    );
+    conversationContext = args.conversationContext;
+  }
+  if (!conversationContext) {
+    conversationContext = "";
+  }
+
+  return { workflowTokenId, chat, conversationContext };
+}
+
 export async function* streamConversationalWorkflow(
   ctx: StreamingWorkflowCtx,
   args: StreamingWorkflowArgs,
@@ -690,93 +814,16 @@ export async function* streamConversationalWorkflow(
   const harvested = createEmptyHarvestedData();
 
   try {
-    // Create workflow token
-    const issuedAt = Date.now();
-    const workflowTokenPayload: {
-      workflowId: string;
-      nonce: string;
-      chatId: Id<"chats">;
-      sessionId?: string;
-      issuedAt: number;
-      expiresAt: number;
-    } = {
+    const session = await initializeWorkflowSession(
+      ctx,
+      args,
       workflowId,
       nonce,
-      chatId: args.chatId,
-      issuedAt,
-      expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
-    };
-
-    if (args.sessionId) {
-      workflowTokenPayload.sessionId = args.sessionId;
-    }
-
-    workflowTokenId = await withErrorContext(
-      "Failed to create workflow token",
-      () =>
-        ctx.runMutation(
-          internal.workflowTokens.createToken,
-          workflowTokenPayload,
-        ),
     );
-
-    // Get chat and verify access
-    const getChatArgs: { chatId: Id<"chats">; sessionId?: string } = {
-      chatId: args.chatId,
-    };
-    if (args.sessionId) getChatArgs.sessionId = args.sessionId;
-
-    const chat = await withErrorContext("Failed to retrieve chat", () =>
-      ctx.runQuery(api.chats.getChatById, getChatArgs),
-    );
-    if (!chat) throw new Error("Chat not found or access denied");
+    workflowTokenId = session.workflowTokenId;
+    const { chat, conversationContext } = session;
 
     yield writeEvent("workflow_start", { workflowId, nonce });
-
-    // Get recent messages for conversation context BEFORE adding the current user message
-    // This prevents the user query from appearing twice in the agent input
-    // Limit to 20 messages to bound memory/latency for large chats while maintaining context
-    const getMessagesArgs: {
-      chatId: Id<"chats">;
-      sessionId?: string;
-      limit?: number;
-    } = {
-      chatId: args.chatId,
-      limit: 20,
-    };
-    if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
-
-    const recentMessages = (await withErrorContext(
-      "Failed to retrieve chat messages",
-      () => ctx.runQuery(api.chats.getChatMessages, getMessagesArgs),
-    )) as Array<{
-      role: "user" | "assistant" | "system";
-      content?: string;
-    }>;
-
-    // Add user message AFTER fetching history to avoid duplication
-    await withErrorContext("Failed to save user message", () =>
-      ctx.runMutation(internal.messages.addMessage, {
-        chatId: args.chatId,
-        role: "user",
-        content: args.userQuery,
-        sessionId: args.sessionId,
-      }),
-    );
-
-    let conversationContext = buildConversationContext(recentMessages || []);
-    if (!conversationContext && args.conversationContext) {
-      console.warn(
-        "buildConversationContext returned empty; using args.conversationContext",
-      );
-      conversationContext = args.conversationContext;
-    }
-    if (!conversationContext) {
-      console.warn(
-        "No conversationContext available from messages or args; proceeding with empty context",
-      );
-      conversationContext = "";
-    }
 
     // Build the input for the conversational agent
     const agentInput = conversationContext
@@ -796,11 +843,13 @@ export async function* streamConversationalWorkflow(
     const agentResult = await run(agents.conversational, agentInput, {
       stream: true,
       context: { actionCtx: ctx },
+      maxTurns: MAX_AGENT_TURNS,
     });
 
     let accumulatedResponse = "";
     let hasStartedStreaming = false;
     let toolCallCount = 0;
+    let toolErrorCount = 0;
     let lastProgressStage = "thinking";
 
     // Process streaming events using extracted helpers (per WRN1)
@@ -848,6 +897,8 @@ export async function* streamConversationalWorkflow(
           if (!output || typeof output !== "object") continue;
           if ("error" in output && output.error) {
             console.log(`⚠️ SKIPPED failed tool output: ${outputToolName}`);
+            toolErrorCount += 1;
+            assertToolErrorThreshold(toolErrorCount, "Conversational workflow");
             continue;
           }
 
@@ -1105,83 +1156,31 @@ export async function* streamResearchWorkflow(
   const startTime = Date.now();
 
   const nonce = generateMessageId();
-  const issuedAt = Date.now();
 
   // Use shared utilities (extracted per DR1a)
   const writeEvent = (type: string, data: Record<string, unknown>) =>
     createWorkflowEvent(type, data);
 
   let workflowTokenId: Id<"workflowTokens"> | null = null;
+  let instantResponse: string | null = null;
   const handleError = createWorkflowErrorHandler({
     ctx,
     workflowId,
     getTokenId: () => workflowTokenId,
   });
 
-  const workflowTokenPayload: {
-    workflowId: string;
-    nonce: string;
-    chatId: Id<"chats">;
-    sessionId?: string;
-    issuedAt: number;
-    expiresAt: number;
-  } = {
-    workflowId,
-    nonce,
-    chatId: args.chatId,
-    issuedAt,
-    expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
-  };
-
-  if (args.sessionId) {
-    workflowTokenPayload.sessionId = args.sessionId;
-  }
-
-  workflowTokenId = await ctx.runMutation(
-    internal.workflowTokens.createToken,
-    workflowTokenPayload,
-  );
-
-  const getChatArgs: { chatId: Id<"chats">; sessionId?: string } = {
-    chatId: args.chatId,
-  };
-  if (args.sessionId) getChatArgs.sessionId = args.sessionId;
-
-  const chat = await ctx.runQuery(api.chats.getChatById, getChatArgs);
-  if (!chat) throw new Error("Chat not found or access denied");
-
-  const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
-    chatId: args.chatId,
-  };
-  if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
-
-  const recentMessages = (await ctx.runQuery(
-    api.chats.getChatMessages,
-    getMessagesArgs,
-  )) as Array<{
-    role: "user" | "assistant" | "system";
-    content?: string;
-    contextReferences?: ResearchContextReference[];
-  }>;
-
-  // Add user message AFTER fetching history to avoid duplication
-  await ctx.runMutation(internal.messages.addMessage, {
-    chatId: args.chatId,
-    role: "user",
-    content: args.userQuery,
-    sessionId: args.sessionId, // Pass sessionId for HTTP action auth
-  });
-
-  const conversationContextFromDb = buildConversationContext(
-    recentMessages || [],
-  );
-
-  const conversationSource =
-    conversationContextFromDb || args.conversationContext || "";
-
-  const instantResponse = detectInstantResponse(args.userQuery);
-
   try {
+    const session = await initializeWorkflowSession(
+      ctx,
+      args,
+      workflowId,
+      nonce,
+    );
+    workflowTokenId = session.workflowTokenId;
+    const { chat, conversationContext: conversationSource } = session;
+
+    instantResponse = detectInstantResponse(args.userQuery);
+
     // ============================================
     // INSTANT RESPONSE PATH (No LLM calls)
     // ============================================
@@ -1302,6 +1301,7 @@ export async function* streamResearchWorkflow(
     const planningResult = await run(agents.queryPlanner, planningInput, {
       stream: true,
       context: { actionCtx: ctx },
+      maxTurns: MAX_AGENT_TURNS,
     });
 
     let planningOutput: any = null;
@@ -1425,7 +1425,11 @@ export async function* streamResearchWorkflow(
       const fastSynthesisResult = await run(
         agents.answerSynthesis,
         fastSynthesisInstructions,
-        { stream: true, context: { actionCtx: ctx } },
+        {
+          stream: true,
+          context: { actionCtx: ctx },
+          maxTurns: MAX_AGENT_TURNS,
+        },
       );
 
       let fastAccumulatedAnswer = "";
@@ -1836,7 +1840,7 @@ export async function* streamResearchWorkflow(
     const synthesisResult = await run(
       agents.answerSynthesis,
       synthesisInstructions,
-      { stream: true, context: { actionCtx: ctx } },
+      { stream: true, context: { actionCtx: ctx }, maxTurns: MAX_AGENT_TURNS },
     );
     let accumulatedAnswer = "";
     const synthesisStreamStart = Date.now();
@@ -2018,3 +2022,65 @@ export async function* streamResearchWorkflow(
     );
   }
 }
+
+// --------------------------------------------
+// Non-streaming workflow with persistence
+// --------------------------------------------
+export const runAgentWorkflowAndPersist = action({
+  args: {
+    chatId: v.id("chats"),
+    message: v.string(),
+    sessionId: v.optional(v.string()),
+  },
+  returns: v.object({
+    assistantMessageId: v.string(),
+    workflowId: v.string(),
+    answer: v.string(),
+    sources: v.array(v.string()),
+    contextReferences: v.array(vContextReference),
+    signature: v.string(),
+  }),
+  // @ts-ignore deep generics
+  handler: async (ctx, args) => {
+    const eventStream = streamConversationalWorkflow(ctx, {
+      chatId: args.chatId,
+      sessionId: args.sessionId,
+      userQuery: args.message,
+      conversationContext: undefined,
+      contextReferences: undefined,
+    });
+
+    let persisted: {
+      payload: StreamingPersistPayload;
+      signature: string;
+    } | null = null;
+
+    for await (const event of eventStream) {
+      if (event.type === "persisted") {
+        const candidate = event as {
+          payload?: StreamingPersistPayload;
+          signature?: string;
+        };
+        if (candidate.payload && candidate.signature) {
+          persisted = {
+            payload: candidate.payload,
+            signature: candidate.signature,
+          };
+        }
+      }
+    }
+
+    if (!persisted) {
+      throw new Error("Workflow did not persist payload");
+    }
+
+    return {
+      assistantMessageId: persisted.payload.assistantMessageId,
+      workflowId: persisted.payload.workflowId,
+      answer: persisted.payload.answer,
+      sources: persisted.payload.sources,
+      contextReferences: persisted.payload.contextReferences,
+      signature: persisted.signature,
+    };
+  },
+});

@@ -8,9 +8,9 @@
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 // Import from the dedicated types module (not orchestration_helpers) so we don't pull
 // any Node-only helpers into browser bundles.
-import type { StreamingPersistPayload } from "../../../convex/agents/types";
+import type { StreamingPersistPayload } from "../../../convex/agents/schema";
 import type { SearchResult } from "../../../convex/lib/types/search";
-export type { ResearchContextReference } from "../../../convex/agents/types";
+export type { ResearchContextReference } from "../../../convex/agents/schema";
 export type { SearchResult } from "../../../convex/lib/types/search";
 
 /**

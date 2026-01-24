@@ -257,7 +257,11 @@ export function buildSynthesisInstructions(params: {
    Type: ${source.type}
    Relevance: ${source.relevance}
    URL: ${source.url}`;
-        } catch {
+        } catch (error) {
+          console.warn("Failed to parse source URL for synthesis prompt", {
+            url: source.url,
+            error,
+          });
           return `${index}. ${source.title}
    Type: ${source.type}
    Relevance: ${source.relevance}
@@ -387,7 +391,11 @@ export function formatContextReferencesForPrompt(
       if (!label && ref.url) {
         try {
           label = new URL(ref.url).hostname;
-        } catch {
+        } catch (error) {
+          console.warn("Failed to parse context reference URL", {
+            url: ref.url,
+            error,
+          });
           label = ref.url;
         }
       }
@@ -485,7 +493,11 @@ export function processToolCalls(
         let parsedArgs: unknown = rawCall.arguments;
         try {
           parsedArgs = JSON.parse(rawCall.arguments);
-        } catch {
+        } catch (error) {
+          console.warn("Failed to parse tool call arguments", {
+            error,
+            rawArguments: rawCall.arguments,
+          });
           parsedArgs = rawCall.arguments;
         }
         toolCallEntries.set(rawCall.callId, {

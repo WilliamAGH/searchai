@@ -87,6 +87,11 @@ export const searchWeb = action({
     searchMethod: vSearchMethod,
     hasRealResults: v.boolean(),
     enrichment: v.optional(vSerpEnrichment),
+    // Error tracking - present when fallback was used due to provider failures
+    providerErrors: v.optional(
+      v.array(v.object({ provider: v.string(), error: v.string() })),
+    ),
+    allProvidersFailed: v.optional(v.boolean()),
   }),
   handler: async (_ctx, args) => {
     const maxResults = args.maxResults || 5;
@@ -108,6 +113,9 @@ export const searchWeb = action({
       return cached;
     }
 
+    // Track provider errors for diagnostics
+    const providerErrors: Array<{ provider: string; error: string }> = [];
+
     // Try SERP API for DuckDuckGo first if available
     if (process.env.SERP_API_KEY) {
       try {
@@ -127,7 +135,12 @@ export const searchWeb = action({
           return result;
         }
       } catch (error) {
-        console.warn("SERP API failed:", error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.warn("SERP API failed:", {
+          error: errorMsg,
+          query: args.query,
+        });
+        providerErrors.push({ provider: "serp", error: errorMsg });
       }
     }
 
@@ -147,7 +160,12 @@ export const searchWeb = action({
           };
         }
       } catch (error) {
-        console.warn("OpenRouter search failed:", error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.warn("OpenRouter search failed:", {
+          error: errorMsg,
+          query: args.query,
+        });
+        providerErrors.push({ provider: "openrouter", error: errorMsg });
       }
     }
 
@@ -165,10 +183,15 @@ export const searchWeb = action({
         };
       }
     } catch (error) {
-      console.warn("DuckDuckGo search failed:", error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn("DuckDuckGo search failed:", {
+        error: errorMsg,
+        query: args.query,
+      });
+      providerErrors.push({ provider: "duckduckgo", error: errorMsg });
     }
 
-    // Final fallback - return minimal search links
+    // Final fallback - return minimal search links with error context
     const fallbackResults = [
       {
         title: `Search for: ${args.query}`,
@@ -179,10 +202,21 @@ export const searchWeb = action({
       },
     ];
 
+    // Log when all providers failed for monitoring
+    if (providerErrors.length > 0) {
+      console.error("All search providers failed:", {
+        query: args.query.substring(0, 100),
+        errors: providerErrors,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     return {
       results: fallbackResults,
       searchMethod: "fallback" as const,
       hasRealResults: false,
+      providerErrors: providerErrors.length > 0 ? providerErrors : undefined,
+      allProvidersFailed: providerErrors.length > 0,
     };
   },
 });
@@ -335,7 +369,16 @@ export const planSearch = action({
       );
       const selected = diversifyQueries(pool, args.newMessage);
       if (selected.length > 0) defaultPlan.queries = selected;
-    } catch {}
+    } catch (diversifyError) {
+      console.warn("Query diversification failed:", {
+        query: args.newMessage.substring(0, 100),
+        error:
+          diversifyError instanceof Error
+            ? diversifyError.message
+            : String(diversifyError),
+      });
+      // Proceed with default queries
+    }
 
     // If no API key present, skip LLM planning
     if (!process.env.OPENROUTER_API_KEY) {
@@ -419,8 +462,18 @@ export const planSearch = action({
       let parsed: unknown;
       try {
         parsed = JSON.parse(text);
-      } catch {
+      } catch (jsonError) {
         // Some models wrap JSON in code fences; try to extract
+        console.warn(
+          "LLM response JSON parse failed, trying regex extraction:",
+          {
+            responseLength: text.length,
+            error:
+              jsonError instanceof Error
+                ? jsonError.message
+                : String(jsonError),
+          },
+        );
         const match = text.match(/\{[\s\S]*\}/);
         parsed = match ? JSON.parse(match[0]) : null;
       }
@@ -462,7 +515,12 @@ export const planSearch = action({
       setCachedPlan(cacheKey, defaultPlan);
       // Metrics recorded at frontend layer
       return defaultPlan;
-    } catch {
+    } catch (llmError) {
+      console.warn("LLM planning call failed:", {
+        chatId: args.chatId,
+        query: args.newMessage.substring(0, 100),
+        error: llmError instanceof Error ? llmError.message : String(llmError),
+      });
       setCachedPlan(cacheKey, defaultPlan);
       // Metrics recorded at frontend layer
       return defaultPlan;

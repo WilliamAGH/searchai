@@ -449,7 +449,8 @@ function ChatInterfaceComponent({
 
       if (!newChatId) {
         // Navigate to home as fallback
-        await navigateWithVerification("/").catch(() => {
+        await navigateWithVerification("/").catch((error) => {
+          logger.error("Navigation failed during new chat fallback:", error);
           window.location.href = "/";
         });
       }

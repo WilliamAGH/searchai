@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect } from "react";
+import { getDomainFromUrl } from "../lib/utils/favicon";
 
 interface CitationRendererProps {
   content: string;
@@ -17,20 +18,6 @@ interface CitationRendererProps {
   }>;
   hoveredSourceUrl?: string | null;
   onCitationHover?: (url: string | null) => void;
-}
-
-/**
- * Extract domain from URL
- * @param url - Full URL
- * @returns Domain without www prefix
- */
-function getDomainFromUrl(url: string): string {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.replace("www.", "");
-  } catch {
-    return "";
-  }
 }
 
 /**

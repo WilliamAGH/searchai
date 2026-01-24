@@ -6,6 +6,7 @@
 import { useEffect, useRef } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { logger } from "../lib/logger";
 
 const SESSION_KEY = "searchai:anonymousSessionId";
 
@@ -36,8 +37,8 @@ export function useClaimAnonymousChats() {
             }
 
             hasClaimedRef.current = true;
-          } catch {
-            // Failed to claim anonymous chats - will retry on next login
+          } catch (error) {
+            logger.error("Failed to claim anonymous chats", { error });
           }
         }
       }

@@ -149,6 +149,33 @@ export const getChatById = query({
 });
 
 /**
+ * Get chat by ID for HTTP routes (no auth context).
+ * - Allows shared/public chats
+ * - Allows sessionId ownership
+ */
+export const getChatByIdHttp = query({
+  args: {
+    chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
+  },
+  returns: v.union(v.any(), v.null()),
+  handler: async (ctx, args) => {
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) return null;
+
+    if (chat.privacy === "shared" || chat.privacy === "public") {
+      return chat;
+    }
+
+    if (hasSessionAccess(chat, args.sessionId)) {
+      return chat;
+    }
+
+    return null;
+  },
+});
+
+/**
  * Get chat by ID with direct database lookup (bypasses indexes)
  * Use this immediately after creation to avoid index propagation delays
  * @param chatId - Chat database ID
@@ -239,6 +266,29 @@ export const getChatByShareId = query({
     if (chat.privacy !== "shared" && chat.privacy !== "public") {
       const userId = await getAuthUserId(ctx);
       if (!hasUserAccess(chat, userId)) return null;
+    }
+
+    return chat;
+  },
+});
+
+/**
+ * Get chat by share ID for HTTP routes (no auth context).
+ * - Only returns shared/public chats
+ */
+export const getChatByShareIdHttp = query({
+  args: { shareId: v.string() },
+  returns: v.union(v.any(), v.null()),
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
+      .unique();
+
+    if (!chat) return null;
+
+    if (chat.privacy !== "shared" && chat.privacy !== "public") {
+      return null;
     }
 
     return chat;

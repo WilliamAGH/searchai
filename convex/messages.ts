@@ -9,7 +9,7 @@ import {
 } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
-import { isAuthorized, isUnownedChat } from "./lib/auth";
+import { isAuthorized, isUnownedChat, hasSessionAccess } from "./lib/auth";
 
 export const addMessage = internalMutation({
   args: {
@@ -65,6 +65,57 @@ export const addMessage = internalMutation({
       chatId: chatId,
       messageId, // UUID v7 for unique message tracking
       threadId, // UUID v7 for conversation thread continuity
+      ...rest,
+      timestamp: Date.now(),
+    });
+  },
+});
+
+// HTTP-only variant for actions without auth context.
+export const addMessageHttp = internalMutation({
+  args: {
+    chatId: v.id("chats"),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.optional(v.string()),
+    isStreaming: v.optional(v.boolean()),
+    streamedContent: v.optional(v.string()),
+    thinking: v.optional(v.string()),
+    searchResults: v.optional(v.array(vSearchResult)),
+    sources: v.optional(v.array(v.string())),
+    reasoning: v.optional(v.string()),
+    searchMethod: v.optional(vSearchMethod),
+    hasRealResults: v.optional(v.boolean()),
+    contextReferences: v.optional(v.array(vContextReference)),
+    workflowId: v.optional(v.string()),
+    sessionId: v.optional(v.string()),
+  },
+  returns: v.id("messages"),
+  handler: async (ctx, args) => {
+    const chat = await ctx.db.get(args.chatId);
+
+    if (!chat) throw new Error("Chat not found");
+
+    const authorized =
+      hasSessionAccess(chat, args.sessionId) ||
+      (isUnownedChat(chat) && !!args.sessionId);
+
+    if (!authorized) {
+      throw new Error("Unauthorized");
+    }
+
+    const messageId = generateMessageId();
+
+    let threadId = chat.threadId;
+    if (!threadId) {
+      threadId = generateThreadId();
+      await ctx.db.patch(args.chatId, { threadId });
+    }
+
+    const { chatId, sessionId: _sessionId, ...rest } = args;
+    return await ctx.db.insert("messages", {
+      chatId: chatId,
+      messageId,
+      threadId,
       ...rest,
       timestamp: Date.now(),
     });

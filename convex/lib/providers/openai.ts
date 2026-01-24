@@ -319,6 +319,57 @@ const createInstrumentedFetch = (debugLogging: boolean): typeof fetch => {
   return instrumented as typeof fetch;
 };
 
+const DEFAULT_HEALTHCHECK_TIMEOUT_MS = 8000;
+let healthCheckPromise: Promise<void> | null = null;
+
+const scheduleOpenAIHealthCheck = (params: {
+  client: OpenAI;
+  model: string;
+  isOpenAIEndpoint: boolean;
+}) => {
+  if (!params.isOpenAIEndpoint) return;
+  if (!process.env.LLM_API_KEY && !process.env.OPENAI_API_KEY) return;
+  if (process.env.LLM_HEALTHCHECK === "0") return;
+  if (healthCheckPromise) return;
+
+  const timeoutMs = Number.parseInt(
+    process.env.LLM_HEALTHCHECK_TIMEOUT_MS || "",
+    10,
+  );
+  const maxWait =
+    Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? timeoutMs
+      : DEFAULT_HEALTHCHECK_TIMEOUT_MS;
+
+  const run = async () => {
+    const start = Date.now();
+    try {
+      const check = params.client.responses.create({
+        model: params.model,
+        input: "healthcheck",
+        max_output_tokens: 1,
+      });
+      await Promise.race([
+        check,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Health check timeout")), maxWait),
+        ),
+      ]);
+      console.info(
+        "✅ OpenAI health check passed",
+        `${params.model} (${Date.now() - start}ms)`,
+      );
+    } catch (error) {
+      console.error("❌ OpenAI health check failed", {
+        model: params.model,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  healthCheckPromise = run();
+};
+
 /**
  * Create an OpenAI-compatible environment configured from env vars
  * Handles model endpoint detection, tracing toggles, and debugging instrumentation
@@ -356,6 +407,8 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   // OpenAI's Responses API is only supported by api.openai.com
   const useChatCompletionsAPI = isOpenRouter || isChatCompletionsEndpoint;
   const debugLogging = process.env.LLM_DEBUG_FETCH === "1";
+  const configuredModel =
+    process.env.LLM_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   const client = new OpenAI({
     apiKey,
@@ -404,6 +457,13 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
       ? "(disabled for Chat Completions)"
       : "(enabled for Responses API)",
   );
+
+  // Validate OpenAI credentials + model on startup (once per runtime)
+  scheduleOpenAIHealthCheck({
+    client,
+    model: configuredModel,
+    isOpenAIEndpoint,
+  });
 
   // Build default model settings
   const temperature = process.env.LLM_TEMPERATURE

@@ -8,13 +8,16 @@
  */
 
 import { httpAction } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
-import { corsResponse, dlog } from "../utils";
+import { corsResponse, dlog, serializeError } from "../utils";
 import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { streamConversationalWorkflow } from "../../agents/orchestration";
+import { safeConvexId } from "../../lib/validators";
+// Types come from the Node-free module so HTTP routes (and other V8 code) never import
+// the helpers that depend on `node:crypto`.
+import type { ResearchContextReference } from "../../agents/schema";
 
 /**
  * Build a standardized rate limit exceeded response
@@ -33,9 +36,6 @@ function rateLimitExceededResponse(
     origin,
   );
 }
-// Types come from the Node-free module so HTTP routes (and other V8 code) never import
-// the helpers that depend on `node:crypto`.
-import type { ResearchContextReference } from "../../agents/schema";
 
 export function sanitizeContextReferences(
   input: unknown,
@@ -121,9 +121,13 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ AGENT API INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
@@ -275,17 +279,18 @@ export function registerAgentAIRoutes(http: HttpRouter) {
 
         return corsResponse(JSON.stringify(response), 200, origin);
       } catch (error) {
+        const errorInfo = serializeError(error);
         console.error("💥 AGENT WORKFLOW FAILED:", {
-          error: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : "No stack trace",
+          error: errorInfo.message,
+          errorDetails: errorInfo,
           timestamp: new Date().toISOString(),
         });
 
         // Fallback error response
         const errorResponse = {
           error: "Agent workflow failed",
-          errorMessage:
-            error instanceof Error ? error.message : "Unknown error occurred",
+          errorMessage: errorInfo.message,
+          errorDetails: errorInfo,
           answer:
             "I apologize, but I encountered an error while processing your request. Please try again.",
           hasLimitations: true,
@@ -334,9 +339,13 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ AGENT STREAM INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
@@ -369,9 +378,23 @@ export function registerAgentAIRoutes(http: HttpRouter) {
         );
       }
 
-      const chatId = payload.chatId as Id<"chats">;
+      const chatId = safeConvexId<"chats">(payload.chatId);
+      if (!chatId) {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid chatId" }),
+          400,
+          origin,
+        );
+      }
       const sessionId =
         typeof payload.sessionId === "string" ? payload.sessionId : undefined;
+      if (!sessionId) {
+        return corsResponse(
+          JSON.stringify({ error: "sessionId is required" }),
+          400,
+          origin,
+        );
+      }
       const conversationContext = payload.conversationContext
         ? String(payload.conversationContext)
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
@@ -390,7 +413,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
                 encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
               );
             } catch (error) {
-              console.error("Failed to send SSE event:", error);
+              console.error("Failed to send SSE event:", serializeError(error));
             }
           };
 
@@ -409,17 +432,23 @@ export function registerAgentAIRoutes(http: HttpRouter) {
 
             dlog("✅ STREAMING CONVERSATIONAL WORKFLOW COMPLETE");
           } catch (error) {
-            console.error("💥 STREAMING WORKFLOW ERROR:", error);
+            console.error(
+              "💥 STREAMING WORKFLOW ERROR:",
+              serializeError(error),
+            );
             sendEvent({
               type: "error",
-              error: error instanceof Error ? error.message : String(error),
+              error: serializeError(error).message,
+              errorDetails: serializeError(error),
               timestamp: Date.now(),
             });
           } finally {
             try {
               controller.close();
-            } catch {
-              // Ignore double-close attempts
+            } catch (closeError) {
+              console.error("Failed to close SSE controller", {
+                error: serializeError(closeError),
+              });
             }
           }
         },
@@ -467,20 +496,43 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ AGENT PERSIST INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
       }
 
-      const payload = rawPayload as Record<string, unknown>;
+      const payload =
+        rawPayload && typeof rawPayload === "object"
+          ? (rawPayload as Record<string, unknown>)
+          : null;
+      if (!payload) {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid request payload" }),
+          400,
+          origin,
+        );
+      }
       const message =
         typeof payload.message === "string" ? payload.message : "";
-      const chatId = typeof payload.chatId === "string" ? payload.chatId : "";
+      const rawChatId =
+        typeof payload.chatId === "string" ? payload.chatId : "";
       const sessionId =
         typeof payload.sessionId === "string" ? payload.sessionId : undefined;
+      if (!sessionId) {
+        return corsResponse(
+          JSON.stringify({ error: "sessionId is required" }),
+          400,
+          origin,
+        );
+      }
+      const chatId = safeConvexId<"chats">(rawChatId);
       if (!message.trim() || !chatId) {
         return corsResponse(
           JSON.stringify({ error: "chatId and message required" }),
@@ -494,17 +546,19 @@ export function registerAgentAIRoutes(http: HttpRouter) {
           // @ts-ignore - passing through to Convex action
           api.agents.orchestration.runAgentWorkflowAndPersist as any,
           {
-            chatId, // Convex will validate this is a valid Id
+            chatId,
             message,
             sessionId,
           },
         );
         return corsResponse(JSON.stringify(result), 200, origin);
       } catch (error) {
+        const errorInfo = serializeError(error);
         return corsResponse(
           JSON.stringify({
             error: "Agent persistence failed",
-            details: error instanceof Error ? error.message : String(error),
+            details: errorInfo.message,
+            errorDetails: errorInfo,
           }),
           500,
           origin,

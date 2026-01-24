@@ -16,6 +16,7 @@ import {
   TitleUtils,
 } from "../types/unified";
 import { logger } from "../logger";
+import { buildHttpError, readResponseBody } from "../utils/httpUtils";
 import {
   verifyPersistedPayload,
   isSignatureVerificationAvailable,
@@ -422,8 +423,19 @@ export class ConvexChatRepository extends BaseRepository {
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await readResponseBody(response);
+        throw buildHttpError(
+          response,
+          errorText,
+          "ConvexChatRepository.generateResponse",
+        );
+      }
+
+      if (!response.body) {
+        throw new Error(
+          `Streaming response missing body from ${apiUrl} (HTTP ${response.status} ${response.statusText})`,
+        );
       }
 
       const reader = response.body.getReader();
@@ -498,8 +510,18 @@ export class ConvexChatRepository extends BaseRepository {
                 yield { type: "done" };
                 break;
             }
-          } catch {
-            // Ignore malformed frames
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            logger.error("Failed to parse SSE frame", {
+              error: message,
+              raw: data,
+              chatId,
+            });
+            yield {
+              type: "error",
+              error: `Failed to parse SSE frame: ${message}. Raw: ${data}`,
+            };
           }
         }
       }
@@ -550,7 +572,7 @@ export class ConvexChatRepository extends BaseRepository {
       return chat ? this.convexToUnifiedChat(chat) : null;
     } catch (error) {
       logger.error("Failed to fetch chat by share ID:", error);
-      return null;
+      throw error;
     }
   }
 
@@ -562,7 +584,7 @@ export class ConvexChatRepository extends BaseRepository {
       return chat ? this.convexToUnifiedChat(chat) : null;
     } catch (error) {
       logger.error("Failed to fetch chat by public ID:", error);
-      return null;
+      throw error;
     }
   }
 

@@ -105,12 +105,15 @@ npx convex env set OPENROUTER_API_KEY "sk-or-v1-your-key-here"
 # Optional search integration
 npx convex env set SERP_API_KEY "your-serp-api-key"
 
-# Optional: Fallback AI provider (Convex OpenAI proxy) if OpenRouter is unavailable
-npx convex env set CONVEX_OPENAI_API_KEY "your-openai-like-key"
-npx convex env set CONVEX_OPENAI_BASE_URL "https://api.openai.com/v1"  # or your proxy base URL
+# Optional: Fallback AI provider if OpenRouter is unavailable
+npx convex env set LLM_API_KEY "your-openai-or-openrouter-key"
+npx convex env set LLM_BASE_URL "https://api.openai.com/v1"  # or your proxy base URL
 
 # Recommended: Your site URL for auth callbacks/headers
 npx convex env set SITE_URL "https://dev.search-ai.io"   # set per environment
+
+# Recommended: Ensure runtime mode is set (affects URL validation and debug payloads)
+npx convex env set NODE_ENV "development"
 
 # Optional: Restrict CORS for export/publish routes (comma-separated origins)
 npx convex env set CONVEX_ALLOWED_ORIGINS "https://dev.search-ai.io,http://localhost:5173,http://localhost:5174"
@@ -170,9 +173,10 @@ npx convex dev --once
 # Set production environment variables first (run once per variable)
 npx convex env set OPENROUTER_API_KEY "your-key" --prod
 npx convex env set SERP_API_KEY "your-serp-key" --prod
-npx convex env set CONVEX_OPENAI_API_KEY "your-openai-like-key" --prod
-npx convex env set CONVEX_OPENAI_BASE_URL "https://api.openai.com/v1" --prod
+npx convex env set LLM_API_KEY "your-openai-or-openrouter-key" --prod
+npx convex env set LLM_BASE_URL "https://api.openai.com/v1" --prod
 npx convex env set SITE_URL "https://search-ai.io" --prod
+npx convex env set NODE_ENV "production" --prod
 
 # Optional: Restrict CORS for export/publish routes (comma-separated origins)
 npx convex env set CONVEX_ALLOWED_ORIGINS "https://search-ai.io,https://dev.search-ai.io" --prod
@@ -234,13 +238,16 @@ Set these using `npx convex env set` (append `--prod` for production):
 
 - `OPENROUTER_API_KEY` - OpenRouter API key for AI responses (required if using OpenRouter)
 - `SERP_API_KEY` - SerpAPI key for web search (optional)
-- `CONVEX_OPENAI_API_KEY` - Optional fallback provider API key (used if OpenRouter is not configured)
-- `CONVEX_OPENAI_BASE_URL` - Base URL for the fallback provider (e.g., `https://api.openai.com/v1` or a proxy URL)
+- `LLM_API_KEY` - Optional fallback provider API key (used if OpenRouter is not configured)
+- `LLM_BASE_URL` - Base URL for the fallback provider (e.g., `https://api.openai.com/v1` or a proxy URL)
+- `LLM_MODEL` - Model name for agent workflows (e.g., `gpt-5.2`)
 - `SITE_URL` - Your app's public URL (used in headers and auth callbacks); set per environment
+- `LLM_HEALTHCHECK` - Set to `0` to disable startup health checks (default: enabled)
+- `LLM_HEALTHCHECK_TIMEOUT_MS` - Health check timeout in ms (default: 8000)
 
 Notes:
 
-- If OpenRouter is your primary provider, you can leave `CONVEX_OPENAI_BASE_URL` and `CONVEX_OPENAI_API_KEY` unset in all environments.
+- If OpenRouter is your primary provider, you can leave `LLM_BASE_URL` and `LLM_API_KEY` unset in all environments.
 - `CONVEX_SITE_URL` is a built-in Convex variable (points to your `*.convex.site` domain) and cannot be set manually. It is available automatically inside Convex functions. The web app does not need a `CONVEX_SITE_URL` env; keep using `VITE_CONVEX_URL` (the `*.convex.cloud` URL) and the app derives the `*.convex.site` base for HTTP routes internally.
 
 #### Planner & Search Relevance Tunables (optional)

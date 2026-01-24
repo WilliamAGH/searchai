@@ -6,7 +6,7 @@
 import { httpAction } from "../../_generated/server";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
-import { corsResponse, dlog } from "../utils";
+import { corsResponse, dlog, serializeError } from "../utils";
 import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
@@ -52,16 +52,30 @@ export function registerSearchRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ SEARCH API INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
       }
 
       // Validate and normalize input
-      const payload = rawPayload as any;
+      const payload =
+        rawPayload && typeof rawPayload === "object"
+          ? (rawPayload as Record<string, unknown>)
+          : null;
+      if (!payload) {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid request payload" }),
+          400,
+          origin,
+        );
+      }
       const query = String(payload.query || "").slice(0, 1000);
       const maxResults =
         typeof payload.maxResults === "number"
@@ -160,35 +174,43 @@ export function registerSearchRoutes(http: HttpRouter) {
 
         return corsResponse(JSON.stringify(enhancedResult), 200, origin);
       } catch (error) {
-        console.error("❌ SEARCH API ERROR:", error);
-
-        // Create fallback search results
-        const fallbackResults = [
-          {
-            title: `Search for: ${query}`,
-            url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-            snippet:
-              "Search results temporarily unavailable. Click to search manually.",
-            relevanceScore: 0.3,
-          },
-        ];
+        const errorInfo = serializeError(error);
+        const errorMessage = errorInfo.message;
+        console.error("❌ SEARCH API ERROR:", {
+          query: query.substring(0, 100),
+          error: errorMessage,
+          errorDetails: errorInfo,
+          timestamp: new Date().toISOString(),
+        });
 
         const errorResponse = {
-          results: fallbackResults,
-          searchMethod: "fallback",
-          hasRealResults: false,
-          error: "Search failed",
+          error: "Search service temporarily unavailable",
+          errorCode: "SEARCH_FAILED",
           errorDetails: {
+            ...errorInfo,
             timestamp: new Date().toISOString(),
           },
+          // Include fallback results for graceful degradation, but with 500 status
+          results: [
+            {
+              title: `Search for: ${query}`,
+              url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+              snippet:
+                "Search results temporarily unavailable. Click to search manually.",
+              relevanceScore: 0.3,
+            },
+          ],
+          searchMethod: "fallback",
+          hasRealResults: false,
         };
 
         dlog(
-          "🔍 SEARCH FALLBACK RESPONSE:",
+          "🔍 SEARCH ERROR RESPONSE:",
           JSON.stringify(errorResponse, null, 2),
         );
 
-        return corsResponse(JSON.stringify(errorResponse), 200, origin);
+        // Return 500 to indicate server error - clients can still use fallback results
+        return corsResponse(JSON.stringify(errorResponse), 500, origin);
       }
     }),
   });

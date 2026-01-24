@@ -7,7 +7,11 @@
 import { httpAction } from "../../_generated/server";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
-import { escapeHtml, formatConversationMarkdown } from "../utils";
+import {
+  escapeHtml,
+  formatConversationMarkdown,
+  serializeError,
+} from "../utils";
 
 /**
  * Register publish and export routes on the HTTP router
@@ -54,23 +58,49 @@ export function registerPublishRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
         const origin = request.headers.get("Origin");
         const allowOrigin = getAllowedOrigin(origin);
-        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": allowOrigin,
+        console.error("❌ PUBLISH INVALID JSON:", serializeError(error));
+        return new Response(
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": allowOrigin,
+            },
           },
-        });
+        );
       }
 
       // Validate basic structure and extract payload (validated inline below)
-      const payload: any = rawPayload;
+      const payload =
+        rawPayload && typeof rawPayload === "object"
+          ? (rawPayload as Record<string, unknown>)
+          : null;
+      if (!payload) {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
+        return new Response(
+          JSON.stringify({ error: "Invalid request payload" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": allowOrigin,
+            },
+          },
+        );
+      }
 
       // Business logic validation
-      const title = (payload.title || "Shared Chat").trim().slice(0, 200);
+      const rawTitle =
+        typeof payload.title === "string" ? payload.title : "Shared Chat";
+      const title = rawTitle.trim().slice(0, 200);
       const privacy = payload.privacy === "public" ? "public" : "shared";
       const shareId = payload.shareId
         ? String(payload.shareId).slice(0, 100)
@@ -123,7 +153,10 @@ export function registerPublishRoutes(http: HttpRouter) {
         });
         const origin = request.headers.get("Origin");
         const allowOrigin = getAllowedOrigin(origin);
-        const baseUrl = origin || process.env.SITE_URL || "";
+        const baseUrl =
+          allowOrigin !== "*" && allowOrigin !== "null"
+            ? allowOrigin
+            : process.env.SITE_URL || "";
         const shareUrl = `${baseUrl}/s/${result.shareId}`;
         const publicUrl = `${baseUrl}/p/${result.publicId}`;
         const convexBase = (process.env.CONVEX_SITE_URL || "").replace(
@@ -148,8 +181,12 @@ export function registerPublishRoutes(http: HttpRouter) {
       } catch (e: any) {
         const origin = request.headers.get("Origin");
         const allowOrigin = getAllowedOrigin(origin);
+        const errorInfo = serializeError(e);
         return new Response(
-          JSON.stringify({ error: String(e?.message || e) }),
+          JSON.stringify({
+            error: String(e?.message || e),
+            errorDetails: errorInfo,
+          }),
           {
             status: 500,
             headers: {
@@ -230,7 +267,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       // Resolve chat by shareId/publicId
       const chat = shareId
-        ? await ctx.runQuery(api.chats.getChatByShareId, { shareId })
+        ? await ctx.runQuery(api.chats.getChatByShareIdHttp, { shareId })
         : await ctx.runQuery(api.chats.getChatByPublicId, {
             publicId: publicId!,
           });
@@ -251,7 +288,7 @@ export function registerPublishRoutes(http: HttpRouter) {
       }
 
       // Load messages
-      const messages = await ctx.runQuery(api.chats.getChatMessages, {
+      const messages = await ctx.runQuery(api.chats.getChatMessagesHttp, {
         chatId: (chat as any)._id,
       });
 
@@ -470,7 +507,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           },
         );
       }
-      const messages = await ctx.runQuery(api.chats.getChatMessages, {
+      const messages = await ctx.runQuery(api.chats.getChatMessagesHttp, {
         chatId: (chat as any)._id,
       });
       const exportedChat = {

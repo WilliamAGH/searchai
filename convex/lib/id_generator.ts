@@ -33,7 +33,8 @@ function getCrypto(): Crypto {
       try {
         const { webcrypto } = nodeRequire("crypto") as { webcrypto: Crypto };
         return webcrypto;
-      } catch {
+      } catch (error) {
+        console.warn("Failed to load node:crypto webcrypto", { error });
         // Fallback to global crypto if available
       }
     }

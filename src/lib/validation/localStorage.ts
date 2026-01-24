@@ -6,6 +6,7 @@
 
 import type { LocalChat } from "../types/chat";
 import type { LocalMessage } from "../types/message";
+import { logger } from "../logger";
 
 /**
  * Validate localStorage chat data
@@ -69,7 +70,12 @@ export function parseLocalChats(json: string): LocalChat[] {
     return parsed
       .map(validateLocalChat)
       .filter((chat): chat is LocalChat => chat !== undefined);
-  } catch {
+  } catch (error) {
+    logger.error("Failed to parse localStorage chats JSON", {
+      error,
+      length: json.length,
+      preview: json.slice(0, 200),
+    });
     return [];
   }
 }
@@ -86,7 +92,12 @@ export function parseLocalMessages(json: string): LocalMessage[] {
     return parsed
       .map(validateLocalMessage)
       .filter((msg): msg is LocalMessage => msg !== undefined);
-  } catch {
+  } catch (error) {
+    logger.error("Failed to parse localStorage messages JSON", {
+      error,
+      length: json.length,
+      preview: json.slice(0, 200),
+    });
     return [];
   }
 }

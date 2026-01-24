@@ -36,20 +36,23 @@ const ipBuckets = new Map<string, number[]>();
  * @returns IP address string or "unknown"
  */
 export function extractClientIp(request: Request): string {
-  // Try X-Forwarded-For first (comma-separated list, leftmost is client)
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const firstIp = forwardedFor.split(",")[0].trim();
-    if (firstIp) return firstIp;
+  const trustProxy = process.env.CONVEX_TRUST_PROXY === "1";
+  if (trustProxy) {
+    // Try X-Forwarded-For first (comma-separated list, leftmost is client)
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    if (forwardedFor) {
+      const firstIp = forwardedFor.split(",")[0].trim();
+      if (firstIp) return firstIp;
+    }
+
+    // Try X-Real-IP (single IP)
+    const realIp = request.headers.get("x-real-ip");
+    if (realIp) return realIp;
+
+    // Try CF-Connecting-IP (Cloudflare)
+    const cfIp = request.headers.get("cf-connecting-ip");
+    if (cfIp) return cfIp;
   }
-
-  // Try X-Real-IP (single IP)
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp;
-
-  // Try CF-Connecting-IP (Cloudflare)
-  const cfIp = request.headers.get("cf-connecting-ip");
-  if (cfIp) return cfIp;
 
   // Fallback: use a fingerprint based on User-Agent
   // This is weaker but prevents complete bypass when no IP headers exist

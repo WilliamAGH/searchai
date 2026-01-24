@@ -131,7 +131,7 @@ export async function persistAssistantMessage(
     contextReferences = [],
   } = params;
 
-  const messageId = await ctx.runMutation(internal.messages.addMessage, {
+  const messageId = await ctx.runMutation(internal.messages.addMessageHttp, {
     chatId,
     role: "assistant",
     content,

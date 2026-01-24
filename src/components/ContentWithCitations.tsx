@@ -7,6 +7,7 @@
  */
 
 import React, { useRef } from "react";
+import { getDomainFromUrl } from "../lib/utils/favicon";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -24,20 +25,6 @@ interface ContentWithCitationsProps {
   }>;
   hoveredSourceUrl?: string | null;
   onCitationHover?: (url: string | null) => void;
-}
-
-/**
- * Extract domain from URL
- * @param url - Full URL
- * @returns Domain without www prefix
- */
-function getDomainFromUrl(url: string): string {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.replace("www.", "");
-  } catch {
-    return "";
-  }
 }
 
 export function ContentWithCitations({

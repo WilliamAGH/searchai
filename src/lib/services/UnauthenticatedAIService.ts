@@ -10,6 +10,7 @@
 // Removed: UnauthenticatedAIService (streaming now uses direct fetch in repositories)
 // This file is kept temporarily to avoid import churn; will be deleted after confirming no references remain.
 import { logger } from "../logger";
+import { buildHttpError, readResponseBody } from "../utils/httpUtils";
 import type { MessageStreamChunk } from "../types/message";
 
 /**
@@ -36,11 +37,11 @@ export class UnauthenticatedAIService {
         // Validate URL format at construction time
         const _parsed = new URL(convexUrl);
         void _parsed;
-      } catch {
-        logger.warn(
-          "[UnauthenticatedAIService] Invalid Convex URL format:",
+      } catch (error) {
+        logger.warn("[UnauthenticatedAIService] Invalid Convex URL format:", {
           convexUrl,
-        );
+          error,
+        });
       }
     }
     this.convexUrl = convexUrl;
@@ -96,9 +97,11 @@ export class UnauthenticatedAIService {
       });
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        throw new Error(
-          `HTTP ${response.status} ${response.statusText} ${errorText}`,
+        const errorText = await readResponseBody(response);
+        throw buildHttpError(
+          response,
+          errorText,
+          "[UnauthenticatedAIService] Streaming request failed",
         );
       }
 
@@ -205,10 +208,21 @@ export class UnauthenticatedAIService {
                       results.length,
                     );
                   } catch (parseError) {
+                    const message =
+                      parseError instanceof Error
+                        ? parseError.message
+                        : String(parseError);
                     logger.warn(
                       "[UnauthenticatedAIService] Failed to parse search results",
-                      parseError,
+                      {
+                        error: message,
+                        result: event.result,
+                      },
                     );
+                    onChunk?.({
+                      type: "error",
+                      error: `Failed to parse search results: ${message}. Result: ${event.result}`,
+                    });
                   }
                 }
                 break;
@@ -267,10 +281,21 @@ export class UnauthenticatedAIService {
                 );
             }
           } catch (parseError) {
+            const message =
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError);
             logger.warn(
-              "[UnauthenticatedAIService] Failed to parse SSE event:",
-              parseError,
+              "[UnauthenticatedAIService] Failed to parse SSE event",
+              {
+                error: message,
+                raw: data,
+              },
             );
+            onChunk?.({
+              type: "error",
+              error: `Failed to parse SSE event: ${message}. Raw: ${data}`,
+            });
           }
         }
       }

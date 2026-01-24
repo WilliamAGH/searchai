@@ -15,6 +15,8 @@ import rehypeSanitize from "rehype-sanitize";
 import { defaultSchema } from "hast-util-sanitize";
 import type { Schema } from "hast-util-sanitize";
 import type { PluggableList } from "unified";
+import { getDomainFromUrl } from "../lib/utils/favicon";
+import { logger } from "../lib/logger";
 
 interface MarkdownWithCitationsProps {
   content: string;
@@ -25,20 +27,6 @@ interface MarkdownWithCitationsProps {
   }>;
   hoveredSourceUrl?: string | null;
   onCitationHover?: (url: string | null) => void;
-}
-
-/**
- * Extract domain from URL
- * @param url - Full URL
- * @returns Domain without www prefix
- */
-function getDomainFromUrl(url: string): string {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.replace("www.", "");
-  } catch {
-    return "";
-  }
 }
 
 export function MarkdownWithCitations({
@@ -81,7 +69,11 @@ export function MarkdownWithCitations({
             // Fallback to domain matching
             url = domainToUrlMap.get(domain);
           }
-        } catch {
+        } catch (error) {
+          logger.warn("Failed to parse cited URL for markdown citation", {
+            citedText,
+            error,
+          });
           url = domainToUrlMap.get(citedText);
         }
       } else if (citedText.includes("/")) {
