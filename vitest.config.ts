@@ -14,11 +14,6 @@ export default defineConfig({
   test: {
     setupFiles: ["./tests/setup.ts"],
     environment: "node",
-    // Use jsdom automatically for DOM-focused tests
-    environmentMatchGlobs: [
-      ["**/*.test.tsx", "jsdom"],
-      ["tests/critical/**", "jsdom"],
-    ],
     silent: false, // Set to true to suppress console output during tests
     include: [
       "tests/**/*.test.{ts,tsx}",
@@ -41,6 +36,41 @@ export default defineConfig({
       minThreads: 1,
       maxThreads: 1,
     }),
+    projects: [
+      {
+        name: "jsdom",
+        test: {
+          environment: "jsdom",
+          include: [
+            "tests/**/*.test.tsx",
+            "src/**/__tests__/**/*.test.tsx",
+            "tests/critical/**",
+          ],
+          exclude: ["node_modules/**", "dist/**"],
+        },
+      },
+      {
+        name: "node",
+        test: {
+          environment: "node",
+          include: [
+            "tests/**/*.test.ts",
+            "src/**/__tests__/**/*.test.ts",
+            "convex/**/*.test.ts",
+          ],
+          exclude: [
+            "node_modules/**",
+            "dist/**",
+            "**/*.test.tsx",
+            "tests/critical/**",
+            "tests/e2e/**",
+            "tests/integration/**",
+            "tests/**/*.spec.ts",
+            "tests/smoke/**",
+          ],
+        },
+      },
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html", "lcov"],
