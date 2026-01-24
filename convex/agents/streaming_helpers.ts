@@ -99,12 +99,27 @@ export interface ToolCallArgs {
   reasoning?: string;
 }
 
-/** Extract a string field from an object, returning undefined if not a string */
+/**
+ * Extract a string field from an object.
+ * Returns undefined if field is not present.
+ * Logs warning and returns undefined if field is present but not a string
+ * (indicates schema mismatch worth investigating).
+ */
 function extractString(obj: unknown, key: string): string | undefined {
-  if (obj && typeof obj === "object" && key in obj) {
-    const value = (obj as Record<string, unknown>)[key];
-    return typeof value === "string" ? value : undefined;
+  if (!obj || typeof obj !== "object" || !(key in obj)) {
+    return undefined; // Field not present - normal case
   }
+
+  const value = (obj as Record<string, unknown>)[key];
+  if (typeof value === "string") {
+    return value;
+  }
+
+  // Field present but wrong type - log for observability
+  console.warn(
+    `Tool argument "${key}" present but not a string:`,
+    typeof value,
+  );
   return undefined;
 }
 
