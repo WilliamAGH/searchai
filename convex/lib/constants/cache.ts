@@ -48,3 +48,19 @@ export const CONFIDENCE_THRESHOLDS = {
   /** Minimum confidence to skip research stage (fast path) */
   SKIP_RESEARCH: 0.9,
 } as const;
+
+/**
+ * Agent execution timeouts.
+ * These prevent indefinite hangs when agents fail to respond.
+ *
+ * Why these specific values:
+ * - AGENT_STAGE_MS (60s): Planning/synthesis stages are single LLM calls
+ * - TOOL_EXECUTION_MS (120s): Research stage includes multiple tool calls
+ *   (search + scrape), each with network latency
+ */
+export const AGENT_TIMEOUTS = {
+  /** Timeout for single-stage agent calls (planning, synthesis) */
+  AGENT_STAGE_MS: 60_000,
+  /** Timeout for research stage with tool calls (search + scrape) */
+  TOOL_EXECUTION_MS: 120_000,
+} as const;
