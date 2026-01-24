@@ -1,0 +1,91 @@
+/**
+ * Centralized authorization helper functions.
+ * Eliminates repeated auth check patterns across the codebase.
+ *
+ * These functions check chat ownership via userId or sessionId,
+ * supporting both authenticated users and anonymous HTTP sessions.
+ */
+
+import type { Id } from "../_generated/dataModel";
+
+/**
+ * Chat document with optional ownership fields.
+ * Matches the minimal shape needed for auth checks.
+ */
+interface ChatOwnership {
+  userId?: Id<"users">;
+  sessionId?: string;
+}
+
+/**
+ * Check if a user has access to a chat via userId.
+ *
+ * @param chat - Chat document with optional userId
+ * @param userId - Current user's ID (may be null if unauthenticated)
+ * @returns true if user owns the chat
+ *
+ * @example
+ * const userId = await getAuthUserId(ctx);
+ * if (hasUserAccess(chat, userId)) {
+ *   // User owns this chat
+ * }
+ */
+export function hasUserAccess(
+  chat: ChatOwnership,
+  userId: Id<"users"> | null,
+): boolean {
+  return !!(chat.userId && userId && chat.userId === userId);
+}
+
+/**
+ * Check if a session has access to a chat via sessionId.
+ *
+ * @param chat - Chat document with optional sessionId
+ * @param sessionId - Current session ID (may be undefined)
+ * @returns true if session owns the chat
+ *
+ * @example
+ * if (hasSessionAccess(chat, args.sessionId)) {
+ *   // Session owns this chat
+ * }
+ */
+export function hasSessionAccess(
+  chat: ChatOwnership,
+  sessionId: string | undefined,
+): boolean {
+  return !!(chat.sessionId && sessionId && chat.sessionId === sessionId);
+}
+
+/**
+ * Check if a user or session is authorized to access a chat.
+ * Combines both userId and sessionId checks.
+ *
+ * @param chat - Chat document with optional ownership fields
+ * @param userId - Current user's ID (may be null)
+ * @param sessionId - Current session ID (may be undefined)
+ * @returns true if either userId or sessionId grants access
+ *
+ * @example
+ * const userId = await getAuthUserId(ctx);
+ * if (!isAuthorized(chat, userId, args.sessionId)) {
+ *   throw new Error("Unauthorized");
+ * }
+ */
+export function isAuthorized(
+  chat: ChatOwnership,
+  userId: Id<"users"> | null,
+  sessionId?: string,
+): boolean {
+  return hasUserAccess(chat, userId) || hasSessionAccess(chat, sessionId);
+}
+
+/**
+ * Check if a chat has no ownership yet (newly created).
+ * Used to allow first access to claim ownership.
+ *
+ * @param chat - Chat document
+ * @returns true if chat has no userId and no sessionId
+ */
+export function isUnownedChat(chat: ChatOwnership): boolean {
+  return !chat.userId && !chat.sessionId;
+}
