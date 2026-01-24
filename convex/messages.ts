@@ -208,12 +208,6 @@ export const updateMessage = internalMutation({
 });
 
 /**
- * Delete a single message from a chat
- * - Validates ownership via chat.userId
- * - Removes the message
- * - Invalidates planner cache and rolling summary (clears summary text)
- */
-/**
  * Count messages for a chat
  * Used to determine if title should be generated
  */
