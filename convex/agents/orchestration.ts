@@ -50,21 +50,44 @@ import { v } from "convex/values";
 import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { RunToolCallItem, RunToolCallOutputItem, run } from "@openai/agents";
+import { run } from "@openai/agents";
+import {
+  RunToolCallItem,
+  RunToolCallOutputItem,
+  isToolCallEvent,
+  isToolOutputEvent,
+  extractToolName,
+  extractTextDelta,
+  getProgressStageForTool,
+  getProgressMessage,
+  harvestSearchResults,
+  harvestScrapedContent,
+  type ProgressStage,
+  type StreamingEventItem,
+} from "./streaming_helpers";
 
 // ============================================
 // Timeout Utilities
 // ============================================
 // Agent calls have no built-in timeout, so we wrap them to prevent indefinite hangs.
 
-const AGENT_TIMEOUT_MS = 60_000; // 60 seconds per agent stage
-const TOOL_EXECUTION_TIMEOUT_MS = 120_000; // 120 seconds for research stage (includes tool calls)
-
 // ============================================
 // Instant Response Detection
 // ============================================
 // Skip ALL LLM calls for obvious conversational messages that don't need research.
 // These patterns match greetings, tests, and simple chat messages.
+
+/** Regex patterns for instant response detection (BLK8: extract magic literals) */
+const INSTANT_PATTERNS = {
+  GREETING: /^(hi|hello|hey|howdy|greetings|yo)[\s!.,?]*$/i,
+  GREETING_TIME: /^(good\s*(morning|afternoon|evening|night))[\s!.,?]*$/i,
+  TEST: /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/i,
+  NEW_CHAT: /^this is a new chat[\s!.,?]*$/i,
+  THANKS: /^(thanks|thank you|thx|ty)[\s!.,?]*$/i,
+  GOODBYE: /^(bye|goodbye|see you|later|cya)[\s!.,?]*$/i,
+  CONFIRM: /^(ok|okay|sure|yes|no|yep|nope|yeah|nah)[\s!.,?]*$/i,
+  HELP: /^(help|help me|\?)[\s!.,?]*$/i,
+} as const;
 
 const INSTANT_RESPONSES: Record<string, string> = {
   greeting:
@@ -79,41 +102,28 @@ const INSTANT_RESPONSES: Record<string, string> = {
 function detectInstantResponse(query: string): string | null {
   const trimmed = query.trim().toLowerCase();
 
-  // Greeting patterns
-  if (/^(hi|hello|hey|howdy|greetings|yo)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.GREETING.test(trimmed)) {
     return INSTANT_RESPONSES.greeting;
   }
-  if (/^(good\s*(morning|afternoon|evening|night))[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.GREETING_TIME.test(trimmed)) {
     return INSTANT_RESPONSES.greeting;
   }
-
-  // Test patterns
-  if (
-    /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/i.test(trimmed)
-  ) {
+  if (INSTANT_PATTERNS.TEST.test(trimmed)) {
     return INSTANT_RESPONSES.test;
   }
-  if (/^this is a new chat[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.NEW_CHAT.test(trimmed)) {
     return INSTANT_RESPONSES.test;
   }
-
-  // Thanks patterns
-  if (/^(thanks|thank you|thx|ty)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.THANKS.test(trimmed)) {
     return INSTANT_RESPONSES.thanks;
   }
-
-  // Goodbye patterns
-  if (/^(bye|goodbye|see you|later|cya)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.GOODBYE.test(trimmed)) {
     return INSTANT_RESPONSES.goodbye;
   }
-
-  // Confirmation patterns
-  if (/^(ok|okay|sure|yes|no|yep|nope|yeah|nah)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.CONFIRM.test(trimmed)) {
     return INSTANT_RESPONSES.confirm;
   }
-
-  // Help patterns
-  if (/^(help|help me|\?)[\s!.,?]*$/i.test(trimmed)) {
+  if (INSTANT_PATTERNS.HELP.test(trimmed)) {
     return INSTANT_RESPONSES.help;
   }
 
@@ -191,21 +201,25 @@ async function withTimeout<T>(
 }
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
-import { generateChatTitle } from "../chats/utils";
 import { parseAnswerText } from "./answerParser";
 import {
   vContextReference,
   vScrapedContent,
   vSerpEnrichment,
 } from "../lib/validators";
-import { CACHE_TTL } from "../lib/constants/cache";
+import {
+  CACHE_TTL,
+  RELEVANCE_SCORES,
+  CONFIDENCE_THRESHOLDS,
+  AGENT_TIMEOUTS,
+  AGENT_LIMITS,
+} from "../lib/constants/cache";
 import {
   buildPlanningInput,
   buildResearchInstructions,
   buildSynthesisInstructions,
   formatContextReferencesForPrompt,
   buildConversationContext,
-  extractContextReferencesFromMessages,
   buildConversationBlock,
   processToolCalls,
   buildToolCallLog,
@@ -220,124 +234,16 @@ import {
 import type {
   ResearchContextReference,
   StreamingPersistPayload,
-} from "./types";
+} from "./schema";
+import { createEmptyHarvestedData } from "./schema";
 import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
 import { applyEnhancements } from "../enhancements";
-export type { ResearchContextReference } from "./types";
-
-// ============================================
-// Tool Output Harvesting
-// ============================================
-// Programmatically capture tool outputs to ensure scraped content
-// and SERP enrichment reach synthesis even if the LLM fails to
-// populate these fields in its structured output.
-
-interface HarvestedToolData {
-  scrapedContent: ScrapedContent[];
-  serpEnrichment: SerpEnrichment;
-  searchResults: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    relevanceScore: number;
-  }>;
-}
-
-/**
- * Harvest tool output programmatically
- * This ensures data flows to synthesis regardless of LLM compliance
- */
-function harvestToolOutput(
-  toolName: string,
-  output: unknown,
-  harvested: HarvestedToolData,
-): void {
-  if (!output || typeof output !== "object") return;
-
-  const out = output as Record<string, unknown>;
-
-  if (toolName === "scrape_webpage" && out.content) {
-    // Ensure contextId is a valid UUIDv7, generate one if missing or invalid
-    const rawContextId = typeof out.contextId === "string" ? out.contextId : "";
-    const contextId = isUuidV7(rawContextId)
-      ? rawContextId
-      : generateMessageId();
-
-    const scraped: ScrapedContent = {
-      url: String(out.url || ""),
-      title: String(out.title || ""),
-      content: String(out.content || ""),
-      summary: String(out.summary || ""),
-      contentLength:
-        typeof out.contentLength === "number"
-          ? out.contentLength
-          : String(out.content || "").length,
-      scrapedAt: typeof out.scrapedAt === "number" ? out.scrapedAt : Date.now(),
-      contextId,
-      relevanceScore: 0.9, // Scraped content is high relevance
-    };
-    harvested.scrapedContent.push(scraped);
-    console.log("📥 HARVESTED scrape_webpage:", {
-      url: scraped.url,
-      contentLength: scraped.contentLength,
-      contextId: scraped.contextId,
-      generatedContextId: !isUuidV7(rawContextId),
-    });
-  }
-
-  if (toolName === "search_web") {
-    // Harvest search results
-    if (Array.isArray(out.results)) {
-      const results = out.results as Array<any>;
-      for (const r of results) {
-        if (r.url && r.title) {
-          harvested.searchResults.push({
-            title: r.title,
-            url: r.url,
-            snippet: r.snippet || "",
-            relevanceScore: r.relevanceScore || 0.5,
-          });
-        }
-      }
-      console.log("📥 HARVESTED search_web results:", results.length);
-    }
-
-    // Harvest enrichment
-    if (out.enrichment) {
-      const enrich = out.enrichment as Partial<SerpEnrichment>;
-      if (enrich.knowledgeGraph) {
-        harvested.serpEnrichment.knowledgeGraph = enrich.knowledgeGraph;
-        console.log(
-          "📥 HARVESTED knowledgeGraph:",
-          enrich.knowledgeGraph.title,
-        );
-      }
-      if (enrich.answerBox) {
-        harvested.serpEnrichment.answerBox = enrich.answerBox;
-        console.log(
-          "📥 HARVESTED answerBox:",
-          enrich.answerBox.answer?.slice(0, 50),
-        );
-      }
-      if (enrich.peopleAlsoAsk?.length) {
-        harvested.serpEnrichment.peopleAlsoAsk = enrich.peopleAlsoAsk;
-        console.log(
-          "📥 HARVESTED peopleAlsoAsk:",
-          enrich.peopleAlsoAsk.length,
-          "questions",
-        );
-      }
-      if (enrich.relatedSearches?.length) {
-        harvested.serpEnrichment.relatedSearches = enrich.relatedSearches;
-        console.log(
-          "📥 HARVESTED relatedSearches:",
-          enrich.relatedSearches.length,
-          "searches",
-        );
-      }
-    }
-  }
-}
+import {
+  updateChatTitleIfNeeded,
+  persistAssistantMessage,
+  completeWorkflowWithSignature,
+} from "./orchestration_persistence";
+export type { ResearchContextReference } from "./schema";
 
 type CustomEventParams<T> = {
   detail?: T;
@@ -353,6 +259,7 @@ const ensureCustomEventPolyfill = () => {
   }
 
   try {
+    // Attempt to extend native Event (works in modern runtimes)
     class NodeCustomEvent<T = any> extends Event {
       detail: T;
       constructor(type: string, params?: CustomEventParams<T>) {
@@ -362,6 +269,8 @@ const ensureCustomEventPolyfill = () => {
     }
     globalAny.CustomEvent = NodeCustomEvent;
   } catch {
+    // Fallback for environments where Event is not extendable (e.g., older Node.js)
+    // This is intentionally silent - the fallback class provides equivalent functionality
     class NodeCustomEvent<T = any> {
       type: string;
       detail: T;
@@ -482,7 +391,7 @@ export const orchestrateResearchWorkflow = action({
       run(agents.queryPlanner, planningInput, {
         context: { actionCtx: ctx },
       }),
-      AGENT_TIMEOUT_MS,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "planning",
     );
     const planningDuration = Date.now() - planningStart;
@@ -541,7 +450,7 @@ export const orchestrateResearchWorkflow = action({
         run(agents.research, researchInstructions, {
           context: { actionCtx: ctx },
         }),
-        TOOL_EXECUTION_TIMEOUT_MS,
+        AGENT_TIMEOUTS.TOOL_EXECUTION_MS,
         "research",
       );
       researchDuration = Date.now() - researchStart;
@@ -604,7 +513,7 @@ export const orchestrateResearchWorkflow = action({
       run(agents.answerSynthesis, synthesisInstructions, {
         context: { actionCtx: ctx },
       }),
-      AGENT_TIMEOUT_MS,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "synthesis",
     );
     const synthesisDuration = Date.now() - synthesisStart;
@@ -663,6 +572,521 @@ type StreamingWorkflowCtx = Pick<
 
 type WorkflowStreamEvent = Record<string, unknown>;
 
+// ============================================
+// Shared Workflow Utilities
+// ============================================
+// Extracted per DR1a to avoid duplication between workflow functions.
+
+/**
+ * Create a cleaned SSE event object, filtering out undefined/null/empty values.
+ * Convex cannot serialize empty objects {}, so we strip them.
+ */
+function createWorkflowEvent(
+  type: string,
+  data: Record<string, unknown>,
+): WorkflowStreamEvent {
+  const cleaned: Record<string, unknown> = { type };
+  for (const [k, v] of Object.entries(data)) {
+    if (v === undefined || v === null) continue;
+    if (
+      typeof v === "object" &&
+      !Array.isArray(v) &&
+      Object.keys(v).length === 0
+    )
+      continue;
+    cleaned[k] = v;
+  }
+  return cleaned;
+}
+
+/**
+ * Wrap a Convex call with explicit error context.
+ * Adds operation context to errors for better debugging.
+ */
+async function withErrorContext<T>(
+  operation: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
+    throw new Error(`${operation}: ${message}`);
+  }
+}
+
+/** Configuration for workflow error handler */
+interface WorkflowErrorHandlerConfig {
+  ctx: StreamingWorkflowCtx;
+  workflowId: string;
+  getTokenId: () => Id<"workflowTokens"> | null;
+}
+
+/**
+ * Create an error handler for workflow functions.
+ * Logs the error, invalidates the workflow token if present, and re-throws.
+ */
+function createWorkflowErrorHandler(config: WorkflowErrorHandlerConfig) {
+  const { ctx, workflowId, getTokenId } = config;
+  return async (error: Error, stage: string): Promise<never> => {
+    console.error(`💥 WORKFLOW ERROR [${stage}]`, {
+      workflowId,
+      error: error.message,
+    });
+
+    const tokenId = getTokenId();
+    if (tokenId) {
+      try {
+        await ctx.runMutation(internal.workflowTokens.invalidateToken, {
+          tokenId,
+        });
+      } catch (invalidationError) {
+        // Log but don't mask the original error
+        console.error("Failed to invalidate workflow token", {
+          tokenId,
+          error:
+            invalidationError instanceof Error
+              ? invalidationError.message
+              : "Unknown invalidation error",
+        });
+      }
+    }
+
+    throw error;
+  };
+}
+
+// ============================================
+// CONVERSATIONAL WORKFLOW (Single-Agent Architecture)
+// ============================================
+// This is the new, faster workflow that uses a single agent with tools.
+// It eliminates the 3-agent sequential pipeline for most queries.
+
+export async function* streamConversationalWorkflow(
+  ctx: StreamingWorkflowCtx,
+  args: StreamingWorkflowArgs,
+): AsyncGenerator<WorkflowStreamEvent> {
+  const { agents } = require("./definitions");
+
+  const workflowId = generateMessageId();
+  const startTime = Date.now();
+  const nonce = generateMessageId();
+
+  // Use shared utilities (extracted per DR1a)
+  const writeEvent = (type: string, data: Record<string, unknown>) =>
+    createWorkflowEvent(type, data);
+
+  let workflowTokenId: Id<"workflowTokens"> | null = null;
+  const handleError = createWorkflowErrorHandler({
+    ctx,
+    workflowId,
+    getTokenId: () => workflowTokenId,
+  });
+
+  // Initialize tool output harvesting using unified HarvestedData type
+  const harvested = createEmptyHarvestedData();
+
+  try {
+    // Create workflow token
+    const issuedAt = Date.now();
+    const workflowTokenPayload: {
+      workflowId: string;
+      nonce: string;
+      chatId: Id<"chats">;
+      sessionId?: string;
+      issuedAt: number;
+      expiresAt: number;
+    } = {
+      workflowId,
+      nonce,
+      chatId: args.chatId,
+      issuedAt,
+      expiresAt: issuedAt + CACHE_TTL.WORKFLOW_TOKEN_MS,
+    };
+
+    if (args.sessionId) {
+      workflowTokenPayload.sessionId = args.sessionId;
+    }
+
+    workflowTokenId = await withErrorContext(
+      "Failed to create workflow token",
+      () =>
+        ctx.runMutation(
+          internal.workflowTokens.createToken,
+          workflowTokenPayload,
+        ),
+    );
+
+    // Get chat and verify access
+    const getChatArgs: { chatId: Id<"chats">; sessionId?: string } = {
+      chatId: args.chatId,
+    };
+    if (args.sessionId) getChatArgs.sessionId = args.sessionId;
+
+    const chat = await withErrorContext("Failed to retrieve chat", () =>
+      ctx.runQuery(api.chats.getChatById, getChatArgs),
+    );
+    if (!chat) throw new Error("Chat not found or access denied");
+
+    yield writeEvent("workflow_start", { workflowId, nonce });
+
+    // Get recent messages for conversation context BEFORE adding the current user message
+    // This prevents the user query from appearing twice in the agent input
+    const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
+      chatId: args.chatId,
+    };
+    if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
+
+    const recentMessages = (await withErrorContext(
+      "Failed to retrieve chat messages",
+      () => ctx.runQuery(api.chats.getChatMessages, getMessagesArgs),
+    )) as Array<{
+      role: "user" | "assistant" | "system";
+      content?: string;
+    }>;
+
+    // Add user message AFTER fetching history to avoid duplication
+    await withErrorContext("Failed to save user message", () =>
+      ctx.runMutation(internal.messages.addMessage, {
+        chatId: args.chatId,
+        role: "user",
+        content: args.userQuery,
+        sessionId: args.sessionId,
+      }),
+    );
+
+    let conversationContext = buildConversationContext(recentMessages || []);
+    if (!conversationContext && args.conversationContext) {
+      console.warn(
+        "buildConversationContext returned empty; using args.conversationContext",
+      );
+      conversationContext = args.conversationContext;
+    }
+    if (!conversationContext) {
+      console.warn(
+        "No conversationContext available from messages or args; proceeding with empty context",
+      );
+      conversationContext = "";
+    }
+
+    // Build the input for the conversational agent
+    const agentInput = conversationContext
+      ? `Previous conversation:\n${conversationContext}\n\nUser: ${args.userQuery}`
+      : args.userQuery;
+
+    console.log(
+      `🚀 CONVERSATIONAL WORKFLOW START: "${args.userQuery.substring(0, 50)}..."`,
+    );
+
+    yield writeEvent("progress", {
+      stage: "thinking",
+      message: "Thinking...",
+    });
+
+    // Run the conversational agent with streaming
+    const agentResult = await run(agents.conversational, agentInput, {
+      stream: true,
+      context: { actionCtx: ctx },
+    });
+
+    let accumulatedResponse = "";
+    let hasStartedStreaming = false;
+    let toolCallCount = 0;
+    let lastProgressStage = "thinking";
+
+    // Process streaming events using extracted helpers (per WRN1)
+    for await (const event of agentResult) {
+      if (event.type === "run_item_stream_event") {
+        const item = event.item as StreamingEventItem;
+        const eventName = (event as { name?: string }).name;
+
+        // Detect tool calls using helper (handles multiple SDK patterns)
+        if (isToolCallEvent(item, eventName)) {
+          toolCallCount++;
+          const toolName = extractToolName(item);
+
+          console.log(`🔧 TOOL CALL DETECTED: ${toolName}`, {
+            eventName,
+            itemType: item?.type,
+            rawItemType: item?.rawItem?.type,
+          });
+
+          // Emit progress events using helper
+          const newStage = getProgressStageForTool(
+            toolName,
+            lastProgressStage as ProgressStage,
+          );
+          if (newStage) {
+            lastProgressStage = newStage;
+            yield writeEvent("progress", {
+              stage: newStage,
+              message: getProgressMessage(newStage),
+            });
+          }
+        }
+
+        // Detect tool outputs and harvest data using helper
+        if (isToolOutputEvent(item, eventName)) {
+          const output = (item?.output || item?.rawItem?.output) as
+            | Record<string, unknown>
+            | undefined;
+          const outputToolName =
+            (item as { toolName?: string })?.toolName ||
+            item?.rawItem?.name ||
+            "";
+
+          // Skip if output is missing or indicates an error
+          if (!output || typeof output !== "object") continue;
+          if ("error" in output && output.error) {
+            console.log(`⚠️ SKIPPED failed tool output: ${outputToolName}`);
+            continue;
+          }
+
+          // Harvest search results using helper
+          if (outputToolName === "search_web" || output.results) {
+            const count = harvestSearchResults(output, harvested);
+            if (count > 0) {
+              console.log(`📥 HARVESTED search results: ${count} items`);
+            }
+          }
+
+          // Harvest scraped content using helper (handles URL deduplication)
+          if (
+            (outputToolName === "scrape_webpage" || output.scrapedAt) &&
+            output.url &&
+            output.content
+          ) {
+            const wasHarvested = harvestScrapedContent(output, harvested);
+            if (wasHarvested) {
+              console.log(`📥 HARVESTED scraped page: ${output.url}`);
+            } else {
+              console.log(`⚠️ SKIPPED duplicate scrape: ${output.url}`);
+            }
+          }
+        }
+
+        // Handle streaming text deltas using helper
+        if (eventName === "message_output_created") continue;
+
+        const delta = extractTextDelta(item, eventName);
+        if (delta) {
+          if (!hasStartedStreaming) {
+            hasStartedStreaming = true;
+            yield writeEvent("progress", {
+              stage: "generating",
+              message: getProgressMessage("generating"),
+            });
+          }
+          accumulatedResponse += delta;
+          yield writeEvent("content", { delta });
+        }
+      }
+    }
+
+    // Wait for completion
+    await withTimeout(
+      agentResult.completed,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS * 2,
+      "conversational",
+    );
+
+    const finalOutput =
+      (agentResult.finalOutput as string) || accumulatedResponse;
+    const totalDuration = Date.now() - startTime;
+
+    // Validate output is not empty (consistent with streamResearchWorkflow validation)
+    if (!finalOutput || finalOutput.trim().length === 0) {
+      throw new Error(
+        "Conversational agent produced empty output - no content to save",
+      );
+    }
+
+    console.log(
+      `🏁 CONVERSATIONAL WORKFLOW COMPLETE: ${totalDuration}ms | tools: ${toolCallCount} | chars: ${finalOutput.length}`,
+    );
+
+    // If no content was streamed, send the final output
+    if (accumulatedResponse.length === 0 && finalOutput.length > 0) {
+      yield writeEvent("content", { delta: finalOutput });
+    }
+
+    // Update chat title if needed
+    await updateChatTitleIfNeeded({
+      ctx,
+      chatId: args.chatId,
+      currentTitle: chat.title,
+      intent: args.userQuery,
+    });
+
+    // Build context references from harvested data
+    const contextReferences: ResearchContextReference[] = [];
+    const now = Date.now();
+
+    // Add scraped pages as high-relevance sources
+    for (const scraped of harvested.scrapedContent) {
+      contextReferences.push({
+        contextId: scraped.contextId,
+        type: "scraped_page",
+        url: scraped.url,
+        title: scraped.title,
+        timestamp: scraped.scrapedAt || now,
+        relevanceScore: scraped.relevanceScore ?? RELEVANCE_SCORES.SCRAPED_PAGE,
+      });
+    }
+
+    // Add search results as medium-relevance sources (if not already scraped)
+    // Use normalized URLs for dedup check to avoid duplicates with trailing slashes
+    const scrapedNormalizedUrls = new Set(
+      harvested.scrapedContent
+        .map((s) => normalizeUrl(s.url))
+        .filter((url): url is string => url !== null),
+    );
+    for (const result of harvested.searchResults) {
+      const normalizedResultUrl = normalizeUrl(result.url) ?? result.url;
+      if (!scrapedNormalizedUrls.has(normalizedResultUrl)) {
+        contextReferences.push({
+          contextId: result.contextId ?? generateMessageId(),
+          type: "search_result",
+          url: result.url,
+          title: result.title,
+          timestamp: now,
+          relevanceScore:
+            result.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
+        });
+      }
+    }
+
+    // Deduplicate by normalized URL, keeping first occurrence (typically higher relevance)
+    const uniqueContextRefs = Array.from(
+      new Map(
+        contextReferences.map((ref) => {
+          const rawUrl = ref.url || "";
+          return [normalizeUrl(rawUrl) ?? rawUrl, ref];
+        }),
+      ).values(),
+    );
+
+    // Build searchResults for the message (used by frontend MessageSources dropdown)
+    const searchResults = uniqueContextRefs
+      .filter(
+        (ref): ref is ResearchContextReference & { url: string } =>
+          typeof ref.url === "string" && ref.url.length > 0,
+      )
+      .map((ref) => ({
+        title: ref.title || ref.url || "",
+        url: ref.url,
+        snippet: "",
+        relevanceScore: ref.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
+      }));
+
+    // Extract source URLs for the sources array
+    const sources = uniqueContextRefs
+      .filter((ref) => ref.url)
+      .map((ref) => ref.url as string);
+
+    console.log(
+      `📊 CONVERSATIONAL SOURCES: ${uniqueContextRefs.length} refs, ${searchResults.length} results, ${sources.length} URLs`,
+    );
+
+    // Save assistant message (extracted per DR1a)
+    const assistantMessageId = await withErrorContext(
+      "Failed to save assistant message",
+      () =>
+        persistAssistantMessage({
+          ctx,
+          chatId: args.chatId,
+          content: finalOutput,
+          workflowId,
+          sessionId: args.sessionId,
+          searchResults,
+          sources,
+          contextReferences: uniqueContextRefs,
+        }),
+    );
+
+    // Build persisted payload
+    const persistedPayload: StreamingPersistPayload = {
+      assistantMessageId,
+      workflowId,
+      answer: finalOutput,
+      sources,
+      contextReferences: uniqueContextRefs,
+    };
+
+    // Complete workflow and sign payload (extracted per DR1a)
+    const signature = await withErrorContext(
+      "Failed to complete workflow",
+      () =>
+        completeWorkflowWithSignature({
+          ctx,
+          workflowTokenId,
+          payload: persistedPayload,
+          nonce,
+        }),
+    );
+
+    // Emit completion events with harvested sources
+    yield writeEvent("complete", {
+      workflow: {
+        workflowId,
+        planning: { userIntent: args.userQuery, searchQueries: [] },
+        research: {
+          researchSummary:
+            harvested.searchResults.length > 0
+              ? `Found ${harvested.searchResults.length} search results and scraped ${harvested.scrapedContent.length} pages.`
+              : "",
+          keyFindings: [],
+          sourcesUsed: uniqueContextRefs.map((ref) => ({
+            url: ref.url || "",
+            title: ref.title || "",
+            contextId: ref.contextId,
+            type: ref.type,
+            relevance:
+              (ref.relevanceScore ?? 0) >= RELEVANCE_SCORES.HIGH_THRESHOLD
+                ? "high"
+                : (ref.relevanceScore ?? 0) >= RELEVANCE_SCORES.MEDIUM_THRESHOLD
+                  ? "medium"
+                  : "low",
+          })),
+        },
+        answer: { answer: finalOutput, confidence: 1 },
+        metadata: { totalDuration, timestamp: Date.now() },
+      },
+    });
+
+    yield writeEvent("metadata", {
+      metadata: {
+        workflowId,
+        contextReferences: uniqueContextRefs,
+        hasLimitations: false,
+        confidence: 1,
+        answerLength: finalOutput.length,
+      },
+      nonce,
+    });
+
+    yield writeEvent("persisted", {
+      payload: persistedPayload,
+      nonce,
+      signature,
+    });
+  } catch (error) {
+    await handleError(
+      error instanceof Error
+        ? error
+        : new Error("Conversational workflow failed"),
+      "conversational",
+    );
+  }
+}
+
+// ============================================
+// LEGACY RESEARCH WORKFLOW (3-Agent Pipeline)
+// ============================================
+// This is the original workflow with planning → research → synthesis.
+// Kept for comparison and fallback.
+
 export async function* streamResearchWorkflow(
   ctx: StreamingWorkflowCtx,
   args: StreamingWorkflowArgs,
@@ -675,48 +1099,16 @@ export async function* streamResearchWorkflow(
   const nonce = generateMessageId();
   const issuedAt = Date.now();
 
-  const writeEvent = (
-    type: string,
-    data: Record<string, unknown>,
-  ): WorkflowStreamEvent => {
-    const cleaned: Record<string, unknown> = { type };
-    for (const [k, v] of Object.entries(data)) {
-      if (v === undefined || v === null) continue;
-      if (
-        typeof v === "object" &&
-        !Array.isArray(v) &&
-        Object.keys(v).length === 0
-      )
-        continue;
-      cleaned[k] = v;
-    }
-    return cleaned;
-  };
+  // Use shared utilities (extracted per DR1a)
+  const writeEvent = (type: string, data: Record<string, unknown>) =>
+    createWorkflowEvent(type, data);
 
   let workflowTokenId: Id<"workflowTokens"> | null = null;
-
-  const handleError = async (error: Error, stage: string) => {
-    console.error(`💥 WORKFLOW ERROR [${stage}]`, {
-      workflowId,
-      error: error.message,
-    });
-    if (workflowTokenId) {
-      try {
-        await ctx.runMutation(internal.workflowTokens.invalidateToken, {
-          tokenId: workflowTokenId,
-        });
-      } catch (invalidationError) {
-        console.error("Failed to invalidate workflow token", {
-          tokenId: workflowTokenId,
-          error:
-            invalidationError instanceof Error
-              ? invalidationError.message
-              : "Unknown invalidation error",
-        });
-      }
-    }
-    throw error;
-  };
+  const handleError = createWorkflowErrorHandler({
+    ctx,
+    workflowId,
+    getTokenId: () => workflowTokenId,
+  });
 
   const workflowTokenPayload: {
     workflowId: string;
@@ -738,7 +1130,6 @@ export async function* streamResearchWorkflow(
   }
 
   workflowTokenId = await ctx.runMutation(
-    // @ts-expect-error - Convex TS2589: deeply nested type inference
     internal.workflowTokens.createToken,
     workflowTokenPayload,
   );
@@ -775,21 +1166,9 @@ export async function* streamResearchWorkflow(
   const conversationContextFromDb = buildConversationContext(
     recentMessages || [],
   );
-  const priorContextReferences = extractContextReferencesFromMessages(
-    recentMessages || [],
-  );
-  const historyReferences = priorContextReferences.slice(-8);
-  const streamingContextReferences = [
-    ...historyReferences,
-    ...(args.contextReferences ?? []),
-  ].slice(-12);
 
   const conversationSource =
     conversationContextFromDb || args.conversationContext || "";
-  const conversationBlock = buildConversationBlock(conversationSource);
-  const referenceBlock = formatContextReferencesForPrompt(
-    streamingContextReferences,
-  );
 
   const instantResponse = detectInstantResponse(args.userQuery);
 
@@ -853,30 +1232,25 @@ export async function* streamResearchWorkflow(
         nonce,
       });
 
-      // Update chat title
-      const generatedTitle = generateChatTitle({ intent: args.userQuery });
-      if (chat.title === "New Chat" || !chat.title) {
-        await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-          chatId: args.chatId,
-          title: generatedTitle,
-        });
-      }
+      // Update chat title (extracted per DR1a)
+      await updateChatTitleIfNeeded({
+        ctx,
+        chatId: args.chatId,
+        currentTitle: chat.title,
+        intent: args.userQuery,
+      });
 
-      // Save assistant message
-      const instantMessageId: Id<"messages"> = (await ctx.runMutation(
-        internal.messages.addMessage,
-        {
-          chatId: args.chatId,
-          role: "assistant",
-          content: instantResponse,
-          searchResults: [],
-          sources: [],
-          contextReferences: [],
-          workflowId,
-          isStreaming: false,
-          sessionId: args.sessionId,
-        },
-      )) as Id<"messages">;
+      // Save assistant message (extracted per DR1a)
+      const instantMessageId = await persistAssistantMessage({
+        ctx,
+        chatId: args.chatId,
+        content: instantResponse,
+        workflowId,
+        sessionId: args.sessionId,
+        searchResults: [],
+        sources: [],
+        contextReferences: [],
+      });
 
       const instantPayload: StreamingPersistPayload = {
         assistantMessageId: instantMessageId,
@@ -886,17 +1260,13 @@ export async function* streamResearchWorkflow(
         contextReferences: [],
       };
 
-      const instantSignature = await ctx.runAction(
-        internal.workflowTokensActions.signPersistedPayload,
-        { payload: instantPayload, nonce },
-      );
-
-      if (workflowTokenId) {
-        await ctx.runMutation(internal.workflowTokens.completeToken, {
-          tokenId: workflowTokenId,
-          signature: instantSignature,
-        });
-      }
+      // Complete workflow (extracted per DR1a)
+      const instantSignature = await completeWorkflowWithSignature({
+        ctx,
+        workflowTokenId,
+        payload: instantPayload,
+        nonce,
+      });
 
       yield writeEvent("persisted", {
         payload: instantPayload,
@@ -939,7 +1309,11 @@ export async function* streamResearchWorkflow(
     }
 
     // CRITICAL: Await stream completion before accessing finalOutput
-    await withTimeout(planningResult.completed, AGENT_TIMEOUT_MS, "planning");
+    await withTimeout(
+      planningResult.completed,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
+      "planning",
+    );
     const planningDuration = Date.now() - planningStart;
     console.log(
       `⚡ PLANNING COMPLETE: ${planningDuration}ms | queries: ${planningResult.finalOutput?.searchQueries?.length || 0}`,
@@ -1007,7 +1381,10 @@ export async function* streamResearchWorkflow(
 
     // FAST PATH: Simple conversational messages that don't need research
     // Skip research stage entirely when planning indicates no information gathering needed
-    if (!needsResearch && planningOutput.confidenceLevel >= 0.9) {
+    if (
+      !needsResearch &&
+      planningOutput.confidenceLevel >= CONFIDENCE_THRESHOLDS.SKIP_RESEARCH
+    ) {
       console.log("⚡ FAST PATH: Skipping research stage for simple message");
 
       yield writeEvent("progress", {
@@ -1059,7 +1436,7 @@ export async function* streamResearchWorkflow(
 
       await withTimeout(
         fastSynthesisResult.completed,
-        AGENT_TIMEOUT_MS,
+        AGENT_TIMEOUTS.AGENT_STAGE_MS,
         "synthesis",
       );
       const fastSynthesisOutput = fastSynthesisResult.finalOutput as string;
@@ -1109,32 +1486,25 @@ export async function* streamResearchWorkflow(
         nonce,
       });
 
-      // Update chat title if needed
-      const generatedTitle = generateChatTitle({
+      // Update chat title if needed (extracted per DR1a)
+      await updateChatTitleIfNeeded({
+        ctx,
+        chatId: args.chatId,
+        currentTitle: chat.title,
         intent: planningOutput?.userIntent || args.userQuery,
       });
-      if (chat.title === "New Chat" || !chat.title) {
-        await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-          chatId: args.chatId,
-          title: generatedTitle,
-        });
-      }
 
-      // Save assistant message
-      const fastAssistantMessageId: Id<"messages"> = (await ctx.runMutation(
-        internal.messages.addMessage,
-        {
-          chatId: args.chatId,
-          role: "assistant",
-          content: fastFinalAnswerText,
-          searchResults: [],
-          sources: fastParsedAnswer.sourcesUsed || [],
-          contextReferences: [],
-          workflowId,
-          isStreaming: false,
-          sessionId: args.sessionId,
-        },
-      )) as Id<"messages">;
+      // Save assistant message (extracted per DR1a)
+      const fastAssistantMessageId = await persistAssistantMessage({
+        ctx,
+        chatId: args.chatId,
+        content: fastFinalAnswerText,
+        workflowId,
+        sessionId: args.sessionId,
+        searchResults: [],
+        sources: fastParsedAnswer.sourcesUsed || [],
+        contextReferences: [],
+      });
 
       const fastPersistedPayload: StreamingPersistPayload = {
         assistantMessageId: fastAssistantMessageId,
@@ -1144,17 +1514,13 @@ export async function* streamResearchWorkflow(
         contextReferences: [],
       };
 
-      const fastSignature = await ctx.runAction(
-        internal.workflowTokensActions.signPersistedPayload,
-        { payload: fastPersistedPayload, nonce },
-      );
-
-      if (workflowTokenId) {
-        await ctx.runMutation(internal.workflowTokens.completeToken, {
-          tokenId: workflowTokenId,
-          signature: fastSignature,
-        });
-      }
+      // Complete workflow (extracted per DR1a)
+      const fastSignature = await completeWorkflowWithSignature({
+        ctx,
+        workflowTokenId,
+        payload: fastPersistedPayload,
+        nonce,
+      });
 
       yield writeEvent("persisted", {
         payload: fastPersistedPayload,
@@ -1172,11 +1538,10 @@ export async function* streamResearchWorkflow(
     // This eliminates the 8-13 second LLM "thinking" gaps between tool calls.
     // Total research phase should complete in ~2-3 seconds instead of 30-60 seconds.
 
-    // Initialize harvested data container
-    const harvested: HarvestedToolData = {
-      scrapedContent: [],
-      serpEnrichment: {},
-      searchResults: [],
+    // Initialize harvested data container (legacy workflow needs serpEnrichment as object)
+    const harvested = {
+      ...createEmptyHarvestedData(),
+      serpEnrichment: {} as SerpEnrichment,
     };
 
     const parallelStartTime = Date.now();
@@ -1216,7 +1581,7 @@ export async function* streamResearchWorkflow(
       const searchResults = await Promise.all(searchPromises);
 
       // Harvest all search results
-      for (const { query, result } of searchResults) {
+      for (const { result } of searchResults) {
         if (!result?.results) continue;
 
         for (const r of result.results) {
@@ -1256,7 +1621,7 @@ export async function* streamResearchWorkflow(
     )
       .filter((r) => r.url && r.url.startsWith("http"))
       .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
-      .slice(0, 4); // Scrape top 4 URLs max
+      .slice(0, AGENT_LIMITS.MAX_SCRAPE_URLS);
 
     // Always scrape when URLs are available - planner's needsWebScraping prediction
     // can be wrong, and skipping scraping when search returns good URLs degrades answer quality.
@@ -1493,7 +1858,11 @@ export async function* streamResearchWorkflow(
 
     // CRITICAL: Await stream completion before accessing finalOutput
     const synthesisCompleteStart = Date.now();
-    await withTimeout(synthesisResult.completed, AGENT_TIMEOUT_MS, "synthesis");
+    await withTimeout(
+      synthesisResult.completed,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
+      "synthesis",
+    );
     console.log(
       `⚡ SYNTHESIS COMPLETE: ${Date.now() - synthesisCompleteStart}ms`,
     );
@@ -1571,44 +1940,38 @@ export async function* streamResearchWorkflow(
       nonce,
     });
 
-    // Generate and update chat title using refined intent from planning
-    // The 25-char limit is enforced by generateChatTitle utility
-    const generatedTitle = generateChatTitle({
+    // Update chat title using refined intent from planning (extracted per DR1a)
+    await updateChatTitleIfNeeded({
+      ctx,
+      chatId: args.chatId,
+      currentTitle: chat.title,
       intent: planningOutput?.userIntent || args.userQuery,
     });
 
-    // Only update if title hasn't been customized (still default or matches generated)
-    if (chat.title === "New Chat" || !chat.title) {
-      await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
-        chatId: args.chatId,
-        title: generatedTitle,
-      });
-    }
+    // Build search results from context references
+    const searchResults = contextReferences
+      .filter(
+        (ref): ref is ResearchContextReference & { url: string } =>
+          typeof ref.url === "string" && ref.url.length > 0,
+      )
+      .map((ref) => ({
+        title: ref.title || ref.url || "",
+        url: ref.url,
+        snippet: "",
+        relevanceScore: ref.relevanceScore ?? 0.5,
+      }));
 
-    const assistantMessageId: Id<"messages"> = (await ctx.runMutation(
-      internal.messages.addMessage,
-      {
-        chatId: args.chatId,
-        role: "assistant",
-        content: finalAnswerText,
-        searchResults: contextReferences
-          .filter(
-            (ref): ref is ResearchContextReference & { url: string } =>
-              typeof ref.url === "string" && ref.url.length > 0,
-          )
-          .map((ref) => ({
-            title: ref.title || ref.url || "",
-            url: ref.url,
-            snippet: "",
-            relevanceScore: ref.relevanceScore ?? 0.5,
-          })),
-        sources: parsedAnswer.sourcesUsed || [],
-        contextReferences,
-        workflowId,
-        isStreaming: false,
-        sessionId: args.sessionId, // Pass sessionId for HTTP action auth
-      },
-    )) as Id<"messages">;
+    // Save assistant message (extracted per DR1a)
+    const assistantMessageId = await persistAssistantMessage({
+      ctx,
+      chatId: args.chatId,
+      content: finalAnswerText,
+      workflowId,
+      sessionId: args.sessionId,
+      searchResults,
+      sources: parsedAnswer.sourcesUsed || [],
+      contextReferences,
+    });
 
     const persistedPayload: StreamingPersistPayload = {
       assistantMessageId,
@@ -1618,19 +1981,13 @@ export async function* streamResearchWorkflow(
       contextReferences,
     };
 
-    const signature = await ctx.runAction(
-      internal.workflowTokensActions.signPersistedPayload,
-      {
-        payload: persistedPayload,
-        nonce,
-      },
-    );
-    if (workflowTokenId) {
-      await ctx.runMutation(internal.workflowTokens.completeToken, {
-        tokenId: workflowTokenId,
-        signature,
-      });
-    }
+    // Complete workflow (extracted per DR1a)
+    const signature = await completeWorkflowWithSignature({
+      ctx,
+      workflowTokenId,
+      payload: persistedPayload,
+      nonce,
+    });
 
     const totalDuration = Date.now() - startTime;
     console.log(

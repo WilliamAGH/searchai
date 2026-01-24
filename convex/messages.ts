@@ -2,8 +2,14 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { vSearchResult } from "./lib/validators";
+import {
+  vSearchResult,
+  vContextReference,
+  vSearchMethod,
+} from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
+import { getErrorMessage } from "./lib/errors";
+import { hasUserAccess, hasSessionAccess, isUnownedChat } from "./lib/auth";
 
 export const addMessage = internalMutation({
   args: {
@@ -16,23 +22,15 @@ export const addMessage = internalMutation({
     searchResults: v.optional(v.array(vSearchResult)),
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
-    searchMethod: v.optional(
-      v.union(
-        v.literal("serp"),
-        v.literal("openrouter"),
-        v.literal("duckduckgo"),
-        v.literal("fallback"),
-      ),
-    ),
+    searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
     // New: provenance tracking and workflow linkage
-    contextReferences: v.optional(
-      v.array(require("./lib/validators").vContextReference),
-    ),
+    contextReferences: v.optional(v.array(vContextReference)),
     workflowId: v.optional(v.string()),
     // CRITICAL: Add sessionId for HTTP action auth (when userId not available)
     sessionId: v.optional(v.string()),
   },
+  returns: v.id("messages"),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
@@ -41,22 +39,10 @@ export const addMessage = internalMutation({
 
     // Dual ownership validation (matches validateChatAccess pattern)
     // Supports both authenticated (userId) and HTTP action (sessionId) contexts
-    let authorized = false;
-
-    // Method 1: Validate via userId (Convex queries/mutations with auth)
-    if (chat.userId && userId && chat.userId === userId) {
-      authorized = true;
-    }
-
-    // Method 2: Validate via sessionId (HTTP actions without auth context)
-    if (chat.sessionId && args.sessionId && chat.sessionId === args.sessionId) {
-      authorized = true;
-    }
-
-    // Method 3: Allow if chat has no ownership yet (newly created)
-    if (!chat.userId && !chat.sessionId && args.sessionId) {
-      authorized = true;
-    }
+    const authorized =
+      hasUserAccess(chat, userId) ||
+      hasSessionAccess(chat, args.sessionId) ||
+      (isUnownedChat(chat) && !!args.sessionId);
 
     if (!authorized) {
       throw new Error("Unauthorized");
@@ -130,14 +116,7 @@ export const updateMessageMetadata = mutation({
     messageId: v.id("messages"),
     searchResults: v.optional(v.array(vSearchResult)),
     sources: v.optional(v.array(v.string())),
-    searchMethod: v.optional(
-      v.union(
-        v.literal("serp"),
-        v.literal("openrouter"),
-        v.literal("duckduckgo"),
-        v.literal("fallback"),
-      ),
-    ),
+    searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
     sessionId: v.optional(v.string()),
   },
@@ -159,13 +138,7 @@ export const updateMessageMetadata = mutation({
     if (!chat) {
       throw new Error("Chat not found");
     }
-    const hasUserAccess = !!(chat.userId && userId && chat.userId === userId);
-    const hasSessionAccess = !!(
-      chat.sessionId &&
-      sessionId &&
-      chat.sessionId === sessionId
-    );
-    if (!hasUserAccess && !hasSessionAccess) {
+    if (!hasUserAccess(chat, userId) && !hasSessionAccess(chat, sessionId)) {
       throw new Error(
         "Unauthorized: You can only update messages in your own chats",
       );
@@ -186,19 +159,10 @@ export const updateMessage = internalMutation({
     searchResults: v.optional(v.array(vSearchResult)),
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
-    searchMethod: v.optional(
-      v.union(
-        v.literal("serp"),
-        v.literal("openrouter"),
-        v.literal("duckduckgo"),
-        v.literal("fallback"),
-      ),
-    ),
+    searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
     // New
-    contextReferences: v.optional(
-      v.array(require("./lib/validators").vContextReference),
-    ),
+    contextReferences: v.optional(v.array(vContextReference)),
     workflowId: v.optional(v.string()),
   },
   handler: async (ctx, { messageId, ...rest }) => {
@@ -206,12 +170,6 @@ export const updateMessage = internalMutation({
   },
 });
 
-/**
- * Delete a single message from a chat
- * - Validates ownership via chat.userId
- * - Removes the message
- * - Invalidates planner cache and rolling summary (clears summary text)
- */
 /**
  * Count messages for a chat
  * Used to determine if title should be generated
@@ -332,7 +290,7 @@ export const addMessageWithTransaction = internalMutation({
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: getErrorMessage(error),
       };
     }
   },

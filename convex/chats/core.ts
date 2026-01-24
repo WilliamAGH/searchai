@@ -10,6 +10,7 @@ import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { generateShareId, generatePublicId } from "../lib/uuid";
+import { hasUserAccess, hasSessionAccess } from "../lib/auth";
 
 /**
  * Create new chat
@@ -112,13 +113,13 @@ async function validateChatAccess(
   }
 
   // For authenticated users: check userId matches (Convex queries/mutations)
-  if (chat.userId && userId && chat.userId === userId) {
+  if (hasUserAccess(chat, userId)) {
     return chat;
   }
 
   // For sessionId-based access: HTTP endpoints or anonymous users
   // Note: HTTP actions don't have auth context, so they rely on sessionId
-  if (chat.sessionId && sessionId && chat.sessionId === sessionId) {
+  if (hasSessionAccess(chat, sessionId)) {
     return chat;
   }
 
@@ -170,9 +171,8 @@ export const getChatByIdDirect = query({
 
     const isSharedOrPublic =
       chat.privacy === "shared" || chat.privacy === "public";
-    const isUserOwner = chat.userId && userId && chat.userId === userId;
-    const isSessionOwner =
-      chat.sessionId && args.sessionId && chat.sessionId === args.sessionId;
+    const isUserOwner = hasUserAccess(chat, userId);
+    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
 
     if (isSharedOrPublic || isUserOwner || isSessionOwner) {
       return chat;

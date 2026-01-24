@@ -1,9 +1,20 @@
 import { v } from "convex/values";
 import type { Id, TableNames } from "../_generated/dataModel";
-import type { ResearchContextReference as ResearchContextReferenceType } from "../agents/types";
+import type { ResearchContextReference as ResearchContextReferenceType } from "../agents/schema";
 
 // Shared validators for backend-only usage
 // Note: Do not re-export Convex-generated types from _generated/*
+
+/**
+ * Search method validator - single source of truth for search provider types.
+ * Used in schema.ts, messages.ts, search.ts, and migration files.
+ */
+export const vSearchMethod = v.union(
+  v.literal("serp"),
+  v.literal("openrouter"),
+  v.literal("duckduckgo"),
+  v.literal("fallback"),
+);
 
 export const vSearchResult = v.object({
   title: v.string(),
