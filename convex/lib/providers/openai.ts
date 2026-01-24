@@ -391,16 +391,24 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
     process.env.LLM_BASE_URL ||
     process.env.OPENAI_BASE_URL ||
     process.env.OPENROUTER_BASE_URL;
-  const apiKey =
-    process.env.LLM_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.OPENROUTER_API_KEY;
   const normalizedBase = baseURL?.toLowerCase();
+
+  // Detect endpoint type BEFORE selecting API key to enable smart matching
+  const isOpenRouter = normalizedBase?.includes("openrouter") ?? false;
   const isOpenAIEndpoint = normalizedBase
     ? normalizedBase.includes("api.openai.com")
     : true;
-  // Detect OpenRouter and other non-OpenAI providers that use Chat Completions API
-  const isOpenRouter = normalizedBase?.includes("openrouter") ?? false;
+
+  // Select API key with endpoint-aware fallback:
+  // 1. LLM_API_KEY always takes precedence (explicit override)
+  // 2. For OpenRouter endpoints, prefer OPENROUTER_API_KEY over OPENAI_API_KEY
+  // 3. For OpenAI endpoints, prefer OPENAI_API_KEY over OPENROUTER_API_KEY
+  // This prevents misconfiguration where the wrong provider's key is sent
+  const apiKey =
+    process.env.LLM_API_KEY ||
+    (isOpenRouter
+      ? process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY
+      : process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY);
   const isChatCompletionsEndpoint =
     normalizedBase?.includes("/chat/completions") ?? false;
   // Use Chat Completions API for OpenRouter and any endpoint with /chat/completions
