@@ -908,13 +908,18 @@ export async function* streamConversationalWorkflow(
           const toolName = extractToolName(item);
           const toolArgs = extractToolArgs(item);
 
+          // Extract validated tool arguments (only include if present)
+          const hasToolQuery = typeof toolArgs.query === "string";
+          const hasToolUrl = typeof toolArgs.url === "string";
+          const hasToolReasoning = typeof toolArgs.reasoning === "string";
+
           console.log(`🔧 TOOL CALL DETECTED: ${toolName}`, {
             eventName,
             itemType: item?.type,
             rawItemType: item?.rawItem?.type,
-            query: toolArgs.query,
-            url: toolArgs.url,
-            reasoning: toolArgs.reasoning,
+            ...(hasToolQuery && { query: toolArgs.query }),
+            ...(hasToolUrl && { url: toolArgs.url }),
+            ...(hasToolReasoning && { reasoning: toolArgs.reasoning }),
           });
 
           // Emit progress events with tool arguments (model-agnostic reasoning)
@@ -927,10 +932,10 @@ export async function* streamConversationalWorkflow(
             yield writeEvent("progress", {
               stage: newStage,
               message: getProgressMessage(newStage),
-              // Include the LLM's schema-enforced reasoning for immediate UI feedback
-              toolReasoning: toolArgs.reasoning,
-              toolQuery: toolArgs.query,
-              toolUrl: toolArgs.url,
+              // Include validated tool context for UI feedback (only if present)
+              ...(hasToolReasoning && { toolReasoning: toolArgs.reasoning }),
+              ...(hasToolQuery && { toolQuery: toolArgs.query }),
+              ...(hasToolUrl && { toolUrl: toolArgs.url }),
             });
           }
         }
