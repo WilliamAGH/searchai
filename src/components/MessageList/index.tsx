@@ -36,10 +36,23 @@ interface MessageListProps {
   onShare?: () => void;
   currentChat?: Chat;
   searchProgress?: {
-    stage: "idle" | "searching" | "scraping" | "analyzing" | "generating";
+    stage:
+      | "idle"
+      | "planning"
+      | "searching"
+      | "scraping"
+      | "analyzing"
+      | "generating";
     message?: string;
     urls?: string[];
     currentUrl?: string;
+    queries?: string[];
+    /** LLM's schema-enforced reasoning for this tool call */
+    toolReasoning?: string;
+    /** Search query being executed */
+    toolQuery?: string;
+    /** URL being scraped */
+    toolUrl?: string;
   } | null;
   onDeleteLocalMessage?: (messageId: string) => void;
   onRequestDeleteMessage?: (messageId: string) => void;
@@ -183,6 +196,7 @@ export function MessageList({
   );
 
   // Intelligent auto-scroll: scroll when near bottom or actively generating
+  // Also triggers on searchProgress changes to keep tool status visible
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -203,6 +217,7 @@ export function MessageList({
     scrollToBottom,
     NEAR_BOTTOM_THRESHOLD,
     scrollContainerRef,
+    searchProgress, // Include to scroll when tool progress updates
   ]);
 
   // Debug logging
@@ -558,8 +573,12 @@ export function MessageList({
 
   // When using external scroll container, just render the content directly
   // The parent handles the scroll container
+  // Use grow shrink-0 (not flex-1): grow to fill space when content is small,
+  // don't shrink when content is large (allows scroll overflow)
   if (useExternalScroll) {
-    return <div className="flex-1 relative">{content}</div>;
+    return (
+      <div className="grow shrink-0 flex flex-col relative">{content}</div>
+    );
   }
 
   // Internal scroll container (fallback for backwards compatibility)

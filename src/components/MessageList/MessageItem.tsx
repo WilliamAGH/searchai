@@ -9,77 +9,12 @@ import { ContentWithCitations } from "../ContentWithCitations";
 import { ReasoningDisplay } from "../ReasoningDisplay";
 import { CopyButton } from "../CopyButton";
 import { MessageSources } from "./MessageSources";
+import { ToolProgressIndicator } from "./ToolProgressIndicator";
 import {
   extractPlainText,
   formatConversationWithSources,
 } from "../../lib/clipboard";
 import type { Message } from "../../lib/types/message";
-
-// Progress stage display mapping - ensures header and description are always distinct
-const PROGRESS_DISPLAY: Record<
-  string,
-  { header: string; description: string }
-> = {
-  thinking: { header: "Processing", description: "Analyzing your question..." },
-  planning: {
-    header: "Research Planning",
-    description: "Determining what information to gather...",
-  },
-  searching: {
-    header: "Web Search",
-    description: "Querying search engines for relevant results...",
-  },
-  scraping: {
-    header: "Reading Sources",
-    description: "Extracting content from web pages...",
-  },
-  analyzing: {
-    header: "Analyzing Results",
-    description: "Processing and synthesizing information...",
-  },
-  generating: {
-    header: "Composing Response",
-    description: "Writing your answer...",
-  },
-};
-
-function getProgressHeader(stage: string): string {
-  return (
-    PROGRESS_DISPLAY[stage]?.header ||
-    stage.charAt(0).toUpperCase() + stage.slice(1)
-  );
-}
-
-function getProgressDescription(stage: string, message?: string): string {
-  // Priority 1: Use custom message if it's meaningfully different from the stage AND header
-  if (message) {
-    const normalizedMessage = message.toLowerCase().replace(/\.*$/, "").trim();
-    const normalizedStage = stage.toLowerCase();
-    const stageRoot = normalizedStage.replace(/ing$/, "");
-    const header = PROGRESS_DISPLAY[stage]?.header?.toLowerCase() || "";
-
-    // Check for redundancy against stage name, root, and header
-    const isRedundant =
-      normalizedMessage === normalizedStage ||
-      normalizedMessage === stageRoot ||
-      normalizedMessage === header ||
-      // Also check if message is essentially the header with different punctuation
-      normalizedMessage.replace(/\s+/g, "") === header.replace(/\s+/g, "");
-
-    if (!isRedundant) {
-      return message;
-    }
-  }
-
-  // Priority 2: Use predefined description for known stages
-  const predefined = PROGRESS_DISPLAY[stage]?.description;
-  if (predefined) {
-    return predefined;
-  }
-
-  // Priority 3: Generic fallback for unknown stages
-  return "Processing...";
-}
 
 interface MessageItemProps {
   message: Message;
@@ -103,6 +38,12 @@ interface MessageItemProps {
     urls?: string[];
     currentUrl?: string;
     queries?: string[];
+    /** LLM's schema-enforced reasoning for this tool call */
+    toolReasoning?: string;
+    /** Search query being executed */
+    toolQuery?: string;
+    /** URL being scraped */
+    toolUrl?: string;
   } | null;
 }
 
@@ -237,40 +178,17 @@ export function MessageItem({
             </div>
           )}
 
-        {/* 4) Search progress status when streaming (now also shows during generating) */}
+        {/* 4) Search progress status when streaming */}
         {message.role === "assistant" &&
           searchProgress &&
           searchProgress.stage !== "idle" && (
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="text-emerald-600 dark:text-emerald-400">
-                  <svg
-                    className="w-4 h-4 animate-pulse"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {getProgressHeader(searchProgress.stage)}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {getProgressDescription(
-                      searchProgress.stage,
-                      searchProgress.message,
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
+            <ToolProgressIndicator
+              stage={searchProgress.stage}
+              message={searchProgress.message}
+              toolReasoning={searchProgress.toolReasoning}
+              toolQuery={searchProgress.toolQuery}
+              toolUrl={searchProgress.toolUrl}
+            />
           )}
 
         {/* 5) AI/user content last – always appears under sources/thinking */}

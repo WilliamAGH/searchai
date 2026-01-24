@@ -57,6 +57,7 @@ import {
   isToolCallEvent,
   isToolOutputEvent,
   extractToolName,
+  extractToolArgs,
   extractTextDelta,
   getProgressStageForTool,
   getProgressMessage,
@@ -890,18 +891,33 @@ export async function* streamConversationalWorkflow(
         const item = event.item as StreamingEventItem;
         const eventName = (event as { name?: string }).name;
 
+        // Emit reasoning/thinking events as the agent plans (before tool calls)
+        if (eventName === "reasoning_item_created") {
+          const reasoningContent =
+            (item as { content?: string; text?: string })?.content ||
+            (item as { content?: string; text?: string })?.text ||
+            "";
+          if (reasoningContent) {
+            yield writeEvent("reasoning", { content: reasoningContent });
+          }
+        }
+
         // Detect tool calls using helper (handles multiple SDK patterns)
         if (isToolCallEvent(item, eventName)) {
           toolCallCount++;
           const toolName = extractToolName(item);
+          const toolArgs = extractToolArgs(item);
 
           console.log(`🔧 TOOL CALL DETECTED: ${toolName}`, {
             eventName,
             itemType: item?.type,
             rawItemType: item?.rawItem?.type,
+            query: toolArgs.query,
+            url: toolArgs.url,
+            reasoning: toolArgs.reasoning,
           });
 
-          // Emit progress events using helper
+          // Emit progress events with tool arguments (model-agnostic reasoning)
           const newStage = getProgressStageForTool(
             toolName,
             lastProgressStage as ProgressStage,
@@ -911,6 +927,10 @@ export async function* streamConversationalWorkflow(
             yield writeEvent("progress", {
               stage: newStage,
               message: getProgressMessage(newStage),
+              // Include the LLM's schema-enforced reasoning for immediate UI feedback
+              toolReasoning: toolArgs.reasoning,
+              toolQuery: toolArgs.query,
+              toolUrl: toolArgs.url,
             });
           }
         }

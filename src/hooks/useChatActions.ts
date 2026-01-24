@@ -332,7 +332,7 @@ export function createChatActions(
         for await (const chunk of generator) {
           switch (chunk.type) {
             case "progress":
-              // Update searchProgress with all stage information
+              // Update searchProgress with all stage information including tool reasoning
               setState((prev) => ({
                 ...prev,
                 searchProgress: {
@@ -342,9 +342,16 @@ export function createChatActions(
                   currentUrl: chunk.currentUrl,
                   queries: chunk.queries,
                   sourcesUsed: chunk.sourcesUsed,
+                  // Model-agnostic reasoning from tool schema
+                  toolReasoning: chunk.toolReasoning,
+                  toolQuery: chunk.toolQuery,
+                  toolUrl: chunk.toolUrl,
                 },
               }));
-              logger.debug("Progress update:", chunk.stage, chunk.message);
+              logger.debug("Progress update:", chunk.stage, chunk.message, {
+                toolReasoning: chunk.toolReasoning,
+                toolQuery: chunk.toolQuery,
+              });
               break;
 
             case "reasoning":

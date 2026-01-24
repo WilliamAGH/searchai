@@ -110,6 +110,12 @@ export type MessageStreamChunk =
       currentUrl?: string;
       queries?: string[];
       sourcesUsed?: number;
+      /** LLM's schema-enforced reasoning for this tool call (model-agnostic) */
+      toolReasoning?: string;
+      /** Search query being executed */
+      toolQuery?: string;
+      /** URL being scraped */
+      toolUrl?: string;
     }
   | { type: "reasoning"; content: string } // Thinking/reasoning from agents
   | { type: "tool_result"; toolName: string; result: string } // Tool execution results
@@ -141,6 +147,12 @@ export interface SearchProgress {
   currentUrl?: string;
   queries?: string[];
   sourcesUsed?: number;
+  /** LLM's schema-enforced reasoning for this tool call (model-agnostic) */
+  toolReasoning?: string;
+  /** Search query being executed */
+  toolQuery?: string;
+  /** URL being scraped */
+  toolUrl?: string;
 }
 
 /**
