@@ -9,6 +9,7 @@
 import React from "react";
 import type { SearchResult } from "../../lib/types/message";
 import { getFaviconUrl } from "../../lib/utils/favicon";
+import { logger } from "../../lib/logger";
 
 type ContextReference = {
   contextId: string;
@@ -38,10 +39,15 @@ interface MessageSourcesProps {
 function getSafeHostname(url: string): string {
   try {
     return new URL(url).hostname;
-  } catch {
+  } catch (error) {
+    logger.warn("Failed to parse source URL hostname", { url, error });
     try {
       return new URL(`https://${url}`).hostname;
-    } catch {
+    } catch (fallbackError) {
+      logger.warn("Failed to parse source hostname with fallback", {
+        url,
+        error: fallbackError,
+      });
       return "";
     }
   }
@@ -80,7 +86,11 @@ export function MessageSources({
           if (!inferredTitle) {
             try {
               inferredTitle = new URL(safeUrl).hostname;
-            } catch {
+            } catch (error) {
+              logger.warn("Failed to infer title from source URL", {
+                url: safeUrl,
+                error,
+              });
               inferredTitle = safeUrl;
             }
           }

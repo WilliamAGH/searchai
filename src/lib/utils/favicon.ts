@@ -1,3 +1,5 @@
+import { logger } from "../logger";
+
 /**
  * Extract hostname from URL safely
  * - Handles malformed URLs and bare hostnames
@@ -5,10 +7,15 @@
 export function getSafeHostname(url: string): string {
   try {
     return new URL(url).hostname;
-  } catch {
+  } catch (error) {
+    logger.warn("Failed to parse URL for hostname", { url, error });
     try {
       return new URL(`https://${url}`).hostname;
-    } catch {
+    } catch (fallbackError) {
+      logger.warn("Failed to parse hostname with https:// fallback", {
+        url,
+        error: fallbackError,
+      });
       return "";
     }
   }

@@ -38,7 +38,8 @@ const storageService = {
     try {
       const raw = localStorage.getItem(key);
       return raw ? (JSON.parse(raw) as T) : null;
-    } catch {
+    } catch (error) {
+      logger.error("Failed to read theme from localStorage", { key, error });
       return null;
     }
   },
@@ -51,8 +52,8 @@ const storageService = {
   set<T>(key: string, value: T): void {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // ignore storage errors
+    } catch (error) {
+      logger.error("Failed to persist theme to localStorage", { key, error });
     }
   },
   /**
@@ -63,7 +64,8 @@ const storageService = {
   has(key: string): boolean {
     try {
       return localStorage.getItem(key) !== null;
-    } catch {
+    } catch (error) {
+      logger.error("Failed to check localStorage key", { key, error });
       return false;
     }
   },

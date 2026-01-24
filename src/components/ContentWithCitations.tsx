@@ -7,6 +7,7 @@
  */
 
 import React, { useRef } from "react";
+import { logger } from "../lib/logger";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -35,7 +36,8 @@ function getDomainFromUrl(url: string): string {
   try {
     const hostname = new URL(url).hostname;
     return hostname.replace("www.", "");
-  } catch {
+  } catch (error) {
+    logger.warn("Failed to parse URL for citation domain", { url, error });
     return "";
   }
 }

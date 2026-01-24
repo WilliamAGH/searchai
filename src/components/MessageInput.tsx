@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
+import { logger } from "../lib/logger";
 
 interface MessageInputProps {
   /** Callback when message is sent */
@@ -192,10 +193,15 @@ export function MessageInput({
     if (!el) return;
     try {
       el.focus({ preventScroll: true });
-    } catch {
+    } catch (error) {
+      logger.warn("MessageInput focus with preventScroll failed", { error });
       try {
         el.focus();
-      } catch {}
+      } catch (fallbackError) {
+        logger.warn("MessageInput focus fallback failed", {
+          error: fallbackError,
+        });
+      }
     }
   }, [disabled]);
 
@@ -258,7 +264,10 @@ export function MessageInput({
       try {
         // Prevent scroll jumps on focus
         el.focus({ preventScroll: true });
-      } catch {
+      } catch (error) {
+        logger.warn("MessageInput auto-focus with preventScroll failed", {
+          error,
+        });
         el.focus();
       }
     });

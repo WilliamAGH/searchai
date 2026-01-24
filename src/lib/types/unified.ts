@@ -10,6 +10,7 @@
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SearchResult } from "./message";
 import { toConvexId as convertToConvexId } from "../utils/idValidation";
+import { logger } from "../logger";
 
 /**
  * Unified Chat - Bridge type for local/Convex chats during migration
@@ -260,7 +261,8 @@ export const StorageUtils = {
       localStorage.setItem(test, test);
       localStorage.removeItem(test);
       return true;
-    } catch {
+    } catch (error) {
+      logger.error("LocalStorage availability check failed", { error });
       return false;
     }
   },

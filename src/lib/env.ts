@@ -35,7 +35,11 @@ function validateEnv(): EnvConfig {
         env.VITE_CONVEX_URL,
       );
     }
-  } catch {
+  } catch (error) {
+    logger.error("Invalid VITE_CONVEX_URL format", {
+      value: env.VITE_CONVEX_URL,
+      error,
+    });
     throw new Error(`Invalid VITE_CONVEX_URL format: ${env.VITE_CONVEX_URL}`);
   }
 
@@ -71,16 +75,19 @@ export const env = {
   get convexUrl(): string {
     try {
       return getEnv().VITE_CONVEX_URL;
-    } catch {
+    } catch (error) {
       // Fallback for local development and local preview/testing environments
       const isLocalHost =
         typeof window !== "undefined" &&
         (window.location.hostname === "127.0.0.1" ||
           window.location.hostname === "localhost");
       if (import.meta.env.DEV || isLocalHost) {
-        logger.warn("Using fallback Convex URL for local environment");
+        logger.warn("Using fallback Convex URL for local environment", {
+          error,
+        });
         return "https://diligent-greyhound-240.convex.cloud";
       }
+      logger.error("Failed to resolve Convex URL from environment", { error });
       throw new Error("VITE_CONVEX_URL is required");
     }
   },
@@ -124,7 +131,11 @@ export const env = {
       if (import.meta.env.VITE_CONVEX_URL) {
         new URL(import.meta.env.VITE_CONVEX_URL);
       }
-    } catch {
+    } catch (error) {
+      logger.error("Failed to parse VITE_CONVEX_URL", {
+        value: import.meta.env.VITE_CONVEX_URL,
+        error,
+      });
       errors.push("VITE_CONVEX_URL is not a valid URL");
     }
 
@@ -150,7 +161,10 @@ export function initializeEnv(): void {
           (window.location.hostname === "127.0.0.1" ||
             window.location.hostname === "localhost")
         );
-      } catch {
+      } catch (error) {
+        logger.error("Failed to detect localhost for env initialization", {
+          error,
+        });
         return false;
       }
     })();

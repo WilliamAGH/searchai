@@ -2,6 +2,7 @@
 // This is a frontend-only utility, not duplicating Convex types
 
 import type { SearchResult } from "../types/message";
+import { logger } from "../logger";
 
 interface ContextReference {
   url?: string;
@@ -42,7 +43,14 @@ export function mapMessagesToLocal(
             if ((!title || title === "Source") && r.url) {
               try {
                 title = new URL(r.url).hostname;
-              } catch {
+              } catch (error) {
+                logger.error(
+                  "Failed to parse URL for context reference title",
+                  {
+                    url: r.url,
+                    error,
+                  },
+                );
                 title = r.url;
               }
             }
@@ -55,8 +63,11 @@ export function mapMessagesToLocal(
               kind: r.type,
             } as SearchResult;
           });
-      } catch {
-        // ignore mapping errors
+      } catch (error) {
+        logger.error("Failed to map context references to search results", {
+          error,
+          contextReferences: msg.contextReferences,
+        });
       }
     }
 

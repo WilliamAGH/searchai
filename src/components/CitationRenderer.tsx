@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect } from "react";
+import { logger } from "../lib/logger";
 
 interface CitationRendererProps {
   content: string;
@@ -28,7 +29,8 @@ function getDomainFromUrl(url: string): string {
   try {
     const hostname = new URL(url).hostname;
     return hostname.replace("www.", "");
-  } catch {
+  } catch (error) {
+    logger.warn("Failed to parse URL for citation domain", { url, error });
     return "";
   }
 }
