@@ -55,7 +55,9 @@ export function normalizeUrlForKey(rawUrl: string): string {
       "fbclid",
       "ref",
     ];
-    paramsToStrip.forEach((p) => u.searchParams.delete(p));
+    paramsToStrip.forEach((p) => {
+      u.searchParams.delete(p);
+    });
 
     if (u.pathname !== "/" && u.pathname.endsWith("/")) {
       u.pathname = u.pathname.slice(0, -1);
@@ -184,7 +186,14 @@ function isIpv6Private(hostname: string): boolean {
   }
 
   const value = parseIpv6ToBigInt(hostname);
-  if (value === null) return true;
+  if (value === null) {
+    // Fail closed: treat unparseable IPv6 addresses as private to prevent bypass
+    // This catches valid but unsupported syntax (e.g. zone IDs) as well as malformed input
+    console.warn(
+      `isIpv6Private: Failed to parse IPv6 address, treating as private: ${hostname}`,
+    );
+    return true;
+  }
 
   // Unspecified (::) or loopback (::1)
   if (value === 0n || value === 1n) return true;
