@@ -50,15 +50,26 @@ import { v } from "convex/values";
 import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { RunToolCallItem, RunToolCallOutputItem, run } from "@openai/agents";
+import { run } from "@openai/agents";
+import {
+  RunToolCallItem,
+  RunToolCallOutputItem,
+  isToolCallEvent,
+  isToolOutputEvent,
+  extractToolName,
+  extractTextDelta,
+  getProgressStageForTool,
+  getProgressMessage,
+  harvestSearchResults,
+  harvestScrapedContent,
+  type ProgressStage,
+  type StreamingEventItem,
+} from "./streaming_helpers";
 
 // ============================================
 // Timeout Utilities
 // ============================================
 // Agent calls have no built-in timeout, so we wrap them to prevent indefinite hangs.
-
-const AGENT_TIMEOUT_MS = 60_000; // 60 seconds per agent stage
-const TOOL_EXECUTION_TIMEOUT_MS = 120_000; // 120 seconds for research stage (includes tool calls)
 
 // ============================================
 // Instant Response Detection
@@ -201,6 +212,7 @@ import {
   CACHE_TTL,
   RELEVANCE_SCORES,
   CONFIDENCE_THRESHOLDS,
+  AGENT_TIMEOUTS,
 } from "../lib/constants/cache";
 import {
   buildPlanningInput,
@@ -247,6 +259,7 @@ const ensureCustomEventPolyfill = () => {
   }
 
   try {
+    // Attempt to extend native Event (works in modern runtimes)
     class NodeCustomEvent<T = any> extends Event {
       detail: T;
       constructor(type: string, params?: CustomEventParams<T>) {
@@ -256,6 +269,8 @@ const ensureCustomEventPolyfill = () => {
     }
     globalAny.CustomEvent = NodeCustomEvent;
   } catch {
+    // Fallback for environments where Event is not extendable (e.g., older Node.js)
+    // This is intentionally silent - the fallback class provides equivalent functionality
     class NodeCustomEvent<T = any> {
       type: string;
       detail: T;
@@ -376,7 +391,7 @@ export const orchestrateResearchWorkflow = action({
       run(agents.queryPlanner, planningInput, {
         context: { actionCtx: ctx },
       }),
-      AGENT_TIMEOUT_MS,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "planning",
     );
     const planningDuration = Date.now() - planningStart;
@@ -435,7 +450,7 @@ export const orchestrateResearchWorkflow = action({
         run(agents.research, researchInstructions, {
           context: { actionCtx: ctx },
         }),
-        TOOL_EXECUTION_TIMEOUT_MS,
+        AGENT_TIMEOUTS.TOOL_EXECUTION_MS,
         "research",
       );
       researchDuration = Date.now() - researchStart;
@@ -498,7 +513,7 @@ export const orchestrateResearchWorkflow = action({
       run(agents.answerSynthesis, synthesisInstructions, {
         context: { actionCtx: ctx },
       }),
-      AGENT_TIMEOUT_MS,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "synthesis",
     );
     const synthesisDuration = Date.now() - synthesisStart;
@@ -770,32 +785,16 @@ export async function* streamConversationalWorkflow(
     let toolCallCount = 0;
     let lastProgressStage = "thinking";
 
-    // Process streaming events
+    // Process streaming events using extracted helpers (per WRN1)
     for await (const event of agentResult) {
       if (event.type === "run_item_stream_event") {
-        const item = event.item as any;
-        const eventName = (event as any).name;
+        const item = event.item as StreamingEventItem;
+        const eventName = (event as { name?: string }).name;
 
-        // Detect tool calls via multiple patterns (OpenAI Agents SDK compatibility)
-        // Pattern 1: item is a RunToolCallItem (has rawItem.type === "function_call")
-        // Pattern 2: eventName contains "tool" or "function"
-        // Pattern 3: item.type === "tool_call" or "function_call"
-        const isToolCall =
-          item instanceof RunToolCallItem ||
-          item?.rawItem?.type === "function_call" ||
-          item?.type === "tool_call" ||
-          item?.type === "function_call" ||
-          eventName === "tool_call_created" ||
-          eventName === "function_call_item_created";
-
-        if (isToolCall) {
+        // Detect tool calls using helper (handles multiple SDK patterns)
+        if (isToolCallEvent(item, eventName)) {
           toolCallCount++;
-          const toolName =
-            item?.name ||
-            item?.rawItem?.name ||
-            item?.tool?.name ||
-            item?.function?.name ||
-            "tool";
+          const toolName = extractToolName(item);
 
           console.log(`🔧 TOOL CALL DETECTED: ${toolName}`, {
             eventName,
@@ -803,50 +802,29 @@ export async function* streamConversationalWorkflow(
             rawItemType: item?.rawItem?.type,
           });
 
-          // Emit progress events for tool calls
-          if (
-            toolName === "plan_research" &&
-            lastProgressStage !== "planning"
-          ) {
-            lastProgressStage = "planning";
+          // Emit progress events using helper
+          const newStage = getProgressStageForTool(
+            toolName,
+            lastProgressStage as ProgressStage,
+          );
+          if (newStage) {
+            lastProgressStage = newStage;
             yield writeEvent("progress", {
-              stage: "planning",
-              message: "Planning research strategy...",
-            });
-          } else if (
-            toolName === "search_web" &&
-            lastProgressStage !== "searching"
-          ) {
-            lastProgressStage = "searching";
-            yield writeEvent("progress", {
-              stage: "searching",
-              message: "Searching the web...",
-            });
-          } else if (
-            toolName === "scrape_webpage" &&
-            lastProgressStage !== "scraping"
-          ) {
-            lastProgressStage = "scraping";
-            yield writeEvent("progress", {
-              stage: "scraping",
-              message: "Reading sources...",
+              stage: newStage,
+              message: getProgressMessage(newStage),
             });
           }
         }
 
-        // Detect tool call outputs and harvest data
-        // Pattern 1: item is a RunToolCallOutputItem
-        // Pattern 2: eventName contains "output"
-        const isToolOutput =
-          item instanceof RunToolCallOutputItem ||
-          item?.type === "tool_call_output" ||
-          item?.type === "function_call_output" ||
-          eventName === "tool_call_output_created" ||
-          eventName === "function_call_output_item_created";
-
-        if (isToolOutput) {
-          const output = item?.output || item?.rawItem?.output;
-          const outputToolName = item?.toolName || item?.rawItem?.name || "";
+        // Detect tool outputs and harvest data using helper
+        if (isToolOutputEvent(item, eventName)) {
+          const output = (item?.output || item?.rawItem?.output) as
+            | Record<string, unknown>
+            | undefined;
+          const outputToolName =
+            (item as { toolName?: string })?.toolName ||
+            item?.rawItem?.name ||
+            "";
 
           // Skip if output is missing or indicates an error
           if (!output || typeof output !== "object") continue;
@@ -855,77 +833,39 @@ export async function* streamConversationalWorkflow(
             continue;
           }
 
-          // Harvest search results
+          // Harvest search results using helper
           if (outputToolName === "search_web" || output.results) {
-            const results = output.results as Array<any> | undefined;
-            if (Array.isArray(results)) {
-              for (const r of results) {
-                if (r.url && r.title) {
-                  harvested.searchResults.push({
-                    title: r.title,
-                    url: r.url,
-                    snippet: r.snippet || "",
-                    relevanceScore:
-                      r.relevanceScore || RELEVANCE_SCORES.SEARCH_RESULT,
-                  });
-                }
-              }
-              console.log(
-                `📥 HARVESTED search results: ${results.length} items`,
-              );
+            const count = harvestSearchResults(output, harvested);
+            if (count > 0) {
+              console.log(`📥 HARVESTED search results: ${count} items`);
             }
           }
 
-          // Harvest scraped content with URL deduplication
-          // Dedup is needed because: (1) LLM may call scrape_webpage twice for same URL,
-          // (2) the same URL may appear in multiple search results
+          // Harvest scraped content using helper (handles URL deduplication)
           if (
             (outputToolName === "scrape_webpage" || output.scrapedAt) &&
             output.url &&
             output.content
           ) {
-            // Normalize URL before dedup check to handle trailing slashes, query params, etc.
-            const rawUrl = String(output.url);
-            const normalizedUrl = normalizeUrl(rawUrl) ?? rawUrl;
-            if (!harvested.scrapedUrls.has(normalizedUrl)) {
-              harvested.scrapedUrls.add(normalizedUrl);
-              const contextId =
-                typeof output.contextId === "string" &&
-                isUuidV7(output.contextId)
-                  ? output.contextId
-                  : generateMessageId();
-              harvested.scrapedContent.push({
-                url: rawUrl, // Store original URL for display
-                title: String(output.title || ""),
-                content: String(output.content || ""),
-                summary: String(output.summary || ""),
-                contentLength: output.content?.length || 0,
-                scrapedAt: output.scrapedAt || Date.now(),
-                contextId,
-                relevanceScore: RELEVANCE_SCORES.SCRAPED_PAGE,
-              });
-              console.log(`📥 HARVESTED scraped page: ${rawUrl}`);
+            const wasHarvested = harvestScrapedContent(output, harvested);
+            if (wasHarvested) {
+              console.log(`📥 HARVESTED scraped page: ${output.url}`);
             } else {
-              console.log(`⚠️ SKIPPED duplicate scrape: ${rawUrl}`);
+              console.log(`⚠️ SKIPPED duplicate scrape: ${output.url}`);
             }
           }
         }
 
-        // Handle streaming text deltas
-        if (eventName === "message_output_created") continue; // Skip full content events
+        // Handle streaming text deltas using helper
+        if (eventName === "message_output_created") continue;
 
-        const delta =
-          item?.delta?.content ||
-          item?.content_delta ||
-          item?.text_delta ||
-          (eventName?.includes("delta") && item?.content);
-
-        if (delta && typeof delta === "string" && delta.length > 0) {
+        const delta = extractTextDelta(item, eventName);
+        if (delta) {
           if (!hasStartedStreaming) {
             hasStartedStreaming = true;
             yield writeEvent("progress", {
               stage: "generating",
-              message: "Generating response...",
+              message: getProgressMessage("generating"),
             });
           }
           accumulatedResponse += delta;
@@ -937,7 +877,7 @@ export async function* streamConversationalWorkflow(
     // Wait for completion
     await withTimeout(
       agentResult.completed,
-      AGENT_TIMEOUT_MS * 2,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS * 2,
       "conversational",
     );
 
@@ -1359,7 +1299,11 @@ export async function* streamResearchWorkflow(
     }
 
     // CRITICAL: Await stream completion before accessing finalOutput
-    await withTimeout(planningResult.completed, AGENT_TIMEOUT_MS, "planning");
+    await withTimeout(
+      planningResult.completed,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
+      "planning",
+    );
     const planningDuration = Date.now() - planningStart;
     console.log(
       `⚡ PLANNING COMPLETE: ${planningDuration}ms | queries: ${planningResult.finalOutput?.searchQueries?.length || 0}`,
@@ -1482,7 +1426,7 @@ export async function* streamResearchWorkflow(
 
       await withTimeout(
         fastSynthesisResult.completed,
-        AGENT_TIMEOUT_MS,
+        AGENT_TIMEOUTS.AGENT_STAGE_MS,
         "synthesis",
       );
       const fastSynthesisOutput = fastSynthesisResult.finalOutput as string;
@@ -1904,7 +1848,11 @@ export async function* streamResearchWorkflow(
 
     // CRITICAL: Await stream completion before accessing finalOutput
     const synthesisCompleteStart = Date.now();
-    await withTimeout(synthesisResult.completed, AGENT_TIMEOUT_MS, "synthesis");
+    await withTimeout(
+      synthesisResult.completed,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
+      "synthesis",
+    );
     console.log(
       `⚡ SYNTHESIS COMPLETE: ${Date.now() - synthesisCompleteStart}ms`,
     );
