@@ -29,44 +29,21 @@ interface ToolProgressIndicatorProps {
   toolUrl?: string;
 }
 
-/** Get display label for a progress stage */
-function getStageLabel(stage: ProgressStage): string {
-  switch (stage) {
-    case "thinking":
-      return "Processing";
-    case "planning":
-      return "Planning";
-    case "searching":
-      return "Searching";
-    case "scraping":
-      return "Reading";
-    case "analyzing":
-      return "Analyzing";
-    case "generating":
-      return "Writing";
-    default:
-      return "Working";
-  }
-}
+/** Stage display text - simple lookup for labels and descriptions */
+const STAGE_TEXT: Record<string, { label: string; description: string }> = {
+  thinking: { label: "Processing", description: "your question" },
+  planning: { label: "Planning", description: "research approach" },
+  searching: { label: "Searching", description: "the web" },
+  scraping: { label: "Reading", description: "source content" },
+  analyzing: { label: "Analyzing", description: "results" },
+  generating: { label: "Writing", description: "response" },
+};
 
-/** Get default description for a progress stage (used when no custom message) */
-function getStageDescription(stage: ProgressStage): string {
-  switch (stage) {
-    case "thinking":
-      return "your question";
-    case "planning":
-      return "research approach";
-    case "searching":
-      return "the web";
-    case "scraping":
-      return "source content";
-    case "analyzing":
-      return "results";
-    case "generating":
-      return "response";
-    default:
-      return "on request";
-  }
+const DEFAULT_STAGE_TEXT = { label: "Working", description: "on request" };
+
+/** Get display text for a stage with fallback */
+function getStageText(stage: string): { label: string; description: string } {
+  return STAGE_TEXT[stage] ?? DEFAULT_STAGE_TEXT;
 }
 
 /** Stage-specific icon component */
@@ -138,6 +115,7 @@ export function ToolProgressIndicator({
   if (stage === "idle") return null;
 
   const displayTarget = toolQuery || toolUrl;
+  const stageText = getStageText(stage);
 
   return (
     <div className="mb-4 animate-slide-up-fade">
@@ -160,10 +138,10 @@ export function ToolProgressIndicator({
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                  {getStageLabel(stage)}
+                  {stageText.label}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {message || getStageDescription(stage)}
+                  {message || stageText.description}
                 </span>
               </div>
             </div>

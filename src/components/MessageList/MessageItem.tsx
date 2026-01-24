@@ -185,9 +185,21 @@ export function MessageItem({
             <ToolProgressIndicator
               stage={searchProgress.stage}
               message={searchProgress.message}
-              toolReasoning={searchProgress.toolReasoning}
-              toolQuery={searchProgress.toolQuery}
-              toolUrl={searchProgress.toolUrl}
+              toolReasoning={
+                typeof searchProgress.toolReasoning === "string"
+                  ? searchProgress.toolReasoning
+                  : undefined
+              }
+              toolQuery={
+                typeof searchProgress.toolQuery === "string"
+                  ? searchProgress.toolQuery
+                  : undefined
+              }
+              toolUrl={
+                typeof searchProgress.toolUrl === "string"
+                  ? searchProgress.toolUrl
+                  : undefined
+              }
             />
           )}
 
