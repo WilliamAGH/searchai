@@ -52,7 +52,10 @@ export function robustSanitize(input: string): string {
       ) {
         return "[BASE64_BLOCKED]";
       }
-    } catch {
+    } catch (error) {
+      console.warn("Failed to decode base64 input during sanitization", {
+        error,
+      });
       // If decoding fails, it's not valid base64, keep original
     }
     return match;
@@ -221,7 +224,8 @@ export function sanitizeJson(jsonString: string): string | null {
 
     const sanitized = sanitizeObject(parsed);
     return JSON.stringify(sanitized);
-  } catch {
+  } catch (error) {
+    console.warn("Failed to sanitize JSON input", { error });
     // Invalid JSON, return null
     return null;
   }

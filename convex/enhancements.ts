@@ -55,7 +55,8 @@ export function createUserProvidedSearchResults(
         snippet: "Source explicitly mentioned by user in their query",
         relevanceScore: 0.95, // High relevance score to prioritize these sources
       };
-    } catch {
+    } catch (error) {
+      console.warn("Failed to parse user-provided URL", { url, error });
       // If URL parsing fails, return a minimal result
       return {
         title: `User-provided source: ${url}`,
@@ -676,12 +677,17 @@ export function shouldPrioritizeUrl(
         const pu = new URL(p.startsWith("http") ? p : `https://${p}`);
         const phost = pu.hostname.toLowerCase().replace(/^www\./, "");
         return host === phost || u.origin === pu.origin;
-      } catch {
+      } catch (error) {
+        console.warn("Failed to parse prioritized URL", {
+          prioritized: p,
+          error,
+        });
         // Fallback to suffix match for non-URL inputs (e.g., domains)
         return host.endsWith(p.toLowerCase().replace(/^www\./, ""));
       }
     });
-  } catch {
+  } catch (error) {
+    console.warn("Failed to evaluate prioritized URL match", { url, error });
     return false;
   }
 }

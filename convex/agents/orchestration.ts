@@ -285,10 +285,11 @@ const ensureCustomEventPolyfill = () => {
       }
     }
     globalAny.CustomEvent = NodeCustomEvent;
-  } catch {
+  } catch (error) {
     // Fallback for environments where Event is not extendable (e.g., older Node.js)
     console.warn(
       "CustomEvent polyfill: Event not extendable, using standalone fallback class",
+      { error },
     );
     class NodeCustomEvent<T = any> {
       type: string;

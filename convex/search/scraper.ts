@@ -324,7 +324,11 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     let hostname = "";
     try {
       hostname = new URL(validatedUrl).hostname;
-    } catch {
+    } catch (hostnameError) {
+      console.warn("Failed to parse hostname for scrape error", {
+        url: validatedUrl,
+        error: hostnameError,
+      });
       hostname = validatedUrl.substring(0, 50);
     }
 

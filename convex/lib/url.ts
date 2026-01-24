@@ -14,7 +14,8 @@ export function normalizeUrl(rawUrl: string | undefined): string | null {
     const parsed = new URL(rawUrl);
     parsed.hash = "";
     return parsed.toString();
-  } catch {
+  } catch (error) {
+    console.warn("normalizeUrl failed for input", { rawUrl, error });
     return null;
   }
 }
@@ -61,7 +62,11 @@ export function normalizeUrlForKey(rawUrl: string): string {
     }
 
     return u.toString();
-  } catch {
+  } catch (error) {
+    console.warn("normalizeUrlForKey failed for normalized URL", {
+      normalized,
+      error,
+    });
     return normalized;
   }
 }
@@ -239,7 +244,11 @@ export function validateScrapeUrl(urlInput: string): ScrapeUrlValidation {
   let url: URL;
   try {
     url = new URL(urlInput);
-  } catch {
+  } catch (error) {
+    console.warn("validateScrapeUrl failed to parse URL", {
+      urlInput,
+      error,
+    });
     return { ok: false, error: "Invalid URL format" };
   }
 
