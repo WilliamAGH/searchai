@@ -33,6 +33,7 @@ export const addMessage = internalMutation({
     // CRITICAL: Add sessionId for HTTP action auth (when userId not available)
     sessionId: v.optional(v.string()),
   },
+  returns: v.id("messages"),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
