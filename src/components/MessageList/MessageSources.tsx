@@ -8,7 +8,7 @@
 
 import React from "react";
 import type { SearchResult } from "../../lib/types/message";
-import { getFaviconUrl } from "../../lib/utils/favicon";
+import { getFaviconUrl, getSafeHostname } from "../../lib/utils/favicon";
 import { logger } from "../../lib/logger";
 
 type ContextReference = {
@@ -31,26 +31,6 @@ interface MessageSourcesProps {
   onSourceHover: (url: string | null) => void;
   // New: Support contextReferences from agent workflow
   contextReferences?: ContextReference[];
-}
-
-/**
- * Extract hostname from URL safely
- */
-function getSafeHostname(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch (error) {
-    logger.warn("Failed to parse source URL hostname", { url, error });
-    try {
-      return new URL(`https://${url}`).hostname;
-    } catch (fallbackError) {
-      logger.warn("Failed to parse source hostname with fallback", {
-        url,
-        error: fallbackError,
-      });
-      return "";
-    }
-  }
 }
 
 export function MessageSources({

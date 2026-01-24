@@ -2,6 +2,23 @@
  * Utility functions for HTTP endpoints
  */
 
+/**
+ * Serialize an error for JSON responses
+ * - Extracts name, message, stack, and cause from Error objects
+ * - Converts non-Error values to string messages
+ */
+export function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: (error as Error & { cause?: unknown }).cause,
+    };
+  }
+  return { message: String(error) };
+}
+
 // Gate verbose logs in production
 export const DEBUG_HTTP = process.env.DEBUG_HTTP === "1";
 export const dlog = (...args: unknown[]) => {

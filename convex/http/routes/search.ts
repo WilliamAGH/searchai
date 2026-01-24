@@ -6,23 +6,11 @@
 import { httpAction } from "../../_generated/server";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
-import { corsResponse, dlog } from "../utils";
+import { corsResponse, dlog, serializeError } from "../utils";
 import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
 import { normalizeUrlForKey } from "../../lib/url";
-
-function serializeError(error: unknown) {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: (error as Error & { cause?: unknown }).cause,
-    };
-  }
-  return { message: String(error) };
-}
 
 /**
  * Register search routes on the HTTP router

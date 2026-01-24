@@ -7,19 +7,11 @@
 import { httpAction } from "../../_generated/server";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
-import { escapeHtml, formatConversationMarkdown } from "../utils";
-
-function serializeError(error: unknown) {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: (error as Error & { cause?: unknown }).cause,
-    };
-  }
-  return { message: String(error) };
-}
+import {
+  escapeHtml,
+  formatConversationMarkdown,
+  serializeError,
+} from "../utils";
 
 /**
  * Register publish and export routes on the HTTP router

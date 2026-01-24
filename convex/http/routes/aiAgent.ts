@@ -10,11 +10,14 @@
 import { httpAction } from "../../_generated/server";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
-import { corsResponse, dlog } from "../utils";
+import { corsResponse, dlog, serializeError } from "../utils";
 import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { streamConversationalWorkflow } from "../../agents/orchestration";
 import { safeConvexId } from "../../lib/validators";
+// Types come from the Node-free module so HTTP routes (and other V8 code) never import
+// the helpers that depend on `node:crypto`.
+import type { ResearchContextReference } from "../../agents/schema";
 
 /**
  * Build a standardized rate limit exceeded response
@@ -32,21 +35,6 @@ function rateLimitExceededResponse(
     429,
     origin,
   );
-}
-// Types come from the Node-free module so HTTP routes (and other V8 code) never import
-// the helpers that depend on `node:crypto`.
-import type { ResearchContextReference } from "../../agents/schema";
-
-function serializeError(error: unknown) {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: (error as Error & { cause?: unknown }).cause,
-    };
-  }
-  return { message: String(error) };
 }
 
 export function sanitizeContextReferences(

@@ -1,6 +1,20 @@
 import { logger } from "../logger";
 
 /**
+ * Extract domain from URL, stripping www. prefix
+ * - Used for citation display and matching
+ */
+export function getDomainFromUrl(url: string): string {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace("www.", "");
+  } catch (error) {
+    logger.warn("Failed to parse URL for domain", { url, error });
+    return "";
+  }
+}
+
+/**
  * Extract hostname from URL safely
  * - Handles malformed URLs and bare hostnames
  */
