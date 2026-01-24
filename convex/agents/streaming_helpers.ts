@@ -67,6 +67,7 @@ export function isToolCallEvent(
     item.rawItem?.type === "function_call" ||
     item.type === "tool_call" ||
     item.type === "function_call" ||
+    eventName === "tool_called" ||
     eventName === "tool_call_created" ||
     eventName === "function_call_item_created"
   );
@@ -99,6 +100,7 @@ export function isToolOutputEvent(
     item instanceof RunToolCallOutputItem ||
     item.type === "tool_call_output" ||
     item.type === "function_call_output" ||
+    eventName === "tool_output" ||
     eventName === "tool_call_output_created" ||
     eventName === "function_call_output_item_created"
   );
