@@ -12,6 +12,18 @@ import { checkIpRateLimit } from "../../lib/rateLimit";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
 import { normalizeUrlForKey } from "../../lib/url";
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: (error as Error & { cause?: unknown }).cause,
+    };
+  }
+  return { message: String(error) };
+}
+
 /**
  * Register search routes on the HTTP router
  */
@@ -52,9 +64,13 @@ export function registerSearchRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ SEARCH API INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
@@ -170,12 +186,12 @@ export function registerSearchRoutes(http: HttpRouter) {
 
         return corsResponse(JSON.stringify(enhancedResult), 200, origin);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorInfo = serializeError(error);
+        const errorMessage = errorInfo.message;
         console.error("❌ SEARCH API ERROR:", {
           query: query.substring(0, 100),
           error: errorMessage,
-          stack: error instanceof Error ? error.stack : undefined,
+          errorDetails: errorInfo,
           timestamp: new Date().toISOString(),
         });
 
@@ -183,7 +199,7 @@ export function registerSearchRoutes(http: HttpRouter) {
           error: "Search service temporarily unavailable",
           errorCode: "SEARCH_FAILED",
           errorDetails: {
-            message: errorMessage,
+            ...errorInfo,
             timestamp: new Date().toISOString(),
           },
           // Include fallback results for graceful degradation, but with 500 status

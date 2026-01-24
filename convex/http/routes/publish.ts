@@ -252,7 +252,7 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       // Resolve chat by shareId/publicId
       const chat = shareId
-        ? await ctx.runQuery(api.chats.getChatByShareId, { shareId })
+        ? await ctx.runQuery(api.chats.getChatByShareIdHttp, { shareId })
         : await ctx.runQuery(api.chats.getChatByPublicId, {
             publicId: publicId!,
           });
@@ -273,7 +273,7 @@ export function registerPublishRoutes(http: HttpRouter) {
       }
 
       // Load messages
-      const messages = await ctx.runQuery(api.chats.getChatMessages, {
+      const messages = await ctx.runQuery(api.chats.getChatMessagesHttp, {
         chatId: (chat as any)._id,
       });
 
@@ -492,7 +492,7 @@ export function registerPublishRoutes(http: HttpRouter) {
           },
         );
       }
-      const messages = await ctx.runQuery(api.chats.getChatMessages, {
+      const messages = await ctx.runQuery(api.chats.getChatMessagesHttp, {
         chatId: (chat as any)._id,
       });
       const exportedChat = {

@@ -379,6 +379,13 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       }
       const sessionId =
         typeof payload.sessionId === "string" ? payload.sessionId : undefined;
+      if (!sessionId) {
+        return corsResponse(
+          JSON.stringify({ error: "sessionId is required" }),
+          400,
+          origin,
+        );
+      }
       const conversationContext = payload.conversationContext
         ? String(payload.conversationContext)
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
@@ -499,6 +506,13 @@ export function registerAgentAIRoutes(http: HttpRouter) {
         typeof payload.chatId === "string" ? payload.chatId : "";
       const sessionId =
         typeof payload.sessionId === "string" ? payload.sessionId : undefined;
+      if (!sessionId) {
+        return corsResponse(
+          JSON.stringify({ error: "sessionId is required" }),
+          400,
+          origin,
+        );
+      }
       const chatId = safeConvexId<"chats">(rawChatId);
       if (!message.trim() || !chatId) {
         return corsResponse(

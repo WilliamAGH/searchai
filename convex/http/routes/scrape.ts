@@ -11,6 +11,18 @@ import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { validateScrapeUrl } from "../../lib/url";
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: (error as Error & { cause?: unknown }).cause,
+    };
+  }
+  return { message: String(error) };
+}
+
 /**
  * Register scrape routes on the HTTP router
  */
@@ -51,9 +63,13 @@ export function registerScrapeRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ SCRAPE API INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
@@ -95,19 +111,23 @@ export function registerScrapeRoutes(http: HttpRouter) {
 
         return corsResponse(JSON.stringify(result), 200, origin);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorInfo = serializeError(error);
+        const errorMessage = errorInfo.message;
         console.error("❌ SCRAPE API ERROR:", {
           url: url.substring(0, 200),
           error: errorMessage,
-          stack: error instanceof Error ? error.stack : undefined,
+          errorDetails: errorInfo,
           timestamp: new Date().toISOString(),
         });
 
         let hostname = "";
         try {
           hostname = new URL(url).hostname;
-        } catch {
+        } catch (hostnameError) {
+          console.warn("Failed to parse hostname for scrape error", {
+            url,
+            error: hostnameError,
+          });
           hostname = url.substring(0, 50);
         }
 
@@ -115,7 +135,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
           error: "Scrape service failed",
           errorCode: "SCRAPE_FAILED",
           errorDetails: {
-            message: errorMessage,
+            ...errorInfo,
             url: url.substring(0, 200),
             timestamp: new Date().toISOString(),
           },
