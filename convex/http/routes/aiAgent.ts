@@ -8,13 +8,13 @@
  */
 
 import { httpAction } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { corsResponse, dlog } from "../utils";
 import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { streamConversationalWorkflow } from "../../agents/orchestration";
+import { safeConvexId } from "../../lib/validators";
 
 /**
  * Build a standardized rate limit exceeded response
@@ -369,7 +369,14 @@ export function registerAgentAIRoutes(http: HttpRouter) {
         );
       }
 
-      const chatId = payload.chatId as Id<"chats">;
+      const chatId = safeConvexId<"chats">(payload.chatId);
+      if (!chatId) {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid chatId" }),
+          400,
+          origin,
+        );
+      }
       const sessionId =
         typeof payload.sessionId === "string" ? payload.sessionId : undefined;
       const conversationContext = payload.conversationContext
@@ -475,12 +482,24 @@ export function registerAgentAIRoutes(http: HttpRouter) {
         );
       }
 
-      const payload = rawPayload as Record<string, unknown>;
+      const payload =
+        rawPayload && typeof rawPayload === "object"
+          ? (rawPayload as Record<string, unknown>)
+          : null;
+      if (!payload) {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid request payload" }),
+          400,
+          origin,
+        );
+      }
       const message =
         typeof payload.message === "string" ? payload.message : "";
-      const chatId = typeof payload.chatId === "string" ? payload.chatId : "";
+      const rawChatId =
+        typeof payload.chatId === "string" ? payload.chatId : "";
       const sessionId =
         typeof payload.sessionId === "string" ? payload.sessionId : undefined;
+      const chatId = safeConvexId<"chats">(rawChatId);
       if (!message.trim() || !chatId) {
         return corsResponse(
           JSON.stringify({ error: "chatId and message required" }),
@@ -494,7 +513,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
           // @ts-ignore - passing through to Convex action
           api.agents.orchestration.runAgentWorkflowAndPersist as any,
           {
-            chatId, // Convex will validate this is a valid Id
+            chatId,
             message,
             sessionId,
           },

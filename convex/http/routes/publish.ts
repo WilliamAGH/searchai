@@ -67,10 +67,29 @@ export function registerPublishRoutes(http: HttpRouter) {
       }
 
       // Validate basic structure and extract payload (validated inline below)
-      const payload: any = rawPayload;
+      const payload =
+        rawPayload && typeof rawPayload === "object"
+          ? (rawPayload as Record<string, unknown>)
+          : null;
+      if (!payload) {
+        const origin = request.headers.get("Origin");
+        const allowOrigin = getAllowedOrigin(origin);
+        return new Response(
+          JSON.stringify({ error: "Invalid request payload" }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": allowOrigin,
+            },
+          },
+        );
+      }
 
       // Business logic validation
-      const title = (payload.title || "Shared Chat").trim().slice(0, 200);
+      const rawTitle =
+        typeof payload.title === "string" ? payload.title : "Shared Chat";
+      const title = rawTitle.trim().slice(0, 200);
       const privacy = payload.privacy === "public" ? "public" : "shared";
       const shareId = payload.shareId
         ? String(payload.shareId).slice(0, 100)
@@ -123,7 +142,10 @@ export function registerPublishRoutes(http: HttpRouter) {
         });
         const origin = request.headers.get("Origin");
         const allowOrigin = getAllowedOrigin(origin);
-        const baseUrl = origin || process.env.SITE_URL || "";
+        const baseUrl =
+          allowOrigin !== "*" && allowOrigin !== "null"
+            ? allowOrigin
+            : process.env.SITE_URL || "";
         const shareUrl = `${baseUrl}/s/${result.shareId}`;
         const publicUrl = `${baseUrl}/p/${result.publicId}`;
         const convexBase = (process.env.CONVEX_SITE_URL || "").replace(

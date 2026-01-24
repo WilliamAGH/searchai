@@ -61,7 +61,17 @@ export function registerSearchRoutes(http: HttpRouter) {
       }
 
       // Validate and normalize input
-      const payload = rawPayload as any;
+      const payload =
+        rawPayload && typeof rawPayload === "object"
+          ? (rawPayload as Record<string, unknown>)
+          : null;
+      if (!payload) {
+        return corsResponse(
+          JSON.stringify({ error: "Invalid request payload" }),
+          400,
+          origin,
+        );
+      }
       const query = String(payload.query || "").slice(0, 1000);
       const maxResults =
         typeof payload.maxResults === "number"
