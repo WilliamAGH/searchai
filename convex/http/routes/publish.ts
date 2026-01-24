@@ -9,6 +9,18 @@ import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { escapeHtml, formatConversationMarkdown } from "../utils";
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: (error as Error & { cause?: unknown }).cause,
+    };
+  }
+  return { message: String(error) };
+}
+
 /**
  * Register publish and export routes on the HTTP router
  */
@@ -54,16 +66,23 @@ export function registerPublishRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
         const origin = request.headers.get("Origin");
         const allowOrigin = getAllowedOrigin(origin);
-        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": allowOrigin,
+        console.error("❌ PUBLISH INVALID JSON:", serializeError(error));
+        return new Response(
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": allowOrigin,
+            },
           },
-        });
+        );
       }
 
       // Validate basic structure and extract payload (validated inline below)
@@ -170,8 +189,12 @@ export function registerPublishRoutes(http: HttpRouter) {
       } catch (e: any) {
         const origin = request.headers.get("Origin");
         const allowOrigin = getAllowedOrigin(origin);
+        const errorInfo = serializeError(e);
         return new Response(
-          JSON.stringify({ error: String(e?.message || e) }),
+          JSON.stringify({
+            error: String(e?.message || e),
+            errorDetails: errorInfo,
+          }),
           {
             status: 500,
             headers: {

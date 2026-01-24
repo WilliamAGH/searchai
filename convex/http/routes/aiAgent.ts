@@ -37,6 +37,18 @@ function rateLimitExceededResponse(
 // the helpers that depend on `node:crypto`.
 import type { ResearchContextReference } from "../../agents/schema";
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: (error as Error & { cause?: unknown }).cause,
+    };
+  }
+  return { message: String(error) };
+}
+
 export function sanitizeContextReferences(
   input: unknown,
 ): ResearchContextReference[] | undefined {
@@ -121,9 +133,13 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ AGENT API INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
@@ -275,17 +291,18 @@ export function registerAgentAIRoutes(http: HttpRouter) {
 
         return corsResponse(JSON.stringify(response), 200, origin);
       } catch (error) {
+        const errorInfo = serializeError(error);
         console.error("💥 AGENT WORKFLOW FAILED:", {
-          error: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : "No stack trace",
+          error: errorInfo.message,
+          errorDetails: errorInfo,
           timestamp: new Date().toISOString(),
         });
 
         // Fallback error response
         const errorResponse = {
           error: "Agent workflow failed",
-          errorMessage:
-            error instanceof Error ? error.message : "Unknown error occurred",
+          errorMessage: errorInfo.message,
+          errorDetails: errorInfo,
           answer:
             "I apologize, but I encountered an error while processing your request. Please try again.",
           hasLimitations: true,
@@ -334,9 +351,13 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ AGENT STREAM INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
@@ -404,7 +425,7 @@ export function registerAgentAIRoutes(http: HttpRouter) {
                 encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
               );
             } catch (error) {
-              console.error("Failed to send SSE event:", error);
+              console.error("Failed to send SSE event:", serializeError(error));
             }
           };
 
@@ -423,17 +444,23 @@ export function registerAgentAIRoutes(http: HttpRouter) {
 
             dlog("✅ STREAMING CONVERSATIONAL WORKFLOW COMPLETE");
           } catch (error) {
-            console.error("💥 STREAMING WORKFLOW ERROR:", error);
+            console.error(
+              "💥 STREAMING WORKFLOW ERROR:",
+              serializeError(error),
+            );
             sendEvent({
               type: "error",
-              error: error instanceof Error ? error.message : String(error),
+              error: serializeError(error).message,
+              errorDetails: serializeError(error),
               timestamp: Date.now(),
             });
           } finally {
             try {
               controller.close();
-            } catch {
-              // Ignore double-close attempts
+            } catch (closeError) {
+              console.error("Failed to close SSE controller", {
+                error: serializeError(closeError),
+              });
             }
           }
         },
@@ -481,9 +508,13 @@ export function registerAgentAIRoutes(http: HttpRouter) {
       let rawPayload: unknown;
       try {
         rawPayload = await request.json();
-      } catch {
+      } catch (error) {
+        console.error("❌ AGENT PERSIST INVALID JSON:", serializeError(error));
         return corsResponse(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({
+            error: "Invalid JSON body",
+            errorDetails: serializeError(error),
+          }),
           400,
           origin,
         );
@@ -534,10 +565,12 @@ export function registerAgentAIRoutes(http: HttpRouter) {
         );
         return corsResponse(JSON.stringify(result), 200, origin);
       } catch (error) {
+        const errorInfo = serializeError(error);
         return corsResponse(
           JSON.stringify({
             error: "Agent persistence failed",
-            details: error instanceof Error ? error.message : String(error),
+            details: errorInfo.message,
+            errorDetails: errorInfo,
           }),
           500,
           origin,
