@@ -9,7 +9,12 @@ import {
 } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
-import { isAuthorized, isUnownedChat, hasSessionAccess } from "./lib/auth";
+import {
+  isAuthorized,
+  isUnownedChat,
+  hasSessionAccess,
+  isSharedOrPublicChat,
+} from "./lib/auth";
 
 export const addMessage = internalMutation({
   args: {
@@ -37,10 +42,13 @@ export const addMessage = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
-    // Dual ownership validation (matches validateChatAccess pattern)
-    // Supports both authenticated (userId) and HTTP action (sessionId) contexts
-    // Also allows claiming unowned chats with a valid sessionId
+    // Authorization logic matches validateChatAccess pattern:
+    // 1. Shared/public chats are accessible to everyone
+    // 2. Authenticated users with matching userId
+    // 3. Sessions with matching sessionId
+    // 4. Unowned chats can be claimed with a valid sessionId
     const authorized =
+      isSharedOrPublicChat(chat) ||
       isAuthorized(chat, userId, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
 
@@ -95,7 +103,12 @@ export const addMessageHttp = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
+    // Authorization logic matches getChatByIdHttp pattern:
+    // 1. Shared/public chats are accessible to everyone
+    // 2. Sessions with matching sessionId
+    // 3. Unowned chats can be claimed with a valid sessionId
     const authorized =
+      isSharedOrPublicChat(chat) ||
       hasSessionAccess(chat, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
 
