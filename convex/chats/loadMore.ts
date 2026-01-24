@@ -52,6 +52,9 @@ export const loadMoreMessages = action({
     ),
     nextCursor: v.optional(v.id("messages")),
     hasMore: v.boolean(),
+    // Error fields - present when load failed
+    error: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
     try {
@@ -67,12 +70,21 @@ export const loadMoreMessages = action({
 
       return result;
     } catch (error) {
-      console.error("Failed to load more messages:", error);
-      // Return empty result to maintain API contract
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error("Failed to load more messages:", {
+        chatId: args.chatId,
+        cursor: args.cursor,
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      // Return error state so callers can distinguish "no messages" from "query failed"
       return {
         messages: [],
         nextCursor: undefined,
         hasMore: false,
+        error: `Failed to load messages: ${errorMessage}`,
+        errorCode: "LOAD_MESSAGES_FAILED",
       };
     }
   },
