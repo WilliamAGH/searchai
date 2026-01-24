@@ -731,17 +731,8 @@ export async function* streamConversationalWorkflow(
 
     yield writeEvent("workflow_start", { workflowId, nonce });
 
-    // Add user message
-    await withErrorContext("Failed to save user message", () =>
-      ctx.runMutation(internal.messages.addMessage, {
-        chatId: args.chatId,
-        role: "user",
-        content: args.userQuery,
-        sessionId: args.sessionId,
-      }),
-    );
-
-    // Get recent messages for conversation context
+    // Get recent messages for conversation context BEFORE adding the current user message
+    // This prevents the user query from appearing twice in the agent input
     const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
       chatId: args.chatId,
     };
@@ -754,6 +745,16 @@ export async function* streamConversationalWorkflow(
       role: "user" | "assistant" | "system";
       content?: string;
     }>;
+
+    // Add user message AFTER fetching history to avoid duplication
+    await withErrorContext("Failed to save user message", () =>
+      ctx.runMutation(internal.messages.addMessage, {
+        chatId: args.chatId,
+        role: "user",
+        content: args.userQuery,
+        sessionId: args.sessionId,
+      }),
+    );
 
     let conversationContext = buildConversationContext(recentMessages || []);
     if (!conversationContext && args.conversationContext) {
