@@ -6,6 +6,7 @@
  */
 
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
+import { isLocalId } from "../utils/idValidation";
 
 /**
  * Local chat for unauthenticated users
@@ -58,13 +59,8 @@ export const isConvexId = (id: string | Id<"chats">): id is Id<"chats"> => {
   return typeof id === "string" ? !isLocalId(id) : true;
 };
 
-/**
- * Type guard to check if ID is a local ID
- * Local IDs start with 'local_' or 'chat_'
- */
-export const isLocalId = (id: string): boolean => {
-  return id.startsWith("local_") || id.startsWith("chat_");
-};
+// Re-export for backward compatibility
+export { isLocalId };
 
 // REMOVED: convexChatToChat function - violates AGENT.md
 // Doc<"chats"> should be used directly without wrapper types or conversions
