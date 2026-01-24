@@ -755,10 +755,19 @@ export async function* streamConversationalWorkflow(
       content?: string;
     }>;
 
-    const conversationContext =
-      buildConversationContext(recentMessages || []) ||
-      args.conversationContext ||
-      "";
+    let conversationContext = buildConversationContext(recentMessages || []);
+    if (!conversationContext && args.conversationContext) {
+      console.warn(
+        "buildConversationContext returned empty; using args.conversationContext",
+      );
+      conversationContext = args.conversationContext;
+    }
+    if (!conversationContext) {
+      console.warn(
+        "No conversationContext available from messages or args; proceeding with empty context",
+      );
+      conversationContext = "";
+    }
 
     // Build the input for the conversational agent
     const agentInput = conversationContext
