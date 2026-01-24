@@ -270,7 +270,9 @@ const ensureCustomEventPolyfill = () => {
     globalAny.CustomEvent = NodeCustomEvent;
   } catch {
     // Fallback for environments where Event is not extendable (e.g., older Node.js)
-    // This is intentionally silent - the fallback class provides equivalent functionality
+    console.warn(
+      "CustomEvent polyfill: Event not extendable, using standalone fallback class",
+    );
     class NodeCustomEvent<T = any> {
       type: string;
       detail: T;
@@ -733,8 +735,14 @@ export async function* streamConversationalWorkflow(
 
     // Get recent messages for conversation context BEFORE adding the current user message
     // This prevents the user query from appearing twice in the agent input
-    const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
+    // Limit to 20 messages to bound memory/latency for large chats while maintaining context
+    const getMessagesArgs: {
+      chatId: Id<"chats">;
+      sessionId?: string;
+      limit?: number;
+    } = {
       chatId: args.chatId,
+      limit: 20,
     };
     if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
 
@@ -1142,13 +1150,6 @@ export async function* streamResearchWorkflow(
   const chat = await ctx.runQuery(api.chats.getChatById, getChatArgs);
   if (!chat) throw new Error("Chat not found or access denied");
 
-  await ctx.runMutation(internal.messages.addMessage, {
-    chatId: args.chatId,
-    role: "user",
-    content: args.userQuery,
-    sessionId: args.sessionId, // Pass sessionId for HTTP action auth
-  });
-
   const getMessagesArgs: { chatId: Id<"chats">; sessionId?: string } = {
     chatId: args.chatId,
   };
@@ -1162,6 +1163,14 @@ export async function* streamResearchWorkflow(
     content?: string;
     contextReferences?: ResearchContextReference[];
   }>;
+
+  // Add user message AFTER fetching history to avoid duplication
+  await ctx.runMutation(internal.messages.addMessage, {
+    chatId: args.chatId,
+    role: "user",
+    content: args.userQuery,
+    sessionId: args.sessionId, // Pass sessionId for HTTP action auth
+  });
 
   const conversationContextFromDb = buildConversationContext(
     recentMessages || [],

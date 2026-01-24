@@ -21,6 +21,7 @@ export const getChatMessages = query({
   args: {
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
+    limit: v.optional(v.number()),
   },
   returns: v.array(
     v.object({
@@ -59,11 +60,29 @@ export const getChatMessages = query({
       return [];
     }
 
-    const docs = await ctx.db
-      .query("messages")
-      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-      .order("asc")
-      .collect();
+    // Validate limit if provided - reject non-positive values to prevent
+    // surprising unbounded fetches when caller expects bounded results
+    if (args.limit !== undefined && args.limit <= 0) {
+      throw new Error("limit must be a positive number");
+    }
+
+    // When limit is specified, fetch most recent N messages by querying desc and reversing
+    // This keeps memory bounded for large chats while preserving chronological order
+    let docs;
+    if (args.limit) {
+      const descDocs = await ctx.db
+        .query("messages")
+        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+        .order("desc")
+        .take(args.limit);
+      docs = descDocs.reverse();
+    } else {
+      docs = await ctx.db
+        .query("messages")
+        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+        .order("asc")
+        .collect();
+    }
 
     // Map to validated shape with _id for client identification
     return docs.map((m) => ({

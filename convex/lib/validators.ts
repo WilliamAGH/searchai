@@ -98,7 +98,7 @@ export const vContextReference = v.object({
 
 // Re-export the TS type used across orchestration to keep validator and TS shape aligned.
 // NOTE: This indirection prevents V8 runtimes from importing `orchestration_helpers.ts`
-// (which uses `node:crypto`). Always import the type from `../agents/types` or from this
+// (which uses `node:crypto`). Always import the type from `../agents/schema` or from this
 // re-export, never from the Node-only helpers.
 export type ResearchContextReference = ResearchContextReferenceType;
 
