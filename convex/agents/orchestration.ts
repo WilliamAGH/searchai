@@ -740,9 +740,23 @@ async function initializeWorkflowSession(
   };
   if (args.sessionId) getChatArgs.sessionId = args.sessionId;
 
-  const chat = await withErrorContext("Failed to retrieve chat", () =>
-    ctx.runQuery(api.chats.getChatByIdHttp, getChatArgs),
-  );
+  // Select query variant based on sessionId presence:
+  // - When sessionId is missing: use auth-aware queries that call getAuthUserId(ctx).
+  //   Note: If this is called from an HTTP action, getAuthUserId returns null,
+  //   so only shared/public chats will be accessible (not private user chats).
+  // - When sessionId is provided: use HTTP-optimized queries with session-based access.
+  const useAuthVariant = !args.sessionId;
+
+  let chat: any;
+  if (useAuthVariant) {
+    chat = await withErrorContext("Failed to retrieve chat", () =>
+      ctx.runQuery(api.chats.getChatById, getChatArgs),
+    );
+  } else {
+    chat = await withErrorContext("Failed to retrieve chat", () =>
+      ctx.runQuery(api.chats.getChatByIdHttp, getChatArgs),
+    );
+  }
   if (!chat) throw new Error("Chat not found or access denied");
 
   // 3. Get recent messages (Fetch FIRST to exclude current query)
@@ -756,23 +770,41 @@ async function initializeWorkflowSession(
   };
   if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
 
-  const recentMessages = (await withErrorContext(
-    "Failed to retrieve chat messages",
-    () => ctx.runQuery(api.chats.getChatMessagesHttp, getMessagesArgs),
-  )) as Array<{
+  let recentMessagesQuery: any;
+  if (useAuthVariant) {
+    recentMessagesQuery = await withErrorContext(
+      "Failed to retrieve chat messages",
+      () => ctx.runQuery(api.chats.getChatMessages, getMessagesArgs),
+    );
+  } else {
+    recentMessagesQuery = await withErrorContext(
+      "Failed to retrieve chat messages",
+      () => ctx.runQuery(api.chats.getChatMessagesHttp, getMessagesArgs),
+    );
+  }
+
+  const recentMessages = recentMessagesQuery as Array<{
     role: "user" | "assistant" | "system";
     content?: string;
   }>;
 
   // 4. Add user message
-  await withErrorContext("Failed to save user message", () =>
-    ctx.runMutation(internal.messages.addMessageHttp, {
-      chatId: args.chatId,
-      role: "user",
-      content: args.userQuery,
-      sessionId: args.sessionId,
-    }),
-  );
+  const addMessageArgs = {
+    chatId: args.chatId,
+    role: "user" as const,
+    content: args.userQuery,
+    sessionId: args.sessionId,
+  };
+
+  if (useAuthVariant) {
+    await withErrorContext("Failed to save user message", () =>
+      ctx.runMutation(internal.messages.addMessage, addMessageArgs),
+    );
+  } else {
+    await withErrorContext("Failed to save user message", () =>
+      ctx.runMutation(internal.messages.addMessageHttp, addMessageArgs),
+    );
+  }
 
   // 5. Build context
   let conversationContext = buildConversationContext(recentMessages || []);

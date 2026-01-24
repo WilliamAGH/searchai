@@ -338,9 +338,6 @@ export default function App() {
                   <span className="text-lg font-semibold !normal-case tracking-normal text-gray-900 dark:text-white truncate max-w-[40vw]">
                     SearchAI
                   </span>
-                  <span className="hidden sm:inline-block text-sm sm:text-base bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 px-2.5 py-0.5 rounded-full font-medium hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors">
-                    search-ai.io
-                  </span>
                 </div>
                 <div className="flex items-center gap-2.5 sm:gap-4">
                   <Authenticated>

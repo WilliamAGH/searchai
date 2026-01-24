@@ -15,6 +15,7 @@ import { corsPreflightResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { streamConversationalWorkflow } from "../../agents/orchestration";
 import { safeConvexId } from "../../lib/validators";
+import { isValidUuidV7 } from "../../lib/uuid";
 // Types come from the Node-free module so HTTP routes (and other V8 code) never import
 // the helpers that depend on `node:crypto`.
 import type { ResearchContextReference } from "../../agents/schema";
@@ -386,15 +387,22 @@ export function registerAgentAIRoutes(http: HttpRouter) {
           origin,
         );
       }
-      const sessionId =
+      const sessionIdRaw =
         typeof payload.sessionId === "string" ? payload.sessionId : undefined;
-      if (!sessionId) {
+      // Validate sessionId as UUIDv7 when present
+      if (sessionIdRaw && !isValidUuidV7(sessionIdRaw)) {
         return corsResponse(
-          JSON.stringify({ error: "sessionId is required" }),
+          JSON.stringify({ error: "Invalid sessionId format" }),
           400,
           origin,
         );
       }
+      const sessionId = sessionIdRaw;
+      // sessionId is optional. Note: HTTP actions do NOT have auth context,
+      // so when sessionId is missing, downstream orchestration will see
+      // getAuthUserId(ctx) === null. This means only shared/public chats are
+      // accessible without sessionId; private/authenticated chats require it.
+
       const conversationContext = payload.conversationContext
         ? String(payload.conversationContext)
             .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
@@ -523,15 +531,22 @@ export function registerAgentAIRoutes(http: HttpRouter) {
         typeof payload.message === "string" ? payload.message : "";
       const rawChatId =
         typeof payload.chatId === "string" ? payload.chatId : "";
-      const sessionId =
+      const sessionIdRaw =
         typeof payload.sessionId === "string" ? payload.sessionId : undefined;
-      if (!sessionId) {
+      // Validate sessionId as UUIDv7 when present
+      if (sessionIdRaw && !isValidUuidV7(sessionIdRaw)) {
         return corsResponse(
-          JSON.stringify({ error: "sessionId is required" }),
+          JSON.stringify({ error: "Invalid sessionId format" }),
           400,
           origin,
         );
       }
+      const sessionId = sessionIdRaw;
+      // sessionId is optional. Note: HTTP actions do NOT have auth context,
+      // so when sessionId is missing, downstream orchestration will see
+      // getAuthUserId(ctx) === null. This means only shared/public chats are
+      // accessible without sessionId; private/authenticated chats require it.
+
       const chatId = safeConvexId<"chats">(rawChatId);
       if (!message.trim() || !chatId) {
         return corsResponse(
