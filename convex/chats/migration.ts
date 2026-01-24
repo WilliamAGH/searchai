@@ -9,6 +9,7 @@ import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { generateShareId, generatePublicId } from "../lib/uuid";
+import { vSearchMethod } from "../lib/validators";
 
 /**
  * Import locally stored chats/messages into the authenticated account
@@ -42,14 +43,7 @@ export const importLocalChats = mutation({
             searchResults: v.optional(v.array(v.any())),
             sources: v.optional(v.array(v.string())),
             reasoning: v.optional(v.any()),
-            searchMethod: v.optional(
-              v.union(
-                v.literal("serp"),
-                v.literal("openrouter"),
-                v.literal("duckduckgo"),
-                v.literal("fallback"),
-              ),
-            ),
+            searchMethod: v.optional(vSearchMethod),
             hasRealResults: v.optional(v.boolean()),
           }),
         ),
@@ -151,14 +145,7 @@ export const publishAnonymousChat = mutation({
         searchResults: v.optional(v.array(v.any())),
         sources: v.optional(v.array(v.string())),
         reasoning: v.optional(v.any()),
-        searchMethod: v.optional(
-          v.union(
-            v.literal("serp"),
-            v.literal("openrouter"),
-            v.literal("duckduckgo"),
-            v.literal("fallback"),
-          ),
-        ),
+        searchMethod: v.optional(vSearchMethod),
         hasRealResults: v.optional(v.boolean()),
       }),
     ),
