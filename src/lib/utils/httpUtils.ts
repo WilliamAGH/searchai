@@ -10,8 +10,12 @@ export function buildApiBase(convexUrl: string): string {
     const url = new URL(convexUrl);
     const siteHost = url.host.replace(".convex.cloud", ".convex.site");
     return `${url.protocol}//${siteHost}`.replace(/\/$/, "");
-  } catch {
+  } catch (error) {
     // Fallback: return input without trailing /api if parsing fails
+    console.error("Failed to parse Convex URL for API base", {
+      convexUrl,
+      error,
+    });
     return convexUrl.replace("/api", "");
   }
 }
@@ -19,6 +23,46 @@ export function buildApiBase(convexUrl: string): string {
 export function resolveApiPath(base: string, path: string): string {
   // For non-Convex API paths
   return `${base}${path}`;
+}
+
+export type HttpErrorDetails = {
+  status: number;
+  statusText: string;
+  url: string;
+  body: string;
+  headers: Record<string, string>;
+};
+
+export async function readResponseBody(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `Failed to read response body: ${message}`;
+  }
+}
+
+export function buildHttpError(
+  response: Response,
+  body: string,
+  context?: string,
+): Error {
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+  const prefix = context ? `${context}: ` : "";
+  const error = new Error(
+    `${prefix}HTTP ${response.status} ${response.statusText} ${body}`.trim(),
+  );
+  Object.assign(error, {
+    status: response.status,
+    statusText: response.statusText,
+    url: response.url,
+    body,
+    headers,
+  } satisfies HttpErrorDetails);
+  return error;
 }
 
 export async function fetchJsonWithRetry(
@@ -33,9 +77,18 @@ export async function fetchJsonWithRetry(
     try {
       const response = await fetch(url, options);
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const body = await readResponseBody(response);
+        throw buildHttpError(response, body, "fetchJsonWithRetry");
       }
-      return await response.json();
+      const body = await readResponseBody(response);
+      try {
+        return JSON.parse(body) as unknown;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Failed to parse JSON response from ${url}: ${message}. Body: ${body}`,
+        );
+      }
     } catch (error) {
       lastError = error as Error;
       if (i < maxRetries - 1) {
