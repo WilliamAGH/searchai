@@ -89,3 +89,14 @@ export function isAuthorized(
 export function isUnownedChat(chat: ChatOwnership): boolean {
   return !chat.userId && !chat.sessionId;
 }
+
+/**
+ * Check if a chat is shared or public.
+ * Shared/public chats are accessible to anyone without ownership checks.
+ *
+ * @param chat - Chat document with optional privacy field
+ * @returns true if chat.privacy is "shared" or "public"
+ */
+export function isSharedOrPublicChat(chat: { privacy?: string }): boolean {
+  return chat.privacy === "shared" || chat.privacy === "public";
+}
