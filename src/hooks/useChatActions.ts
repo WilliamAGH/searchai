@@ -327,6 +327,18 @@ export function createChatActions(
         }
 
         const persistedConfirmed = streamHandler.getPersistedConfirmed();
+        if (!persistedConfirmed) {
+          setState((prev) => ({
+            ...prev,
+            isGenerating: false,
+            searchProgress: { stage: "idle" },
+            messages: prev.messages.map((m, index) =>
+              index === prev.messages.length - 1 && m.role === "assistant"
+                ? { ...m, isStreaming: false, thinking: undefined }
+                : m,
+            ),
+          }));
+        }
 
         const refreshAfterPersist = async (shouldForce: boolean) => {
           if (!repository) {
