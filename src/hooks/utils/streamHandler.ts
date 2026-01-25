@@ -147,7 +147,7 @@ export class StreamEventHandler {
         {
           searchProgress: {
             stage: "generating",
-            message: "Writing answer...",
+            message: "your answer...",
           },
         },
       );

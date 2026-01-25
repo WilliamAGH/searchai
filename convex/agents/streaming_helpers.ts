@@ -210,21 +210,29 @@ export function getProgressStageForTool(
   return null;
 }
 
-/** Get human-readable message for a progress stage */
+/**
+ * Get human-readable message for a progress stage.
+ *
+ * IMPORTANT: Messages must NOT start with the same word as the UI label
+ * to avoid redundancy like "Planning Planning research strategy...".
+ *
+ * UI labels are: Thinking, Planning, Searching, Reading (scraping),
+ * Analyzing, Writing (generating), Working (default).
+ */
 export function getProgressMessage(stage: ProgressStage): string {
   switch (stage) {
     case "thinking":
-      return "Thinking...";
+      return "about your question...";
     case "planning":
-      return "Planning research strategy...";
+      return "research strategy...";
     case "searching":
-      return "Searching the web...";
+      return "the web...";
     case "scraping":
-      return "Reading sources...";
+      return "source content...";
     case "generating":
-      return "Generating response...";
+      return "response...";
     default:
-      return "Processing...";
+      return "on request...";
   }
 }
 

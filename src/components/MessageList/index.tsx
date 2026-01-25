@@ -21,7 +21,7 @@ import { VirtualizedMessageList } from "./VirtualizedMessageList";
 import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { throttle, isNearBottom } from "../../lib/utils";
+import { throttle, isNearBottom, isScrolledPastPercent } from "../../lib/utils";
 import { resolveMessageKey } from "./messageKey";
 
 /**
@@ -123,6 +123,8 @@ export function MessageList({
   // Dynamic thresholds based on viewport
   const NEAR_BOTTOM_THRESHOLD = isMobile ? 100 : 200;
   const STUCK_THRESHOLD = isMobile ? 50 : 100;
+  // Percentage threshold: hide FAB when user is 95%+ of the way down
+  const SCROLL_PERCENT_THRESHOLD = 95;
 
   /**
    * Cancel any ongoing smooth scroll
@@ -147,15 +149,22 @@ export function MessageList({
       if (behavior === "smooth") {
         smoothScrollInProgressRef.current = true;
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        // Reset flag after animation completes (~500ms)
+        // Reset flag after animation completes (~500ms) and ensure FAB is hidden
         setTimeout(() => {
           smoothScrollInProgressRef.current = false;
+          // After scroll animation, verify we're near bottom and keep FAB hidden
+          const stillNearBottom =
+            isNearBottom(container, STUCK_THRESHOLD) ||
+            isScrolledPastPercent(container, SCROLL_PERCENT_THRESHOLD);
+          if (stillNearBottom) {
+            setUserHasScrolled(false);
+          }
         }, 600);
       } else {
         messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
       }
     },
-    [scrollContainerRef],
+    [scrollContainerRef, STUCK_THRESHOLD, SCROLL_PERCENT_THRESHOLD],
   );
 
   const handleScrollToBottom = useCallback(() => {
@@ -279,7 +288,14 @@ export function MessageList({
       // If smooth scroll is in progress, don't update state
       if (smoothScrollInProgressRef.current) return;
 
-      const nearBottom = isNearBottom(container, STUCK_THRESHOLD);
+      // Use both pixel threshold AND percentage-based check for reliability
+      // This ensures FAB hides at ~95% scroll even on very tall content
+      const nearBottomPixels = isNearBottom(container, STUCK_THRESHOLD);
+      const nearBottomPercent = isScrolledPastPercent(
+        container,
+        SCROLL_PERCENT_THRESHOLD,
+      );
+      const nearBottom = nearBottomPixels || nearBottomPercent;
       const wasScrolledUp = userHasScrolled;
 
       // User is near bottom - enable auto-scroll
