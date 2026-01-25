@@ -164,6 +164,10 @@ export class StreamEventHandler {
       const metadataSources = Array.isArray(metadata.sources)
         ? (metadata.sources as string[])
         : undefined;
+      // Guard against non-array searchResults from SSE payload
+      const fallbackSearchResults = Array.isArray(metadata.searchResults)
+        ? metadata.searchResults
+        : [];
       const searchResults = contextRefs
         ? contextRefs.map((ref) => {
             const parsedUrl = ref.url ? safeParseUrl(ref.url) : null;
@@ -175,7 +179,7 @@ export class StreamEventHandler {
               kind: ref.type,
             };
           })
-        : metadata.searchResults || [];
+        : fallbackSearchResults;
 
       // Cast searchResults to any to bypass strict UnifiedMessage type check for now
       // This is safe because the UI handles these fields flexibly
