@@ -1,7 +1,8 @@
 /**
  * Message Type Definitions
- * Uses Convex's auto-generated types directly (Doc<"messages">) for server data
- * Defines LocalMessage only for localStorage-specific needs
+ *
+ * Uses Convex's auto-generated types directly (Doc<"messages">) for server data.
+ * LocalMessage is derived from Zod schema (single source of truth).
  * Complies with AGENT.md: NO redundant type definitions for Convex entities
  */
 
@@ -10,35 +11,15 @@ import type { Doc, Id } from "../../../convex/_generated/dataModel";
 // any Node-only helpers into browser bundles.
 import type { StreamingPersistPayload } from "../../../convex/agents/schema";
 import type { SearchResult } from "../../../convex/lib/types/search";
+import { generateLocalId } from "../utils/id";
+
+// Re-export types from canonical sources
 export type { ResearchContextReference } from "../../../convex/agents/schema";
 export type { SearchResult } from "../../../convex/lib/types/search";
 
-/**
- * Local message for unauthenticated users
- * Mimics Convex structure but stored in localStorage
- */
-export interface LocalMessage {
-  _id: string; // Local ID format: "msg_timestamp"
-  chatId: string;
-  role: "user" | "assistant" | "system";
-  content?: string;
-  timestamp?: number;
-
-  // Search and AI metadata (matching Convex schema)
-  searchResults?: SearchResult[];
-  sources?: string[];
-  reasoning?: string;
-  searchMethod?: "serp" | "openrouter" | "duckduckgo" | "fallback";
-  hasRealResults?: boolean;
-  isStreaming?: boolean;
-  streamedContent?: string;
-  thinking?: string;
-
-  // Local-only metadata
-  isLocal: true;
-  source: "local";
-  hasStartedContent?: boolean;
-}
+// Re-export LocalMessage from schema (single source of truth)
+export type { LocalMessage } from "../schemas/localStorage";
+import type { LocalMessage } from "../schemas/localStorage";
 
 /**
  * Union type for components that work with both storage backends
@@ -83,7 +64,7 @@ export const createLocalMessage = (
   content: string,
 ): LocalMessage => {
   return {
-    _id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    _id: generateLocalId("message"),
     chatId,
     role,
     content,

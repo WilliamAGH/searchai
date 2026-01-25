@@ -13,6 +13,7 @@ import {
   toConvexId as convertToConvexId,
   isLocalId as checkIsLocalId,
 } from "../utils/idValidation";
+import { generateLocalId as generateLocalIdUtil } from "../utils/id";
 import { logger } from "../logger";
 
 /**
@@ -207,13 +208,15 @@ export const IdUtils = {
    * Check if ID is a local ID (not from Convex)
    * @see {@link checkIsLocalId} - Centralized implementation
    */
-  isLocalId: (id: string): boolean => checkIsLocalId(id),
+  isLocalId: (id: string | null | undefined): boolean => checkIsLocalId(id),
 
   /**
    * Generate a local ID for temporary messages/chats
+   * @see {@link generateLocalIdUtil} - Centralized implementation
    */
   generateLocalId: (prefix: "chat" | "msg"): string => {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const type = prefix === "chat" ? "chat" : "message";
+    return generateLocalIdUtil(type);
   },
 };
 
