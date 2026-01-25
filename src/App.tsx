@@ -226,17 +226,32 @@ export default function App() {
 
     setAppDvh();
 
+    // When the page itself can't scroll (we use internal scroll containers),
+    // Safari's browser chrome can still expand/collapse during *element* scroll.
+    // Capture scroll events and refresh dvh once per frame to avoid stale sizing.
+    let rafId: number | null = null;
+    const scheduleSetAppDvh = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        setAppDvh();
+      });
+    };
+
     const vv = window.visualViewport;
     vv?.addEventListener("resize", setAppDvh);
     vv?.addEventListener("scroll", setAppDvh);
     window.addEventListener("resize", setAppDvh);
     window.addEventListener("orientationchange", setAppDvh);
+    window.addEventListener("scroll", scheduleSetAppDvh, true);
 
     return () => {
       vv?.removeEventListener("resize", setAppDvh);
       vv?.removeEventListener("scroll", setAppDvh);
       window.removeEventListener("resize", setAppDvh);
       window.removeEventListener("orientationchange", setAppDvh);
+      window.removeEventListener("scroll", scheduleSetAppDvh, true);
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
     };
   }, []);
 
