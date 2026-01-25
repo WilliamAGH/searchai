@@ -413,8 +413,8 @@ html.dark .prose code {
 
 .prose a {
   @apply text-primary hover:text-primary/80;
-  /* Force URL breaking to prevent overflow */
-  word-break: break-all;
+  /* Allow long URLs to wrap without breaking words arbitrarily */
+  overflow-wrap: break-word;
 }
 
 .prose code {
