@@ -36,6 +36,7 @@ import { env } from "../env";
 const ProgressEventSchema = z.object({
   type: z.literal("progress"),
   stage: z.enum([
+    "thinking",
     "planning",
     "searching",
     "scraping",

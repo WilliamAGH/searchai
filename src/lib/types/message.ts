@@ -85,7 +85,13 @@ export type MessageStreamChunk =
   | { type: "content"; content: string; delta?: string } // Answer content (with optional delta)
   | {
       type: "progress";
-      stage: "planning" | "searching" | "scraping" | "analyzing" | "generating";
+      stage:
+        | "thinking"
+        | "planning"
+        | "searching"
+        | "scraping"
+        | "analyzing"
+        | "generating";
       message: string;
       urls?: string[];
       currentUrl?: string;
