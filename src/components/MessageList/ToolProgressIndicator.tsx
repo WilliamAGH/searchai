@@ -31,7 +31,7 @@ interface ToolProgressIndicatorProps {
 
 /** Stage display text - simple lookup for labels and descriptions */
 const STAGE_TEXT: Record<string, { label: string; description: string }> = {
-  thinking: { label: "Processing", description: "your question" },
+  thinking: { label: "Thinking", description: "about your question" },
   planning: { label: "Planning", description: "research approach" },
   searching: { label: "Searching", description: "the web" },
   scraping: { label: "Reading", description: "source content" },

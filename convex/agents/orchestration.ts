@@ -871,7 +871,7 @@ export async function* streamConversationalWorkflow(
 
     yield writeEvent("progress", {
       stage: "thinking",
-      message: "your question...",
+      message: "about your question...",
     });
 
     // Run the conversational agent with streaming

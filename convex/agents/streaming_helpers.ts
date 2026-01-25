@@ -216,13 +216,13 @@ export function getProgressStageForTool(
  * IMPORTANT: Messages must NOT start with the same word as the UI label
  * to avoid redundancy like "Planning Planning research strategy...".
  *
- * UI labels are: Processing (thinking), Planning, Searching, Reading (scraping),
+ * UI labels are: Thinking, Planning, Searching, Reading (scraping),
  * Analyzing, Writing (generating), Working (default).
  */
 export function getProgressMessage(stage: ProgressStage): string {
   switch (stage) {
     case "thinking":
-      return "your question...";
+      return "about your question...";
     case "planning":
       return "research strategy...";
     case "searching":
