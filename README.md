@@ -51,6 +51,12 @@ npm run dev
 - `npm run test:all`
 - `npm run validate`
 
+## Contributing
+
+See `CONTRIBUTING.md`.
+
 ## License
 
-UNLICENSED
+Copyright © 2026 William Callahan.
+
+See `LICENSE.md`.

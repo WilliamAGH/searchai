@@ -10,3 +10,7 @@
 Domain diagrams:
 
 - Chat domain: `docs/domains/chat.mmd`
+
+## License
+
+See `../LICENSE.md`.
