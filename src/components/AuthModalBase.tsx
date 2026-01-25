@@ -101,12 +101,6 @@ export function AuthModalBase({
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
 
-    if (!enableFocusTrap) {
-      return () => {
-        previouslyFocusedRef.current?.focus?.();
-      };
-    }
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -114,7 +108,7 @@ export function AuthModalBase({
         return;
       }
 
-      if (e.key === "Tab") {
+      if (enableFocusTrap && e.key === "Tab") {
         const container = dialogRef.current;
         if (!container) return;
         const focusable = container.querySelectorAll<HTMLElement>(
