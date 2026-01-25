@@ -215,6 +215,31 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
 
+  // Keep the app pinned to the Visual Viewport on iOS Safari (address bar + keyboard).
+  // This prevents the "gap under composer" where 100dvh can desync from the visible area.
+  useEffect(() => {
+    const setAppDvh = () => {
+      const vv = window.visualViewport;
+      const height = vv?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty("--app-dvh", `${height}px`);
+    };
+
+    setAppDvh();
+
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", setAppDvh);
+    vv?.addEventListener("scroll", setAppDvh);
+    window.addEventListener("resize", setAppDvh);
+    window.addEventListener("orientationchange", setAppDvh);
+
+    return () => {
+      vv?.removeEventListener("resize", setAppDvh);
+      vv?.removeEventListener("scroll", setAppDvh);
+      window.removeEventListener("resize", setAppDvh);
+      window.removeEventListener("orientationchange", setAppDvh);
+    };
+  }, []);
+
   // Claim anonymous chats when user signs in
   useClaimAnonymousChats();
 
@@ -365,7 +390,7 @@ export default function App() {
               </div>
             </header>
 
-            <main className="flex-1 flex overflow-hidden">
+            <main className="flex-1 flex min-h-0 overflow-hidden">
               <Routes>
                 <Route
                   path="/"

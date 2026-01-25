@@ -110,7 +110,7 @@ export function ChatLayout({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="flex-1 flex h-full relative">
+    <div className="flex-1 flex h-full min-h-0 relative">
       {/* Desktop Sidebar - Fixed position so scroll appears at browser edge */}
       {showDesktopSidebar && (
         <div className="fixed left-0 top-[3.75rem] sm:top-16 w-80 h-[calc(100dvh-3.75rem)] sm:h-[calc(100dvh-4rem)] z-40">
@@ -126,7 +126,7 @@ export function ChatLayout({
       {/* Main content - full width scroll container, scrollbar at browser edge */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 flex flex-col h-full overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
+        className={`flex-1 flex flex-col h-full min-h-0 overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
         {...swipeHandlers}
       >
         {/* Content wrapper: grow to fill when content is small, don't shrink when content is large */}

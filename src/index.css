@@ -226,10 +226,11 @@
 
   /* Dynamic viewport units to avoid mobile 100vh bugs */
   .h-dvh {
-    height: 100dvh;
+    /* JS can set --app-dvh using VisualViewport for iOS Safari edge cases */
+    height: var(--app-dvh, 100dvh);
   }
   .min-h-dvh {
-    min-height: 100dvh;
+    min-height: var(--app-dvh, 100dvh);
   }
 
   /* Floating action button bottom offset with safe-area support */
@@ -269,7 +270,13 @@ html,
 body,
 #root {
   height: 100%;
-  min-height: 100dvh;
+  min-height: var(--app-dvh, 100dvh);
+}
+
+/* The app provides its own scroll containers; never allow page-level scrolling. */
+html,
+body {
+  overflow: hidden;
 }
 
 /*
