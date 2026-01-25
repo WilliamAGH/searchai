@@ -82,7 +82,7 @@ export type PersistedPayload = StreamingPersistPayload;
 
 export type MessageStreamChunk =
   | { type: "chunk"; content: string } // Legacy: text content chunk
-  | { type: "content"; content: string; delta?: string } // Answer content (with optional delta)
+  | { type: "content"; content?: string; delta?: string } // Answer content (with optional delta)
   | {
       type: "progress";
       stage:

@@ -60,7 +60,7 @@ const ReasoningEventSchema = z.object({
 
 const ContentEventSchema = z.object({
   type: z.literal("content"),
-  content: z.string(),
+  content: z.string().optional(),
   delta: z.string().optional(),
 });
 
