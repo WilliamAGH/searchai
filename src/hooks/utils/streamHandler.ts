@@ -147,7 +147,8 @@ export class StreamEventHandler {
       const messageUpdates: Partial<UnifiedMessage> = {
         isStreaming: true,
         thinking: undefined,
-        searchResults: searchResults as any,
+        searchResults:
+          searchResults as unknown as UnifiedMessage["searchResults"],
       };
       if (workflowIdFromMetadata !== undefined) {
         messageUpdates.workflowId = workflowIdFromMetadata;
@@ -212,7 +213,8 @@ export class StreamEventHandler {
       messageUpdates.workflowSignature = chunk.signature;
     }
     if (persistedSearchResults !== undefined) {
-      messageUpdates.searchResults = persistedSearchResults as any;
+      messageUpdates.searchResults =
+        persistedSearchResults as unknown as UnifiedMessage["searchResults"];
     }
 
     updateLastAssistantMessage(this.setState, messageUpdates, {
