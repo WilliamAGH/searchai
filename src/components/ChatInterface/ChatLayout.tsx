@@ -140,7 +140,14 @@ export function ChatLayout({
             scrollContainerRef={scrollContainerRef}
           />
         </div>
-        {/* Input area - sticky at bottom, relative for absolute-positioned children */}
+        {/*
+          Input area - sticky at bottom, relative for absolute-positioned children.
+
+          SAFE AREA STRATEGY: This component owns bottom safe-area padding.
+          Body-level padding-bottom is intentionally omitted (see index.css).
+          This prevents the "floating gap" bug where double padding creates
+          visible whitespace between app content and browser chrome on iOS.
+        */}
         <div
           className={`flex-shrink-0 sticky bottom-0 relative bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 pb-[env(safe-area-inset-bottom)] ${!showDesktopSidebar ? "max-w-4xl mx-auto w-full" : ""}`}
         >
