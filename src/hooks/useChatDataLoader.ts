@@ -149,10 +149,10 @@ export function useChatDataLoader(
         setState((current) => ({
           ...current,
           isLoading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to load messages for first chat",
+          error: getErrorMessage(
+            error,
+            "Failed to load messages for first chat",
+          ),
         }));
       });
 

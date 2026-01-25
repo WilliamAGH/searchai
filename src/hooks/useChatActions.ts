@@ -11,6 +11,7 @@ import { TitleUtils, IdUtils } from "../lib/types/unified";
 import { getErrorMessage } from "../lib/utils/errorUtils";
 import type { PersistedPayload } from "../lib/types/message";
 import { logger } from "../lib/logger";
+import { updateLastAssistantMessage } from "./utils/messageStateUpdaters";
 // Minimal fallback to avoid missing StorageService import during build
 const storageService = {
   clearAll() {
@@ -354,18 +355,10 @@ export function createChatActions(
             case "reasoning":
               // Accumulate reasoning/thinking content
               accumulatedReasoning += chunk.content;
-              setState((prev) => ({
-                ...prev,
-                messages: prev.messages.map((m, index) =>
-                  index === prev.messages.length - 1 && m.role === "assistant"
-                    ? {
-                        ...m,
-                        reasoning: accumulatedReasoning,
-                        thinking: "Thinking...",
-                      }
-                    : m,
-                ),
-              }));
+              updateLastAssistantMessage(setState, {
+                reasoning: accumulatedReasoning,
+                thinking: "Thinking...",
+              });
               logger.debug("Reasoning chunk received");
               break;
 
@@ -379,22 +372,16 @@ export function createChatActions(
               if (delta) {
                 fullContent += delta;
                 // Update last assistant message with streaming content
-                setState((prev) => ({
-                  ...prev,
-                  messages: prev.messages.map((m, index) =>
-                    index === prev.messages.length - 1 && m.role === "assistant"
-                      ? {
-                          ...m,
-                          content: fullContent,
-                          isStreaming: true,
-                        }
-                      : m,
-                  ),
-                  searchProgress: {
-                    stage: "generating",
-                    message: "Writing answer...",
+                updateLastAssistantMessage(
+                  setState,
+                  { content: fullContent, isStreaming: true },
+                  {
+                    searchProgress: {
+                      stage: "generating",
+                      message: "Writing answer...",
+                    },
                   },
-                }));
+                );
               }
               break;
 
@@ -455,18 +442,16 @@ export function createChatActions(
             case "done":
             case "complete":
               // Indicate finalizing while waiting for persisted confirmation
-              setState((prev) => ({
-                ...prev,
-                searchProgress: {
-                  stage: "finalizing",
-                  message: "Saving and securing results...",
+              updateLastAssistantMessage(
+                setState,
+                { isStreaming: true, thinking: undefined },
+                {
+                  searchProgress: {
+                    stage: "finalizing",
+                    message: "Saving and securing results...",
+                  },
                 },
-                messages: prev.messages.map((m, index) =>
-                  index === prev.messages.length - 1 && m.role === "assistant"
-                    ? { ...m, isStreaming: true, thinking: undefined }
-                    : m,
-                ),
-              }));
+              );
               logger.debug("Stream complete, awaiting persisted event...");
               break;
 

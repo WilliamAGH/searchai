@@ -12,6 +12,7 @@
 import { logger } from "../logger";
 import { buildHttpError, readResponseBody } from "../utils/httpUtils";
 import { getErrorMessage } from "../utils/errorUtils";
+import { parseSSEStream, isSSEParseError } from "../utils/sseParser";
 import type { MessageStreamChunk } from "../types/message";
 
 /**
@@ -54,6 +55,9 @@ export class UnauthenticatedAIService {
    * Consumes SSE stream from /api/ai/agent/stream endpoint.
    * Emits progress events for: planning, searching, scraping, analyzing, generating
    * Streams answer content token-by-token for real-time UX.
+   *
+   * @see {@link ../utils/sseParser.ts} - Shared SSE parsing logic
+   * @see {@link ConvexChatRepository.generateResponse} - Authenticated equivalent
    */
   async generateResponse(
     message: string,
@@ -75,7 +79,7 @@ export class UnauthenticatedAIService {
       const host = window.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
       const apiUrl = isDev
-        ? "/api/ai/agent/stream" // NEW: Streaming endpoint
+        ? "/api/ai/agent/stream"
         : `${this.convexUrl}/api/ai/agent/stream`;
 
       // Build optional conversationContext string from chatHistory
@@ -114,10 +118,7 @@ export class UnauthenticatedAIService {
         "[UnauthenticatedAIService] Streaming response received, parsing SSE...",
       );
 
-      // Parse SSE stream
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+      // Track search results across events
       const searchResults: Array<{
         title: string;
         url: string;
@@ -125,179 +126,154 @@ export class UnauthenticatedAIService {
         relevanceScore: number;
       }> = [];
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      // Use shared SSE parser for stream processing
+      for await (const evt of parseSSEStream(response)) {
+        // Handle parse errors from the SSE parser
+        if (isSSEParseError(evt)) {
+          logger.warn("[UnauthenticatedAIService] Failed to parse SSE event", {
+            error: evt.error,
+            raw: evt.raw,
+          });
+          onChunk?.({
+            type: "error",
+            error: `Failed to parse SSE event: ${evt.error}`,
+          });
+          continue;
+        }
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() || "";
+        // Handle different event types from backend
+        switch (evt.type) {
+          case "progress":
+            // Emit searchProgress updates for all stages
+            onChunk?.({
+              type: "progress",
+              stage: evt.stage as string,
+              message: evt.message as string,
+              urls: evt.urls as string[] | undefined,
+              currentUrl: evt.currentUrl as string | undefined,
+              queries: evt.queries as string[] | undefined,
+              sourcesUsed: evt.sourcesUsed as number | undefined,
+            });
+            logger.debug(
+              "[UnauthenticatedAIService] Progress:",
+              evt.stage,
+              evt.message,
+            );
+            break;
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
+          case "reasoning":
+            // Emit thinking/reasoning chunks
+            onChunk?.({
+              type: "reasoning",
+              content: evt.content as string,
+            });
+            logger.debug("[UnauthenticatedAIService] Reasoning chunk received");
+            break;
 
-          const data = line.slice(6);
-          if (data === "[DONE]") {
-            logger.info("[UnauthenticatedAIService] Stream complete");
-            onComplete?.();
-            return;
+          case "content": {
+            // Emit answer content chunks
+            const delta = (evt.delta || evt.content || "") as string;
+            onChunk?.({
+              type: "content",
+              content: delta,
+              delta: delta,
+            });
+            break;
           }
 
-          try {
-            const event = JSON.parse(data);
-
-            // Handle different event types from backend
-            switch (event.type) {
-              case "progress":
-                // Emit searchProgress updates for all stages
-                onChunk?.({
-                  type: "progress",
-                  stage: event.stage, // planning, searching, scraping, analyzing, generating
-                  message: event.message,
-                  urls: event.urls,
-                  currentUrl: event.currentUrl,
-                  queries: event.queries,
-                  sourcesUsed: event.sourcesUsed,
-                });
+          case "tool_result":
+            // Extract search results from tool outputs
+            if (evt.toolName === "search_web") {
+              try {
+                const toolOutput = JSON.parse(evt.result as string);
+                const results = toolOutput.results || [];
+                searchResults.push(
+                  ...results.map((r: unknown) => {
+                    const result = r as Record<string, unknown>;
+                    return {
+                      title: String(result.title || ""),
+                      url: String(result.url || ""),
+                      snippet: String(result.snippet || ""),
+                      relevanceScore: Number(result.relevanceScore) || 0.5,
+                    };
+                  }),
+                );
                 logger.debug(
-                  "[UnauthenticatedAIService] Progress:",
-                  event.stage,
-                  event.message,
+                  "[UnauthenticatedAIService] Search results extracted:",
+                  results.length,
                 );
-                break;
-
-              case "reasoning":
-                // Emit thinking/reasoning chunks
-                onChunk?.({
-                  type: "reasoning",
-                  content: event.content,
-                });
-                logger.debug(
-                  "[UnauthenticatedAIService] Reasoning chunk received",
-                );
-                break;
-
-              case "content":
-                // Emit answer content chunks
-                const delta = event.delta || event.content || "";
-                onChunk?.({
-                  type: "content",
-                  content: delta,
-                  delta: delta,
-                });
-                break;
-
-              case "tool_result":
-                // Extract search results from tool outputs
-                if (event.toolName === "search_web") {
-                  try {
-                    const toolOutput = JSON.parse(event.result);
-                    const results = toolOutput.results || [];
-                    searchResults.push(
-                      ...results.map((r: unknown) => {
-                        const result = r as Record<string, unknown>;
-                        return {
-                          title: String(result.title || ""),
-                          url: String(result.url || ""),
-                          snippet: String(result.snippet || ""),
-                          relevanceScore: Number(result.relevanceScore) || 0.5,
-                        };
-                      }),
-                    );
-                    logger.debug(
-                      "[UnauthenticatedAIService] Search results extracted:",
-                      results.length,
-                    );
-                  } catch (parseError) {
-                    const message =
-                      parseError instanceof Error
-                        ? parseError.message
-                        : String(parseError);
-                    logger.warn(
-                      "[UnauthenticatedAIService] Failed to parse search results",
-                      {
-                        error: message,
-                        result: event.result,
-                      },
-                    );
-                    onChunk?.({
-                      type: "error",
-                      error: `Failed to parse search results: ${message}. Result: ${event.result}`,
-                    });
-                  }
-                }
-                break;
-
-              case "complete":
-                // Final metadata with workflow details
-                const workflow = event.workflow || {};
-                const research = workflow.research || {};
-                const answer = workflow.answer || {};
-
-                onChunk?.({
-                  type: "metadata",
-                  metadata: {
-                    sources: answer.sourcesUsed || [],
-                    searchResults:
-                      searchResults.length > 0
-                        ? searchResults
-                        : (research.sourcesUsed || []).map((s: unknown) => {
-                            const source = s as Record<string, unknown>;
-                            return {
-                              title: String(source.title || ""),
-                              url: String(source.url || ""),
-                              snippet: "",
-                              relevanceScore:
-                                source.relevance === "high"
-                                  ? 0.9
-                                  : source.relevance === "medium"
-                                    ? 0.7
-                                    : 0.5,
-                            };
-                          }),
-                    workflowId: workflow.workflowId,
-                  } as unknown,
-                });
-                logger.info(
-                  "[UnauthenticatedAIService] Workflow complete:",
-                  workflow.workflowId,
-                );
-                break;
-
-              case "error":
-                logger.error(
-                  "[UnauthenticatedAIService] Stream error:",
-                  event.error,
+              } catch (parseError) {
+                const errorMsg = getErrorMessage(parseError);
+                logger.warn(
+                  "[UnauthenticatedAIService] Failed to parse search results",
+                  {
+                    error: errorMsg,
+                    result: evt.result,
+                  },
                 );
                 onChunk?.({
                   type: "error",
-                  error: event.error,
+                  error: `Failed to parse search results: ${errorMsg}`,
                 });
-                break;
-
-              default:
-                logger.warn(
-                  "[UnauthenticatedAIService] Unknown event type:",
-                  event.type,
-                );
+              }
             }
-          } catch (parseError) {
-            const message =
-              parseError instanceof Error
-                ? parseError.message
-                : String(parseError);
-            logger.warn(
-              "[UnauthenticatedAIService] Failed to parse SSE event",
-              {
-                error: message,
-                raw: data,
-              },
+            break;
+
+          case "complete": {
+            // Final metadata with workflow details
+            const workflow = (evt.workflow || {}) as Record<string, unknown>;
+            const research = (workflow.research || {}) as Record<
+              string,
+              unknown
+            >;
+            const answer = (workflow.answer || {}) as Record<string, unknown>;
+
+            onChunk?.({
+              type: "metadata",
+              metadata: {
+                sources: (answer.sourcesUsed || []) as string[],
+                searchResults:
+                  searchResults.length > 0
+                    ? searchResults
+                    : ((research.sourcesUsed || []) as unknown[]).map(
+                        (s: unknown) => {
+                          const source = s as Record<string, unknown>;
+                          return {
+                            title: String(source.title || ""),
+                            url: String(source.url || ""),
+                            snippet: "",
+                            relevanceScore:
+                              source.relevance === "high"
+                                ? 0.9
+                                : source.relevance === "medium"
+                                  ? 0.7
+                                  : 0.5,
+                          };
+                        },
+                      ),
+                workflowId: workflow.workflowId as string | undefined,
+              } as unknown,
+            });
+            logger.info(
+              "[UnauthenticatedAIService] Workflow complete:",
+              workflow.workflowId,
             );
+            break;
+          }
+
+          case "error":
+            logger.error("[UnauthenticatedAIService] Stream error:", evt.error);
             onChunk?.({
               type: "error",
-              error: `Failed to parse SSE event: ${message}. Raw: ${data}`,
+              error: evt.error as string,
             });
-          }
+            break;
+
+          default:
+            logger.warn(
+              "[UnauthenticatedAIService] Unknown event type:",
+              evt.type,
+            );
         }
       }
 
@@ -312,10 +288,9 @@ export class UnauthenticatedAIService {
         logger.info("[UnauthenticatedAIService] Stream aborted by user");
         // Swallow aborts
       } else {
-        logger.error(
-          "[UnauthenticatedAIService] Streaming request failed",
-          error,
-        );
+        logger.error("[UnauthenticatedAIService] Streaming request failed", {
+          error: getErrorMessage(error),
+        });
         onChunk?.({
           type: "error",
           error: getErrorMessage(error),

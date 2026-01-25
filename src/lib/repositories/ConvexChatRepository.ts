@@ -18,6 +18,8 @@ import {
 import { logger } from "../logger";
 import { buildHttpError, readResponseBody } from "../utils/httpUtils";
 import { getErrorMessage } from "../utils/errorUtils";
+import { parseSSEStream, isSSEParseError } from "../utils/sseParser";
+import { MAX_LOOKUP_RETRIES, computeFastBackoff } from "../constants/retry";
 import {
   verifyPersistedPayload,
   isSignatureVerificationAvailable,
@@ -52,7 +54,11 @@ export class ConvexChatRepository extends BaseRepository {
     });
   }
 
-  // Chat operations
+  /**
+   * Get all chats for the current user.
+   * @returns Array of chats, or empty array on error (UI shows empty state)
+   * @note Errors are logged but not thrown to allow graceful degradation
+   */
   async getChats(): Promise<UnifiedChat[]> {
     try {
       const chats = await this.client.query(api.chats.getUserChats, {
@@ -75,11 +81,19 @@ export class ConvexChatRepository extends BaseRepository {
         lastSyncAt: Date.now(),
       }));
     } catch (error) {
-      logger.error("Failed to fetch chats from Convex:", error);
+      logger.error("Failed to fetch chats from Convex:", {
+        error: getErrorMessage(error),
+      });
       return [];
     }
   }
 
+  /**
+   * Get a single chat by ID.
+   * @param id - Chat ID (Convex ID or opaque ID)
+   * @returns UnifiedChat if found, null if not found or on error
+   * @note Errors are logged but not thrown - caller should check for null
+   */
   async getChatById(id: string): Promise<UnifiedChat | null> {
     try {
       if (!IdUtils.isConvexId(id)) {
@@ -101,11 +115,20 @@ export class ConvexChatRepository extends BaseRepository {
 
       return chat ? this.convexToUnifiedChat(chat) : null;
     } catch (error) {
-      logger.error("Failed to fetch chat from Convex:", error);
+      logger.error("Failed to fetch chat from Convex:", {
+        error: getErrorMessage(error),
+        id,
+      });
       return null;
     }
   }
 
+  /**
+   * Create a new chat.
+   * @param title - Optional title for the chat
+   * @returns ChatResponse with the created chat
+   * @throws Error if creation fails - caller must handle failure
+   */
   async createChat(title?: string): Promise<ChatResponse> {
     try {
       const finalTitle = title || "New Chat";
@@ -132,7 +155,7 @@ export class ConvexChatRepository extends BaseRepository {
       return { chat, isNew: true };
     } catch (error) {
       logger.error("Failed to create chat in Convex:", {
-        error,
+        error: getErrorMessage(error),
         sessionId: this.sessionId,
       });
       throw error;
@@ -140,10 +163,10 @@ export class ConvexChatRepository extends BaseRepository {
   }
 
   /**
-   * Update the title of an existing chat
+   * Update the title of an existing chat.
    * @param id - Chat ID to update
    * @param title - New title for the chat
-   * @throws {Error} If update fails
+   * @throws Error if update fails - caller must handle failure
    */
   async updateChatTitle(id: string, title: string): Promise<void> {
     try {
@@ -152,16 +175,19 @@ export class ConvexChatRepository extends BaseRepository {
         title: TitleUtils.sanitize(title),
       });
     } catch (error) {
-      logger.error("Failed to update chat title in Convex:", error);
+      logger.error("Failed to update chat title in Convex:", {
+        error: getErrorMessage(error),
+        id,
+      });
       throw error;
     }
   }
 
   /**
-   * Update the privacy setting of a chat
+   * Update the privacy setting of a chat.
    * @param id - Chat ID to update
    * @param privacy - New privacy setting (private, shared, or public)
-   * @throws {Error} If update fails
+   * @throws Error if update fails - caller must handle failure
    */
   async updateChatPrivacy(
     id: string,
@@ -173,15 +199,19 @@ export class ConvexChatRepository extends BaseRepository {
         privacy,
       });
     } catch (error) {
-      logger.error("Failed to update chat privacy in Convex:", error);
+      logger.error("Failed to update chat privacy in Convex:", {
+        error: getErrorMessage(error),
+        id,
+        privacy,
+      });
       throw error;
     }
   }
 
   /**
-   * Delete a chat and all its messages
+   * Delete a chat and all its messages.
    * @param id - Chat ID to delete
-   * @throws {Error} If deletion fails
+   * @throws Error if deletion fails - caller must handle failure
    */
   async deleteChat(id: string): Promise<void> {
     try {
@@ -190,12 +220,20 @@ export class ConvexChatRepository extends BaseRepository {
         sessionId: this.sessionId,
       });
     } catch (error) {
-      logger.error("Failed to delete chat from Convex:", error);
+      logger.error("Failed to delete chat from Convex:", {
+        error: getErrorMessage(error),
+        id,
+      });
       throw error;
     }
   }
 
-  // Message operations
+  /**
+   * Get all messages for a chat.
+   * @param chatId - Chat ID to get messages for
+   * @returns Array of messages, or empty array on error (UI shows empty state)
+   * @note Errors are logged but not thrown to allow graceful degradation
+   */
   async getMessages(chatId: string): Promise<UnifiedMessage[]> {
     try {
       logger.debug("Fetching messages for chat", {
@@ -222,7 +260,7 @@ export class ConvexChatRepository extends BaseRepository {
       return messages.map((msg) => this.convexToUnifiedMessage(msg));
     } catch (error) {
       logger.error("Failed to fetch messages from Convex:", {
-        error,
+        error: getErrorMessage(error),
         chatId,
         sessionId: this.sessionId,
       });
@@ -231,12 +269,13 @@ export class ConvexChatRepository extends BaseRepository {
   }
 
   /**
-   * Get paginated messages for a chat
-   * Used for performance optimization in chats with many messages
+   * Get paginated messages for a chat.
+   * Used for performance optimization in chats with many messages.
    * @param chatId - ID of the chat to get messages for
    * @param limit - Maximum number of messages to return (default: 50)
    * @param cursor - Pagination cursor for fetching next batch
    * @returns Object containing messages array, next cursor, and hasMore flag
+   * @note Errors are logged but not thrown to allow graceful degradation
    */
   async getMessagesPaginated(
     chatId: string,
@@ -274,7 +313,10 @@ export class ConvexChatRepository extends BaseRepository {
         hasMore: result.hasMore,
       };
     } catch (error) {
-      logger.error("Failed to fetch paginated messages from Convex:", error);
+      logger.error("Failed to fetch paginated messages from Convex:", {
+        error: getErrorMessage(error),
+        chatId,
+      });
       return {
         messages: [],
         hasMore: false,
@@ -282,6 +324,14 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Add a message to a chat.
+   * @param chatId - Chat ID to add message to
+   * @param message - Message data to add
+   * @returns The created message
+   * @throws Error if creation fails - caller must handle failure
+   * @note For user messages in authenticated mode, prefer generateResponse flow
+   */
   async addMessage(
     chatId: string,
     message: Partial<UnifiedMessage>,
@@ -333,7 +383,10 @@ export class ConvexChatRepository extends BaseRepository {
 
       return createdMessage;
     } catch (error) {
-      logger.error("Failed to add message to Convex:", error);
+      logger.error("Failed to add message to Convex:", {
+        error: getErrorMessage(error),
+        chatId,
+      });
       // Fallback: For user messages in authenticated mode, use the generateResponse flow
       throw new Error(
         "Direct message addition not supported. Use generateResponse for adding messages in Convex authenticated mode.",
@@ -341,6 +394,13 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Update a message's metadata.
+   * @param id - Message ID to update
+   * @param updates - Fields to update (searchResults, sources, searchMethod, hasRealResults)
+   * @throws Error if update fails - caller must handle failure
+   * @note Content/reasoning updates are only allowed during streaming for security
+   */
   async updateMessage(
     id: string,
     updates: Partial<UnifiedMessage>,
@@ -372,23 +432,41 @@ export class ConvexChatRepository extends BaseRepository {
         );
       }
     } catch (error) {
-      logger.error("Failed to update message in Convex:", error);
+      logger.error("Failed to update message in Convex:", {
+        error: getErrorMessage(error),
+        id,
+      });
       throw error;
     }
   }
 
+  /**
+   * Delete a message.
+   * @param id - Message ID to delete
+   * @throws Error if deletion fails - caller must handle failure
+   */
   async deleteMessage(id: string): Promise<void> {
     try {
       await this.client.mutation(api.messages.deleteMessage, {
         messageId: IdUtils.toConvexMessageId(id),
       });
     } catch (error) {
-      logger.error("Failed to delete message from Convex:", error);
+      logger.error("Failed to delete message from Convex:", {
+        error: getErrorMessage(error),
+        id,
+      });
       throw error;
     }
   }
 
-  // Search and AI operations
+  /**
+   * Stream AI response for a chat message.
+   * @param chatId - Chat ID to generate response for
+   * @param message - User message to respond to
+   * @yields StreamChunk events (progress, reasoning, content, metadata, error, done)
+   * @see {@link ../utils/sseParser.ts} - Shared SSE parsing logic
+   * @see {@link UnauthenticatedAIService.generateResponse} - Unauthenticated equivalent
+   */
   async *generateResponse(
     chatId: string,
     message: string,
@@ -433,96 +511,76 @@ export class ConvexChatRepository extends BaseRepository {
         );
       }
 
-      if (!response.body) {
-        throw new Error(
-          `Streaming response missing body from ${apiUrl} (HTTP ${response.status} ${response.statusText})`,
-        );
-      }
+      // Use shared SSE parser for stream processing
+      for await (const evt of parseSSEStream(response)) {
+        // Handle parse errors from the SSE parser
+        if (isSSEParseError(evt)) {
+          logger.error("Failed to parse SSE frame", {
+            error: evt.error,
+            raw: evt.raw,
+            chatId,
+          });
+          yield {
+            type: "error",
+            error: `Failed to parse SSE frame: ${evt.error}`,
+          };
+          continue;
+        }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+        // Map SSE events to StreamChunk
+        switch (evt.type) {
+          case "progress":
+          case "reasoning":
+          case "content":
+          case "metadata":
+          case "tool_result":
+          case "error":
+            yield evt as StreamChunk;
+            break;
+          case "persisted": {
+            // Verify signature if available and enabled
+            // Note: Signature verification is optional in production since
+            // the signing key can't be safely embedded in frontend code.
+            // In dev, you can set VITE_AGENT_SIGNING_KEY for testing.
+            const signingKey = import.meta.env.VITE_AGENT_SIGNING_KEY;
 
-      // Stream all events to the generator
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() || "";
+            if (
+              signingKey &&
+              isSignatureVerificationAvailable() &&
+              evt.payload &&
+              evt.nonce &&
+              evt.signature
+            ) {
+              const isValid = await verifyPersistedPayload(
+                evt.payload as PersistedPayload,
+                evt.nonce as string,
+                evt.signature as string,
+                signingKey,
+              );
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (!data) continue;
-          try {
-            const evt = JSON.parse(data);
-            switch (evt.type) {
-              case "progress":
-              case "reasoning":
-              case "content":
-              case "metadata":
-              case "tool_result":
-              case "error":
-                yield evt as StreamChunk;
-                break;
-              case "persisted": {
-                // Verify signature if available and enabled
-                // Note: Signature verification is optional in production since
-                // the signing key can't be safely embedded in frontend code.
-                // In dev, you can set VITE_AGENT_SIGNING_KEY for testing.
-                const signingKey = import.meta.env.VITE_AGENT_SIGNING_KEY;
-
-                if (
-                  signingKey &&
-                  isSignatureVerificationAvailable() &&
-                  evt.payload &&
-                  evt.nonce &&
-                  evt.signature
-                ) {
-                  const isValid = await verifyPersistedPayload(
-                    evt.payload as PersistedPayload,
-                    evt.nonce,
-                    evt.signature,
-                    signingKey,
-                  );
-
-                  if (!isValid) {
-                    logger.error(
-                      "🚫 Invalid signature detected on persisted event",
-                      {
-                        workflowId: evt.payload?.workflowId,
-                        nonce: evt.nonce,
-                      },
-                    );
-                    // Skip this event - possible tampering
-                    break;
-                  }
-
-                  logger.debug("✅ Signature verified for persisted event", {
-                    workflowId: evt.payload?.workflowId,
-                  });
-                }
-
-                yield evt as StreamChunk;
+              if (!isValid) {
+                logger.error(
+                  "🚫 Invalid signature detected on persisted event",
+                  {
+                    workflowId: (evt.payload as PersistedPayload)?.workflowId,
+                    nonce: evt.nonce,
+                  },
+                );
+                // Skip this event - possible tampering
                 break;
               }
-              case "complete":
-                yield { type: "done" };
-                break;
+
+              logger.debug("✅ Signature verified for persisted event", {
+                workflowId: (evt.payload as PersistedPayload)?.workflowId,
+              });
             }
-          } catch (error) {
-            const message = getErrorMessage(error);
-            logger.error("Failed to parse SSE frame", {
-              error: message,
-              raw: data,
-              chatId,
-            });
-            yield {
-              type: "error",
-              error: `Failed to parse SSE frame: ${message}. Raw: ${data}`,
-            };
+
+            yield evt as StreamChunk;
+            break;
           }
+          case "complete":
+            yield { type: "done" };
+            break;
         }
       }
     } catch (error) {
@@ -533,6 +591,12 @@ export class ConvexChatRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Execute a web search query.
+   * @param query - Search query text
+   * @returns Search results
+   * @throws Error if search fails - caller must handle failure
+   */
   async searchWeb(query: string): Promise<unknown> {
     try {
       return await this.client.action(api.search.searchWeb, {
@@ -540,12 +604,18 @@ export class ConvexChatRepository extends BaseRepository {
         maxResults: 5,
       });
     } catch (error) {
-      logger.error("Search failed:", error);
+      logger.error("Search failed:", { error: getErrorMessage(error), query });
       throw error;
     }
   }
 
-  // Sharing operations
+  /**
+   * Share a chat by updating its privacy setting.
+   * @param id - Chat ID to share
+   * @param privacy - Privacy level (shared or public)
+   * @returns Object with shareId and/or publicId
+   * @throws Error if sharing fails - caller must handle failure
+   */
   async shareChat(
     id: string,
     privacy: "shared" | "public",
@@ -559,11 +629,21 @@ export class ConvexChatRepository extends BaseRepository {
         publicId: chat?.publicId,
       };
     } catch (error) {
-      logger.error("Failed to share chat:", error);
+      logger.error("Failed to share chat:", {
+        error: getErrorMessage(error),
+        id,
+        privacy,
+      });
       throw error;
     }
   }
 
+  /**
+   * Get a chat by its share ID.
+   * @param shareId - Share ID to look up
+   * @returns UnifiedChat if found, null if not found or on error
+   * @note Errors are logged but not thrown - caller should check for null
+   */
   async getChatByShareId(shareId: string): Promise<UnifiedChat | null> {
     try {
       const chat = await this.client.query(api.chats.getChatByShareId, {
@@ -571,11 +651,20 @@ export class ConvexChatRepository extends BaseRepository {
       });
       return chat ? this.convexToUnifiedChat(chat) : null;
     } catch (error) {
-      logger.error("Failed to fetch chat by share ID:", error);
-      throw error;
+      logger.error("Failed to fetch chat by share ID:", {
+        error: getErrorMessage(error),
+        shareId,
+      });
+      return null;
     }
   }
 
+  /**
+   * Get a chat by its public ID.
+   * @param publicId - Public ID to look up
+   * @returns UnifiedChat if found, null if not found or on error
+   * @note Errors are logged but not thrown - caller should check for null
+   */
   async getChatByPublicId(publicId: string): Promise<UnifiedChat | null> {
     try {
       const chat = await this.client.query(api.chats.getChatByPublicId, {
@@ -583,21 +672,25 @@ export class ConvexChatRepository extends BaseRepository {
       });
       return chat ? this.convexToUnifiedChat(chat) : null;
     } catch (error) {
-      logger.error("Failed to fetch chat by public ID:", error);
-      throw error;
+      logger.error("Failed to fetch chat by public ID:", {
+        error: getErrorMessage(error),
+        publicId,
+      });
+      return null;
     }
   }
 
   /**
-   * Get chat by ID with retry logic for post-creation lookups
-   * Uses direct database lookup to bypass index propagation delays
+   * Get chat by ID with retry logic for post-creation lookups.
+   * Uses direct database lookup to bypass index propagation delays.
    * @param chatId - Convex chat ID
-   * @param maxAttempts - Maximum number of retry attempts (default: 5)
+   * @param maxAttempts - Maximum retry attempts (default: MAX_LOOKUP_RETRIES)
    * @returns UnifiedChat or null
+   * @see {@link ../constants/retry.ts} - Retry constants and backoff computation
    */
   private async getChatByIdWithRetry(
     chatId: Id<"chats">,
-    maxAttempts = 5,
+    maxAttempts = MAX_LOOKUP_RETRIES,
   ): Promise<UnifiedChat | null> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
@@ -616,9 +709,9 @@ export class ConvexChatRepository extends BaseRepository {
           return this.convexToUnifiedChat(chat);
         }
 
-        // Chat not found - wait before retrying
+        // Chat not found - wait before retrying with exponential backoff
         if (attempt < maxAttempts - 1) {
-          const delay = 50 * Math.pow(2, attempt); // Exponential backoff: 50ms, 100ms, 200ms, 400ms
+          const delay = computeFastBackoff(attempt);
           logger.debug("Chat not found, retrying", {
             chatId,
             attempt,
@@ -631,7 +724,7 @@ export class ConvexChatRepository extends BaseRepository {
         logger.error("Error fetching chat", {
           chatId,
           attempt,
-          error,
+          error: getErrorMessage(error),
           sessionId: this.sessionId,
         });
 
