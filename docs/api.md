@@ -48,6 +48,7 @@ In production, the app calls `*.convex.site` directly. In local dev, `vite` prox
 
 Event types used by the client:
 
+- `workflow_start`: `{ workflowId: string, nonce: string }`
 - `progress`: `{ stage: "thinking" | "planning" | "searching" | "scraping" | "analyzing" | "generating", message: string, urls?, currentUrl?, queries?, sourcesUsed?, toolReasoning?, toolQuery?, toolUrl? }`
 - `reasoning`: `{ content: string }`
 - `content`: `{ delta: string }`
