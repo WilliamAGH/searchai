@@ -14,7 +14,7 @@ import {
 
 test.describe("New Chat Functionality E2E", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     // Wait for app to load, using a more robust strategy for CI
     // domcontentloaded is faster and usually sufficient for initial interaction
     await page.waitForLoadState("domcontentloaded");
@@ -181,7 +181,7 @@ test.describe("New Chat Functionality E2E", () => {
       };
     });
 
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle");
 
     // Open sidebar if needed
@@ -317,7 +317,7 @@ test.describe("New Chat Functionality E2E", () => {
 
   test("should handle follow-up new chat creation", async ({ page }) => {
     // First, create a chat and send a message
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     const input = page.locator('textarea, [role="textbox"]').first();
     await input.fill("Test message");
     await page.keyboard.press("Enter");
@@ -430,7 +430,7 @@ test.describe("New Chat Functionality E2E", () => {
 
   test("should recover from error boundary", async ({ page }) => {
     // Navigate to page first
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     // Inject a script that will throw an error in React component
     await page.addInitScript(() => {
@@ -644,8 +644,7 @@ test.describe("New Chat Stress Tests", () => {
     page,
   }) => {
     // Navigate to home first to ensure we start fresh
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     // Wait for message input to be ready
     const input = page
