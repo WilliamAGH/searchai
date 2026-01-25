@@ -160,25 +160,37 @@ export function isAtBottom(
 }
 
 /**
+ * Input types that accept text entry (excludes buttons, checkboxes, etc.)
+ */
+const TEXT_INPUT_TYPES = new Set([
+  "text",
+  "search",
+  "email",
+  "url",
+  "tel",
+  "password",
+]);
+
+/**
  * Check if user is actively typing in an input field.
  * Used to pause auto-scroll and other viewport manipulations to prevent
  * stealing focus or causing layout shifts while the user is composing input.
- * @returns True if an input or textarea is focused
+ * @returns True if a text input or textarea is focused
  */
 export function isUserTypingInInput(): boolean {
   const active = document.activeElement;
-  if (active instanceof HTMLTextAreaElement) return true;
-  if (active instanceof HTMLInputElement) {
-    // Only consider text-like inputs, not buttons/checkboxes/etc.
-    const textInputTypes = [
-      "text",
-      "search",
-      "email",
-      "url",
-      "tel",
-      "password",
-    ];
-    return textInputTypes.includes(active.type);
+  if (!active) return false;
+
+  const tagName = active.tagName;
+
+  if (tagName === "TEXTAREA") {
+    return true;
   }
+
+  if (tagName === "INPUT") {
+    const inputType = (active as HTMLInputElement).type;
+    return TEXT_INPUT_TYPES.has(inputType);
+  }
+
   return false;
 }
