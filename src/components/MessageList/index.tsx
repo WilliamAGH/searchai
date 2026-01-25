@@ -21,7 +21,13 @@ import { VirtualizedMessageList } from "./VirtualizedMessageList";
 import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { throttle, isNearBottom, isScrolledPastPercent } from "../../lib/utils";
+import { useIsVirtualKeyboardOpen } from "../../hooks/useIsVirtualKeyboardOpen";
+import {
+  throttle,
+  isNearBottom,
+  isScrolledPastPercent,
+  isUserTypingInInput,
+} from "../../lib/utils";
 import { resolveMessageKey } from "./messageKey";
 
 /**
@@ -110,6 +116,7 @@ export function MessageList({
   const smoothScrollInProgressRef = useRef(false);
 
   const isMobile = useIsMobile();
+  const isVirtualKeyboardOpen = useIsVirtualKeyboardOpen();
   const [collapsedById, setCollapsedById] = useState<Record<string, boolean>>(
     {},
   );
@@ -206,12 +213,20 @@ export function MessageList({
 
   // Intelligent auto-scroll: scroll when near bottom or actively generating
   // Also triggers on searchProgress changes to keep tool status visible
+  // IMPORTANT: Pauses when user is typing or virtual keyboard is open to prevent
+  // viewport theft and layout shifts during input composition
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    // Don't auto-scroll while user is actively typing in an input field
+    // This prevents viewport jumps and focus stealing during composition
+    const isUserTyping = isUserTypingInInput();
+
     const shouldAutoScroll =
       autoScrollEnabledRef.current &&
+      !isUserTyping &&
+      !isVirtualKeyboardOpen &&
       (isNearBottom(container, NEAR_BOTTOM_THRESHOLD) ||
         (isGenerating && !userHasScrolled));
 
@@ -223,6 +238,7 @@ export function MessageList({
     messages,
     isGenerating,
     userHasScrolled,
+    isVirtualKeyboardOpen,
     scrollToBottom,
     NEAR_BOTTOM_THRESHOLD,
     scrollContainerRef,
