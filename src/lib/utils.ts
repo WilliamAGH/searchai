@@ -158,3 +158,46 @@ export function isAtBottom(
   const { scrollTop, scrollHeight, clientHeight } = element;
   return Math.abs(scrollHeight - scrollTop - clientHeight) <= tolerance;
 }
+
+/**
+ * Input types that accept text entry (excludes buttons, checkboxes, etc.)
+ */
+const TEXT_INPUT_TYPES = new Set([
+  "text",
+  "search",
+  "email",
+  "url",
+  "tel",
+  "password",
+  "number",
+]);
+
+/**
+ * Check if a text input or textarea is currently focused.
+ * Useful for determining if the user might be composing input.
+ *
+ * Note: This checks focus, not active typing. For auto-scroll decisions,
+ * prefer useIsVirtualKeyboardOpen() which detects actual keyboard presence.
+ *
+ * @returns True if a text input or textarea is focused
+ */
+export function isUserTypingInInput(): boolean {
+  // SSR/test guard: document may not exist
+  if (typeof document === "undefined") return false;
+
+  const active = document.activeElement;
+  if (!active) return false;
+
+  const tagName = active.tagName;
+
+  if (tagName === "TEXTAREA") {
+    return true;
+  }
+
+  if (tagName === "INPUT") {
+    const inputType = (active as HTMLInputElement).type;
+    return TEXT_INPUT_TYPES.has(inputType);
+  }
+
+  return false;
+}

@@ -272,11 +272,26 @@ body,
   min-height: 100dvh;
 }
 
-/* Respect device safe areas for full-bleed layouts */
+/*
+ * Safe Area Inset Strategy (IMPORTANT - read before modifying)
+ * ─────────────────────────────────────────────────────────────
+ * We intentionally OMIT padding-bottom on body.
+ *
+ * WHY: Body padding creates space OUTSIDE the app container (h-dvh),
+ * causing a visible gap between app content and browser chrome on iOS.
+ * Instead, bottom safe-area is handled at the COMPONENT level:
+ *   - ChatLayout input area: pb-[env(safe-area-inset-bottom)]
+ *   - FAB positioning: calc(5rem + env(safe-area-inset-bottom))
+ *
+ * This ensures the app fills the full viewport with no floating gap,
+ * while still respecting the home indicator where needed.
+ *
+ * Top/left/right padding remains for notch and landscape support.
+ */
 body {
   padding-top: env(safe-area-inset-top);
   padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
+  /* padding-bottom intentionally omitted - see comment above */
   padding-left: env(safe-area-inset-left);
 }
 
