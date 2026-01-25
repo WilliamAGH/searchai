@@ -3,6 +3,18 @@
  */
 
 /**
+ * Safely parse a URL string without throwing or logging.
+ * Returns null if the URL is invalid.
+ */
+export function safeParseUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Normalize URLs for comparison/deduplication.
  * - Returns null for invalid/missing inputs
  * - Strips hash fragments
@@ -10,14 +22,12 @@
  */
 export function normalizeUrl(rawUrl: string | undefined): string | null {
   if (!rawUrl || typeof rawUrl !== "string") return null;
-  try {
-    const parsed = new URL(rawUrl);
-    parsed.hash = "";
-    return parsed.toString();
-  } catch (error) {
-    console.warn("normalizeUrl failed for input", { rawUrl, error });
-    return null;
-  }
+
+  const parsed = safeParseUrl(rawUrl);
+  if (!parsed) return null;
+
+  parsed.hash = "";
+  return parsed.toString();
 }
 
 /**
@@ -40,37 +50,31 @@ export function normalizeUrlForKey(rawUrl: string): string {
     return hashIndex !== -1 ? trimmed.slice(0, hashIndex) : trimmed;
   }
 
-  try {
-    const u = new URL(normalized);
-    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
+  const u = safeParseUrl(normalized);
+  if (!u) return normalized;
 
-    // Strip common tracking params
-    const paramsToStrip = [
-      "utm_source",
-      "utm_medium",
-      "utm_campaign",
-      "utm_term",
-      "utm_content",
-      "gclid",
-      "fbclid",
-      "ref",
-    ];
-    paramsToStrip.forEach((p) => {
-      u.searchParams.delete(p);
-    });
+  u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
 
-    if (u.pathname !== "/" && u.pathname.endsWith("/")) {
-      u.pathname = u.pathname.slice(0, -1);
-    }
+  // Strip common tracking params
+  const paramsToStrip = [
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "gclid",
+    "fbclid",
+    "ref",
+  ];
+  paramsToStrip.forEach((p) => {
+    u.searchParams.delete(p);
+  });
 
-    return u.toString();
-  } catch (error) {
-    console.warn("normalizeUrlForKey failed for normalized URL", {
-      normalized,
-      error,
-    });
-    return normalized;
+  if (u.pathname !== "/" && u.pathname.endsWith("/")) {
+    u.pathname = u.pathname.slice(0, -1);
   }
+
+  return u.toString();
 }
 
 const IPV4_PATTERN = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
@@ -250,14 +254,8 @@ export type ScrapeUrlValidation =
   | { ok: false; error: string };
 
 export function validateScrapeUrl(urlInput: string): ScrapeUrlValidation {
-  let url: URL;
-  try {
-    url = new URL(urlInput);
-  } catch (error) {
-    console.warn("validateScrapeUrl failed to parse URL", {
-      urlInput,
-      error,
-    });
+  const url = safeParseUrl(urlInput);
+  if (!url) {
     return { ok: false, error: "Invalid URL format" };
   }
 
