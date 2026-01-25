@@ -2,22 +2,24 @@
  * Search utilities for text processing and entity extraction
  */
 
-// Test-only helpers (no production references). Kept minimal and standalone.
-export function __testTokenize(text: string): string[] {
-  return (text || "")
+import { normalizeWhitespace } from "../lib/text";
+
+// Text processing utilities (defined first so test helpers can use them)
+export function serialize(s: string | undefined): string {
+  return normalizeWhitespace(s);
+}
+
+export function tokenize(t: string): string[] {
+  return t
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
 }
 
-export function __testSerialize(s?: string): string {
-  return (s || "").replace(/\s+/g, " ").trim();
-}
-
-// Extract keywords for testing
+// Test helpers that use the production utilities above
 export function __extractKeywordsForTest(text: string, max: number): string[] {
   const freq = new Map<string, number>();
-  for (const tok of __testTokenize(text)) {
+  for (const tok of tokenize(text || "")) {
     if (tok.length < 4) continue;
     freq.set(tok, (freq.get(tok) || 0) + 1);
   }
@@ -33,8 +35,8 @@ export function __augmentQueryForTest(
   kws: string[],
   maxExtras: number,
 ): string {
-  const base = __testSerialize(q);
-  const words = new Set(__testTokenize(base));
+  const base = serialize(q);
+  const words = new Set(tokenize(base));
   const extras: string[] = [];
   const cap = Math.max(1, maxExtras | 0);
   for (const k of kws || []) {
@@ -76,18 +78,6 @@ export function extractKeyEntities(context: string): string[] {
 
   // Remove duplicates and return most relevant entities
   return [...new Set(entities)].slice(0, 5);
-}
-
-// Text processing utilities
-export function serialize(s: string | undefined): string {
-  return (s || "").replace(/\s+/g, " ").trim();
-}
-
-export function tokenize(t: string): string[] {
-  return t
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
 }
 
 export function tokSet(s: string): Set<string> {

@@ -249,6 +249,7 @@ import {
   normalizeUrl,
   extractContextIdFromOutput,
   convertToContextReferences,
+  relevanceScoreToLabel,
 } from "./orchestration_helpers";
 import type {
   ResearchContextReference,
@@ -1159,12 +1160,7 @@ export async function* streamConversationalWorkflow(
             title: ref.title || "",
             contextId: ref.contextId,
             type: ref.type,
-            relevance:
-              (ref.relevanceScore ?? 0) >= RELEVANCE_SCORES.HIGH_THRESHOLD
-                ? "high"
-                : (ref.relevanceScore ?? 0) >= RELEVANCE_SCORES.MEDIUM_THRESHOLD
-                  ? "medium"
-                  : "low",
+            relevance: relevanceScoreToLabel(ref.relevanceScore),
           })),
         },
         answer: { answer: finalOutput, confidence: 1 },

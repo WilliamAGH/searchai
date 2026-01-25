@@ -1,6 +1,6 @@
 "use node";
 
-import { generateMessageId } from "./id_generator";
+import { generateMessageId } from "../id_generator";
 
 /**
  * Type guards for request payload inspection

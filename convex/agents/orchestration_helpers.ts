@@ -15,6 +15,10 @@ import { RELEVANCE_SCORES } from "../lib/constants/cache";
 // Constants and Utilities
 // ============================================
 
+/**
+ * UUID v7 validation pattern - duplicated from lib/uuid.ts for bundle optimization.
+ * @see {@link ../lib/uuid.ts:isValidUuidV7} - canonical implementation
+ */
 const UUID_V7_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOOL_RESULT_MAX_LENGTH = 200;
@@ -24,6 +28,22 @@ const CHARS_PER_TOKEN_ESTIMATE = 4;
 
 export const isUuidV7 = (value: string | undefined): boolean =>
   !!value && UUID_V7_REGEX.test(value);
+
+/**
+ * Convert numeric relevance score to human-readable label.
+ * Uses centralized thresholds from RELEVANCE_SCORES constants.
+ *
+ * @param score - Relevance score (0-1), or undefined
+ * @returns "high" | "medium" | "low" based on threshold comparison
+ */
+export function relevanceScoreToLabel(
+  score: number | undefined,
+): "high" | "medium" | "low" {
+  const s = score ?? 0;
+  if (s >= RELEVANCE_SCORES.HIGH_THRESHOLD) return "high";
+  if (s >= RELEVANCE_SCORES.MEDIUM_THRESHOLD) return "medium";
+  return "low";
+}
 
 export const summarizeToolResult = (output: unknown): string => {
   if (output === null || typeof output === "undefined") {

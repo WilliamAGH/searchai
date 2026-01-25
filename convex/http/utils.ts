@@ -2,6 +2,8 @@
  * Utility functions for HTTP endpoints
  */
 
+import { normalizeWhitespace } from "../lib/text";
+
 /**
  * Serialize an error for JSON responses
  * - Extracts name, message, stack, and cause from Error objects
@@ -118,7 +120,7 @@ export function extractPlainText(content: string): string {
   text = text.replace(/```[\s\S]*?```/g, "");
   // HTML tags
   text = text.replace(/<[^>]*>/g, "");
-  return text.replace(/\s+/g, " ").trim();
+  return normalizeWhitespace(text);
 }
 
 /**

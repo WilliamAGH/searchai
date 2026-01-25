@@ -24,13 +24,22 @@ import {
   type ModelSettings,
 } from "@openai/agents-core";
 import OpenAI from "openai";
-import { getErrorMessage } from "../errors";
 
-import { createInstrumentedFetch } from "../fetchUtils";
+import { createInstrumentedFetch } from "./fetch_instrumentation";
 import {
   parseOpenRouterProvider,
   parseReasoningSettings,
 } from "./openai_config";
+import { scheduleOpenAIHealthCheck } from "./openai_health";
+import type {
+  OpenRouterBody as LegacyOpenRouterBody,
+  OpenRouterMessage as LegacyOpenRouterMessage,
+} from "./openrouter_types";
+
+export type {
+  LegacyOpenRouterBody as OpenRouterBody,
+  LegacyOpenRouterMessage as OpenRouterMessage,
+};
 
 /**
  * Shared OpenAI environment configuration
@@ -40,62 +49,6 @@ export interface OpenAIEnvironment {
   isOpenAIEndpoint: boolean;
   defaultModelSettings: Partial<ModelSettings>;
 }
-
-/**
- * Wrap the native fetch to inject IDs for function_call_output items
- * and optionally dump payloads when debugging
- */
-
-const DEFAULT_HEALTHCHECK_TIMEOUT_MS = 8000;
-let healthCheckPromise: Promise<void> | null = null;
-
-const scheduleOpenAIHealthCheck = (params: {
-  client: OpenAI;
-  model: string;
-  isOpenAIEndpoint: boolean;
-}) => {
-  if (!params.isOpenAIEndpoint) return;
-  if (!process.env.LLM_API_KEY && !process.env.OPENAI_API_KEY) return;
-  if (process.env.LLM_HEALTHCHECK === "0") return;
-  if (healthCheckPromise) return;
-
-  const timeoutMs = Number.parseInt(
-    process.env.LLM_HEALTHCHECK_TIMEOUT_MS || "",
-    10,
-  );
-  const maxWait =
-    Number.isFinite(timeoutMs) && timeoutMs > 0
-      ? timeoutMs
-      : DEFAULT_HEALTHCHECK_TIMEOUT_MS;
-
-  const run = async () => {
-    const start = Date.now();
-    try {
-      const check = params.client.responses.create({
-        model: params.model,
-        input: "healthcheck",
-        max_output_tokens: 1,
-      });
-      await Promise.race([
-        check,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Health check timeout")), maxWait),
-        ),
-      ]);
-      console.info(
-        "✅ OpenAI health check passed",
-        `${params.model} (${Date.now() - start}ms)`,
-      );
-    } catch (error) {
-      console.error("❌ OpenAI health check failed", {
-        model: params.model,
-        error: getErrorMessage(error),
-      });
-    }
-  };
-
-  healthCheckPromise = run();
-};
 
 /**
  * Create an OpenAI-compatible environment configured from env vars
@@ -280,27 +233,3 @@ export const isOpenRouterEndpoint = (): boolean => {
     process.env.OPENROUTER_BASE_URL;
   return baseURL?.toLowerCase().includes("openrouter") || false;
 };
-
-/**
- * Legacy compatibility: OpenRouter message format
- * Used for backward compatibility with existing streaming.ts
- */
-export interface OpenRouterMessage {
-  role: string;
-  content: string;
-  cache_control?: { type: string };
-}
-
-/**
- * Legacy compatibility: OpenRouter request body
- */
-export interface OpenRouterBody {
-  model: string;
-  messages: OpenRouterMessage[];
-  temperature: number;
-  max_tokens: number;
-  top_p?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
-  stream?: boolean;
-}
