@@ -3,6 +3,11 @@
  *
  * Provides safe validation and casting for Convex IDs in frontend code.
  * Prevents unsafe string-to-ID casts that can cause runtime errors.
+ *
+ * @note Accepted duplication: This module mirrors validation logic in
+ * convex/lib/validators.ts for bundle isolation. Both implementations
+ * should remain in sync.
+ * @see {@link ../../../../convex/lib/validators.ts} - backend version
  */
 
 import type { Id } from "../../../convex/_generated/dataModel";
