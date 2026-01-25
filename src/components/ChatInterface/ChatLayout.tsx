@@ -113,7 +113,7 @@ export function ChatLayout({
     <div className="flex-1 flex h-full min-h-0 relative">
       {/* Desktop Sidebar - Fixed position so scroll appears at browser edge */}
       {showDesktopSidebar && (
-        <div className="fixed left-0 top-[3.75rem] sm:top-16 w-80 h-[calc(100dvh-3.75rem)] sm:h-[calc(100dvh-4rem)] z-40">
+        <div className="fixed left-0 top-[3.75rem] sm:top-16 w-80 h-[calc(var(--app-dvh,100dvh)-3.75rem)] sm:h-[calc(var(--app-dvh,100dvh)-4rem)] z-40">
           <div className="h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
             <ChatSidebar {...chatSidebarProps} />
           </div>
