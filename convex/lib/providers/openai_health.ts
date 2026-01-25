@@ -1,9 +1,20 @@
 "use node";
 
+/**
+ * OpenAI Health Check Provider
+ *
+ * Schedules a lightweight background health check for OpenAI-compatible endpoints.
+ * Ensures the model is responsive before allowing heavy traffic.
+ * Uses a single-flight pattern to prevent stampeding checks.
+ */
+
 import type OpenAI from "openai";
 import { getErrorMessage } from "../errors";
 
 const DEFAULT_HEALTHCHECK_TIMEOUT_MS = 8000;
+const HEALTHCHECK_INPUT = "healthcheck";
+const HEALTHCHECK_MAX_TOKENS = 1;
+
 let healthCheckPromise: Promise<void> | null = null;
 
 export const scheduleOpenAIHealthCheck = (params: {
@@ -30,8 +41,8 @@ export const scheduleOpenAIHealthCheck = (params: {
     try {
       const check = params.client.responses.create({
         model: params.model,
-        input: "healthcheck",
-        max_output_tokens: 1,
+        input: HEALTHCHECK_INPUT,
+        max_output_tokens: HEALTHCHECK_MAX_TOKENS,
       });
       await Promise.race([
         check,
