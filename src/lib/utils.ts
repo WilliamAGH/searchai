@@ -169,15 +169,22 @@ const TEXT_INPUT_TYPES = new Set([
   "url",
   "tel",
   "password",
+  "number",
 ]);
 
 /**
- * Check if user is actively typing in an input field.
- * Used to pause auto-scroll and other viewport manipulations to prevent
- * stealing focus or causing layout shifts while the user is composing input.
+ * Check if a text input or textarea is currently focused.
+ * Useful for determining if the user might be composing input.
+ *
+ * Note: This checks focus, not active typing. For auto-scroll decisions,
+ * prefer useIsVirtualKeyboardOpen() which detects actual keyboard presence.
+ *
  * @returns True if a text input or textarea is focused
  */
 export function isUserTypingInInput(): boolean {
+  // SSR/test guard: document may not exist
+  if (typeof document === "undefined") return false;
+
   const active = document.activeElement;
   if (!active) return false;
 
