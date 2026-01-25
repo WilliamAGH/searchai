@@ -199,7 +199,7 @@ export function MarkdownWithCitations({
                     target="_blank"
                     rel="noopener noreferrer"
                     className={clsx(
-                      "inline-flex items-center gap-0.5 px-1 py-0.5 mx-1 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
+                      "inline-flex items-center gap-0.5 px-1 py-0.5 mx-1 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline citation-pill",
                       isHighlighted
                         ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
                         : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
@@ -208,9 +208,9 @@ export function MarkdownWithCitations({
                     onMouseLeave={() => onCitationHover?.(null)}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <span>{domain}</span>
+                    <span className="citation-pill-text">{domain}</span>
                     <svg
-                      className="w-3 h-3 opacity-60"
+                      className="w-3 h-3 opacity-60 flex-shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -258,7 +258,7 @@ export function MarkdownWithCitations({
                     target="_blank"
                     rel="noopener noreferrer"
                     className={clsx(
-                      "inline-flex items-center gap-0.5 px-1 py-0.5 mx-1 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline",
+                      "inline-flex items-center gap-0.5 px-1 py-0.5 mx-1 rounded-md text-xs font-medium transition-all duration-200 no-underline align-baseline citation-pill",
                       isHighlighted
                         ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
                         : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300",
@@ -267,9 +267,9 @@ export function MarkdownWithCitations({
                     onMouseLeave={() => onCitationHover?.(null)}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <span>{domain}</span>
+                    <span className="citation-pill-text">{domain}</span>
                     <svg
-                      className="w-3 h-3 opacity-60"
+                      className="w-3 h-3 opacity-60 flex-shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"

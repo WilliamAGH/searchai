@@ -1,7 +1,7 @@
 {
   "name": "searchai-io",
   "private": true,
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "AI-powered search application",
   "type": "module",
   "homepage": "https://search-ai.io",

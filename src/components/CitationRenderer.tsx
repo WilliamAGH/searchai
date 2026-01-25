@@ -53,7 +53,7 @@ const CitationLink: React.FC<{
       rel="noopener noreferrer"
       className={`
         inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-xs font-medium
-        transition-all duration-200 no-underline
+        transition-all duration-200 no-underline citation-pill
         ${
           isHighlighted
             ? "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600"
@@ -66,10 +66,10 @@ const CitationLink: React.FC<{
       onMouseLeave={handleLeave}
       onClick={handleClick}
     >
-      <span>{domain}</span>
+      <span className="citation-pill-text">{domain}</span>
       {(isHovered || isHighlighted) && (
         <svg
-          className="w-3 h-3 opacity-60"
+          className="w-3 h-3 opacity-60 flex-shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

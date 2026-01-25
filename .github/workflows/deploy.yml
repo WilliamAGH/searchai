@@ -1,0 +1,54 @@
+name: Deploy Convex
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        default: "development"
+        type: choice
+        options:
+          - development
+          - production
+
+jobs:
+  deploy:
+    name: Deploy to ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name == 'push' && github.ref_name == 'main') && 'Production' || 'Development' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name == 'push' && github.ref_name == 'main') && 'production' || 'development' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy to Convex
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: npx convex deploy
+
+      - name: Deployment Summary
+        env:
+          DEPLOYMENT_NAME: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name == 'push' && github.ref_name == 'main') && 'vivid-boar-858' || 'diligent-greyhound-240' }}
+          ENV_NAME: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name == 'push' && github.ref_name == 'main') && 'Production' || 'Development' }}
+        run: |
+          {
+            echo "## Convex Deployment Complete"
+            echo ""
+            echo "**Environment:** $ENV_NAME"
+            echo ""
+            echo "**Deployment:** \`$DEPLOYMENT_NAME\`"
+            echo ""
+            echo "**Dashboard:** https://dashboard.convex.dev/d/$DEPLOYMENT_NAME"
+          } >> "$GITHUB_STEP_SUMMARY"
