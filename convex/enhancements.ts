@@ -10,6 +10,8 @@
 
 // Import SearchResult from the single source of truth
 import type { SearchResult } from "./lib/types/search";
+import { safeParseUrl } from "./lib/url";
+import { buildTemporalHeader } from "./lib/dateTime";
 
 // Enhancement system - no convex values needed here
 
@@ -41,8 +43,6 @@ export function extractUrlsFromMessage(message: string): string[] {
   const deduped = Array.from(new Set(urls));
   return deduped;
 }
-
-import { safeParseUrl } from "./lib/url";
 
 // Create search results from user-provided URLs
 export function createUserProvidedSearchResults(
@@ -100,8 +100,6 @@ export interface EnhancementRule {
  * This is designed to be a single, centralized place to inject temporal context
  * whenever callers opt-in via `enhanceSystemPrompt: true`.
  */
-import { buildTemporalHeader } from "./lib/dateTime";
-
 const temporalEnhancement: EnhancementRule = {
   id: "temporal-context",
   name: "Temporal Context (UTC & PT)",
