@@ -22,12 +22,7 @@ import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useIsVirtualKeyboardOpen } from "../../hooks/useIsVirtualKeyboardOpen";
-import {
-  throttle,
-  isNearBottom,
-  isScrolledPastPercent,
-  isUserTypingInInput,
-} from "../../lib/utils";
+import { throttle, isNearBottom, isScrolledPastPercent } from "../../lib/utils";
 import { resolveMessageKey } from "./messageKey";
 
 /**
@@ -213,19 +208,18 @@ export function MessageList({
 
   // Intelligent auto-scroll: scroll when near bottom or actively generating
   // Also triggers on searchProgress changes to keep tool status visible
-  // IMPORTANT: Pauses when user is typing or virtual keyboard is open to prevent
-  // viewport theft and layout shifts during input composition
+  // IMPORTANT: Pauses when virtual keyboard is open to prevent viewport theft
+  // on mobile during input composition (see useIsVirtualKeyboardOpen)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // Don't auto-scroll while user is actively typing in an input field
-    // This prevents viewport jumps and focus stealing during composition
-    const isUserTyping = isUserTypingInInput();
-
+    // On mobile, the virtual keyboard hook detects when the keyboard is open
+    // and pauses auto-scroll to prevent layout shifts during typing.
+    // On desktop, focus alone shouldn't disable auto-scroll since there's no
+    // viewport shift - only the virtual keyboard causes that issue.
     const shouldAutoScroll =
       autoScrollEnabledRef.current &&
-      !isUserTyping &&
       !isVirtualKeyboardOpen &&
       (isNearBottom(container, NEAR_BOTTOM_THRESHOLD) ||
         (isGenerating && !userHasScrolled));
