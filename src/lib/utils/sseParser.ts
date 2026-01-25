@@ -1,9 +1,8 @@
 /**
  * Server-Sent Events (SSE) stream parsing utilities.
- * Shared between ConvexChatRepository and UnauthenticatedAIService.
+ * Provides shared parsing for SSE streams used by chat repositories.
  *
  * @see ConvexChatRepository.generateResponse - Authenticated streaming
- * @see UnauthenticatedAIService.generateResponse - Unauthenticated streaming
  */
 
 import { getErrorMessage } from "./errorUtils";

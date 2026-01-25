@@ -465,7 +465,6 @@ export class ConvexChatRepository extends BaseRepository {
    * @param message - User message to respond to
    * @yields StreamChunk events (progress, reasoning, content, metadata, error, done)
    * @see {@link ../utils/sseParser.ts} - Shared SSE parsing logic
-   * @see {@link UnauthenticatedAIService.generateResponse} - Unauthenticated equivalent
    */
   async *generateResponse(
     chatId: string,
