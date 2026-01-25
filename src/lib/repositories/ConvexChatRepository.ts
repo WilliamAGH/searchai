@@ -18,7 +18,11 @@ import {
 import { logger } from "../logger";
 import { buildHttpError, readResponseBody } from "../utils/httpUtils";
 import { getErrorMessage } from "../utils/errorUtils";
-import { parseSSEStream, isSSEParseError } from "../utils/sseParser";
+import {
+  parseSSEStream,
+  isSSEParseError,
+  type SSEEvent,
+} from "../utils/sseParser";
 import { MAX_LOOKUP_RETRIES, computeFastBackoff } from "../constants/retry";
 import {
   verifyPersistedPayload,
@@ -512,7 +516,6 @@ export class ConvexChatRepository extends BaseRepository {
 
       // Use shared SSE parser for stream processing
       for await (const evt of parseSSEStream(response)) {
-        // Handle parse errors from the SSE parser
         if (isSSEParseError(evt)) {
           logger.error("Failed to parse SSE frame", {
             error: evt.error,
@@ -526,60 +529,9 @@ export class ConvexChatRepository extends BaseRepository {
           continue;
         }
 
-        // Map SSE events to StreamChunk
-        switch (evt.type) {
-          case "progress":
-          case "reasoning":
-          case "content":
-          case "metadata":
-          case "tool_result":
-          case "error":
-            yield evt as StreamChunk;
-            break;
-          case "persisted": {
-            // Verify signature if available and enabled
-            // Note: Signature verification is optional in production since
-            // the signing key can't be safely embedded in frontend code.
-            // In dev, you can set VITE_AGENT_SIGNING_KEY for testing.
-            const signingKey = import.meta.env.VITE_AGENT_SIGNING_KEY;
-
-            if (
-              signingKey &&
-              isSignatureVerificationAvailable() &&
-              evt.payload &&
-              evt.nonce &&
-              evt.signature
-            ) {
-              const isValid = await verifyPersistedPayload(
-                evt.payload as PersistedPayload,
-                evt.nonce as string,
-                evt.signature as string,
-                signingKey,
-              );
-
-              if (!isValid) {
-                logger.error(
-                  "🚫 Invalid signature detected on persisted event",
-                  {
-                    workflowId: (evt.payload as PersistedPayload)?.workflowId,
-                    nonce: evt.nonce,
-                  },
-                );
-                // Skip this event - possible tampering
-                break;
-              }
-
-              logger.debug("✅ Signature verified for persisted event", {
-                workflowId: (evt.payload as PersistedPayload)?.workflowId,
-              });
-            }
-
-            yield evt as StreamChunk;
-            break;
-          }
-          case "complete":
-            yield { type: "done" };
-            break;
+        const processed = await this.handleStreamEvent(evt);
+        if (processed) {
+          yield processed;
         }
       }
     } catch (error) {
@@ -738,6 +690,74 @@ export class ConvexChatRepository extends BaseRepository {
       sessionId: this.sessionId,
     });
     return null;
+  }
+
+  /**
+   * Handle individual SSE events and transform them to StreamChunks.
+   * Encapsulates event processing logic to simplify the main generator loop.
+   */
+  private async handleStreamEvent(evt: SSEEvent): Promise<StreamChunk | null> {
+    // Pass-through events
+    if (
+      [
+        "progress",
+        "reasoning",
+        "content",
+        "metadata",
+        "tool_result",
+        "error",
+      ].includes(evt.type)
+    ) {
+      return evt as StreamChunk;
+    }
+
+    if (evt.type === "complete") {
+      return { type: "done" };
+    }
+
+    if (evt.type === "persisted") {
+      return this.handlePersistedEvent(evt);
+    }
+
+    return null;
+  }
+
+  /**
+   * Verify and process 'persisted' events.
+   */
+  private async handlePersistedEvent(
+    evt: SSEEvent,
+  ): Promise<StreamChunk | null> {
+    const signingKey = import.meta.env.VITE_AGENT_SIGNING_KEY;
+
+    if (
+      signingKey &&
+      isSignatureVerificationAvailable() &&
+      evt.payload &&
+      evt.nonce &&
+      evt.signature
+    ) {
+      const isValid = await verifyPersistedPayload(
+        evt.payload as PersistedPayload,
+        evt.nonce as string,
+        evt.signature as string,
+        signingKey,
+      );
+
+      if (!isValid) {
+        logger.error("🚫 Invalid signature detected on persisted event", {
+          workflowId: (evt.payload as PersistedPayload)?.workflowId,
+          nonce: evt.nonce,
+        });
+        return null;
+      }
+
+      logger.debug("✅ Signature verified for persisted event", {
+        workflowId: (evt.payload as PersistedPayload)?.workflowId,
+      });
+    }
+
+    return evt as StreamChunk;
   }
 
   // Helper methods
