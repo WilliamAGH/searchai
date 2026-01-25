@@ -126,6 +126,25 @@ export function isNearBottom(
 }
 
 /**
+ * Check if scroll position is at or past a percentage of total scrollable content.
+ * Useful for hiding FAB when user is ~95% of the way down regardless of viewport size.
+ * @param element - Scrollable element
+ * @param percentThreshold - Percentage threshold (0-100). E.g., 95 means "at 95% or more"
+ * @returns True if scroll position is at or past the threshold
+ */
+export function isScrolledPastPercent(
+  element: HTMLElement | null,
+  percentThreshold: number,
+): boolean {
+  if (!element) return false;
+  const { scrollTop, scrollHeight, clientHeight } = element;
+  const maxScroll = scrollHeight - clientHeight;
+  if (maxScroll <= 0) return true; // Content fits in viewport, consider "at bottom"
+  const scrollPercent = (scrollTop / maxScroll) * 100;
+  return scrollPercent >= percentThreshold;
+}
+
+/**
  * Check if an element is at the bottom of its scroll container
  * @param element - Scrollable element
  * @param tolerance - Tolerance in pixels (default: 1)
