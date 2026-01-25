@@ -178,6 +178,19 @@
 }
 
 @layer utilities {
+  /* Citation pill overflow protection - constrains long URLs/domains */
+  .citation-pill {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .citation-pill-text {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* Default: broad compatibility */
   .text-balance {
     overflow-wrap: break-word;
@@ -311,6 +324,9 @@ body {
   /* Keep prose inheriting page font (Playfair light, Mono dark) */
   font-family: inherit;
   font-variant-numeric: lining-nums;
+  /* Prevent long strings from breaking mobile viewport */
+  overflow-wrap: break-word;
+  word-wrap: break-word; /* Legacy fallback */
 }
 
 /* Ensure nested text elements inherit numeric features */
@@ -397,6 +413,8 @@ html.dark .prose code {
 
 .prose a {
   @apply text-primary hover:text-primary/80;
+  /* Force URL breaking to prevent overflow */
+  word-break: break-all;
 }
 
 .prose code {
