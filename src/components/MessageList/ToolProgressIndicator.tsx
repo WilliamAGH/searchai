@@ -136,7 +136,7 @@ export function ToolProgressIndicator({
 
             {/* Stage info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-1.5">
                 <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
                   {stageText.label}
                 </span>

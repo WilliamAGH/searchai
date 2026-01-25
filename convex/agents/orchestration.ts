@@ -871,7 +871,7 @@ export async function* streamConversationalWorkflow(
 
     yield writeEvent("progress", {
       stage: "thinking",
-      message: "Thinking...",
+      message: "your question...",
     });
 
     // Run the conversational agent with streaming
@@ -1344,7 +1344,7 @@ export async function* streamResearchWorkflow(
     // ============================================
     yield writeEvent("progress", {
       stage: "planning",
-      message: "Analyzing your question and planning research strategy...",
+      message: "your question and preparing research approach...",
     });
 
     const planningStart = Date.now();
@@ -1616,7 +1616,7 @@ export async function* streamResearchWorkflow(
     if (searchQueriesCount > 0) {
       yield writeEvent("progress", {
         stage: "searching",
-        message: `Searching ${searchQueriesCount} ${searchQueriesCount === 1 ? "query" : "queries"} in parallel...`,
+        message: `${searchQueriesCount} ${searchQueriesCount === 1 ? "query" : "queries"} in parallel...`,
         queries: planningOutput.searchQueries.map((q: any) => q.query),
       });
 
@@ -1696,7 +1696,7 @@ export async function* streamResearchWorkflow(
     if (uniqueUrls.length > 0) {
       yield writeEvent("progress", {
         stage: "scraping",
-        message: `Reading ${uniqueUrls.length} sources in parallel...`,
+        message: `${uniqueUrls.length} sources in parallel...`,
         urls: uniqueUrls.map((u) => u.url),
       });
 
