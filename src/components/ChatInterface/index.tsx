@@ -34,11 +34,7 @@ import { ChatLayout } from "./ChatLayout";
 import type { Chat } from "../../lib/types/chat";
 import { createChatFromData } from "../../lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "../../lib/constants/topicDetection";
-import {
-  buildApiBase,
-  resolveApiPath,
-  fetchJsonWithRetry,
-} from "../../lib/utils/httpUtils";
+import { buildApiBase, resolveApiPath } from "../../lib/utils/httpUtils";
 import { isTopicChange } from "../../lib/utils/topicDetection";
 import { mapMessagesToLocal } from "../../lib/utils/messageMapper";
 import { buildUserHistory } from "../../lib/utils/chatHistory";
@@ -125,17 +121,13 @@ function ChatInterfaceComponent({
     return baseChats;
   }, [chats]);
 
-  const {
-    navigateWithVerification,
-    buildChatPath,
-    handleSelectChat: navHandleSelectChat,
-  } = useChatNavigation({
-    currentChatId,
-    allChats,
-    isAuthenticated,
-    onSelectChat: chatActions.selectChat,
-  });
-  const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
+  const { navigateWithVerification, handleSelectChat: navHandleSelectChat } =
+    useChatNavigation({
+      currentChatId,
+      allChats,
+      isAuthenticated,
+      onSelectChat: chatActions.selectChat,
+    });
   const planSearch = useAction(api.search.planSearch);
   const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
@@ -509,8 +501,6 @@ function ChatInterfaceComponent({
       showFollowUpPrompt={showFollowUpPrompt}
       currentChatId={currentChatId}
       currentChat={currentChat}
-      isAuthenticated={isAuthenticated}
-      allChats={allChats}
       undoBanner={undoBanner}
       plannerHint={plannerHint}
       chatSidebarProps={chatSidebarProps}
@@ -520,16 +510,10 @@ function ChatInterfaceComponent({
       swipeHandlers={swipeHandlers}
       setShowShareModal={setShowShareModal}
       setUndoBanner={setUndoBanner}
-      openShareModal={openShareModal}
       handleContinueChat={handleContinueChat}
       handleNewChatForFollowUp={handleNewChatForFollowUp}
       handleNewChatWithSummary={handleNewChatWithSummary}
-      chatState={chatState}
       chatActions={chatActions}
-      updateChatPrivacy={updateChatPrivacy}
-      navigateWithVerification={navigateWithVerification}
-      buildChatPath={buildChatPath}
-      fetchJsonWithRetry={fetchJsonWithRetry}
       resolveApi={resolveApi}
     />
   );

@@ -13,7 +13,7 @@ import { UndoBanner } from "../UndoBanner";
 import { ShareModalContainer } from "../ShareModalContainer";
 // Global agent status overlay removed; inline statuses handle all feedback
 import type { Chat } from "../../lib/types/chat";
-import type { ChatState, ChatActions } from "../../hooks/types";
+import type { ChatActions } from "../../hooks/types";
 
 type ChatSidebarProps = React.ComponentProps<typeof ChatSidebar>;
 type MobileSidebarProps = React.ComponentProps<typeof MobileSidebar>;
@@ -28,8 +28,6 @@ interface ChatLayoutProps {
   showFollowUpPrompt: boolean;
   currentChatId: string | null;
   currentChat: Chat | null;
-  isAuthenticated: boolean;
-  allChats: Chat[];
 
   // UI state
   undoBanner: {
@@ -53,23 +51,14 @@ interface ChatLayoutProps {
   setUndoBanner: (
     banner: { message: string; action?: () => void } | null,
   ) => void;
-  openShareModal: () => void;
   handleContinueChat: () => void;
   handleNewChatForFollowUp: () => void;
   handleNewChatWithSummary: () => void;
 
   // Chat data
-  chatState: ChatState;
   chatActions: ChatActions;
 
   // API functions
-  updateChatPrivacy: (args: {
-    chatId: string;
-    privacy: "private" | "shared" | "public";
-  }) => Promise<void>;
-  navigateWithVerification: (path: string) => Promise<void>;
-  buildChatPath: (chatId: string) => string;
-  fetchJsonWithRetry: <T>(url: string, init?: RequestInit) => Promise<T>;
   resolveApi: (path: string) => string;
 }
 
@@ -80,8 +69,6 @@ export function ChatLayout({
   showFollowUpPrompt,
   currentChatId,
   currentChat,
-  isAuthenticated: _isAuthenticated,
-  allChats: _allChats,
   undoBanner,
   plannerHint,
   chatSidebarProps,
@@ -91,16 +78,10 @@ export function ChatLayout({
   swipeHandlers,
   setShowShareModal,
   setUndoBanner,
-  openShareModal: _openShareModal,
   handleContinueChat,
   handleNewChatForFollowUp,
   handleNewChatWithSummary,
-  chatState: _chatState,
   chatActions,
-  updateChatPrivacy: _updateChatPrivacy,
-  navigateWithVerification: _navigateWithVerification,
-  buildChatPath: _buildChatPath,
-  fetchJsonWithRetry: _fetchJsonWithRetry,
   resolveApi,
 }: ChatLayoutProps) {
   // Desktop sidebar visible: not mobile AND sidebar is open
