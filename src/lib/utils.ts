@@ -158,3 +158,27 @@ export function isAtBottom(
   const { scrollTop, scrollHeight, clientHeight } = element;
   return Math.abs(scrollHeight - scrollTop - clientHeight) <= tolerance;
 }
+
+/**
+ * Check if user is actively typing in an input field.
+ * Used to pause auto-scroll and other viewport manipulations to prevent
+ * stealing focus or causing layout shifts while the user is composing input.
+ * @returns True if an input or textarea is focused
+ */
+export function isUserTypingInInput(): boolean {
+  const active = document.activeElement;
+  if (active instanceof HTMLTextAreaElement) return true;
+  if (active instanceof HTMLInputElement) {
+    // Only consider text-like inputs, not buttons/checkboxes/etc.
+    const textInputTypes = [
+      "text",
+      "search",
+      "email",
+      "url",
+      "tel",
+      "password",
+    ];
+    return textInputTypes.includes(active.type);
+  }
+  return false;
+}
