@@ -326,6 +326,7 @@ export function createChatActions(
           streamHandler.handle(chunk);
         }
 
+        // If persistence wasn't confirmed via SSE, clean up streaming state
         const persistedConfirmed = streamHandler.getPersistedConfirmed();
         if (!persistedConfirmed) {
           setState((prev) => ({
@@ -339,29 +340,8 @@ export function createChatActions(
             ),
           }));
         }
-
-        const refreshAfterPersist = async (shouldForce: boolean) => {
-          if (!repository) {
-            return;
-          }
-
-          // CRITICAL FIX: For authenticated users, SKIP refresh entirely
-          // Optimistic state is already correct and refreshing causes flickering
-          // because DB messages have different IDs than optimistic messages
-          logger.debug(
-            "Skipping refresh - optimistic state is source of truth",
-            {
-              chatId,
-              shouldForce,
-            },
-          );
-          return;
-        };
-
-        // CRITICAL FIX: Pass persistedConfirmed directly (not inverted)
-        // When persistence is confirmed (TRUE), we SHOULD refresh to sync with DB
-        // When persistence is not confirmed (FALSE), we SHOULD NOT refresh (keep optimistic state)
-        await refreshAfterPersist(persistedConfirmed);
+        // Note: We intentionally skip refresh after persist - optimistic state is source of truth
+        // Refreshing causes UI flickering because DB messages have different IDs
       } catch (error) {
         logger.error("Failed to send message:", error);
         setState((prev) => ({
@@ -369,6 +349,12 @@ export function createChatActions(
           isGenerating: false,
           error: getErrorMessage(error, "Failed to send message"),
           searchProgress: { stage: "idle" },
+          // Clear streaming flags on the last assistant message to avoid stuck UI
+          messages: prev.messages.map((m, index) =>
+            index === prev.messages.length - 1 && m.role === "assistant"
+              ? { ...m, isStreaming: false, thinking: undefined }
+              : m,
+          ),
         }));
       }
     },

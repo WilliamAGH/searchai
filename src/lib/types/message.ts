@@ -91,7 +91,8 @@ export type MessageStreamChunk =
         | "searching"
         | "scraping"
         | "analyzing"
-        | "generating";
+        | "generating"
+        | "finalizing";
       message: string;
       urls?: string[];
       currentUrl?: string;
@@ -111,6 +112,11 @@ export type MessageStreamChunk =
   | { type: "error"; error: string } // Error events
   | { type: "done" } // Stream completion
   | {
+      type: "workflow_start";
+      workflowId: string;
+      nonce: string;
+    } // Workflow initialization event
+  | {
       type: "persisted";
       payload: PersistedPayload;
       nonce: string;
@@ -124,11 +130,13 @@ export type MessageStreamChunk =
 export interface SearchProgress {
   stage:
     | "idle"
+    | "thinking"
     | "planning"
     | "searching"
     | "scraping"
     | "analyzing"
-    | "generating";
+    | "generating"
+    | "finalizing";
   message?: string;
   urls?: string[];
   currentUrl?: string;

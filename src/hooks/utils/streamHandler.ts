@@ -18,6 +18,8 @@ export class StreamEventHandler {
   private accumulatedReasoning = "";
   private persistedDetails: PersistedPayload | null = null;
   private persistedConfirmed = false;
+  private workflowId: string | null = null;
+  private workflowNonce: string | null = null;
 
   constructor(
     private setState: Dispatch<SetStateAction<ChatState>>,
@@ -36,7 +38,19 @@ export class StreamEventHandler {
     return this.fullContent;
   }
 
+  public getWorkflowId(): string | null {
+    return this.workflowId;
+  }
+
+  public getWorkflowNonce(): string | null {
+    return this.workflowNonce;
+  }
+
   public handle(chunk: StreamChunk): void {
+    if (chunk.type === "workflow_start") {
+      this.handleWorkflowStart(chunk);
+      return;
+    }
     if (chunk.type === "progress") {
       this.handleProgress(chunk);
       return;
@@ -89,6 +103,24 @@ export class StreamEventHandler {
     logger.debug("Progress update:", chunk.stage, chunk.message, {
       toolReasoning: chunk.toolReasoning,
       toolQuery: chunk.toolQuery,
+    });
+  }
+
+  private handleWorkflowStart(
+    chunk: Extract<StreamChunk, { type: "workflow_start" }>,
+  ) {
+    this.workflowId = chunk.workflowId;
+    this.workflowNonce = chunk.nonce;
+
+    // Update the last assistant message with workflow tracking info
+    updateLastAssistantMessage(this.setState, {
+      workflowId: chunk.workflowId,
+      workflowNonce: chunk.nonce,
+    });
+
+    logger.debug("Workflow started", {
+      chatId: this.chatId,
+      workflowId: chunk.workflowId,
     });
   }
 
