@@ -101,7 +101,11 @@ export function AuthModalBase({
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
 
-    if (!enableFocusTrap) return;
+    if (!enableFocusTrap) {
+      return () => {
+        previouslyFocusedRef.current?.focus?.();
+      };
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
