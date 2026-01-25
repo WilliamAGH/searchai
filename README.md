@@ -4,8 +4,15 @@ AI-powered search chat built with React + Vite and Convex.
 
 ![search-ai.io](public/images/opengraph/searchai-io-og.png)
 
-- Live: https://search-ai.io
+- Live: [search-ai.io](https://search-ai.io)
 - Docs: [docs/README.md](docs/README.md)
+
+## Features
+
+- Web search + page scraping
+- Streaming agent responses (SSE)
+- Chat sharing + export (markdown/html/json/txt)
+- Local-only mode and Convex-backed mode
 
 ## Quick start
 
@@ -14,6 +21,7 @@ npm install
 cp .env.example .env.local
 
 # Set VITE_CONVEX_URL in .env.local (https://<deployment>.convex.cloud)
+# Optionally set CONVEX_DEPLOYMENT for Convex CLI commands
 
 # Required for browser clients (CORS allowlist)
 npx convex env set CONVEX_ALLOWED_ORIGINS "http://localhost:5173"
@@ -30,6 +38,7 @@ npm run dev
 
 - [Development](docs/development.md)
 - [Configuration](docs/configuration.md)
+- [Testing](docs/testing.md)
 - [API](docs/api.md)
 - [Deployment](docs/deployment.md)
 - [Architecture](docs/architecture.md)

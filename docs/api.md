@@ -65,4 +65,4 @@ Event types used by the client:
 
 - `POST /api/publishChat` publishes an anonymous chat and returns share/public URLs.
 - `GET /api/exportChat?shareId=...&format=json|markdown|html|txt` exports a chat (also supports `publicId`).
-- `GET /api/chatTextMarkdown?shareId=...` returns the conversation as plain markdown text (used for CLI-friendly share/public routes).
+- `GET /api/chatTextMarkdown?shareId=...` returns the conversation as plain Markdown text (used for CLI-friendly share/public routes).

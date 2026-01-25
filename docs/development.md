@@ -28,6 +28,20 @@ npm run dev:frontend
 npm run dev:backend
 ```
 
+## Common commands
+
+```bash
+# Convex
+npx convex env list
+npx convex logs
+npx convex dashboard
+
+# Code quality
+npm run lint
+npm run typecheck
+npm run format
+```
+
 ## Validation and tests
 
 ```bash
@@ -35,6 +49,8 @@ npm run validate:quick
 npm run validate
 npm run test:all
 ```
+
+More details: [Testing](testing.md).
 
 ## Convex `_generated` imports
 
@@ -56,3 +72,4 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 - **403 Unauthorized origin**: Set `CONVEX_ALLOWED_ORIGINS` in your Convex deployment to include your local dev origin(s) (for example `http://localhost:5173`). See [Configuration](configuration.md#cors-origins-required).
 - **404 on `/api/*` endpoints**: Deploy Convex HTTP routes (`npx convex dev --once` for dev, `npx convex deploy` for prod).
 - **AI errors / missing tools**: Ensure an API key is configured (`LLM_API_KEY`, `OPENAI_API_KEY`, or `OPENROUTER_API_KEY`) and that `LLM_BASE_URL` matches the provider you intend to use.
+- **VS Code TS weirdness**: Run `npm run clean:vscode` and restart the TypeScript server.
