@@ -409,28 +409,28 @@ export function createChatActions(
                     }))
                   : metadata.searchResults || [];
 
-                setState((prev) => ({
-                  ...prev,
-                  messages: prev.messages.map((m, index) =>
-                    index === prev.messages.length - 1 && m.role === "assistant"
-                      ? {
-                          ...m,
-                          workflowId: workflowIdFromMetadata ?? m.workflowId,
-                          workflowNonce:
-                            (chunk as { nonce?: string }).nonce ??
-                            m.workflowNonce,
-                          contextReferences: contextRefs ?? m.contextReferences,
-                          sources: metadataSources ?? m.sources,
-                          searchResults:
-                            searchResults as UnifiedMessage["searchResults"],
-                          // CRITICAL: Keep isStreaming=true until persisted event fires
-                          // This prevents effectiveMessages from switching to paginatedMessages too early
-                          isStreaming: true,
-                          thinking: undefined,
-                        }
-                      : m,
-                  ),
-                }));
+                // Build message updates with only defined values
+                // CRITICAL: Keep isStreaming=true until persisted event fires
+                const messageUpdates: Partial<UnifiedMessage> = {
+                  isStreaming: true,
+                  thinking: undefined,
+                  searchResults:
+                    searchResults as UnifiedMessage["searchResults"],
+                };
+                if (workflowIdFromMetadata !== undefined) {
+                  messageUpdates.workflowId = workflowIdFromMetadata;
+                }
+                const nonce = (chunk as { nonce?: string }).nonce;
+                if (nonce !== undefined) {
+                  messageUpdates.workflowNonce = nonce;
+                }
+                if (contextRefs !== undefined) {
+                  messageUpdates.contextReferences = contextRefs;
+                }
+                if (metadataSources !== undefined) {
+                  messageUpdates.sources = metadataSources;
+                }
+                updateLastAssistantMessage(setState, messageUpdates);
               }
               logger.debug("Metadata received");
               break;
@@ -455,47 +455,47 @@ export function createChatActions(
               logger.debug("Stream complete, awaiting persisted event...");
               break;
 
-            case "persisted":
+            case "persisted": {
               persistedConfirmed = true;
               persistedDetails = chunk.payload;
-              setState((prev) => ({
-                ...prev,
+              // Build message updates with pre-computed transformations
+              const persistedSearchResults = chunk.payload.contextReferences
+                ?.filter((ref) => ref && typeof ref.url === "string")
+                .map((ref) => ({
+                  title: ref.title || ref.url || "Unknown",
+                  url: ref.url || "",
+                  snippet: "",
+                  relevanceScore: ref.relevanceScore ?? 0.5,
+                  kind: ref.type,
+                }));
+              const messageUpdates: Partial<UnifiedMessage> = {
+                workflowId: chunk.payload.workflowId,
+                sources: chunk.payload.sources,
+                contextReferences: chunk.payload.contextReferences,
+                isStreaming: false,
+                thinking: undefined,
+                persisted: true,
+              };
+              // Only include optional fields if defined
+              if (chunk.nonce !== undefined) {
+                messageUpdates.workflowNonce = chunk.nonce;
+              }
+              if (chunk.signature !== undefined) {
+                messageUpdates.workflowSignature = chunk.signature;
+              }
+              if (persistedSearchResults !== undefined) {
+                messageUpdates.searchResults = persistedSearchResults;
+              }
+              updateLastAssistantMessage(setState, messageUpdates, {
                 isGenerating: false,
                 searchProgress: { stage: "idle" },
-                messages: prev.messages.map((m, index) =>
-                  index === prev.messages.length - 1 && m.role === "assistant"
-                    ? {
-                        ...m,
-                        workflowId: chunk.payload.workflowId,
-                        workflowNonce: chunk.nonce ?? m.workflowNonce,
-                        workflowSignature:
-                          chunk.signature ?? m.workflowSignature,
-                        sources: chunk.payload.sources,
-                        contextReferences: chunk.payload.contextReferences,
-                        searchResults:
-                          chunk.payload.contextReferences
-                            ?.filter(
-                              (ref) => ref && typeof ref.url === "string",
-                            )
-                            .map((ref) => ({
-                              title: ref.title || ref.url || "Unknown",
-                              url: ref.url || "",
-                              snippet: "",
-                              relevanceScore: ref.relevanceScore ?? 0.5,
-                              kind: ref.type,
-                            })) || m.searchResults,
-                        isStreaming: false,
-                        thinking: undefined,
-                        persisted: true,
-                      }
-                    : m,
-                ),
-              }));
+              });
               logger.debug("Persistence confirmed via SSE", {
                 chatId,
                 workflowId: chunk.payload.workflowId,
               });
               break;
+            }
           }
         }
 
