@@ -7,6 +7,7 @@ import {
 } from "../../lib/types/unified";
 import { logger } from "../../lib/logger";
 import { updateLastAssistantMessage } from "./messageStateUpdaters";
+import { safeParseUrl } from "../../../convex/lib/url";
 
 /**
  * Handles processing of stream events for the chat UI.
@@ -132,14 +133,16 @@ export class StreamEventHandler {
         ? (metadata.sources as string[])
         : undefined;
       const searchResults = contextRefs
-        ? contextRefs.map((ref) => ({
-            title:
-              ref.title || (ref.url ? new URL(ref.url).hostname : "Unknown"),
-            url: ref.url || "",
-            snippet: "",
-            relevanceScore: ref.relevanceScore ?? 0.5,
-            kind: ref.type,
-          }))
+        ? contextRefs.map((ref) => {
+            const parsedUrl = ref.url ? safeParseUrl(ref.url) : null;
+            return {
+              title: ref.title || parsedUrl?.hostname || "Unknown",
+              url: parsedUrl ? ref.url || "" : "",
+              snippet: "",
+              relevanceScore: ref.relevanceScore ?? 0.5,
+              kind: ref.type,
+            };
+          })
         : metadata.searchResults || [];
 
       // Cast searchResults to any to bypass strict UnifiedMessage type check for now

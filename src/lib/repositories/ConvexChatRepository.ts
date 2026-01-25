@@ -4,8 +4,10 @@
  */
 
 import { ConvexClient } from "convex/browser";
+import { z } from "zod/v4";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { StreamingPersistPayloadSchema } from "../../../convex/agents/schema";
 import { BaseRepository } from "./ChatRepository";
 import {
   UnifiedChat,
@@ -27,10 +29,63 @@ import { MAX_LOOKUP_RETRIES, computeFastBackoff } from "../constants/retry";
 import {
   verifyPersistedPayload,
   isSignatureVerificationAvailable,
-  type PersistedPayload,
 } from "../security/signature";
 import { env } from "../env";
 // Removed unused imports from errorHandling
+
+const ProgressEventSchema = z.object({
+  type: z.literal("progress"),
+  stage: z.enum([
+    "planning",
+    "searching",
+    "scraping",
+    "analyzing",
+    "generating",
+  ]),
+  message: z.string(),
+  urls: z.array(z.string()).optional(),
+  currentUrl: z.string().optional(),
+  queries: z.array(z.string()).optional(),
+  sourcesUsed: z.number().optional(),
+  toolReasoning: z.string().optional(),
+  toolQuery: z.string().optional(),
+  toolUrl: z.string().optional(),
+});
+
+const ReasoningEventSchema = z.object({
+  type: z.literal("reasoning"),
+  content: z.string(),
+});
+
+const ContentEventSchema = z.object({
+  type: z.literal("content"),
+  content: z.string(),
+  delta: z.string().optional(),
+});
+
+const MetadataEventSchema = z.object({
+  type: z.literal("metadata"),
+  metadata: z.unknown(),
+  nonce: z.string().optional(),
+});
+
+const ToolResultEventSchema = z.object({
+  type: z.literal("tool_result"),
+  toolName: z.string(),
+  result: z.string(),
+});
+
+const ErrorEventSchema = z.object({
+  type: z.literal("error"),
+  error: z.string(),
+});
+
+const PersistedEventSchema = z.object({
+  type: z.literal("persisted"),
+  payload: StreamingPersistPayloadSchema,
+  nonce: z.string(),
+  signature: z.string(),
+});
 
 export class ConvexChatRepository extends BaseRepository {
   protected storageType = "convex" as const;
@@ -697,18 +752,28 @@ export class ConvexChatRepository extends BaseRepository {
    * Encapsulates event processing logic to simplify the main generator loop.
    */
   private async handleStreamEvent(evt: SSEEvent): Promise<StreamChunk | null> {
-    // Pass-through events
-    if (
-      [
-        "progress",
-        "reasoning",
-        "content",
-        "metadata",
-        "tool_result",
-        "error",
-      ].includes(evt.type)
-    ) {
-      return evt as StreamChunk;
+    if (evt.type === "progress") {
+      return this.parseStreamEvent(ProgressEventSchema, evt);
+    }
+
+    if (evt.type === "reasoning") {
+      return this.parseStreamEvent(ReasoningEventSchema, evt);
+    }
+
+    if (evt.type === "content") {
+      return this.parseStreamEvent(ContentEventSchema, evt);
+    }
+
+    if (evt.type === "metadata") {
+      return this.parseStreamEvent(MetadataEventSchema, evt);
+    }
+
+    if (evt.type === "tool_result") {
+      return this.parseStreamEvent(ToolResultEventSchema, evt);
+    }
+
+    if (evt.type === "error") {
+      return this.parseStreamEvent(ErrorEventSchema, evt);
     }
 
     if (evt.type === "complete") {
@@ -728,36 +793,61 @@ export class ConvexChatRepository extends BaseRepository {
   private async handlePersistedEvent(
     evt: SSEEvent,
   ): Promise<StreamChunk | null> {
-    const signingKey = import.meta.env.VITE_AGENT_SIGNING_KEY;
+    const parsed = PersistedEventSchema.safeParse(evt);
+    if (!parsed.success) {
+      logger.error("Invalid persisted SSE event payload", {
+        error: parsed.error,
+        sessionId: this.sessionId,
+      });
+      return null;
+    }
+
+    const signingKey = env.agentSigningKey;
 
     if (
       signingKey &&
       isSignatureVerificationAvailable() &&
-      evt.payload &&
-      evt.nonce &&
-      evt.signature
+      parsed.data.payload &&
+      parsed.data.nonce &&
+      parsed.data.signature
     ) {
       const isValid = await verifyPersistedPayload(
-        evt.payload as PersistedPayload,
-        evt.nonce as string,
-        evt.signature as string,
+        parsed.data.payload,
+        parsed.data.nonce,
+        parsed.data.signature,
         signingKey,
       );
 
       if (!isValid) {
         logger.error("🚫 Invalid signature detected on persisted event", {
-          workflowId: (evt.payload as PersistedPayload)?.workflowId,
-          nonce: evt.nonce,
+          workflowId: parsed.data.payload.workflowId,
+          nonce: parsed.data.nonce,
         });
         return null;
       }
 
       logger.debug("✅ Signature verified for persisted event", {
-        workflowId: (evt.payload as PersistedPayload)?.workflowId,
+        workflowId: parsed.data.payload.workflowId,
       });
     }
 
-    return evt as StreamChunk;
+    return parsed.data;
+  }
+
+  private parseStreamEvent<T extends StreamChunk>(
+    schema: z.ZodSchema<T>,
+    evt: SSEEvent,
+  ): T | null {
+    const parsed = schema.safeParse(evt);
+    if (!parsed.success) {
+      logger.error("Invalid SSE event payload", {
+        type: evt.type,
+        error: parsed.error,
+        sessionId: this.sessionId,
+      });
+      return null;
+    }
+    return parsed.data;
   }
 
   // Helper methods

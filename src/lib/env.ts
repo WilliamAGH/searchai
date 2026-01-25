@@ -6,6 +6,7 @@ import { logger } from "./logger";
 
 interface EnvConfig {
   VITE_CONVEX_URL: string;
+  VITE_AGENT_SIGNING_KEY?: string;
   DEV: boolean;
   PROD: boolean;
   MODE: "development" | "production" | "test";
@@ -45,6 +46,7 @@ function validateEnv(): EnvConfig {
 
   return {
     VITE_CONVEX_URL: env.VITE_CONVEX_URL,
+    VITE_AGENT_SIGNING_KEY: env.VITE_AGENT_SIGNING_KEY,
     DEV: env.DEV === true,
     PROD: env.PROD === true,
     MODE: env.MODE as "development" | "production" | "test",
@@ -94,6 +96,10 @@ export const env = {
 
   get isDev(): boolean {
     return import.meta.env.DEV === true;
+  },
+
+  get agentSigningKey(): string | undefined {
+    return getEnv().VITE_AGENT_SIGNING_KEY;
   },
 
   get isProd(): boolean {
