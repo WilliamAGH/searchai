@@ -1344,7 +1344,7 @@ export async function* streamResearchWorkflow(
     // ============================================
     yield writeEvent("progress", {
       stage: "planning",
-      message: "your question and preparing research approach...",
+      message: "research strategy for your question...",
     });
 
     const planningStart = Date.now();
