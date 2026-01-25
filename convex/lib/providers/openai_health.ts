@@ -51,5 +51,7 @@ export const scheduleOpenAIHealthCheck = (params: {
     }
   };
 
-  healthCheckPromise = run();
+  healthCheckPromise = run().finally(() => {
+    healthCheckPromise = null;
+  });
 };
