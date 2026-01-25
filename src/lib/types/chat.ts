@@ -1,32 +1,21 @@
 /**
  * Chat Type Definitions
- * Uses Convex's auto-generated types directly (Doc<"chats">) for server data
- * Defines LocalChat only for localStorage-specific needs
+ *
+ * Uses Convex's auto-generated types directly (Doc<"chats">) for server data.
+ * LocalChat is derived from Zod schema (single source of truth).
  * Complies with AGENT.md: NO redundant type definitions for Convex entities
  */
 
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
+import { isLocalId } from "../utils/idValidation";
+import { generateLocalId } from "../utils/id";
 
-/**
- * Local chat for unauthenticated users
- * Stored in localStorage, mimics Convex structure for easy migration
- * This is the ONLY custom type - server chats use Doc<"chats"> directly
- */
-export interface LocalChat {
-  _id: string; // Local ID format: "local_timestamp_random"
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  privacy: "private" | "shared" | "public";
-  shareId?: string;
-  publicId?: string;
-  rollingSummary?: string;
-  rollingSummaryUpdatedAt?: number;
+// Re-export LocalChat from schema (single source of truth)
+export type { LocalChat } from "../schemas/localStorage";
+import type { LocalChat } from "../schemas/localStorage";
 
-  // Local-only metadata
-  isLocal: true;
-  source: "local";
-}
+// Re-export ShareChatResponse from schema (single source of truth)
+export type { ShareChatResponse } from "../schemas/apiResponses";
 
 /**
  * Union type for components that work with both storage backends
@@ -58,13 +47,8 @@ export const isConvexId = (id: string | Id<"chats">): id is Id<"chats"> => {
   return typeof id === "string" ? !isLocalId(id) : true;
 };
 
-/**
- * Type guard to check if ID is a local ID
- * Local IDs start with 'local_' or 'chat_'
- */
-export const isLocalId = (id: string): boolean => {
-  return id.startsWith("local_") || id.startsWith("chat_");
-};
+// Re-export for backward compatibility
+export { isLocalId };
 
 // REMOVED: convexChatToChat function - violates AGENT.md
 // Doc<"chats"> should be used directly without wrapper types or conversions
@@ -75,29 +59,22 @@ export const isLocalId = (id: string): boolean => {
  */
 export const createLocalChat = (title: string = "New Chat"): LocalChat => {
   const now = Date.now();
-  const randomId = Math.random().toString(36).substring(2, 9);
+  const chatId = generateLocalId("chat");
+  // Extract the random suffix from the chat ID for consistency
+  const randomSuffix = chatId.split("_").pop() || "";
 
   return {
-    _id: `local_${now}_${randomId}`,
+    _id: chatId,
     title,
     createdAt: now,
     updatedAt: now,
     privacy: "private",
-    shareId: `share_${now}_${randomId}`,
-    publicId: `public_${now}_${randomId}`,
+    shareId: `share_${now}_${randomSuffix}`,
+    publicId: `public_${now}_${randomSuffix}`,
     isLocal: true,
     source: "local",
   };
 };
-
-/**
- * Chat API response types
- */
-export interface ShareChatResponse {
-  shareId?: string;
-  publicId?: string;
-  url?: string;
-}
 
 /**
  * Type guard to validate if an object is a valid Chat

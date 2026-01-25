@@ -37,9 +37,8 @@ export const addMessage = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
-    // Dual ownership validation (matches validateChatAccess pattern)
-    // Supports both authenticated (userId) and HTTP action (sessionId) contexts
-    // Also allows claiming unowned chats with a valid sessionId
+    // Authorization: require ownership to add messages
+    // Shared/public chats are read-only - viewers cannot inject messages
     const authorized =
       isAuthorized(chat, userId, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
@@ -95,6 +94,8 @@ export const addMessageHttp = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
+    // Authorization: require ownership to add messages
+    // Shared/public chats are read-only - viewers cannot inject messages
     const authorized =
       hasSessionAccess(chat, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);

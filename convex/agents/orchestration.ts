@@ -51,12 +51,14 @@ import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { run } from "@openai/agents";
+import { getErrorMessage } from "../lib/errors";
 import {
   RunToolCallItem,
   RunToolCallOutputItem,
   isToolCallEvent,
   isToolOutputEvent,
   extractToolName,
+  extractToolArgs,
   extractTextDelta,
   getProgressStageForTool,
   getProgressMessage,
@@ -247,6 +249,7 @@ import {
   normalizeUrl,
   extractContextIdFromOutput,
   convertToContextReferences,
+  relevanceScoreToLabel,
 } from "./orchestration_helpers";
 import type {
   ResearchContextReference,
@@ -641,9 +644,9 @@ async function withErrorContext<T>(
   try {
     return await fn();
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error occurred";
-    throw new Error(`${operation}: ${message}`);
+    throw new Error(
+      `${operation}: ${getErrorMessage(error, "Unknown error occurred")}`,
+    );
   }
 }
 
@@ -890,18 +893,38 @@ export async function* streamConversationalWorkflow(
         const item = event.item as StreamingEventItem;
         const eventName = (event as { name?: string }).name;
 
+        // Emit reasoning/thinking events as the agent plans (before tool calls)
+        if (eventName === "reasoning_item_created") {
+          const reasoningContent =
+            (item as { content?: string; text?: string })?.content ||
+            (item as { content?: string; text?: string })?.text ||
+            "";
+          if (reasoningContent) {
+            yield writeEvent("reasoning", { content: reasoningContent });
+          }
+        }
+
         // Detect tool calls using helper (handles multiple SDK patterns)
         if (isToolCallEvent(item, eventName)) {
           toolCallCount++;
           const toolName = extractToolName(item);
+          const toolArgs = extractToolArgs(item);
+
+          // Extract validated tool arguments (only include if present)
+          const hasToolQuery = typeof toolArgs.query === "string";
+          const hasToolUrl = typeof toolArgs.url === "string";
+          const hasToolReasoning = typeof toolArgs.reasoning === "string";
 
           console.log(`🔧 TOOL CALL DETECTED: ${toolName}`, {
             eventName,
             itemType: item?.type,
             rawItemType: item?.rawItem?.type,
+            ...(hasToolQuery && { query: toolArgs.query }),
+            ...(hasToolUrl && { url: toolArgs.url }),
+            ...(hasToolReasoning && { reasoning: toolArgs.reasoning }),
           });
 
-          // Emit progress events using helper
+          // Emit progress events with tool arguments (model-agnostic reasoning)
           const newStage = getProgressStageForTool(
             toolName,
             lastProgressStage as ProgressStage,
@@ -911,6 +934,10 @@ export async function* streamConversationalWorkflow(
             yield writeEvent("progress", {
               stage: newStage,
               message: getProgressMessage(newStage),
+              // Include validated tool context for UI feedback (only if present)
+              ...(hasToolReasoning && { toolReasoning: toolArgs.reasoning }),
+              ...(hasToolQuery && { toolQuery: toolArgs.query }),
+              ...(hasToolUrl && { toolUrl: toolArgs.url }),
             });
           }
         }
@@ -1133,12 +1160,7 @@ export async function* streamConversationalWorkflow(
             title: ref.title || "",
             contextId: ref.contextId,
             type: ref.type,
-            relevance:
-              (ref.relevanceScore ?? 0) >= RELEVANCE_SCORES.HIGH_THRESHOLD
-                ? "high"
-                : (ref.relevanceScore ?? 0) >= RELEVANCE_SCORES.MEDIUM_THRESHOLD
-                  ? "medium"
-                  : "low",
+            relevance: relevanceScoreToLabel(ref.relevanceScore),
           })),
         },
         answer: { answer: finalOutput, confidence: 1 },

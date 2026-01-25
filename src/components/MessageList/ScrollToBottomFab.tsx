@@ -22,7 +22,7 @@ export function ScrollToBottomFab({
     <button
       type="button"
       onClick={onClick}
-      className="fixed bottom-24 right-4 sm:right-6 z-40 p-3 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full shadow-lg hover:shadow-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 transform hover:scale-105"
+      className="fixed fab-bottom right-4 sm:right-6 z-40 p-3 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full shadow-lg hover:shadow-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 transform hover:scale-105"
       aria-label={`Scroll to bottom${unseenCount > 0 ? ` (${unseenCount} new message${unseenCount > 1 ? "s" : ""})` : ""}`}
     >
       <div className="relative">

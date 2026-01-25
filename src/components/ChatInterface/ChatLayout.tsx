@@ -3,7 +3,7 @@
  * Handles the layout structure and conditional rendering
  */
 
-import React from "react";
+import React, { useRef } from "react";
 import { ChatSidebar } from "../ChatSidebar";
 import { MobileSidebar } from "../MobileSidebar";
 import { MessageList } from "../MessageList";
@@ -103,11 +103,17 @@ export function ChatLayout({
   fetchJsonWithRetry: _fetchJsonWithRetry,
   resolveApi,
 }: ChatLayoutProps) {
+  // Desktop sidebar visible: not mobile AND sidebar is open
+  const showDesktopSidebar = !isMobile && sidebarOpen;
+
+  // Ref for the scroll container - passed to MessageList for scroll handling
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   return (
-    <div className="flex-1 flex h-full overflow-hidden relative">
-      {/* Desktop Sidebar */}
-      {sidebarOpen && (
-        <div className="hidden lg:block w-80 flex-shrink-0">
+    <div className="flex-1 flex h-full relative">
+      {/* Desktop Sidebar - Fixed position so scroll appears at browser edge */}
+      {showDesktopSidebar && (
+        <div className="fixed left-0 top-[3.75rem] sm:top-16 w-80 h-[calc(100dvh-3.75rem)] sm:h-[calc(100dvh-4rem)] z-40">
           <div className="h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
             <ChatSidebar {...chatSidebarProps} />
           </div>
@@ -117,15 +123,27 @@ export function ChatLayout({
       {/* Mobile Sidebar */}
       {sidebarOpen && isMobile && <MobileSidebar {...mobileSidebarProps} />}
 
-      {/* Main content */}
+      {/* Main content - full width scroll container, scrollbar at browser edge */}
       <div
-        className={`flex-1 flex flex-col h-full ${!sidebarOpen || isMobile ? "max-w-4xl mx-auto w-full" : ""}`}
+        ref={scrollContainerRef}
+        className={`flex-1 flex flex-col h-full overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
         {...swipeHandlers}
       >
-        <div className="flex-1 flex flex-col min-h-0">
-          <MessageList key={String(currentChatId)} {...messageListProps} />
+        {/* Content wrapper: grow to fill when content is small, don't shrink when content is large */}
+        {/* grow = flex-grow:1, shrink-0 = flex-shrink:0, combined with default flex-basis:auto */}
+        <div
+          className={`grow shrink-0 flex flex-col w-full ${!showDesktopSidebar ? "max-w-4xl mx-auto" : ""}`}
+        >
+          <MessageList
+            key={String(currentChatId)}
+            {...messageListProps}
+            scrollContainerRef={scrollContainerRef}
+          />
         </div>
-        <div className="flex-shrink-0 relative">
+        {/* Input area - sticky at bottom, relative for absolute-positioned children */}
+        <div
+          className={`flex-shrink-0 sticky bottom-0 relative bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 pb-[env(safe-area-inset-bottom)] ${!showDesktopSidebar ? "max-w-4xl mx-auto w-full" : ""}`}
+        >
           <FollowUpPrompt
             isOpen={showFollowUpPrompt}
             onContinue={handleContinueChat}

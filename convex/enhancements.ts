@@ -10,6 +10,8 @@
 
 // Import SearchResult from the single source of truth
 import type { SearchResult } from "./lib/types/search";
+import { safeParseUrl } from "./lib/url";
+import { buildTemporalHeader } from "./lib/dateTime";
 
 // Enhancement system - no convex values needed here
 
@@ -47,24 +49,23 @@ export function createUserProvidedSearchResults(
   urls: string[],
 ): SearchResult[] {
   return urls.map((url) => {
-    try {
-      const parsedUrl = new URL(url);
+    const parsedUrl = safeParseUrl(url);
+    if (parsedUrl) {
       return {
         title: `User-provided source: ${parsedUrl.hostname}`,
         url: url,
         snippet: "Source explicitly mentioned by user in their query",
         relevanceScore: 0.95, // High relevance score to prioritize these sources
       };
-    } catch (error) {
-      console.warn("Failed to parse user-provided URL", { url, error });
-      // If URL parsing fails, return a minimal result
-      return {
-        title: `User-provided source: ${url}`,
-        url: url,
-        snippet: "Source explicitly mentioned by user in their query",
-        relevanceScore: 0.95,
-      };
     }
+
+    // If URL parsing fails, return a minimal result without logging warning
+    return {
+      title: `User-provided source: ${url}`,
+      url: url,
+      snippet: "Source explicitly mentioned by user in their query",
+      relevanceScore: 0.95,
+    };
   });
 }
 
@@ -99,8 +100,6 @@ export interface EnhancementRule {
  * This is designed to be a single, centralized place to inject temporal context
  * whenever callers opt-in via `enhanceSystemPrompt: true`.
  */
-import { buildTemporalHeader } from "./lib/dateTime";
-
 const temporalEnhancement: EnhancementRule = {
   id: "temporal-context",
   name: "Temporal Context (UTC & PT)",
@@ -669,27 +668,19 @@ export function shouldPrioritizeUrl(
   url: string,
   prioritizedUrls: string[],
 ): boolean {
-  try {
-    const u = new URL(url);
-    const host = u.hostname.toLowerCase().replace(/^www\./, "");
-    return prioritizedUrls.some((p) => {
-      try {
-        const pu = new URL(p.startsWith("http") ? p : `https://${p}`);
-        const phost = pu.hostname.toLowerCase().replace(/^www\./, "");
-        return host === phost || u.origin === pu.origin;
-      } catch (error) {
-        console.warn("Failed to parse prioritized URL", {
-          prioritized: p,
-          error,
-        });
-        // Fallback to suffix match for non-URL inputs (e.g., domains)
-        return host.endsWith(p.toLowerCase().replace(/^www\./, ""));
-      }
-    });
-  } catch (error) {
-    console.warn("Failed to evaluate prioritized URL match", { url, error });
-    return false;
-  }
+  const u = safeParseUrl(url);
+  if (!u) return false;
+
+  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  return prioritizedUrls.some((p) => {
+    const pu = safeParseUrl(p.startsWith("http") ? p : `https://${p}`);
+    if (pu) {
+      const phost = pu.hostname.toLowerCase().replace(/^www\./, "");
+      return host === phost || u.origin === pu.origin;
+    }
+    // Fallback to suffix match for non-URL inputs (e.g., domains)
+    return host.endsWith(p.toLowerCase().replace(/^www\./, ""));
+  });
 }
 
 /**

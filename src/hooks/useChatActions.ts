@@ -8,8 +8,9 @@ import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import type { ChatState } from "./useChatState";
 import type { UnifiedChat, UnifiedMessage } from "../lib/types/unified";
 import { TitleUtils, IdUtils } from "../lib/types/unified";
-import type { PersistedPayload } from "../lib/types/message";
+import { getErrorMessage } from "../lib/utils/errorUtils";
 import { logger } from "../lib/logger";
+import { StreamEventHandler } from "./utils/streamHandler";
 // Minimal fallback to avoid missing StorageService import during build
 const storageService = {
   clearAll() {
@@ -110,7 +111,7 @@ export function createChatActions(
         // This prevents duplicate chats from appearing in the sidebar
         setState((prev) => ({
           ...prev,
-          currentChatId: chat.id,
+          currentChatId: chat.id as string,
           currentChat: chat,
           messages: [],
           isLoading: false,
@@ -122,8 +123,7 @@ export function createChatActions(
         setState((prev) => ({
           ...prev,
           isLoading: false,
-          error:
-            error instanceof Error ? error.message : "Failed to create chat",
+          error: getErrorMessage(error, "Failed to create chat"),
         }));
         throw error;
       }
@@ -183,8 +183,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to select chat",
+          error: getErrorMessage(error, "Failed to select chat"),
         }));
       }
     },
@@ -211,8 +210,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to delete chat",
+          error: getErrorMessage(error, "Failed to delete chat"),
         }));
         throw error;
       }
@@ -238,8 +236,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to update title",
+          error: getErrorMessage(error, "Failed to update title"),
         }));
       }
     },
@@ -323,326 +320,41 @@ export function createChatActions(
       try {
         // Send message and get streaming response
         const generator = repository.generateResponse(chatId, content);
-
-        let fullContent = "";
-        let accumulatedReasoning = "";
-        let persistedDetails: PersistedPayload | null = null;
-        let persistedConfirmed = false;
+        const streamHandler = new StreamEventHandler(setState, chatId);
 
         for await (const chunk of generator) {
-          switch (chunk.type) {
-            case "progress":
-              // Update searchProgress with all stage information
-              setState((prev) => ({
-                ...prev,
-                searchProgress: {
-                  stage: chunk.stage,
-                  message: chunk.message,
-                  urls: chunk.urls,
-                  currentUrl: chunk.currentUrl,
-                  queries: chunk.queries,
-                  sourcesUsed: chunk.sourcesUsed,
-                },
-              }));
-              logger.debug("Progress update:", chunk.stage, chunk.message);
-              break;
-
-            case "reasoning":
-              // Accumulate reasoning/thinking content
-              accumulatedReasoning += chunk.content;
-              setState((prev) => ({
-                ...prev,
-                messages: prev.messages.map((m, index) =>
-                  index === prev.messages.length - 1 && m.role === "assistant"
-                    ? {
-                        ...m,
-                        reasoning: accumulatedReasoning,
-                        thinking: "Thinking...",
-                      }
-                    : m,
-                ),
-              }));
-              logger.debug("Reasoning chunk received");
-              break;
-
-            case "content":
-            case "chunk":
-              // Accumulate answer content (handle both "content" and legacy "chunk")
-              const delta =
-                chunk.type === "content" && "delta" in chunk
-                  ? chunk.delta
-                  : chunk.content;
-              if (delta) {
-                fullContent += delta;
-                // Update last assistant message with streaming content
-                setState((prev) => ({
-                  ...prev,
-                  messages: prev.messages.map((m, index) =>
-                    index === prev.messages.length - 1 && m.role === "assistant"
-                      ? {
-                          ...m,
-                          content: fullContent,
-                          isStreaming: true,
-                        }
-                      : m,
-                  ),
-                  searchProgress: {
-                    stage: "generating",
-                    message: "Writing answer...",
-                  },
-                }));
-              }
-              break;
-
-            case "metadata": {
-              if (chunk.metadata && typeof chunk.metadata === "object") {
-                const metadata = chunk.metadata as Record<string, unknown>;
-                const workflowIdFromMetadata = metadata.workflowId as
-                  | string
-                  | undefined;
-                const contextRefs = Array.isArray(metadata.contextReferences)
-                  ? (metadata.contextReferences as UnifiedMessage["contextReferences"])
-                  : undefined;
-                const metadataSources = Array.isArray(metadata.sources)
-                  ? (metadata.sources as string[])
-                  : undefined;
-                const searchResults = contextRefs
-                  ? contextRefs.map((ref) => ({
-                      title:
-                        ref.title ||
-                        (ref.url ? new URL(ref.url).hostname : "Unknown"),
-                      url: ref.url || "",
-                      snippet: "",
-                      relevanceScore: ref.relevanceScore ?? 0.5,
-                      kind: ref.type,
-                    }))
-                  : metadata.searchResults || [];
-
-                setState((prev) => ({
-                  ...prev,
-                  messages: prev.messages.map((m, index) =>
-                    index === prev.messages.length - 1 && m.role === "assistant"
-                      ? {
-                          ...m,
-                          workflowId: workflowIdFromMetadata ?? m.workflowId,
-                          workflowNonce:
-                            (chunk as { nonce?: string }).nonce ??
-                            m.workflowNonce,
-                          contextReferences: contextRefs ?? m.contextReferences,
-                          sources: metadataSources ?? m.sources,
-                          searchResults:
-                            searchResults as UnifiedMessage["searchResults"],
-                          // CRITICAL: Keep isStreaming=true until persisted event fires
-                          // This prevents effectiveMessages from switching to paginatedMessages too early
-                          isStreaming: true,
-                          thinking: undefined,
-                        }
-                      : m,
-                  ),
-                }));
-              }
-              logger.debug("Metadata received");
-              break;
-            }
-
-            case "error":
-              throw new Error(chunk.error);
-
-            case "done":
-            case "complete":
-              // Indicate finalizing while waiting for persisted confirmation
-              setState((prev) => ({
-                ...prev,
-                searchProgress: {
-                  stage: "finalizing",
-                  message: "Saving and securing results...",
-                },
-                messages: prev.messages.map((m, index) =>
-                  index === prev.messages.length - 1 && m.role === "assistant"
-                    ? { ...m, isStreaming: true, thinking: undefined }
-                    : m,
-                ),
-              }));
-              logger.debug("Stream complete, awaiting persisted event...");
-              break;
-
-            case "persisted":
-              persistedConfirmed = true;
-              persistedDetails = chunk.payload;
-              setState((prev) => ({
-                ...prev,
-                isGenerating: false,
-                searchProgress: { stage: "idle" },
-                messages: prev.messages.map((m, index) =>
-                  index === prev.messages.length - 1 && m.role === "assistant"
-                    ? {
-                        ...m,
-                        workflowId: chunk.payload.workflowId,
-                        workflowNonce: chunk.nonce ?? m.workflowNonce,
-                        workflowSignature:
-                          chunk.signature ?? m.workflowSignature,
-                        sources: chunk.payload.sources,
-                        contextReferences: chunk.payload.contextReferences,
-                        searchResults:
-                          chunk.payload.contextReferences
-                            ?.filter(
-                              (ref) => ref && typeof ref.url === "string",
-                            )
-                            .map((ref) => ({
-                              title: ref.title || ref.url || "Unknown",
-                              url: ref.url || "",
-                              snippet: "",
-                              relevanceScore: ref.relevanceScore ?? 0.5,
-                              kind: ref.type,
-                            })) || m.searchResults,
-                        isStreaming: false,
-                        thinking: undefined,
-                        persisted: true,
-                      }
-                    : m,
-                ),
-              }));
-              logger.debug("Persistence confirmed via SSE", {
-                chatId,
-                workflowId: chunk.payload.workflowId,
-              });
-              break;
-          }
+          streamHandler.handle(chunk);
         }
 
-        const refreshAfterPersist = async (shouldForce: boolean) => {
-          if (!repository) {
-            return;
-          }
-
-          // CRITICAL FIX: For authenticated users, SKIP refresh entirely
-          // Optimistic state is already correct and refreshing causes flickering
-          // because DB messages have different IDs than optimistic messages
-          logger.debug(
-            "Skipping refresh - optimistic state is source of truth",
-            {
-              chatId,
-              shouldForce,
-            },
-          );
-          return;
-
-          // The code below is disabled to prevent flickering
-          // If needed in the future, we need to merge DB messages with optimistic state
-          // instead of replacing entirely
-
-          /*
-          if (!shouldForce) {
-            logger.debug("Skipping refresh - persistence not confirmed", { chatId });
-            return;
-          }
-          */
-
-          const maxAttempts = 5;
-          const delay = (ms: number) =>
-            new Promise((resolve) => setTimeout(resolve, ms));
-          const targetAssistantId = persistedDetails
-            ? IdUtils.toUnifiedId(persistedDetails.assistantMessageId)
-            : null;
-          const trimmedAnswer = fullContent.trim();
-          if (!persistedDetails) {
-            logger.warn(
-              "Persist payload missing; relying on content match for refresh",
-              { chatId },
-            );
-          }
-
-          for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            try {
-              const messages = await repository.getMessages(chatId);
-              const hasUserMessage = messages.some(
-                (m) => m.role === "user" && m.content === content,
-              );
-              const hasAssistantMessage = messages.some((m) => {
-                if (m.role !== "assistant") return false;
-                if (targetAssistantId && m.id === targetAssistantId) {
-                  return true;
-                }
-                if (
-                  persistedDetails?.workflowId &&
-                  m.workflowId === persistedDetails.workflowId
-                ) {
-                  return true;
-                }
-                const normalizedContent = (m.content || "").trim();
-                if (trimmedAnswer.length === 0) {
-                  return normalizedContent.length === 0;
-                }
-                return normalizedContent === trimmedAnswer;
-              });
-
-              if (hasUserMessage && hasAssistantMessage) {
-                logger.debug("Messages refreshed after persistence", {
-                  chatId,
-                  messageCount: messages.length,
-                  attempt,
-                });
-
-                // CRITICAL: Only update if DB messages are actually different
-                // This prevents flickering when optimistic state is already correct
-                setState((prev) => {
-                  // Check if we already have the correct messages (optimistic state)
-                  const hasOptimisticState = prev.messages.some(
-                    (m) =>
-                      m.role === "assistant" &&
-                      m.content === trimmedAnswer &&
-                      m.persisted === true,
-                  );
-
-                  if (hasOptimisticState) {
-                    logger.debug(
-                      "Skipping refresh - optimistic state already correct",
-                      { chatId },
-                    );
-                    // Don't replace messages - optimistic state is already good
-                    return prev;
-                  }
-
-                  // Messages from DB are different - do the update
-                  return {
-                    ...prev,
-                    messages,
-                    currentChatId: chatId,
-                    currentChat:
-                      prev.chats.find((c) => c.id === chatId) ||
-                      prev.currentChat,
-                  };
-                });
-                return;
-              }
-            } catch (error) {
-              logger.error("Failed to refresh messages after persistence:", {
-                chatId,
-                error,
-              });
-            }
-
-            await delay(150 * (attempt + 1));
-          }
-
-          logger.warn(
-            "Persisted messages not visible after retries; retaining optimistic state",
-            { chatId },
-          );
-        };
-
-        // CRITICAL FIX: Pass persistedConfirmed directly (not inverted)
-        // When persistence is confirmed (TRUE), we SHOULD refresh to sync with DB
-        // When persistence is not confirmed (FALSE), we SHOULD NOT refresh (keep optimistic state)
-        await refreshAfterPersist(persistedConfirmed);
+        // If persistence wasn't confirmed via SSE, clean up streaming state
+        const persistedConfirmed = streamHandler.getPersistedConfirmed();
+        if (!persistedConfirmed) {
+          setState((prev) => ({
+            ...prev,
+            isGenerating: false,
+            searchProgress: { stage: "idle" },
+            messages: prev.messages.map((m, index) =>
+              index === prev.messages.length - 1 && m.role === "assistant"
+                ? { ...m, isStreaming: false, thinking: undefined }
+                : m,
+            ),
+          }));
+        }
+        // Note: We intentionally skip refresh after persist - optimistic state is source of truth
+        // Refreshing causes UI flickering because DB messages have different IDs
       } catch (error) {
         logger.error("Failed to send message:", error);
         setState((prev) => ({
           ...prev,
           isGenerating: false,
-          error:
-            error instanceof Error ? error.message : "Failed to send message",
+          error: getErrorMessage(error, "Failed to send message"),
           searchProgress: { stage: "idle" },
+          // Clear streaming flags on the last assistant message to avoid stuck UI
+          messages: prev.messages.map((m, index) =>
+            index === prev.messages.length - 1 && m.role === "assistant"
+              ? { ...m, isStreaming: false, thinking: undefined }
+              : m,
+          ),
         }));
       }
     },
@@ -661,8 +373,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to delete message",
+          error: getErrorMessage(error, "Failed to delete message"),
         }));
       }
     },
@@ -708,8 +419,7 @@ export function createChatActions(
       } catch (error) {
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error ? error.message : "Failed to share chat",
+          error: getErrorMessage(error, "Failed to share chat"),
         }));
         throw error;
       }
@@ -814,8 +524,7 @@ export function createChatActions(
         setState((prev) => ({
           ...prev,
           isLoading: false,
-          error:
-            error instanceof Error ? error.message : "Failed to refresh chats",
+          error: getErrorMessage(error, "Failed to refresh chats"),
         }));
       }
     },

@@ -6,6 +6,7 @@
 
 import { robustSanitize } from "./sanitization";
 import { checkForInjection, assessRisk } from "./patterns";
+import { normalizeWhitespace } from "../text";
 
 /**
  * Result of web content validation
@@ -218,7 +219,7 @@ export function extractTextFromHtml(html: string): string {
     .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
   // Collapse whitespace
-  text = text.replace(/\s+/g, " ").trim();
+  text = normalizeWhitespace(text);
 
   // Apply sanitization
   return robustSanitize(text);

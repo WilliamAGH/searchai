@@ -36,10 +36,23 @@ interface MessageListProps {
   onShare?: () => void;
   currentChat?: Chat;
   searchProgress?: {
-    stage: "idle" | "searching" | "scraping" | "analyzing" | "generating";
+    stage:
+      | "idle"
+      | "planning"
+      | "searching"
+      | "scraping"
+      | "analyzing"
+      | "generating";
     message?: string;
     urls?: string[];
     currentUrl?: string;
+    queries?: string[];
+    /** LLM's schema-enforced reasoning for this tool call */
+    toolReasoning?: string;
+    /** Search query being executed */
+    toolQuery?: string;
+    /** URL being scraped */
+    toolUrl?: string;
   } | null;
   onDeleteLocalMessage?: (messageId: string) => void;
   onRequestDeleteMessage?: (messageId: string) => void;
@@ -53,6 +66,8 @@ interface MessageListProps {
   onClearError?: () => void;
   // Session ID for authorization (anonymous users)
   sessionId?: string;
+  // Optional external scroll container ref (when parent handles scrolling)
+  scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
 /**
@@ -79,10 +94,14 @@ export function MessageList({
   retryCount = 0,
   onClearError,
   sessionId,
+  scrollContainerRef: externalScrollRef,
 }: MessageListProps) {
   const deleteMessage = useMutation(api.messages.deleteMessage);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const internalScrollRef = useRef<HTMLDivElement>(null);
+  // Use external scroll container if provided, otherwise use internal
+  const scrollContainerRef = externalScrollRef || internalScrollRef;
+  const useExternalScroll = !!externalScrollRef;
   const previousMessagesLengthRef = useRef(messages.length);
   const isLoadingMoreRef = useRef(false);
   const lastSeenMessageCountRef = useRef(messages.length);
@@ -115,26 +134,29 @@ export function MessageList({
       container.scrollTo({ top: currentPos, behavior: "instant" });
       smoothScrollInProgressRef.current = false;
     }
-  }, []);
+  }, [scrollContainerRef]);
 
   /**
    * Scroll to bottom of messages
    */
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "smooth") => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
 
-    if (behavior === "smooth") {
-      smoothScrollInProgressRef.current = true;
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      // Reset flag after animation completes (~500ms)
-      setTimeout(() => {
-        smoothScrollInProgressRef.current = false;
-      }, 600);
-    } else {
-      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
-    }
-  }, []);
+      if (behavior === "smooth") {
+        smoothScrollInProgressRef.current = true;
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        // Reset flag after animation completes (~500ms)
+        setTimeout(() => {
+          smoothScrollInProgressRef.current = false;
+        }, 600);
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      }
+    },
+    [scrollContainerRef],
+  );
 
   const handleScrollToBottom = useCallback(() => {
     scrollToBottom("smooth");
@@ -174,6 +196,7 @@ export function MessageList({
   );
 
   // Intelligent auto-scroll: scroll when near bottom or actively generating
+  // Also triggers on searchProgress changes to keep tool status visible
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -193,6 +216,8 @@ export function MessageList({
     userHasScrolled,
     scrollToBottom,
     NEAR_BOTTOM_THRESHOLD,
+    scrollContainerRef,
+    searchProgress, // Include to scroll when tool progress updates
   ]);
 
   // Debug logging
@@ -230,7 +255,7 @@ export function MessageList({
         setUserHasScrolled(false);
       }
     }
-  }, [messages, isGenerating, NEAR_BOTTOM_THRESHOLD]);
+  }, [messages, isGenerating, NEAR_BOTTOM_THRESHOLD, scrollContainerRef]);
 
   // Detect when user scrolls manually with touch/scroll awareness
   useEffect(() => {
@@ -289,7 +314,13 @@ export function MessageList({
       container.removeEventListener("touchend", handleTouchEnd);
       container.removeEventListener("wheel", handleWheel);
     };
-  }, [userHasScrolled, messages.length, STUCK_THRESHOLD, cancelSmoothScroll]);
+  }, [
+    userHasScrolled,
+    messages.length,
+    STUCK_THRESHOLD,
+    cancelSmoothScroll,
+    scrollContainerRef,
+  ]);
 
   // Auto-collapse sources and reasoning appropriately
   useEffect(() => {
@@ -365,7 +396,7 @@ export function MessageList({
     } finally {
       isLoadingMoreRef.current = false;
     }
-  }, [onLoadMore]);
+  }, [onLoadMore, scrollContainerRef]);
 
   // Track when messages change to preserve scroll on load more
   useEffect(() => {
@@ -381,13 +412,11 @@ export function MessageList({
     }
 
     previousMessagesLengthRef.current = currLength;
-  }, [messages.length]);
+  }, [messages.length, scrollContainerRef]);
 
-  return (
-    <div
-      ref={scrollContainerRef}
-      className="flex-1 overflow-y-auto relative overscroll-contain"
-    >
+  // Content to render (shared between internal and external scroll modes)
+  const content = (
+    <>
       <ScrollToBottomFab
         visible={userHasScrolled && messages.length > 0}
         onClick={handleScrollToBottom}
@@ -539,6 +568,26 @@ export function MessageList({
         </div>
       )}
       <div ref={messagesEndRef} />
+    </>
+  );
+
+  // When using external scroll container, just render the content directly
+  // The parent handles the scroll container
+  // Use grow shrink-0 (not flex-1): grow to fill space when content is small,
+  // don't shrink when content is large (allows scroll overflow)
+  if (useExternalScroll) {
+    return (
+      <div className="grow shrink-0 flex flex-col relative">{content}</div>
+    );
+  }
+
+  // Internal scroll container (fallback for backwards compatibility)
+  return (
+    <div
+      ref={internalScrollRef}
+      className="flex-1 overflow-y-auto relative overscroll-contain"
+    >
+      {content}
     </div>
   );
 }

@@ -31,6 +31,7 @@ export interface ChatState {
     /** Current stage of the search/response process */
     stage:
       | "idle"
+      | "thinking"
       | "planning"
       | "searching"
       | "scraping"

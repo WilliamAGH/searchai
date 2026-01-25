@@ -1,8 +1,6 @@
 /**
- * Hook to provide service instances
- *
- * NOTE: UnauthenticatedAIService has been removed. Streaming uses direct fetch
- * to /api/ai/agent/stream; this hook is retained for future DI if needed.
+ * Hook to provide service instances.
+ * Retained as a stub for future dependency injection if needed.
  */
 export function useServices(_convexUrl?: string) {
   return {} as const;

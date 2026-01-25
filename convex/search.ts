@@ -4,7 +4,7 @@
  */
 
 import { v } from "convex/values";
-import { action, internalAction, internalMutation } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import {
   vSearchResult,
   vSerpEnrichment,
@@ -18,6 +18,7 @@ import {
   searchWithSerpApiDuckDuckGo,
   searchWithDuckDuckGo,
 } from "./search/providers";
+import { getErrorMessage } from "./lib/errors";
 
 // Import utilities
 import {
@@ -135,7 +136,7 @@ export const searchWeb = action({
           return result;
         }
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorMsg = getErrorMessage(error);
         console.warn("SERP API failed:", {
           error: errorMsg,
           query: args.query,
@@ -160,7 +161,7 @@ export const searchWeb = action({
           };
         }
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorMsg = getErrorMessage(error);
         console.warn("OpenRouter search failed:", {
           error: errorMsg,
           query: args.query,
@@ -183,7 +184,7 @@ export const searchWeb = action({
         };
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorMsg = getErrorMessage(error);
       console.warn("DuckDuckGo search failed:", {
         error: errorMsg,
         query: args.query,
@@ -372,10 +373,7 @@ export const planSearch = action({
     } catch (diversifyError) {
       console.warn("Query diversification failed:", {
         query: args.newMessage.substring(0, 100),
-        error:
-          diversifyError instanceof Error
-            ? diversifyError.message
-            : String(diversifyError),
+        error: getErrorMessage(diversifyError),
       });
       // Proceed with default queries
     }
@@ -468,10 +466,7 @@ export const planSearch = action({
           "LLM response JSON parse failed, trying regex extraction:",
           {
             responseLength: text.length,
-            error:
-              jsonError instanceof Error
-                ? jsonError.message
-                : String(jsonError),
+            error: getErrorMessage(jsonError),
           },
         );
         const match = text.match(/\{[\s\S]*\}/);
@@ -519,7 +514,7 @@ export const planSearch = action({
       console.warn("LLM planning call failed:", {
         chatId: args.chatId,
         query: args.newMessage.substring(0, 100),
-        error: llmError instanceof Error ? llmError.message : String(llmError),
+        error: getErrorMessage(llmError),
       });
       setCachedPlan(cacheKey, defaultPlan);
       // Metrics recorded at frontend layer
@@ -538,46 +533,8 @@ export const invalidatePlanCacheForChat = internalAction({
   },
 });
 
-/** Record analytics metric */
-export const recordMetric = internalMutation({
-  args: {
-    name: v.union(
-      v.literal("planner_invoked"),
-      v.literal("planner_rate_limited"),
-      v.literal("user_overrode_prompt"),
-      v.literal("new_chat_confirmed"),
-    ),
-    chatId: v.optional(v.id("chats")),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    try {
-      const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-      const existing = await ctx.db
-        .query("metrics")
-        .withIndex("by_name_and_date", (q) =>
-          q.eq("name", args.name).eq("date", date),
-        )
-        .first();
-      if (existing) {
-        await ctx.db.patch(existing._id, { count: (existing.count || 0) + 1 });
-      } else {
-        await ctx.db.insert("metrics", {
-          name: args.name,
-          date,
-          chatId: args.chatId,
-          count: 1,
-        });
-      }
-    } catch (e) {
-      console.warn("metrics failed", args.name, e);
-    }
-    return null;
-  },
-});
-
-// Import and re-export client metrics
-export { recordClientMetric } from "./search/metrics";
+// Re-export metrics from centralized location
+export { recordMetric, recordClientMetric } from "./search/metrics";
 
 // NOTE: scrapeUrl action is available at api.search.scraper_action.scrapeUrl
 // It's a Node.js action and cannot be re-exported from this V8-runtime module

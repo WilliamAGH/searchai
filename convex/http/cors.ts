@@ -22,30 +22,39 @@ function getAllowedOrigins(): string[] | null {
 }
 
 /**
- * Merge development convenience origins for Vite dev servers.
- * Ensures both 5173 and 5174 ports are accepted when either is specified.
+ * Merge development convenience origins for Vite dev/preview servers.
+ * Ensures all common dev ports (5173, 5174) and preview port (4173) are accepted.
+ * Also includes 127.0.0.1 variants since browsers treat localhost vs 127.0.0.1 as different origins.
  */
 const DEV_VITE_ORIGINS = new Set([
+  // Dev server (vite dev)
   "http://localhost:5173",
   "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
   "https://localhost:5173",
   "https://localhost:5174",
+  // Preview server (vite preview)
+  "http://localhost:4173",
+  "http://127.0.0.1:4173",
+  "https://localhost:4173",
 ]);
 
 function normalizeDevOrigins(origins: string[]): string[] {
   const set = new Set(origins);
 
-  // If any localhost Vite origin is present, ensure both ports are allowed.
-  if (
-    origins.some((origin) =>
-      [
-        "http://localhost:5173",
-        "https://localhost:5173",
-        "http://localhost:5174",
-        "https://localhost:5174",
-      ].includes(origin),
-    )
-  ) {
+  // If any localhost/127.0.0.1 Vite origin is present, ensure all dev/preview ports are allowed.
+  const hasLocalDevOrigin = origins.some(
+    (origin) =>
+      origin.includes("localhost:5173") ||
+      origin.includes("localhost:5174") ||
+      origin.includes("localhost:4173") ||
+      origin.includes("127.0.0.1:5173") ||
+      origin.includes("127.0.0.1:5174") ||
+      origin.includes("127.0.0.1:4173"),
+  );
+
+  if (hasLocalDevOrigin) {
     for (const devOrigin of DEV_VITE_ORIGINS) {
       set.add(devOrigin);
     }

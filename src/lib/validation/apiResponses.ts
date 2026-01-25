@@ -1,65 +1,74 @@
 /**
  * External API Response Validation
- * For non-Convex API responses (search, AI generation, etc.)
- * These APIs don't use Convex validators, so we need runtime validation
+ *
+ * Uses Zod schemas for runtime validation of external API responses.
+ * Schemas are defined in ../schemas/apiResponses.ts (single source of truth).
+ *
+ * @see {@link ../schemas/apiResponses.ts} - Zod schemas
  */
 
 import type { SearchResult } from "../types/message";
 import type { SerpEnrichment } from "../../../convex/lib/types/search";
+import {
+  SearchResultSchema,
+  SearchMethodSchema,
+  AIResponseSchema,
+  ShareResponseSchema,
+  DEFAULT_AI_RESPONSE,
+  type SearchMethod,
+} from "../schemas/apiResponses";
 
 /**
- * Validate search API response
+ * Default search response when validation fails.
+ * Defined here with proper types (SerpEnrichment, not unknown).
+ */
+const DEFAULT_SEARCH_RESPONSE_TYPED: {
+  results: SearchResult[];
+  searchMethod: SearchMethod;
+  hasRealResults: boolean;
+  enrichment?: SerpEnrichment;
+} = {
+  results: [],
+  searchMethod: "fallback",
+  hasRealResults: false,
+};
+
+/**
+ * Validate search API response.
+ * Uses Zod schemas with custom transforms for length limits.
  */
 export function validateSearchResponse(data: unknown): {
   results: SearchResult[];
-  searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback";
+  searchMethod: SearchMethod;
   hasRealResults: boolean;
   enrichment?: SerpEnrichment;
 } {
   if (!data || typeof data !== "object") {
-    return {
-      results: [],
-      searchMethod: "fallback",
-      hasRealResults: false,
-    };
+    return DEFAULT_SEARCH_RESPONSE_TYPED;
   }
 
   const response = data as Record<string, unknown>;
 
-  // Validate and sanitize results array
+  // Validate and sanitize results array with length limits
   const results: SearchResult[] = [];
   if (Array.isArray(response.results)) {
     for (const item of response.results) {
-      if (
-        item &&
-        typeof item === "object" &&
-        typeof item.title === "string" &&
-        typeof item.url === "string" &&
-        typeof item.snippet === "string"
-      ) {
+      const parsed = SearchResultSchema.safeParse(item);
+      if (parsed.success) {
         results.push({
-          title: item.title.substring(0, 500), // Limit length
-          url: item.url.substring(0, 2000),
-          snippet: item.snippet.substring(0, 1000),
-          relevanceScore:
-            typeof item.relevanceScore === "number"
-              ? Math.max(0, Math.min(1, item.relevanceScore)) // Clamp 0-1
-              : undefined,
+          title: parsed.data.title.substring(0, 500),
+          url: parsed.data.url.substring(0, 2000),
+          snippet: parsed.data.snippet.substring(0, 1000),
+          // relevanceScore is guaranteed by schema default, clamp to 0-1
+          relevanceScore: Math.max(0, Math.min(1, parsed.data.relevanceScore)),
         });
       }
     }
   }
 
   // Validate search method
-  const validMethods = [
-    "serp",
-    "openrouter",
-    "duckduckgo",
-    "fallback",
-  ] as const;
-  const searchMethod = validMethods.includes(response.searchMethod)
-    ? response.searchMethod
-    : "fallback";
+  const methodResult = SearchMethodSchema.safeParse(response.searchMethod);
+  const searchMethod = methodResult.success ? methodResult.data : "fallback";
 
   // Validate boolean
   const hasRealResults = response.hasRealResults === true;
@@ -76,47 +85,48 @@ export function validateSearchResponse(data: unknown): {
 }
 
 /**
- * Validate AI generation response
+ * Validate AI generation response.
+ * Uses Zod schema for structure validation.
  */
 export function validateAIResponse(data: unknown): {
   response: string;
   reasoning?: string;
 } {
-  if (!data || typeof data !== "object") {
-    return {
-      response: "Failed to generate response. Please try again.",
-    };
+  const result = AIResponseSchema.safeParse(data);
+  if (result.success) {
+    return result.data;
   }
 
-  const aiData = data as Record<string, unknown>;
+  // Fallback: try to extract response field manually
+  if (data && typeof data === "object") {
+    const aiData = data as Record<string, unknown>;
+    if (typeof aiData.response === "string") {
+      return {
+        response: aiData.response,
+        reasoning:
+          typeof aiData.reasoning === "string" ? aiData.reasoning : undefined,
+      };
+    }
+  }
 
-  return {
-    response:
-      typeof aiData.response === "string"
-        ? aiData.response
-        : "Failed to generate response. Please try again.",
-    reasoning:
-      typeof aiData.reasoning === "string" ? aiData.reasoning : undefined,
-  };
+  return DEFAULT_AI_RESPONSE;
 }
 
 /**
- * Validate share response from publish endpoint
+ * Validate share response from publish endpoint.
+ * Uses Zod schema for structure validation.
  */
 export function validateShareResponse(data: unknown): {
   shareId?: string;
   publicId?: string;
 } {
-  if (!data || typeof data !== "object") {
-    return {};
+  const result = ShareResponseSchema.safeParse(data);
+  if (result.success) {
+    return result.data;
   }
-
-  const response = data as Record<string, unknown>;
-
-  return {
-    shareId:
-      typeof response.shareId === "string" ? response.shareId : undefined,
-    publicId:
-      typeof response.publicId === "string" ? response.publicId : undefined,
-  };
+  return {};
 }
+
+// Re-export types and defaults for consumers
+export type { SearchMethod };
+export { DEFAULT_AI_RESPONSE };

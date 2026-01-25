@@ -5,11 +5,13 @@ interface SearchProgressProps {
   progress: {
     stage:
       | "idle"
+      | "thinking"
       | "planning"
       | "searching"
       | "scraping"
       | "analyzing"
-      | "generating";
+      | "generating"
+      | "finalizing";
     message?: string;
     urls?: string[];
     currentUrl?: string;

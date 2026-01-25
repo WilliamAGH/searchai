@@ -2,6 +2,8 @@
  * Shared utility functions for chat operations
  */
 
+import { normalizeWhitespace } from "../lib/text";
+
 /**
  * Build a compact context summary from messages
  * Used by planner to reduce token usage
@@ -16,7 +18,7 @@ export function buildContextSummary(params: {
   maxChars?: number;
 }): string {
   const { messages, rollingSummary, maxChars = 1600 } = params;
-  const sanitize = (s?: string) => (s || "").replace(/\s+/g, " ").trim();
+  const sanitize = normalizeWhitespace;
   const recent = messages.slice(-14); // cap to last 14 turns for cost
 
   // Collect last 2 user turns verbatim (truncated), then last assistant, then compact older
@@ -84,7 +86,7 @@ export function generateChatTitle(params: {
   const { intent, maxLength = DEFAULT_TITLE_MAX_LENGTH } = params;
   if (!intent) return "New Chat";
 
-  const sanitized = intent.replace(/<+/g, "").replace(/\s+/g, " ").trim();
+  const sanitized = normalizeWhitespace(intent.replace(/<+/g, ""));
   if (!sanitized) return "New Chat";
 
   // Remove common filler words/phrases to make titles more concise

@@ -10,6 +10,7 @@ import { api } from "../../convex/_generated/api";
 import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import type { ChatState } from "./useChatState";
 import { logger } from "../lib/logger";
+import { getErrorMessage } from "../lib/utils/errorUtils";
 import { IdUtils } from "../lib/types/unified";
 import { useAnonymousSession } from "./useAnonymousSession";
 
@@ -65,7 +66,7 @@ export function useChatDataLoader(
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : "Failed to load chats",
+        error: getErrorMessage(error, "Failed to load chats"),
       }));
     }
   }, [convexChats, repository, setState]);
@@ -148,10 +149,10 @@ export function useChatDataLoader(
         setState((current) => ({
           ...current,
           isLoading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to load messages for first chat",
+          error: getErrorMessage(
+            error,
+            "Failed to load messages for first chat",
+          ),
         }));
       });
 

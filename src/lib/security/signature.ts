@@ -5,20 +5,14 @@
  * Verifies HMAC-SHA256 signatures from backend
  */
 
-export type PersistedPayload = {
-  assistantMessageId: string;
-  workflowId: string;
-  answer: string;
-  sources: string[];
-  contextReferences: Array<{
-    contextId: string;
-    type: "search_result" | "scraped_page" | "research_summary";
-    url?: string;
-    title?: string;
-    timestamp: number;
-    relevanceScore?: number;
-  }>;
-};
+// Import PersistedPayload from the single source of truth
+import type { StreamingPersistPayload } from "../../../convex/agents/schema";
+
+/**
+ * PersistedPayload type for browser signature verification.
+ * Re-exported from convex/agents/schema.ts (single source of truth).
+ */
+export type PersistedPayload = StreamingPersistPayload;
 
 /**
  * Convert Uint8Array to hex string
