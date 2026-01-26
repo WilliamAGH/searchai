@@ -21,18 +21,18 @@ interface UseMessageListScrollOptions {
   /** Whether the AI is currently generating a response */
   isGenerating: boolean;
   /** External scroll container ref (when parent handles scrolling) */
-  externalScrollRef?: React.RefObject<HTMLDivElement>;
+  externalScrollRef?: React.RefObject<HTMLDivElement | null>;
   /** Search progress to trigger scroll on tool updates */
   searchProgress?: unknown;
 }
 
 interface UseMessageListScrollResult {
   /** Ref for the scroll container (internal or external) */
-  scrollContainerRef: React.RefObject<HTMLDivElement>;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   /** Ref for the end-of-messages marker element */
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
   /** Internal scroll ref (for fallback mode) */
-  internalScrollRef: React.RefObject<HTMLDivElement>;
+  internalScrollRef: React.RefObject<HTMLDivElement | null>;
   /** Whether using external scroll container */
   useExternalScroll: boolean;
   /** Whether user has scrolled away from bottom */
@@ -59,8 +59,8 @@ export function useMessageListScroll({
   externalScrollRef,
   searchProgress,
 }: UseMessageListScrollOptions): UseMessageListScrollResult {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const internalScrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const internalScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = externalScrollRef || internalScrollRef;
   const useExternalScroll = !!externalScrollRef;
 
@@ -69,8 +69,8 @@ export function useMessageListScroll({
   const isLoadingMoreRef = useRef(false);
   const lastSeenMessageCountRef = useRef(messageCount);
   const autoScrollEnabledRef = useRef(true);
-  const isTouchingRef = useRef(false);
   const smoothScrollInProgressRef = useRef(false);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isMobile = useIsMobile();
   const isVirtualKeyboardOpen = useIsVirtualKeyboardOpen();
@@ -87,9 +87,13 @@ export function useMessageListScroll({
    */
   const cancelSmoothScroll = useCallback(() => {
     const container = scrollContainerRef.current;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = null;
+    }
     if (container && smoothScrollInProgressRef.current) {
       const currentPos = container.scrollTop;
-      container.scrollTo({ top: currentPos, behavior: "instant" });
+      container.scrollTo({ top: currentPos, behavior: "auto" });
       smoothScrollInProgressRef.current = false;
     }
   }, [scrollContainerRef]);
@@ -106,7 +110,10 @@ export function useMessageListScroll({
         smoothScrollInProgressRef.current = true;
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         // Reset flag after animation completes and ensure FAB is hidden
-        setTimeout(() => {
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+        scrollTimeoutRef.current = setTimeout(() => {
           smoothScrollInProgressRef.current = false;
           // After scroll animation, verify we're near bottom and keep FAB hidden
           const stillNearBottom =
@@ -117,11 +124,20 @@ export function useMessageListScroll({
           }
         }, SCROLL_ANIMATION_MS);
       } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
       }
     },
     [scrollContainerRef, STUCK_THRESHOLD],
   );
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handleScrollToBottom = useCallback(() => {
     scrollToBottom("smooth");
@@ -222,12 +238,7 @@ export function useMessageListScroll({
     if (!container) return;
 
     const handleTouchStart = () => {
-      isTouchingRef.current = true;
       cancelSmoothScroll();
-    };
-
-    const handleTouchEnd = () => {
-      isTouchingRef.current = false;
     };
 
     const handleWheel = () => {
@@ -270,13 +281,11 @@ export function useMessageListScroll({
     container.addEventListener("touchstart", handleTouchStart, {
       passive: true,
     });
-    container.addEventListener("touchend", handleTouchEnd, { passive: true });
     container.addEventListener("wheel", handleWheel, { passive: true });
 
     return () => {
       container.removeEventListener("scroll", handleScroll);
       container.removeEventListener("touchstart", handleTouchStart);
-      container.removeEventListener("touchend", handleTouchEnd);
       container.removeEventListener("wheel", handleWheel);
     };
   }, [
