@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  extractUrlsFromMessage,
-  createUserProvidedSearchResults,
-} from "../convex/enhancements.ts";
+import { extractUrlsFromMessage } from "../convex/lib/url";
+import { createUserProvidedSearchResults } from "../convex/enhancements.ts";
 
 describe("URL extraction and enhancement", () => {
   it("extracts full HTTP URLs", () => {

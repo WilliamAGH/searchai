@@ -285,3 +285,32 @@ export function validateScrapeUrl(urlInput: string): ScrapeUrlValidation {
 
   return { ok: true, url: url.toString() };
 }
+
+// Extract URLs and domains from user message
+export function extractUrlsFromMessage(message: string): string[] {
+  // Regex to match:
+  // 1) http/https URLs up to whitespace or closing paren
+  // 2) www.* domains
+  // 3) bare domains with TLDs, allowing subdomains
+  const urlRegex =
+    /(https?:\/\/[\w\-._~:/?#[\]@!$&'()*+,;=%]+)|(www\.[^\s)]+)|\b([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?=\/|\b)/g;
+  const matches = message.match(urlRegex) || [];
+
+  const urls: string[] = [];
+  for (let raw of matches) {
+    // Strip surrounding quotes and trailing punctuation/parentheses
+    raw = raw.replace(/^['"(]+/, "").replace(/[)\].,!?]+$/, "");
+
+    if (raw.startsWith("http")) {
+      urls.push(raw);
+    } else if (raw.startsWith("www.")) {
+      urls.push(`https://${raw}`);
+    } else {
+      urls.push(`https://${raw}`);
+    }
+  }
+
+  // Deduplicate and normalize
+  const deduped = Array.from(new Set(urls));
+  return deduped;
+}
