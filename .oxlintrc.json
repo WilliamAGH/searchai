@@ -41,7 +41,7 @@
               "../lib/convexTypes",
               "../../lib/convexTypes"
             ],
-            "message": "❌ CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See CLAUDE.md for correct patterns."
+            "message": "❌ CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See AGENTS.md for correct patterns."
           },
           {
             "group": [

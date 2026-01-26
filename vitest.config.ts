@@ -8,9 +8,15 @@
  */
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import path from "node:path";
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   test: {
     setupFiles: ["./tests/setup.ts"],
     environment: "node",
@@ -30,7 +36,7 @@ export default defineConfig({
       "tests/smoke/**",
       "convex/_generated/**",
     ],
-    reporter: process.env.CI ? ["default", "json", "html"] : ["default"],
+    reporters: process.env.CI ? ["default", "json", "html"] : ["default"],
     ...(process.env.CI && {
       pool: "vmForks" as const,
       minThreads: 1,
@@ -38,8 +44,10 @@ export default defineConfig({
     }),
     projects: [
       {
-        name: "jsdom",
+        // inherit plugins and resolve.alias from root config
+        extends: true,
         test: {
+          name: "jsdom",
           environment: "jsdom",
           include: [
             "tests/**/*.test.tsx",
@@ -50,8 +58,10 @@ export default defineConfig({
         },
       },
       {
-        name: "node",
+        // inherit plugins and resolve.alias from root config
+        extends: true,
         test: {
+          name: "node",
           environment: "node",
           include: [
             "tests/**/*.test.ts",

@@ -1,9 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // Ensure env vars are available (optional .env)
+// Intentional: dotenv is optional - silently continue if not installed
 try {
   await import("dotenv/config");
-} catch {}
+} catch {
+  // dotenv not available - this is fine, env vars may be set via other means
+}
 import { desktopViewport } from "./tests/config/viewports";
 
 /**

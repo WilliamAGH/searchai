@@ -1,5 +1,5 @@
 ---
-description: "searchai-io agent rules - Convex runtimes, git safety, UI constraints, and verification workflow"
+description: "searchai-io agent rules - Convex runtimes, git safety, clean code, and verification workflow"
 alwaysApply: true
 ---
 
@@ -13,34 +13,45 @@ alwaysApply: true
 
 ## Rule Summary [SUM]
 
-- [ZT1a-c] Evidence-first / zero assumptions
-- [GT1a-i] Git, history safety, hooks/signing, lock files, and clean commits
+- [ZA1a-c] Zero Tolerance Policy (zero assumptions, validation workflow, forbidden practices)
+- [GT1a-j] Git, history safety, hooks/signing, lock files, and clean commits
 - [CX1a-h] Convex runtimes: `"use node";` boundaries for Node-only imports
-- [ED1a-b] Editing discipline: never undo another engineer’s edits
-- [FS1a-b] File creation policy (existing-first; explicit approval for new files)
-- [DR1a-c] Convention-over-configuration + DRY (no duplicate wrappers; keep files small)
-- [UI1a-c] UI status/overlays (inline-only; never block input)
-- [HP1a-c] HTTP endpoints (Convex): validation, clarity, no ambiguous routing
-- [CS1a-c] Code search policy (semantic-first; validate Convex code before commit)
-- [VR1a-e] Verification loops (build/typecheck/lint/tests/e2e)
+- [RC1a-d] Root Cause Resolution (single implementation, no fallbacks, no shims/workarounds)
+- [IM1a-d] Import Rules (no barrel files, `@/` alias only, no relative imports)
+- [LGY1a-c] No Legacy Code (no new code in legacy paths; migrate touched logic)
+- [FS1a-n] File Creation & Clean Architecture (search first, strict types, single responsibility)
+- [AB1a-c] Abstraction Discipline (reuse-first, no anemic wrappers)
+- [EH1a-c] Error Handling (no swallowing, no silent degradation)
+- [TY1a-p] Type Safety & Zod (Zod v4 compatibility, strict types, no `any`)
+- [SDK1-2] SDK Integration (OpenAI Agents SDK type patterns, Zod version boundary)
+- [UI1a-c] UI Status & Overlays (inline-only; never block input)
+- [HP1a-c] HTTP Endpoints (Convex): validation, clarity, no ambiguous routing
+- [CS1a-c] Code Search Policy (semantic-first; validate Convex code before commit)
+- [VR1a-e] Verification Loops (build/typecheck/lint/tests/e2e)
 - [LG1a] Language (American English only)
 
-## [ZT1] Evidence / No Assumptions
+## [ZA1] Zero Tolerance Policy
 
-- [ZT1a] Do not assume behavior, APIs, or architecture—verify in the codebase/docs first.
-- [ZT1b] When uncertain, pause and investigate rather than guessing.
-- [ZT1c] Prefer evidence-backed answers (reference concrete files/paths when possible).
+- [ZA1a] **Zero Assumptions**: Do not assume behavior, APIs, or versions. Verify in the codebase/docs first.
+- [ZA1b] **Validation**: `npm run validate` must pass with 0 errors before asking for review.
+- [ZA1c] **Forbidden Practices**:
+  - No `any`, loose typing, `as` assertions, or `as unknown as`.
+  - No polyfills for modern browsers/runtimes.
+  - No trusting memory—verify every import/API/config against current docs.
+- [ZA1d] **Dependency Verification**: You MUST research dependency questions and correct usage to ensure idiomatic patterns. Never use legacy or `@deprecated` features. Verification is facilitated by reviewing related code directly in `node_modules` and using online tool calls.
+- [ZA1e] **Dependency Search**: To search `node_modules` efficiently with `ast-grep`, target specific packages: `ast-grep run --pattern '...' node_modules/<package>`. Do NOT scan the entire `node_modules` folder.
 
 ## [GT1] Git, History, Hooks, Lock Files
 
 - [GT1a] Never bypass pre-commit hooks or commit signing.
   - Forbidden: `git commit -n`, `git commit -n -c commit.gpgsign=false`, setting `HUSKY=0` / `SKIP_HUSKY=1`, or otherwise forcing a commit.
 - [GT1b] If hooks fail (network/SSO agent issues, Convex checks, etc.), fix the environment or follow the project’s documented process; if blocked, escalate in the task thread—do not force the commit.
-- [GT1c] Request explicit permission for git operations and use the proper tool permissions (e.g., `git_write`); never attempt to sidestep policy checks.
+- [GT1c] Read-only git commands (e.g., `git status`, `git diff`, `git log`, `git show`) never require permission. Any git command that writes to the working tree, index, or history requires explicit permission (see [GT1g]).
 - [GT1d] Commit message standards: one logical change per commit; describe the change and purpose; no tooling/AI references; no `Co-authored-by` or AI attribution.
 - [GT1e] Do not amend or rewrite history (no `--amend`, no force pushes) without explicit user permission.
 - [GT1f] Do not change branches (checkout/merge/rebase/pull) unless the user explicitly instructs it.
-- [GT1g] Destructive git commands are prohibited unless explicitly ordered by the user (e.g., `git restore`, `git reset`, force checkout).
+- [GT1g] Destructive git commands are prohibited unless explicitly ordered by the user (e.g., `git restore`, `git reset`, force checkout). Destructive commands are a subset of write operations; read-only commands are always allowed without permission per [GT1c].
+- [GT1j] Examples of write operations that require permission: `git add`, `git commit`, `git checkout`, `git merge`, `git rebase`, `git reset`, `git restore`, `git clean`, `git cherry-pick`.
 - [GT1h] Never delete lock files automatically (including `.git/index.lock`). Stop and ask for instruction.
 - [GT1i] Treat existing staged/unstaged changes as intentional unless the user says otherwise; never “clean up” someone else’s work unprompted.
 
@@ -55,26 +66,69 @@ alwaysApply: true
 - [CX1g] Per Convex, only **actions** may run in the Node.js runtime; Node-only helpers must live alongside (and be imported only by) Node-runtime actions.
 - [CX1h] Do not rip out other engineers’ code to “fix” runtime issues; follow the layering/import rules and make minimal, compatible changes.
 
-References:
+## [RC1] Root Cause Resolution — No Fallbacks
 
-- Convex runtimes docs: https://docs.convex.dev/functions/runtimes#nodejs-runtime
-- Convex dashboard: https://dashboard.convex.dev/d/diligent-greyhound-240
+- [RC1a] **One Way**: Ship one proven implementation—no fallback paths, no "try X then Y", no silent degradation.
+- [RC1b] **No Shims**: **NO compatibility layers, shims, adapters, or wrappers** that hide defects. NO `as unknown as T`.
+- [RC1c] **Fix Roots**: Investigate → understand → fix root causes. Do not add band-aids (re-exports, polyfills, bridge code) to silence errors.
+- [RC1d] **Dev Logging**: Dev-only logging is allowed to learn (must not change behavior, remove before shipping).
 
-## [ED1] Editing Discipline (Protect Existing Work)
+## [ID1] Idiomatic Patterns & Defaults
 
-- [ED1a] Never undo another engineer’s edits (even if they look wrong) unless the original author explicitly requested it in this task.
-- [ED1b] Layer your fix on top, keep prior edits intact, and raise questions in the task thread instead of reverting.
+- [ID1a] **Defaults First**: Always prefer the idiomatic, expected, and default patterns provided by the framework, library, or SDK (e.g., Next.js, React, Convex, Zod).
+- [ID1b] **Custom Justification**: Custom implementations require a compelling reason (performance bottleneck, missing feature) and deep expertise. If you can't justify it, use the standard way.
+- [ID1c] **No Reinventing**: Do not build custom utilities for things the platform already does (e.g., use standard `Request`/`Response`, standard Zod methods, standard React hooks).
 
-## [FS1] File Creation Policy
+- [ID1d] **Node Modules**: Make careful use of `node_modules` dependencies. Do not make assumptions—use the correct idiomatic behavior of dependencies wherever possible to avoid unnecessary boilerplate or duplicate code.
 
-- [FS1a] Prefer edits within existing files; do not create new files unless necessary for the task’s goal.
-- [FS1b] If a brand-new file is truly required (especially new top-level modules/components), pause and obtain explicit user approval first.
+## [CC1] Clean Code & DDD (Mandatory)
 
-## [DR1] Convention over Configuration + DRY
+- [CC1a] **Mandatory Principles**: Clean Code principles (Robert C. Martin) and Domain-Driven Design (DDD) are **mandatory** and required in this repository.
+- [CC1b] **DRY (Don't Repeat Yourself)**: Avoid redundant code. Reuse code where appropriate and consistent with clean code principles.
+- [CC1c] **YAGNI (You Aren't Gonna Need It)**: Do not build features or abstractions "just in case". Implement only what is required for the current task.
+- [CC1d] **Clean Architecture**: Dependencies point inward. Domain logic has zero framework imports.
 
-- [DR1a] Favor existing components, hooks, and utilities over wrappers or duplicates.
-- [DR1b] Good abstractions: shared constants/validators/provider config/focused utilities that reduce repetition. Bad abstractions: wrappers around simple APIs, generic helpers that obscure intent, duplicate overlay/status components.
-- [DR1c] Large files: if a file approaches ~500 lines, prefer extracting cohesive pieces or reusing existing modules rather than adding more lines.
+## [IM1] Import Rules
+
+- [IM1a] **No Barrel Files**: `index.ts` re-exports are **forbidden**. Import directly from the source file.
+- [IM1b] **Use Aliases in `src/`**: In `src/**/*` files, always use `@/` alias for local imports (e.g., `@/components/Chat`)—never relative `./` or `../` unless strictly necessary for sibling assets.
+- [IM1c] **Direct Imports**: Import specific symbols; avoid `import * as`.
+- [IM1d] **No `@/` in Convex**: In `convex/**/*` files, `@/` path aliases are **FORBIDDEN**. Convex's esbuild bundler does not read `convex/tsconfig.json` paths; `@/` imports will pass IDE typechecking but **fail at bundle time**. Use relative imports within convex (e.g., `../lib/foo`). Enforced by `npm run lint:convex-imports`.
+
+## [LGY1] No Legacy Code
+
+- [LGY1a] **Definition**: Legacy = files/dirs labeled `legacy`, `deprecated`, `v1`, `old`, or explicitly marked in comments/docs.
+- [LGY1b] **Freeze**: Do not add new code or dependencies in legacy paths.
+- [LGY1c] **Migrate**: If you touch legacy logic, migrate it to canonical paths/patterns. If safe migration is impossible, stop and ask.
+
+## [FS1] File Creation & Clean Architecture
+
+- [FS1a] **Search First**: Search exhaustively for existing logic → reuse or extend → only then create new files.
+- [FS1b] **Single Responsibility**: New features belong in NEW files named for their single responsibility. Do not cram code into existing files.
+- [FS1c] **Clean Architecture**: Dependencies point inward. Domain logic has zero framework imports.
+- [FS1d] **One Way**: There is one single way to do everything. No exceptions. If something is updated, update all consumers immediately and remove the old code.
+- [FS1e] **No Duplication**: Single sources of truth. Do not scatter duplicate constants or config fragments.
+
+## [AB1] Abstraction Discipline
+
+- [AB1a] **No Anemic Wrappers**: Do not add classes/modules that only forward calls or rename fields without adding behavior.
+- [AB1b] **Earn Reuse**: New abstractions must earn reuse—extend existing code first; only add a helper when it removes real duplication.
+- [AB1c] **Delete Unused**: Delete unused exports/code instead of keeping them "just in case".
+
+## [EH1] Error Handling — No Swallowing
+
+- [EH1a] **Never Swallow**: No empty catch blocks, no `catch {}` that returns defaults, no `.catch(() => undefined)`.
+- [EH1b] **Surface Failures**: If you catch, add context and rethrow or surface a typed error.
+- [EH1c] **UI Feedback**: UI must surface failures via error boundaries or explicit error states, not silent fallbacks.
+
+## [TY1] Type Safety & Zod
+
+- [TY1a] **Strictness**: `noImplicitAny` is enabled. Explicit `any` is **FORBIDDEN** (except for Convex recursion limits and SDK integration per [SDK1]).
+- [TY1b] **No `unknown` Propagation**: `unknown` is allowed ONLY at system boundaries (inputs, errors). It MUST be validated/narrowed immediately via Zod. Do not pass `unknown` through domain logic.
+- [TY1c] **Zod v4**: Always import from `zod/v4` (e.g., `import { z } from "zod/v4";`) to ensure v4 compatibility. Exception: SDK integration files per [SDK2].
+- [TY1d] **Schema-First**: Define schemas in `src/schemas/` (or domain folders) and derive types via `z.infer`.
+- [TY1e] **Validation**: All external data (API, env, user input) MUST be validated before use. Use `.safeParse()`.
+- [TY1f] **No `any`**: Do not use `any` to silence errors. Fix the types.
 
 ## [UI1] UI Status & Overlays Policy (Inline-only)
 

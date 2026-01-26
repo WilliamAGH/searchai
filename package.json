@@ -20,6 +20,9 @@
     "convex",
     "react"
   ],
+  "engines": {
+    "node": "22.17.0"
+  },
   "scripts": {
     "validate:quick": "oxlint && tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false && npm run -s test",
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
@@ -32,7 +35,7 @@
     "typecheck": "tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
-    "validate": "npm-run-all --parallel lint typecheck format:check lint:convex-imports lint:convex-types --sequential test:single build",
+    "validate": "npm-run-all --parallel lint typecheck format:check lint:convex-imports lint:convex-types lint:duplicates --sequential test:single build",
     "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo '✅ Cleaned build caches'",
     "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo '✅ Cleaned everything - run npm install'",
     "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo '✅ Cleaned VSCode caches - restart VSCode'",
@@ -54,7 +57,9 @@
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test -g smoke --reporter=line",
     "prepare": "husky",
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
-    "lint:convex-types": "node scripts/lint-convex-types.mjs"
+    "lint:convex-types": "node scripts/lint-convex-types.mjs",
+    "lint:duplicates": "dry --no-cache && dry --no-cache --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
+    "lint:duplicates:near": "dry --no-cache --threshold 0.9"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
@@ -81,10 +86,13 @@
     "sonner": "^2.0.3",
     "tailwind-merge": "3.3.0",
     "terser": "5.40.0",
-    "zod": "^3.25.76",
-    "uuidv7": "^1.0.2"
+    "uuidv7": "^1.0.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@dry-lint/cli": "^3.0.0",
+    "@dry-lint/typescript": "^3.0.0",
+    "@dry-lint/zod": "^3.0.0",
     "@playwright/test": "1.56.1",
     "@testing-library/react": "^16.0.0",
     "@types/node": "24.2.1",
@@ -93,6 +101,7 @@
     "@vitejs/plugin-react": "4.4.1",
     "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "~10",
+    "cli-progress": "^3.12.0",
     "convex-test": "^0.0.38",
     "dotenv": "16.5.0",
     "esbuild": "0.25.4",

@@ -15,14 +15,30 @@ globs: **/*.ts,**/*.tsx,**/*.js,**/*.jsx
 ## Imports
 
 ```typescript
-// Backend
+// Backend (convex/**/*.ts)
 import { query, mutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 
-// Frontend  
+// Frontend (src/**/*.ts)
 import { api } from "../convex/_generated/api";
 ```
+
+## [IM1d] Path Aliases: `@/` is FORBIDDEN in Convex Files
+
+**Rule**: Never use `@/` path aliases in `convex/**/*` files. Use relative imports only.
+
+**Why**: Convex's esbuild bundler does **not** resolve tsconfig `paths`. The `convex/tsconfig.json` has no `paths` configured, and even if added, Convex's CLI does not pass tsconfig options to esbuild. `@/` imports will pass IDE typechecking (because `tsconfig.app.json` includes convex files) but **fail at bundle time**.
+
+```typescript
+// ❌ WRONG - will fail when Convex bundles
+import { something } from "@/lib/utils";
+
+// ✅ CORRECT - relative imports work in convex/
+import { something } from "../lib/utils";
+```
+
+**Enforcement**: `npm run lint:convex-imports` (runs as part of `npm run validate`). See AGENTS.md `[IM1d]`.
 
 ## Function Patterns
 
@@ -89,6 +105,8 @@ export default defineSchema({
 - Use `Doc<"tableName">` for full documents
 - Add type hints for circular references: `const result: string = await ctx.runQuery(...)`
 - Use `as const` for discriminated unions
+- **Recursion Depth Issues**: See `.cursor/rules/type-safety-zod-validation.mdc` for handling "excessively deep" type errors via `any` casting or `@ts-ignore`.
+- **OpenAI Agents Zod Boundary**: OpenAI Agents tool parameter schemas use Zod v3; canonical schemas stay on v4. See `.cursor/rules/type-safety-zod-validation.mdc` [ZD1] for the boundary rules.
 
 ## Pagination
 
