@@ -1,81 +1,41 @@
 ---
-description: "Type safety and Zod validation standards for the repository"
+description: "Type safety and Zod validation standards"
 globs: "**/*.ts,**/*.tsx"
 ---
 
 # Type Safety & Zod Validation
 
-## [TS1] Strict Type Safety Policy
+Core rules in `CLAUDE.md`: [TY1], [VL1]
 
-- [TS1a] **Strictness**: The repository enforces strict type checking. `noImplicitAny` is enabled.
-- [TS1b] **No `any`**: Explicit `any` is **FORBIDDEN**. It defeats the purpose of TypeScript.
-  - **Exception**: ONLY allowed for Convex recursion limits or SDK integration per [SDK1] in `.cursor/rules/sdk-integration.mdc`.
-- [TS1c] **No `unknown` in Domain**: The `unknown` type is permitted **ONLY** at system boundaries (API inputs, catch blocks) where the type is truly not yet known.
-  - **Requirement**: Data typed as `unknown` MUST be validated/narrowed (via Zod or type guards) IMMEDIATELY upon entry.
-  - **Prohibition**: Do not pass `unknown` types through application layers. Validate at the gate.
-- [TS1d] **Convex API Workaround**: When encountering "Type instantiation is excessively deep" with Convex generated types:
-  - Use an intermediate `any` cast or `@ts-ignore` with a specific comment explaining the issue.
-  - Example:
-    ```typescript
-    // @ts-ignore - Convex api type instantiation is too deep here
-    const deleteChat = useMutation(api.chats.deleteChat);
-    ```
-  - Do NOT disable strict mode globally or for entire files.
+## [TS1] Strict Type Safety
 
-## [ZD1] Zod Version Strategy & OpenAI Agents Boundary
+- [TS1a] `noImplicitAny` enabled. Explicit `any` **FORBIDDEN** except Convex recursion limits.
+- [TS1b] `unknown` only at boundaries; validate immediately, never propagate.
+- [TS1c] Convex "excessively deep" errors: use `@ts-ignore` with comment, not global disables.
 
-- [ZD1a] **Canonical Version**: Zod v4 is the canonical schema language. Import from `zod/v4` everywhere by default.
-- [ZD1b] **OpenAI Agents Exception**: Files that integrate `@openai/agents` MAY import `zod` v3 **only** for tool parameter schemas. See [SDK2] in `.cursor/rules/sdk-integration.mdc`.
-  - Allowed files: `convex/agents/tools.ts`, `convex/agents/definitions.ts`.
-  - All other files MUST use `zod/v4`.
-  ```typescript
-  // ✅ Canonical default
-  import { z } from "zod/v4";
+## [ZD1] Zod Version
 
-  // ✅ Allowed ONLY in OpenAI Agents integration files
-  import { z } from "zod";
-  ```
-- [ZD1c] **Boundary Rule**: v3 schemas MUST NOT cross the integration boundary. Tool outputs must be validated against v4 schemas (see `convex/agents/schema.ts`) before use outside the integration layer.
-- [ZD1d] **No v4 Install**: Do NOT install `zod@4.x.x` directly as it conflicts with v3 peer dependencies required by the Agents SDK.
-- [ZD1e] **Convex Cross-Reference**: See `.cursor/rules/convex_rules.mdc` for Convex-specific guidance and path alias restrictions.
+- [ZD1a] Import `zod/v4` everywhere.
+- [ZD1b] Exception: `convex/agents/tools.ts` uses `zod` v3 for OpenAI Agents SDK tool params.
+- [ZD1c] v3 schemas must not cross integration boundary.
 
-## [ZD2] Schema Definition & Organization
+## [ZD2] Schema Location — Per [VL1]
 
-- [ZD2a] **Schema-First**: Define schemas in `src/schemas/` (or similar domain folders) and derive types via `z.infer<typeof Schema>`.
-  - **Never** define standalone interfaces for API data; they drift from validation logic.
-- [ZD2b] **Naming**: Use `<Entity>Schema` for the runtime object and `<Entity>` for the inferred type.
-- [ZD2c] **Strictness**: Use `.strict()` for API payloads to reject unknown keys when the contract is stable.
+- [ZD2a] **Canonical Zod schemas**: `convex/lib/schemas/` (importable by both `src/` and `convex/`)
+- [ZD2b] **Convex validators**: `convex/lib/validators.ts` (required for database, cannot use Zod)
+- [ZD2c] **No duplication**: Import from canonical location. Never redefine same schema.
 
-## [ZD3] Schema Composition (Best Practice)
+## [ZD3] When to Validate
 
-- [ZD3a] **Shape Spread**: When combining object schemas, prefer `.shape` spread with `z.object()` (or `z.looseObject()` if available) over `.merge()`.
-  - Deep `.merge()` chains (6+ levels) break TypeScript inference.
-  ```typescript
-  // ✅ PREFERRED: Maintains inference
-  const CombinedSchema = z.object({
-    ...BaseSchema.shape,
-    ...ExtensionSchema.shape,
-  });
+| Data Source | Validation | Why |
+|-------------|------------|-----|
+| External API (SerpAPI, scrapers) | Zod `.safeParse()` | Untrusted |
+| Convex query/mutation result | **None** | Already validated by Convex |
+| Tool call output (OpenAI SDK) | Zod `.safeParse()` | JSON parsing boundary |
+| User form input | Zod or form library | Untrusted |
 
-  // ❌ AVOID: Can break inference at depth
-  const CombinedSchema = BaseSchema.merge(ExtensionSchema);
-  ```
+## [ZD4] Best Practices
 
-## [ZD4] Boundary Validation
-
-- [ZD4a] **Mandatory Validation**: All external data (API responses, user input, environment variables) MUST be validated before use.
-- [ZD4b] **Safe Parse**: Use `.safeParse()` on untrusted data.
-  - **Never** use `.parse()` on network payloads (it throws and crashes).
-  - **Never** use `.data ?? default` (it silently swallows validation errors).
-- [ZD4c] **Discriminated Union**: Boundary functions should return a result object rather than `null` on failure.
-  ```typescript
-  type Result<T> = { success: true; data: T } | { success: false; error: unknown };
-  ```
-
-## [CX1] Convex & Zod Integration
-
-- [CX1a] **Validators**: While Convex has its own `v` validators for database schemas, use Zod for:
-  - Complex application-level validation logic.
-  - Validating external API responses (e.g., from 3rd party services).
-  - Frontend form validation.
-  - Environment variable validation.
+- Use `.safeParse()` on untrusted data (never `.parse()` on network payloads).
+- Derive types via `z.infer<typeof Schema>`.
+- Use `.strict()` for stable API contracts.

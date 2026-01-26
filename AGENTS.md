@@ -22,8 +22,8 @@ alwaysApply: true
 - [FS1a-n] File Creation & Clean Architecture (search first, strict types, single responsibility)
 - [AB1a-c] Abstraction Discipline (reuse-first, no anemic wrappers)
 - [EH1a-c] Error Handling (no swallowing, no silent degradation)
-- [TY1a-p] Type Safety & Zod (Zod v4 compatibility, strict types, no `any`)
-- [SDK1-2] SDK Integration (OpenAI Agents SDK type patterns, Zod version boundary)
+- [TY1a-f] Type Safety & Zod (Zod v4, strict types, no `any`)
+- [VL1a-d] Validation Architecture (no duplication, trust Convex, Zod at external boundaries only)
 - [UI1a-c] UI Status & Overlays (inline-only; never block input)
 - [HP1a-c] HTTP Endpoints (Convex): validation, clarity, no ambiguous routing
 - [CS1a-c] Code Search Policy (semantic-first; validate Convex code before commit)
@@ -123,12 +123,19 @@ alwaysApply: true
 
 ## [TY1] Type Safety & Zod
 
-- [TY1a] **Strictness**: `noImplicitAny` is enabled. Explicit `any` is **FORBIDDEN** (except for Convex recursion limits and SDK integration per [SDK1]).
-- [TY1b] **No `unknown` Propagation**: `unknown` is allowed ONLY at system boundaries (inputs, errors). It MUST be validated/narrowed immediately via Zod. Do not pass `unknown` through domain logic.
-- [TY1c] **Zod v4**: Always import from `zod/v4` (e.g., `import { z } from "zod/v4";`) to ensure v4 compatibility. Exception: SDK integration files per [SDK2].
-- [TY1d] **Schema-First**: Define schemas in `src/schemas/` (or domain folders) and derive types via `z.infer`.
-- [TY1e] **Validation**: All external data (API, env, user input) MUST be validated before use. Use `.safeParse()`.
+- [TY1a] **Strictness**: `noImplicitAny` is enabled. Explicit `any` is **FORBIDDEN** (except for Convex recursion limits).
+- [TY1b] **No `unknown` Propagation**: `unknown` is allowed ONLY at system boundaries. Validate immediately via Zod.
+- [TY1c] **Zod v4**: Import from `zod/v4`. Exception: OpenAI Agents tool params use v3.
+- [TY1d] **Schema Location**: Canonical Zod schemas live in `convex/lib/schemas/`. See [VL1].
+- [TY1e] **Validation**: External data (third-party APIs) MUST be validated. Convex-returned data needs NO re-validation.
 - [TY1f] **No `any`**: Do not use `any` to silence errors. Fix the types.
+
+## [VL1] Validation Architecture — No Duplication
+
+- [VL1a] **Convex `v` validators**: Required for database schema and function args. Cannot be replaced.
+- [VL1b] **Zod schemas**: Use ONLY at external API boundaries (data Convex doesn't see). Canonical location: `convex/lib/schemas/`.
+- [VL1c] **Trust Convex**: Data from Convex queries/mutations is already validated. Do NOT re-validate with Zod.
+- [VL1d] **No Duplication**: Never define the same schema in multiple files. Import from canonical location.
 
 ## [UI1] UI Status & Overlays Policy (Inline-only)
 

@@ -22,6 +22,29 @@ export type {
 } from "@/lib/schemas/messageStream";
 
 /**
+ * Workflow progress stages for search/response process.
+ * "idle" is UI-only initial state; active stages are used in stream events.
+ *
+ * @see {@link ../../../convex/agents/streaming_helpers.ts} ProgressStage (backend subset)
+ */
+export const WORKFLOW_STAGES = [
+  "idle",
+  "thinking",
+  "planning",
+  "searching",
+  "scraping",
+  "analyzing",
+  "generating",
+  "finalizing",
+] as const;
+
+/** All workflow stages including idle (UI state) */
+export type WorkflowStage = (typeof WORKFLOW_STAGES)[number];
+
+/** Active workflow stages (excludes idle - used in stream events) */
+export type ActiveWorkflowStage = Exclude<WorkflowStage, "idle">;
+
+/**
  * UI-specific message fields for streaming state tracking.
  * These fields are NOT persisted to Convex - they exist only in UI state.
  */
@@ -63,14 +86,7 @@ export type MessageStreamChunk =
   | { type: "content"; content?: string; delta?: string } // Answer content (with optional delta)
   | {
       type: "progress";
-      stage:
-        | "thinking"
-        | "planning"
-        | "searching"
-        | "scraping"
-        | "analyzing"
-        | "generating"
-        | "finalizing";
+      stage: ActiveWorkflowStage;
       message: string;
       urls?: string[];
       currentUrl?: string;
@@ -106,15 +122,7 @@ export type MessageStreamChunk =
  * Extended to support planning stage and additional metadata
  */
 export interface SearchProgress {
-  stage:
-    | "idle"
-    | "thinking"
-    | "planning"
-    | "searching"
-    | "scraping"
-    | "analyzing"
-    | "generating"
-    | "finalizing";
+  stage: WorkflowStage;
   message?: string;
   urls?: string[];
   currentUrl?: string;

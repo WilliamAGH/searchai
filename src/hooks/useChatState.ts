@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import type { Doc } from "../../convex/_generated/dataModel";
-import type { Message } from "../lib/types/message";
+import type { Message, WorkflowStage } from "@/lib/types/message";
 
 /**
  * Complete chat application state interface
@@ -30,15 +30,7 @@ export interface ChatState {
   /** Real-time search progress tracking */
   searchProgress: {
     /** Current stage of the search/response process */
-    stage:
-      | "idle"
-      | "thinking"
-      | "planning"
-      | "searching"
-      | "scraping"
-      | "analyzing"
-      | "generating"
-      | "finalizing"; // waiting for persistence confirmation
+    stage: WorkflowStage;
     /** Optional status message for current stage */
     message?: string;
     /** URLs being processed during scraping */
