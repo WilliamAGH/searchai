@@ -194,8 +194,8 @@ export function isUserTypingInInput(): boolean {
     return true;
   }
 
-  if (tagName === "INPUT") {
-    const inputType = (active as HTMLInputElement).type;
+  if (active instanceof HTMLInputElement) {
+    const inputType = active.type;
     return TEXT_INPUT_TYPES.has(inputType);
   }
 

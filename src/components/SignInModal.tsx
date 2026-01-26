@@ -12,7 +12,22 @@ import {
   AuthModalBase,
   extractAuthErrorMessage,
   getAuthToastMessage,
-} from "./AuthModalBase";
+} from "@/components/AuthModalBase";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const getResultErrorMessage = (value: unknown): string | null => {
+  if (!isRecord(value)) return null;
+  const error = value.error;
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error !== undefined) {
+    return String(error);
+  }
+  return null;
+};
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -59,15 +74,15 @@ export function SignInModal({
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       setSubmitting(true);
-      const formData = new FormData(e.target as HTMLFormElement);
+      const formData = new FormData(e.currentTarget);
       formData.set("flow", "signIn");
       try {
         const result = await signIn("password", formData);
-        if ((result as { error?: unknown })?.error) {
-          const msg = String((result as { error?: unknown }).error || "");
+        const errorMessage = getResultErrorMessage(result);
+        if (errorMessage) {
           toast.error(
             getAuthToastMessage(
-              msg,
+              errorMessage,
               "Could not sign in. Please check your credentials.",
             ),
           );

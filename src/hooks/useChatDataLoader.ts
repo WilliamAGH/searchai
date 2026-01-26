@@ -11,7 +11,6 @@ import type { IChatRepository } from "../lib/repositories/ChatRepository";
 import type { ChatState } from "./useChatState";
 import { logger } from "../lib/logger";
 import { getErrorMessage } from "../lib/utils/errorUtils";
-import { IdUtils } from "../lib/types/unified";
 import { useAnonymousSession } from "./useAnonymousSession";
 
 export function useChatDataLoader(
@@ -21,7 +20,7 @@ export function useChatDataLoader(
   const sessionId = useAnonymousSession();
 
   // Use reactive Convex query for chat list (auto-updates on changes)
-  const convexChats = useQuery(
+  const convexChats = useQuery<typeof api.chats.getUserChats>(
     api.chats.getUserChats,
     repository ? { sessionId: sessionId || undefined } : "skip",
   );
@@ -31,31 +30,17 @@ export function useChatDataLoader(
     if (!repository || convexChats === undefined) return;
 
     try {
-      // Convert Convex chats to unified format
-      const unifiedChats = (convexChats || []).map((chat) => ({
-        id: IdUtils.toUnifiedId(chat._id),
-        title: chat.title,
-        createdAt: chat._creationTime,
-        updatedAt: chat.updatedAt || chat._creationTime,
-        privacy: chat.privacy || ("private" as const),
-        shareId: chat.shareId,
-        publicId: chat.publicId,
-        rollingSummary: chat.rollingSummary,
-        source: "convex" as const,
-        synced: true,
-        isLocal: false,
-        lastSyncAt: Date.now(),
-      }));
+      const chats = convexChats || [];
 
       setState((prev) => {
         const currentChat = prev.currentChatId
-          ? (unifiedChats.find((chat) => chat.id === prev.currentChatId) ??
+          ? (chats.find((chat) => chat._id === prev.currentChatId) ??
             prev.currentChat)
           : prev.currentChat;
 
         return {
           ...prev,
-          chats: unifiedChats,
+          chats,
           currentChat,
           isLoading: false,
           error: null,
@@ -91,7 +76,12 @@ export function useChatDataLoader(
         return prev;
       }
 
-      pendingChatId = firstChat.id;
+      // Extract chat ID, handling both Convex Id<"chats"> and edge cases
+      const chatId = firstChat._id;
+      if (!chatId) {
+        return prev;
+      }
+      pendingChatId = String(chatId);
       pendingChat = firstChat;
 
       return {
@@ -122,8 +112,9 @@ export function useChatDataLoader(
           }
 
           const nextChat =
-            current.chats.find((chat) => chat.id === pendingChatId) ??
-            pendingChat;
+            current.chats.find(
+              (chat) => String(chat._id ?? "") === String(pendingChatId),
+            ) ?? pendingChat;
 
           if (!nextChat) {
             return {
@@ -134,7 +125,7 @@ export function useChatDataLoader(
 
           return {
             ...current,
-            currentChatId: nextChat.id,
+            currentChatId: String(nextChat._id ?? ""),
             currentChat: nextChat,
             messages,
             isLoading: false,

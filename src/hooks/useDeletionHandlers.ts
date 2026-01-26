@@ -1,32 +1,30 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { logger } from "../lib/logger";
 import { getErrorMessage } from "../lib/utils/errorUtils";
+import { toConvexId } from "../lib/utils/idValidation";
 import type { Id } from "../../convex/_generated/dataModel";
+import type { Message } from "@/lib/types/message";
 
 interface UseDeletionHandlersProps {
-  chatState: {
-    chats: Array<{ id: string; title?: string }>;
-    messages: Array<{ id: string }>;
+  chatState?: {
+    messages: Message[];
   };
-  chatActions: {
-    deleteChat: (id: string) => Promise<void>;
-    createChat: (chat: { id: string; title?: string }) => void;
-    deleteMessage: (id: string) => Promise<void>;
-    addMessage: (msg: { id: string }) => void;
+  chatActions?: {
+    removeMessage: (id: string) => void;
+    addMessage: (message: Message) => void;
   };
   deleteChat: (args: {
     chatId: Id<"chats">;
     sessionId?: string;
-  }) => Promise<void>;
+  }) => Promise<null>;
   deleteMessage: (args: {
     messageId: Id<"messages">;
     sessionId?: string;
-  }) => Promise<void>;
+  }) => Promise<null>;
   sessionId?: string;
 }
 
 interface UndoBannerState {
-  show: boolean;
   message: string;
   action?: () => void;
 }
@@ -57,52 +55,18 @@ export function useDeletionHandlers({
     };
   }, [clearAllTimeouts]);
 
-  const handleDeleteLocalChat = useCallback(
-    async (chatId: string) => {
-      // Store chat data for undo
-      const chatToDelete = chatState.chats.find((c) => c.id === chatId);
-
-      if (chatToDelete) {
-        // Perform deletion
-        await chatActions.deleteChat(chatId);
-
-        // Show undo banner
-        setUndoBanner({
-          show: true,
-          message: `Chat "${chatToDelete.title || "Untitled"}" deleted`,
-          action: () => {
-            // Restore chat
-            chatActions.createChat(
-              chatToDelete as { id: string; title?: string },
-            );
-            setUndoBanner(null);
-          },
-        });
-
-        // Auto-hide after 2 seconds (with cleanup)
-        clearAllTimeouts();
-        const timeoutId = window.setTimeout(() => {
-          setUndoBanner((prev) =>
-            prev?.message ===
-            `Chat "${chatToDelete.title || "Untitled"}" deleted`
-              ? null
-              : prev,
-          );
-        }, 2000);
-        timeoutsRef.current.push(timeoutId);
-      }
-    },
-    [chatState.chats, chatActions, clearAllTimeouts],
-  );
-
   const handleRequestDeleteChat = useCallback(
-    async (chatId: Id<"chats">) => {
+    async (chatId: Id<"chats"> | string) => {
       try {
-        await deleteChat({ chatId, sessionId });
+        const resolvedChatId =
+          typeof chatId === "string" ? toConvexId<"chats">(chatId) : chatId;
+        if (!resolvedChatId) {
+          throw new Error(`Invalid chat ID for deletion: ${chatId}`);
+        }
+        await deleteChat({ chatId: resolvedChatId, sessionId });
 
         // Show success banner
         setUndoBanner({
-          show: true,
           message: "Chat deleted successfully",
         });
 
@@ -118,7 +82,6 @@ export function useDeletionHandlers({
         if (!errorMessage.includes("Chat not found")) {
           logger.error("Failed to delete chat:", error);
           setUndoBanner({
-            show: true,
             message: "Failed to delete chat",
           });
         }
@@ -129,47 +92,49 @@ export function useDeletionHandlers({
 
   const handleDeleteLocalMessage = useCallback(
     async (messageId: string) => {
-      // Store message data for undo
+      if (!chatState || !chatActions) return;
       const messageToDelete = chatState.messages.find(
-        (m) => m.id === messageId,
+        (m) => String(m._id) === messageId,
       );
 
-      if (messageToDelete) {
-        // Perform deletion
-        await chatActions.deleteMessage(messageId);
+      if (!messageToDelete) return;
 
-        // Show undo banner
-        setUndoBanner({
-          show: true,
-          message: "Message deleted",
-          action: () => {
-            // Restore message
-            chatActions.addMessage(messageToDelete);
-            setUndoBanner(null);
-          },
-        });
+      chatActions.removeMessage(messageId);
 
-        // Auto-hide after 2 seconds (with cleanup)
-        clearAllTimeouts();
-        const timeoutId = window.setTimeout(() => {
-          setUndoBanner((prev) =>
-            prev?.message === "Message deleted" ? null : prev,
-          );
-        }, 2000);
-        timeoutsRef.current.push(timeoutId);
-      }
+      setUndoBanner({
+        message: "Message deleted",
+        action: () => {
+          chatActions.addMessage(messageToDelete);
+          setUndoBanner(null);
+        },
+      });
+
+      clearAllTimeouts();
+      const timeoutId = window.setTimeout(() => {
+        setUndoBanner((prev) =>
+          prev?.message === "Message deleted" ? null : prev,
+        );
+      }, 2000);
+      timeoutsRef.current.push(timeoutId);
     },
-    [chatState.messages, chatActions, clearAllTimeouts],
+    [chatActions, chatState, clearAllTimeouts],
   );
 
   const handleRequestDeleteMessage = useCallback(
-    async (messageId: Id<"messages">) => {
+    async (messageId: Id<"messages"> | string) => {
       try {
-        await deleteMessage({ messageId, sessionId });
+        const resolvedMessageId =
+          typeof messageId === "string"
+            ? toConvexId<"messages">(messageId)
+            : messageId;
+        if (!resolvedMessageId) {
+          await handleDeleteLocalMessage(String(messageId));
+          return;
+        }
+        await deleteMessage({ messageId: resolvedMessageId, sessionId });
 
         // Show success banner
         setUndoBanner({
-          show: true,
           message: "Message deleted",
         });
 
@@ -182,18 +147,15 @@ export function useDeletionHandlers({
       } catch (error) {
         logger.error("Failed to delete message:", error);
         setUndoBanner({
-          show: true,
           message: "Failed to delete message",
         });
       }
     },
-    [deleteMessage, sessionId, clearAllTimeouts],
+    [deleteMessage, sessionId, clearAllTimeouts, handleDeleteLocalMessage],
   );
 
   return {
-    handleDeleteLocalChat,
     handleRequestDeleteChat,
-    handleDeleteLocalMessage,
     handleRequestDeleteMessage,
     undoBanner,
     setUndoBanner,

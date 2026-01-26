@@ -1,17 +1,13 @@
 import { useCallback, useRef } from "react";
 
 interface UseSidebarTimingProps {
-  sidebarOpen: boolean;
   onToggleSidebar?: () => void;
 }
 
 /**
- * Hook to manage sidebar timing and animations
+ * Hook to manage sidebar close timing for animations
  */
-export function useSidebarTiming({
-  sidebarOpen: _sidebarOpen,
-  onToggleSidebar,
-}: UseSidebarTimingProps) {
+export function useSidebarTiming({ onToggleSidebar }: UseSidebarTimingProps) {
   const closingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMobileSidebarClose = useCallback(() => {

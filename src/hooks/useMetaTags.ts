@@ -1,47 +1,31 @@
 import { useEffect } from "react";
+import type { Chat } from "../lib/types/chat";
 
 interface MetaTagsProps {
-  title?: string;
-  description?: string;
-  keywords?: string;
+  currentChatId: string | null;
+  allChats: Chat[];
 }
 
 /**
- * Hook to manage document meta tags
+ * Hook to manage document title for chat routes
  */
-export function useMetaTags({ title, description, keywords }: MetaTagsProps) {
+export function useMetaTags({ currentChatId, allChats }: MetaTagsProps) {
   useEffect(() => {
     const originalTitle = document.title;
+    const resolvedChat = currentChatId
+      ? allChats.find(
+          (chat) => String(chat._id ?? "") === String(currentChatId),
+        )
+      : undefined;
 
-    if (title) {
-      document.title = title;
+    if (resolvedChat?.title) {
+      document.title = `${resolvedChat.title} · SearchAI`;
+    } else {
+      document.title = "SearchAI";
     }
 
-    // Update meta description
-    if (description) {
-      let metaDescription = document.querySelector('meta[name="description"]');
-      if (!metaDescription) {
-        metaDescription = document.createElement("meta");
-        metaDescription.setAttribute("name", "description");
-        document.head.appendChild(metaDescription);
-      }
-      metaDescription.setAttribute("content", description);
-    }
-
-    // Update meta keywords
-    if (keywords) {
-      let metaKeywords = document.querySelector('meta[name="keywords"]');
-      if (!metaKeywords) {
-        metaKeywords = document.createElement("meta");
-        metaKeywords.setAttribute("name", "keywords");
-        document.head.appendChild(metaKeywords);
-      }
-      metaKeywords.setAttribute("content", keywords);
-    }
-
-    // Cleanup function to restore original title
     return () => {
       document.title = originalTitle;
     };
-  }, [title, description, keywords]);
+  }, [currentChatId, allChats]);
 }

@@ -4,7 +4,7 @@
  */
 
 import { useCallback } from "react";
-import { useMutation } from "convex/react";
+import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useAnonymousSession } from "./useAnonymousSession";
@@ -14,13 +14,17 @@ import { useAnonymousSession } from "./useAnonymousSession";
  * This ensures anonymous users can delete their own chats
  */
 export function useSessionAwareDeleteChat() {
-  const deleteChat = useMutation(api.chats.deleteChat);
+  const convex = useConvex();
   const sessionId = useAnonymousSession();
 
   return useCallback(
-    (chatId: Id<"chats">) => {
-      return deleteChat({ chatId, sessionId: sessionId || undefined });
+    async (chatId: Id<"chats">) => {
+      // @ts-ignore - Convex api type instantiation is excessively deep [TS1c]
+      await convex.mutation(api.chats.deleteChat, {
+        chatId,
+        sessionId: sessionId || undefined,
+      });
     },
-    [deleteChat, sessionId],
+    [convex, sessionId],
   );
 }

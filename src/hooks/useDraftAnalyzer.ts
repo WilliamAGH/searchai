@@ -49,7 +49,7 @@ export function useDraftAnalyzer({
     [minLength, onAnalysis],
   );
 
-  const debouncedAnalyze = useDebounce(analyzeDraft, debounceMs);
+  const debouncedAnalyze = useDebounce<[string]>(analyzeDraft, debounceMs);
 
   const handleDraftChange = useCallback(
     (draft: string) => {

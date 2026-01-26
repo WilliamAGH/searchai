@@ -4,10 +4,8 @@
  */
 
 import React, { useEffect, useCallback, useState } from "react";
-import { useConvex } from "convex/react";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { api } from "../../../convex/_generated/api";
-import { logger } from "../../lib/logger";
+import { logger } from "@/lib/logger";
 import { EmptyState } from "./EmptyState";
 import { ScrollToBottomFab } from "./ScrollToBottomFab";
 import { MessageItem } from "./MessageItem";
@@ -18,8 +16,8 @@ import {
   LoadErrorState,
 } from "./MessageSkeleton";
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
-import type { Message, SearchProgress } from "../../lib/types/message";
-import { useMessageListScroll } from "../../hooks/useMessageListScroll";
+import type { Message, SearchProgress } from "@/lib/types/message";
+import { useMessageListScroll } from "@/hooks/useMessageListScroll";
 import { resolveMessageKey } from "./messageKey";
 import { ReasoningDisplay } from "./ReasoningDisplay";
 
@@ -31,8 +29,7 @@ interface MessageListProps {
   isGenerating: boolean;
   onToggleSidebar: () => void;
   searchProgress?: SearchProgress | null;
-  onDeleteLocalMessage?: (messageId: string) => void;
-  onRequestDeleteMessage?: (messageId: string | Id<"messages">) => void;
+  onRequestDeleteMessage: (messageId: string | Id<"messages">) => void;
   // Pagination props
   isLoadingMore?: boolean;
   hasMore?: boolean;
@@ -41,8 +38,6 @@ interface MessageListProps {
   loadError?: Error | null;
   retryCount?: number;
   onClearError?: () => void;
-  // Session ID for authorization (anonymous users)
-  sessionId?: string;
   // Optional external scroll container ref (when parent handles scrolling)
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -55,7 +50,6 @@ export function MessageList({
   isGenerating,
   onToggleSidebar,
   searchProgress,
-  onDeleteLocalMessage,
   onRequestDeleteMessage,
   // Pagination props
   isLoadingMore = false,
@@ -65,10 +59,8 @@ export function MessageList({
   loadError,
   retryCount = 0,
   onClearError,
-  sessionId,
   scrollContainerRef: externalScrollRef,
 }: MessageListProps) {
-  const convex = useConvex();
   // Use the scroll behavior hook
   const {
     scrollContainerRef: _scrollContainerRef,
@@ -90,9 +82,10 @@ export function MessageList({
     {},
   );
   const [hoveredSourceUrl, setHoveredSourceUrl] = useState<string | null>(null);
-  // Citation hover callback - currently unused but passed to children for future highlight sync
+  // Citation hover callback - wired to CitationRenderer for hover highlighting
+  // Currently no-op at this level; could sync with hoveredSourceUrl for cross-component highlighting
   const handleCitationHover = useCallback((_url: string | null) => {
-    // No-op: citation hover state not currently consumed
+    // Placeholder for future citation highlight synchronization
   }, []);
 
   const handleDeleteMessage = React.useCallback(
@@ -102,28 +95,12 @@ export function MessageList({
       try {
         if (!window.confirm("Delete this message? This cannot be undone."))
           return;
-        if (onRequestDeleteMessage) {
-          onRequestDeleteMessage(String(messageId));
-          return;
-        }
-
-        if (
-          String(messageId).startsWith("local_") ||
-          String(messageId).startsWith("msg_")
-        ) {
-          onDeleteLocalMessage?.(String(messageId));
-        } else {
-          // @ts-ignore - Convex api type instantiation is excessively deep [TS1c]
-          await convex.mutation(api.messages.deleteMessage, {
-            messageId: messageId as Id<"messages">,
-            sessionId,
-          });
-        }
+        onRequestDeleteMessage(String(messageId));
       } catch (err) {
         logger.error("Failed to delete message", err);
       }
     },
-    [onRequestDeleteMessage, onDeleteLocalMessage, sessionId, convex],
+    [onRequestDeleteMessage],
   );
 
   // Debug logging

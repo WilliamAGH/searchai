@@ -1,10 +1,36 @@
 import React from "react";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { Chat } from "../lib/types/chat";
-import { logger } from "../lib/logger";
-import { isLocalChat } from "../lib/types/chat";
-import { toConvexId } from "../lib/utils/idValidation";
-import { useSessionAwareDeleteChat } from "../hooks/useSessionAwareDeleteChat";
+import type { Chat } from "@/lib/types/chat";
+import { logger } from "@/lib/logger";
+import { toConvexId } from "@/lib/utils/idValidation";
+import { useSessionAwareDeleteChat } from "@/hooks/useSessionAwareDeleteChat";
+
+/**
+ * Execute chat deletion based on available handlers.
+ */
+async function executeDeleteChat(
+  chatId: string,
+  chat: Chat | undefined,
+  handlers: {
+    onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
+    deleteChat: (chatId: Id<"chats">) => Promise<void>;
+  },
+): Promise<void> {
+  const { onRequestDeleteChat, deleteChat } = handlers;
+  const resolvedId = String(chat?._id ?? chatId);
+  const convexId = toConvexId<"chats">(resolvedId);
+
+  if (!convexId) {
+    throw new Error(`Invalid chat ID for deletion: ${resolvedId}`);
+  }
+
+  if (onRequestDeleteChat) {
+    onRequestDeleteChat(convexId);
+    return;
+  }
+
+  await deleteChat(convexId);
+}
 
 /**
  * Props for the ChatSidebar component
@@ -19,12 +45,8 @@ interface ChatSidebarProps {
   onSelectChat: (chatId: Id<"chats"> | string | null) => void;
   /** Callback fired when user clicks the "New Chat" button */
   onNewChat: () => void;
-  /** Optional callback to delete a local (non-synced) chat */
-  onDeleteLocalChat?: (chatId: string) => void;
   /** Optional callback to request deletion of a synced chat */
   onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
-  /** Controls whether the sidebar is visible (mobile) or expanded (desktop) */
-  isOpen: boolean;
   /** Callback to toggle sidebar open/closed state */
   onToggle: () => void;
   /** Indicates if a new chat is currently being created (shows loading state) */
@@ -50,9 +72,7 @@ export function ChatSidebar({
   currentChatId,
   onSelectChat,
   onNewChat,
-  onDeleteLocalChat,
   onRequestDeleteChat,
-  isOpen: _isOpen,
   onToggle,
   isCreatingChat = false,
 }: ChatSidebarProps) {
@@ -70,85 +90,40 @@ export function ChatSidebar({
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const attr = e.currentTarget.getAttribute("data-chat-id");
       if (!attr) return;
-      const match = chats.find((c) => String(c._id ?? c.id ?? "") === attr);
-      handleSelectChat(match ? (match._id ?? match.id ?? attr) : attr);
+      const match = chats.find((c) => String(c._id) === attr);
+      handleSelectChat(match ? match._id : attr);
     },
     [chats, handleSelectChat],
   );
 
   const handleDeleteClick = React.useCallback(
     async (e: React.MouseEvent<HTMLButtonElement>) => {
-      const attr = e.currentTarget.getAttribute("data-chat-id");
-      if (!attr) return;
-      const match = chats.find((c) => String(c._id ?? c.id ?? "") === attr);
+      const chatId = e.currentTarget.getAttribute("data-chat-id");
+      if (!chatId) return;
+
+      if (!window.confirm("Delete this chat? This cannot be undone.")) return;
+
+      const chat = chats.find((c) => String(c._id) === chatId);
+
       try {
-        if (!window.confirm("Delete this chat? This cannot be undone.")) return;
+        await executeDeleteChat(chatId, chat, {
+          onRequestDeleteChat,
+          deleteChat,
+        });
 
-        const resolvedId = match?._id ?? match?.id ?? undefined;
-
-        // Prefer parent-provided handler (shows undo banner, etc.)
-        if (onRequestDeleteChat) {
-          if (match && resolvedId) {
-            onRequestDeleteChat(
-              isLocalChat(match)
-                ? (String(resolvedId) as string)
-                : (resolvedId as Id<"chats">),
-            );
-          } else {
-            // Safely validate Convex ID before casting
-            const convexId = toConvexId<"chats">(attr);
-            if (convexId) {
-              onRequestDeleteChat(convexId);
-            } else {
-              onRequestDeleteChat(attr as string);
-            }
-          }
-        } else if (match) {
-          // Decide local vs server based on chat object, not typeof _id
-          if (isLocalChat(match)) {
-            onDeleteLocalChat?.(String(resolvedId ?? attr));
-          } else {
-            // Safely validate before calling mutation
-            const chatId = toConvexId<"chats">(String(resolvedId ?? attr));
-            if (chatId) {
-              await deleteChat(chatId);
-            } else {
-              logger.warn(
-                "Invalid Convex ID format for chat deletion:",
-                resolvedId ?? attr,
-              );
-            }
-          }
-        } else {
-          // Fallback: safely validate before deciding local vs Convex
-          const convexId = toConvexId<"chats">(attr);
-          if (convexId) {
-            await deleteChat(convexId);
-          } else {
-            onDeleteLocalChat?.(attr);
-          }
-        }
-
+        // Navigate away if deleting the current chat
         const currentIdString =
           currentChatId !== null ? String(currentChatId) : null;
-        if (match && resolvedId && currentIdString === String(resolvedId)) {
+        if (chat?._id && currentIdString === String(chat._id)) {
           onSelectChat(null);
         }
       } catch (err) {
-        // Only log warnings in dev to avoid noise in production
         if (import.meta.env.DEV) {
           logger.warn("Chat deletion failed:", err);
         }
       }
     },
-    [
-      chats,
-      onRequestDeleteChat,
-      onDeleteLocalChat,
-      deleteChat,
-      onSelectChat,
-      currentChatId,
-    ],
+    [chats, onRequestDeleteChat, deleteChat, onSelectChat, currentChatId],
   );
 
   // Always render the sidebar container so tests can locate the "New Chat" button
@@ -238,14 +213,14 @@ export function ChatSidebar({
         ) : (
           <div className="p-2">
             {chats.map((chat) => {
-              const resolvedChatId = String(chat._id ?? chat.id ?? "");
+              const resolvedChatId = String(chat._id);
               const isSelected =
                 currentChatId !== null &&
                 String(currentChatId) === resolvedChatId;
 
               return (
                 <div
-                  key={chat._id || chat.id || `chat-${Math.random()}`}
+                  key={chat._id}
                   className="flex items-center gap-2 mb-1 pr-2 min-w-0"
                 >
                   <button
@@ -260,11 +235,6 @@ export function ChatSidebar({
                       {chat.title}
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-1 min-w-0 mt-0.5">
-                      {"isLocal" in chat && chat.isLocal && (
-                        <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
-                          Local
-                        </span>
-                      )}
                       <span className="truncate">
                         {new Date(chat.updatedAt).toLocaleDateString()}
                       </span>

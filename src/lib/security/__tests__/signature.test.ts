@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { verifyPersistedPayload, type PersistedPayload } from "../signature";
+import {
+  verifyPersistedPayload,
+  type PersistedPayloadWire,
+} from "../signature";
 
 const encoder = new TextEncoder();
 
 async function signPayload(
-  payload: PersistedPayload,
+  payload: PersistedPayloadWire,
   nonce: string,
   signingKey: string,
 ): Promise<string> {
@@ -27,8 +30,8 @@ async function signPayload(
 }
 
 describe("verifyPersistedPayload", () => {
-  const payload: PersistedPayload = {
-    assistantMessageId: "msg_1" as any,
+  const payload: PersistedPayloadWire = {
+    assistantMessageId: "msg_1",
     workflowId: "019a122e-c507-7851-99f7-b8f5d7345b40",
     answer: "Example",
     sources: ["anthropic.com"],

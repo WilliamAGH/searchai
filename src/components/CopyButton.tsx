@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef } from "react";
-import { copyToClipboard } from "../lib/clipboard";
+import { copyToClipboard } from "@/lib/clipboard";
 import clsx from "clsx";
 import { toast } from "sonner";
 

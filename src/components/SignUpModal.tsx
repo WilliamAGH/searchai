@@ -12,7 +12,7 @@ import {
   AuthModalBase,
   extractAuthErrorMessage,
   getAuthToastMessage,
-} from "./AuthModalBase";
+} from "@/components/AuthModalBase";
 
 interface SignUpModalProps {
   isOpen: boolean;
@@ -59,8 +59,7 @@ export function SignUpModal({
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       setSubmitting(true);
-      const form = e.currentTarget as HTMLFormElement;
-      const formData = new FormData(form);
+      const formData = new FormData(e.currentTarget);
       formData.set("flow", "signUp");
       try {
         await signIn("password", formData);

@@ -1,15 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
 import type { MutableRefObject } from "react";
 import { logger } from "../lib/logger";
+import type { Id } from "../../convex/_generated/dataModel";
+import { toConvexId } from "../lib/utils/idValidation";
 import { isTopicChange } from "../lib/utils/topicDetection";
 
 interface UseEnhancedFollowUpPromptProps {
-  isAuthenticated: boolean;
   currentChatId: string | null;
   handleNewChat: (opts?: { userInitiated?: boolean }) => Promise<string | null>;
   sendRef: MutableRefObject<((message: string) => Promise<void>) | null>;
-  recordClientMetric?: unknown;
-  summarizeRecentAction?: unknown;
+  summarizeRecentAction?: (args: { chatId: Id<"chats"> }) => Promise<string>;
   chatState: {
     messages?: Array<{ role?: string; content?: string }>;
     isGenerating?: boolean;
@@ -20,18 +20,20 @@ interface UseEnhancedFollowUpPromptProps {
  * Hook to manage enhanced follow-up prompts and chat continuations
  */
 export function useEnhancedFollowUpPrompt({
-  isAuthenticated: _isAuthenticated,
   currentChatId,
   handleNewChat,
   sendRef,
-  recordClientMetric: _recordClientMetric,
   summarizeRecentAction,
   chatState,
 }: UseEnhancedFollowUpPromptProps) {
   const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
-  const [plannerHint, setPlannerHint] = useState<string | null>(null);
+  const [plannerHint, setPlannerHint] = useState<{
+    reason?: string;
+    confidence?: number;
+  } | null>(null);
   const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([]);
+  const [summaryError, setSummaryError] = useState<Error | null>(null);
 
   // Generate follow-up suggestions based on last assistant message
   useEffect(() => {
@@ -68,6 +70,7 @@ export function useEnhancedFollowUpPrompt({
         // Simple follow-up generation - can be enhanced with AI
         const suggestions = generateFollowUpSuggestions(lastMessage.content);
         setFollowUpSuggestions(suggestions);
+        setPendingMessage(lastUserMessage.content);
         // Show follow-up if there are suggestions and not currently generating
         if (suggestions.length > 0 && !chatState?.isGenerating) {
           setShowFollowUpPrompt(true);
@@ -84,6 +87,7 @@ export function useEnhancedFollowUpPrompt({
     setFollowUpSuggestions([]);
     setPendingMessage(null);
     setPlannerHint(null);
+    setSummaryError(null);
   }, []);
 
   const maybeShowFollowUpPrompt = useCallback(() => {
@@ -111,65 +115,59 @@ export function useEnhancedFollowUpPrompt({
       );
 
       if (hasTopicChanged) {
+        setPendingMessage(lastUserMessage.content);
         setShowFollowUpPrompt(true);
       }
     }
   }, [chatState?.messages, chatState?.isGenerating]);
 
-  const handleContinueChat = useCallback(
-    async (message: string) => {
-      // Continue in current chat
-      if (sendRef.current && currentChatId) {
-        resetFollowUp();
-        await sendRef.current(message);
-      }
-    },
-    [currentChatId, sendRef, resetFollowUp],
-  );
+  const handleContinueChat = useCallback(() => {
+    resetFollowUp();
+  }, [resetFollowUp]);
 
-  const handleNewChatForFollowUp = useCallback(
-    async (message: string) => {
-      // Create new chat and send message
-      resetFollowUp();
-      const newChatId = await handleNewChat({ userInitiated: true });
-      if (newChatId && sendRef.current) {
-        // Set pending message to be sent after chat creation
-        setPendingMessage(message);
-      }
-    },
-    [handleNewChat, resetFollowUp, sendRef],
-  );
+  const handleNewChatForFollowUp = useCallback(async () => {
+    const messageToSend = pendingMessage;
+    resetFollowUp();
+    if (messageToSend) {
+      setPendingMessage(messageToSend);
+    }
+    await handleNewChat({ userInitiated: true });
+  }, [handleNewChat, pendingMessage, resetFollowUp]);
 
-  const handleNewChatWithSummary = useCallback(
-    async (message: string) => {
-      // Create new chat with summary from previous chat
-      resetFollowUp();
+  const handleNewChatWithSummary = useCallback(async () => {
+    const messageToSend = pendingMessage;
+    resetFollowUp();
+    if (messageToSend) {
+      setPendingMessage(messageToSend);
+    }
 
-      // Optionally summarize recent conversation
-      if (summarizeRecentAction && currentChatId) {
-        try {
-          const summary = await summarizeRecentAction({
-            chatId: currentChatId,
-          });
-          setPlannerHint(summary);
-        } catch (error) {
-          logger.error("Failed to summarize recent chat:", error);
-        }
+    if (summarizeRecentAction && currentChatId) {
+      const convexChatId = toConvexId<"chats">(currentChatId);
+      if (!convexChatId) {
+        await handleNewChat({ userInitiated: true });
+        return;
       }
+      try {
+        const summary = await summarizeRecentAction({
+          chatId: convexChatId,
+        });
+        setPlannerHint({ reason: String(summary) });
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger.error("Failed to summarize recent chat:", error);
+        setSummaryError(error);
+        // Continue with new chat creation despite summary failure
+      }
+    }
 
-      const newChatId = await handleNewChat({ userInitiated: true });
-      if (newChatId && sendRef.current) {
-        setPendingMessage(message);
-      }
-    },
-    [
-      currentChatId,
-      handleNewChat,
-      resetFollowUp,
-      sendRef,
-      summarizeRecentAction,
-    ],
-  );
+    await handleNewChat({ userInitiated: true });
+  }, [
+    currentChatId,
+    handleNewChat,
+    pendingMessage,
+    resetFollowUp,
+    summarizeRecentAction,
+  ]);
 
   // Send pending message when chat is ready
   useEffect(() => {
@@ -193,6 +191,8 @@ export function useEnhancedFollowUpPrompt({
     handleNewChatForFollowUp,
     handleNewChatWithSummary,
     followUpSuggestions,
+    /** Error from last summarization attempt, if any. Callers can use this to show UI feedback. */
+    summaryError,
   };
 }
 

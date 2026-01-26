@@ -3,34 +3,35 @@
  * Handles chat operations for authenticated users using Convex backend
  */
 
-import { ConvexClient } from "convex/browser";
+import type { ConvexReactClient } from "convex/react";
 import { z } from "zod/v4";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
-import { StreamingPersistPayloadSchema } from "../../../convex/agents/schema";
-import { BaseRepository } from "./ChatRepository";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import {
-  UnifiedChat,
-  UnifiedMessage,
-  StreamChunk,
-  ChatResponse,
-  IdUtils,
-  TitleUtils,
-} from "../types/unified";
-import { logger } from "../logger";
-import { buildHttpError, readResponseBody } from "../utils/httpUtils";
-import { getErrorMessage } from "../utils/errorUtils";
+  StreamingPersistPayloadSchema,
+  type StreamingPersistPayload,
+} from "../../../convex/agents/schema";
+import {
+  BaseRepository,
+  type SearchWebResponse,
+} from "@/lib/repositories/ChatRepository";
+import { IdUtils, TitleUtils } from "@/lib/types/unified";
+import type { MessageStreamChunk } from "@/lib/types/message";
+import { MessageMetadataSchema } from "@/lib/schemas/messageStream";
+import { logger } from "@/lib/logger";
+import { buildHttpError, readResponseBody } from "@/lib/utils/httpUtils";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
 import {
   parseSSEStream,
   isSSEParseError,
   type SSEEvent,
-} from "../utils/sseParser";
-import { MAX_LOOKUP_RETRIES, computeFastBackoff } from "../constants/retry";
+} from "@/lib/utils/sseParser";
+import { MAX_LOOKUP_RETRIES, computeFastBackoff } from "@/lib/constants/retry";
 import {
   verifyPersistedPayload,
   isSignatureVerificationAvailable,
-} from "../security/signature";
-import { env } from "../env";
+} from "@/lib/security/signature";
+import { env } from "@/lib/env";
 // Removed unused imports from errorHandling
 
 const ProgressEventSchema = z.object({
@@ -66,7 +67,7 @@ const ContentEventSchema = z.object({
 
 const MetadataEventSchema = z.object({
   type: z.literal("metadata"),
-  metadata: z.unknown(),
+  metadata: MessageMetadataSchema,
   nonce: z.string().optional(),
 });
 
@@ -90,10 +91,10 @@ const PersistedEventSchema = z.object({
 
 export class ConvexChatRepository extends BaseRepository {
   protected storageType = "convex" as const;
-  private client: ConvexClient;
+  private client: ConvexReactClient;
   private sessionId?: string;
 
-  constructor(client: ConvexClient, sessionId?: string) {
+  constructor(client: ConvexReactClient, sessionId?: string) {
     super();
     this.client = client;
     this.sessionId = sessionId;
@@ -116,80 +117,50 @@ export class ConvexChatRepository extends BaseRepository {
 
   /**
    * Get all chats for the current user.
-   * @returns Array of chats, or empty array on error (UI shows empty state)
-   * @note Errors are logged but not thrown to allow graceful degradation
+   * @returns Array of chats (empty array if user has no chats)
+   * @throws Error if fetch fails - caller must handle failure
    */
-  async getChats(): Promise<UnifiedChat[]> {
-    try {
-      const chats = await this.client.query(api.chats.getUserChats, {
-        sessionId: this.sessionId,
-      });
-      if (!chats) return [];
-
-      return chats.map((chat) => ({
-        id: IdUtils.toUnifiedId(chat._id),
-        title: chat.title,
-        createdAt: chat._creationTime,
-        updatedAt: chat.updatedAt || chat._creationTime,
-        privacy: chat.privacy || "private",
-        shareId: chat.shareId,
-        publicId: chat.publicId,
-        rollingSummary: chat.rollingSummary,
-        source: "convex",
-        synced: true,
-        isLocal: false,
-        lastSyncAt: Date.now(),
-      }));
-    } catch (error) {
-      logger.error("Failed to fetch chats from Convex:", {
-        error: getErrorMessage(error),
-      });
-      return [];
-    }
+  async getChats(): Promise<Doc<"chats">[]> {
+    // @ts-ignore - Convex api type instantiation is excessively deep [TS1c]
+    const chats = await this.client.query(api.chats.getUserChats, {
+      sessionId: this.sessionId,
+    });
+    return chats ?? [];
   }
 
   /**
    * Get a single chat by ID.
    * @param id - Chat ID (Convex ID or opaque ID)
-   * @returns UnifiedChat if found, null if not found or on error
-   * @note Errors are logged but not thrown - caller should check for null
+   * @returns Doc<"chats"> if found, null if not found
+   * @throws Error if fetch fails - caller must handle failure
    */
-  async getChatById(id: string): Promise<UnifiedChat | null> {
-    try {
-      if (!IdUtils.isConvexId(id)) {
-        // Try to find by opaque ID or share ID
-        const byOpaque = await this.client.query(api.chats.getChatByOpaqueId, {
-          opaqueId: id,
-          sessionId: this.sessionId,
-        });
-        if (byOpaque) {
-          return this.convexToUnifiedChat(byOpaque);
-        }
-        return null;
-      }
-
-      const chat = await this.client.query(api.chats.getChatById, {
-        chatId: IdUtils.toConvexChatId(id),
+  async getChatById(id: string): Promise<Doc<"chats"> | null> {
+    if (!IdUtils.isConvexId(id)) {
+      // Try to find by opaque ID or share ID
+      const byOpaque = await this.client.query(api.chats.getChatByOpaqueId, {
+        opaqueId: id,
         sessionId: this.sessionId,
       });
-
-      return chat ? this.convexToUnifiedChat(chat) : null;
-    } catch (error) {
-      logger.error("Failed to fetch chat from Convex:", {
-        error: getErrorMessage(error),
-        id,
-      });
-      return null;
+      return byOpaque || null;
     }
+
+    const chat = await this.client.query(api.chats.getChatById, {
+      chatId: IdUtils.toConvexChatId(id),
+      sessionId: this.sessionId,
+    });
+
+    return chat || null;
   }
 
   /**
    * Create a new chat.
    * @param title - Optional title for the chat
-   * @returns ChatResponse with the created chat
+   * @returns Object with created chat and isNew flag
    * @throws Error if creation fails - caller must handle failure
    */
-  async createChat(title?: string): Promise<ChatResponse> {
+  async createChat(
+    title?: string,
+  ): Promise<{ chat: Doc<"chats">; isNew: boolean }> {
     try {
       const finalTitle = title || "New Chat";
       logger.debug("Creating chat", {
@@ -291,41 +262,30 @@ export class ConvexChatRepository extends BaseRepository {
   /**
    * Get all messages for a chat.
    * @param chatId - Chat ID to get messages for
-   * @returns Array of messages, or empty array on error (UI shows empty state)
-   * @note Errors are logged but not thrown to allow graceful degradation
+   * @returns Array of messages (empty array if chat has no messages)
+   * @throws Error if fetch fails - caller must handle failure
    */
-  async getMessages(chatId: string): Promise<UnifiedMessage[]> {
-    try {
-      logger.debug("Fetching messages for chat", {
-        chatId,
-        sessionId: this.sessionId,
-        hasSessionId: !!this.sessionId,
-      });
+  async getMessages(chatId: string): Promise<Doc<"messages">[]> {
+    logger.debug("Fetching messages for chat", {
+      chatId,
+      sessionId: this.sessionId,
+      hasSessionId: !!this.sessionId,
+    });
 
-      const messages = await this.client.query(api.chats.getChatMessages, {
-        chatId: IdUtils.toConvexChatId(chatId),
-        sessionId: this.sessionId,
-      });
+    const messages = await this.client.query(api.chats.getChatMessages, {
+      chatId: IdUtils.toConvexChatId(chatId),
+      sessionId: this.sessionId,
+    });
 
-      if (!messages) {
-        logger.warn("No messages returned from Convex", { chatId });
-        return [];
-      }
+    // Convex queries return null for empty results, which is valid (not an error)
+    const result = messages ?? [];
 
-      logger.debug("Messages fetched successfully", {
-        chatId,
-        count: messages.length,
-      });
+    logger.debug("Messages fetched successfully", {
+      chatId,
+      count: result.length,
+    });
 
-      return messages.map((msg) => this.convexToUnifiedMessage(msg));
-    } catch (error) {
-      logger.error("Failed to fetch messages from Convex:", {
-        error: getErrorMessage(error),
-        chatId,
-        sessionId: this.sessionId,
-      });
-      return [];
-    }
+    return result;
   }
 
   /**
@@ -335,53 +295,52 @@ export class ConvexChatRepository extends BaseRepository {
    * @param limit - Maximum number of messages to return (default: 50)
    * @param cursor - Pagination cursor for fetching next batch
    * @returns Object containing messages array, next cursor, and hasMore flag
-   * @note Errors are logged but not thrown to allow graceful degradation
+   * @throws Error if fetch fails or returns invalid response
    */
   async getMessagesPaginated(
     chatId: string,
     limit = 50,
-    cursor?: string,
+    cursor?: string | Id<"messages">,
   ): Promise<{
-    messages: UnifiedMessage[];
-    nextCursor?: string;
+    messages: Doc<"messages">[];
+    nextCursor?: Id<"messages">;
     hasMore: boolean;
   }> {
-    try {
-      const result = await this.client.query(
-        api.chats.messagesPaginated.getChatMessagesPaginated,
-        {
-          chatId: IdUtils.toConvexChatId(chatId),
-          limit,
-          cursor,
-        },
+    const cursorId =
+      cursor !== undefined
+        ? IdUtils.toConvexMessageId(String(cursor))
+        : undefined;
+    const result = await this.client.query(
+      api.chats.messagesPaginated.getChatMessagesPaginated,
+      {
+        chatId: IdUtils.toConvexChatId(chatId),
+        limit,
+        cursor: cursorId,
+        sessionId: this.sessionId,
+      },
+    );
+
+    // The paginated query should always return a valid result object.
+    // A null result indicates an unexpected error condition.
+    if (!result) {
+      throw new Error(
+        `Failed to fetch paginated messages for chat ${chatId}: received null response`,
       );
-
-      if (!result) {
-        return {
-          messages: [],
-          hasMore: false,
-        };
-      }
-
-      const messages = result.messages.map((msg) =>
-        this.convexToUnifiedMessage(msg),
-      );
-
-      return {
-        messages,
-        nextCursor: result.nextCursor,
-        hasMore: result.hasMore,
-      };
-    } catch (error) {
-      logger.error("Failed to fetch paginated messages from Convex:", {
-        error: getErrorMessage(error),
-        chatId,
-      });
-      return {
-        messages: [],
-        hasMore: false,
-      };
     }
+
+    const nextCursor = result.nextCursor ?? undefined;
+
+    const messages: Doc<"messages">[] = result.messages.map((msg) => ({
+      ...msg,
+      _creationTime: msg._creationTime ?? Date.now(),
+      chatId: msg.chatId ?? IdUtils.toConvexChatId(chatId),
+    }));
+
+    return {
+      messages,
+      nextCursor,
+      hasMore: result.hasMore,
+    };
   }
 
   /**
@@ -389,115 +348,64 @@ export class ConvexChatRepository extends BaseRepository {
    * @param chatId - Chat ID to add message to
    * @param message - Message data to add
    * @returns The created message
-   * @throws Error if creation fails - caller must handle failure
-   * @note For user messages in authenticated mode, prefer generateResponse flow
+   * @throws Error - Direct message creation is not supported in Convex
+   * @note For user messages in authenticated mode, use generateResponse flow
    */
   async addMessage(
     chatId: string,
-    message: Partial<UnifiedMessage>,
-  ): Promise<UnifiedMessage> {
-    try {
-      // Note: addMessage is an internal mutation in Convex, primarily used by the streaming response
-      // For user messages, they are typically added as part of the generateResponse flow
-      // This implementation provides a way to add messages directly if needed
-
-      // Convex typing: addMessage is an internal mutation; cast narrowly at callsite
-      const messageId = await this.client.mutation(
-        api.messages.addMessage as unknown as (args: {
-          chatId: ReturnType<typeof IdUtils.toConvexChatId>;
-          role: "user" | "assistant" | "system";
-          content: string;
-          searchResults?: UnifiedMessage["searchResults"];
-          sources?: string[];
-          reasoning?: string;
-          searchMethod?: UnifiedMessage["searchMethod"];
-          hasRealResults?: boolean;
-          isStreaming?: boolean;
-          streamedContent?: string;
-          thinking?: string;
-        }) => Promise<unknown>,
-        {
-          chatId: IdUtils.toConvexChatId(chatId),
-          role: message.role || "user",
-          content: message.content || "",
-          searchResults: message.searchResults,
-          sources: message.sources,
-          reasoning: message.reasoning,
-          searchMethod: message.searchMethod,
-          hasRealResults: message.hasRealResults,
-          isStreaming: message.isStreaming,
-          streamedContent: message.streamedContent,
-          thinking: message.thinking,
-        },
-      );
-
-      // Fetch the created message
-      const messages = await this.getMessages(chatId);
-      const createdMessage = messages.find(
-        (m) => m.id === IdUtils.toUnifiedId(messageId),
-      );
-
-      if (!createdMessage) {
-        throw new Error("Failed to retrieve created message");
-      }
-
-      return createdMessage;
-    } catch (error) {
-      logger.error("Failed to add message to Convex:", {
-        error: getErrorMessage(error),
-        chatId,
-      });
-      // Fallback: For user messages in authenticated mode, use the generateResponse flow
-      throw new Error(
-        "Direct message addition not supported. Use generateResponse for adding messages in Convex authenticated mode.",
-      );
-    }
+    _message: Partial<Doc<"messages">>,
+  ): Promise<Doc<"messages">> {
+    // Direct message creation bypasses the agent workflow security model.
+    // All messages should be created through generateResponse which handles
+    // proper workflow tracking, signing, and persistence.
+    throw new Error(
+      `Direct message creation is not supported for chat ${chatId}. Use generateResponse instead.`,
+    );
   }
 
   /**
    * Update a message's metadata.
    * @param id - Message ID to update
    * @param updates - Fields to update (searchResults, sources, searchMethod, hasRealResults)
-   * @throws Error if update fails - caller must handle failure
+   * @throws Error if update fails or no valid update fields provided
    * @note Content/reasoning updates are only allowed during streaming for security
    */
   async updateMessage(
     id: string,
-    updates: Partial<UnifiedMessage>,
+    updates: Partial<Doc<"messages">>,
   ): Promise<void> {
-    try {
-      // Update message metadata using the available mutation
-      if (
-        updates.searchResults ||
-        updates.sources ||
-        updates.searchMethod ||
-        updates.hasRealResults !== undefined
-      ) {
-        await this.client.mutation(api.messages.updateMessageMetadata, {
-          messageId: IdUtils.toConvexMessageId(id),
-          searchResults: updates.searchResults,
-          sources: updates.sources,
-          searchMethod: updates.searchMethod,
-          hasRealResults: updates.hasRealResults,
-          sessionId: this.sessionId,
-        });
-      }
+    const hasMetadataUpdates =
+      updates.searchResults !== undefined ||
+      updates.sources !== undefined ||
+      updates.searchMethod !== undefined ||
+      updates.hasRealResults !== undefined;
 
-      // Note: Content and reasoning updates are handled by internal mutations
-      // during the streaming process. Direct content updates are not exposed
-      // as public mutations for security reasons.
-      if (updates.content || updates.reasoning) {
-        logger.warn(
-          "Direct content/reasoning updates not supported in Convex. These are updated during streaming.",
-        );
-      }
-    } catch (error) {
-      logger.error("Failed to update message in Convex:", {
-        error: getErrorMessage(error),
-        id,
-      });
-      throw error;
+    const hasContentUpdates =
+      updates.content !== undefined || updates.reasoning !== undefined;
+
+    // Reject content/reasoning updates - these must go through streaming
+    if (hasContentUpdates) {
+      throw new Error(
+        "Direct content/reasoning updates are not supported. These are updated during streaming.",
+      );
     }
+
+    // Require at least one valid metadata field to update
+    if (!hasMetadataUpdates) {
+      throw new Error(
+        `No valid update fields provided for message ${id}. ` +
+          "Supported fields: searchResults, sources, searchMethod, hasRealResults",
+      );
+    }
+
+    await this.client.mutation(api.messages.updateMessageMetadata, {
+      messageId: IdUtils.toConvexMessageId(id),
+      searchResults: updates.searchResults,
+      sources: updates.sources,
+      searchMethod: updates.searchMethod,
+      hasRealResults: updates.hasRealResults,
+      sessionId: this.sessionId,
+    });
   }
 
   /**
@@ -523,13 +431,13 @@ export class ConvexChatRepository extends BaseRepository {
    * Stream AI response for a chat message.
    * @param chatId - Chat ID to generate response for
    * @param message - User message to respond to
-   * @yields StreamChunk events (progress, reasoning, content, metadata, error, done)
+   * @yields MessageStreamChunk events (progress, reasoning, content, metadata, error, done)
    * @see {@link ../utils/sseParser.ts} - Shared SSE parsing logic
    */
   async *generateResponse(
     chatId: string,
     message: string,
-  ): AsyncGenerator<StreamChunk> {
+  ): AsyncGenerator<MessageStreamChunk> {
     try {
       // Stream via HTTP SSE for live UI updates (server now persists)
       const host = window.location.hostname;
@@ -604,7 +512,7 @@ export class ConvexChatRepository extends BaseRepository {
    * @returns Search results
    * @throws Error if search fails - caller must handle failure
    */
-  async searchWeb(query: string): Promise<unknown> {
+  async searchWeb(query: string): Promise<SearchWebResponse> {
     try {
       return await this.client.action(api.search.searchWeb, {
         query,
@@ -648,43 +556,27 @@ export class ConvexChatRepository extends BaseRepository {
   /**
    * Get a chat by its share ID.
    * @param shareId - Share ID to look up
-   * @returns UnifiedChat if found, null if not found or on error
-   * @note Errors are logged but not thrown - caller should check for null
+   * @returns Doc<"chats"> if found, null if not found
+   * @throws Error if fetch fails - caller must handle failure
    */
-  async getChatByShareId(shareId: string): Promise<UnifiedChat | null> {
-    try {
-      const chat = await this.client.query(api.chats.getChatByShareId, {
-        shareId,
-      });
-      return chat ? this.convexToUnifiedChat(chat) : null;
-    } catch (error) {
-      logger.error("Failed to fetch chat by share ID:", {
-        error: getErrorMessage(error),
-        shareId,
-      });
-      return null;
-    }
+  async getChatByShareId(shareId: string): Promise<Doc<"chats"> | null> {
+    const chat = await this.client.query(api.chats.getChatByShareId, {
+      shareId,
+    });
+    return chat || null;
   }
 
   /**
    * Get a chat by its public ID.
    * @param publicId - Public ID to look up
-   * @returns UnifiedChat if found, null if not found or on error
-   * @note Errors are logged but not thrown - caller should check for null
+   * @returns Doc<"chats"> if found, null if not found
+   * @throws Error if fetch fails - caller must handle failure
    */
-  async getChatByPublicId(publicId: string): Promise<UnifiedChat | null> {
-    try {
-      const chat = await this.client.query(api.chats.getChatByPublicId, {
-        publicId,
-      });
-      return chat ? this.convexToUnifiedChat(chat) : null;
-    } catch (error) {
-      logger.error("Failed to fetch chat by public ID:", {
-        error: getErrorMessage(error),
-        publicId,
-      });
-      return null;
-    }
+  async getChatByPublicId(publicId: string): Promise<Doc<"chats"> | null> {
+    const chat = await this.client.query(api.chats.getChatByPublicId, {
+      publicId,
+    });
+    return chat || null;
   }
 
   /**
@@ -692,13 +584,13 @@ export class ConvexChatRepository extends BaseRepository {
    * Uses direct database lookup to bypass index propagation delays.
    * @param chatId - Convex chat ID
    * @param maxAttempts - Maximum retry attempts (default: MAX_LOOKUP_RETRIES)
-   * @returns UnifiedChat or null
+   * @returns Doc<"chats"> or null
    * @see {@link ../constants/retry.ts} - Retry constants and backoff computation
    */
   private async getChatByIdWithRetry(
     chatId: Id<"chats">,
     maxAttempts = MAX_LOOKUP_RETRIES,
-  ): Promise<UnifiedChat | null> {
+  ): Promise<Doc<"chats"> | null> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         // Use direct lookup query that bypasses indexes
@@ -713,7 +605,7 @@ export class ConvexChatRepository extends BaseRepository {
             attempt,
             sessionId: this.sessionId,
           });
-          return this.convexToUnifiedChat(chat);
+          return chat;
         }
 
         // Chat not found - wait before retrying with exponential backoff
@@ -749,10 +641,12 @@ export class ConvexChatRepository extends BaseRepository {
   }
 
   /**
-   * Handle individual SSE events and transform them to StreamChunks.
+   * Handle individual SSE events and transform them to MessageStreamChunks.
    * Encapsulates event processing logic to simplify the main generator loop.
    */
-  private async handleStreamEvent(evt: SSEEvent): Promise<StreamChunk | null> {
+  private async handleStreamEvent(
+    evt: SSEEvent,
+  ): Promise<MessageStreamChunk | null> {
     if (evt.type === "progress") {
       return this.parseStreamEvent(ProgressEventSchema, evt);
     }
@@ -793,7 +687,7 @@ export class ConvexChatRepository extends BaseRepository {
    */
   private async handlePersistedEvent(
     evt: SSEEvent,
-  ): Promise<StreamChunk | null> {
+  ): Promise<MessageStreamChunk | null> {
     const parsed = PersistedEventSchema.safeParse(evt);
     if (!parsed.success) {
       logger.error("Invalid persisted SSE event payload", {
@@ -832,10 +726,29 @@ export class ConvexChatRepository extends BaseRepository {
       });
     }
 
-    return parsed.data;
+    let payloadWithTypedId: StreamingPersistPayload;
+    try {
+      payloadWithTypedId = {
+        ...parsed.data.payload,
+        assistantMessageId: IdUtils.toConvexMessageId(
+          parsed.data.payload.assistantMessageId,
+        ),
+      };
+    } catch (error) {
+      logger.error("Invalid assistantMessageId in persisted payload", {
+        error: getErrorMessage(error),
+        assistantMessageId: parsed.data.payload.assistantMessageId,
+      });
+      return null;
+    }
+
+    return {
+      ...parsed.data,
+      payload: payloadWithTypedId,
+    };
   }
 
-  private parseStreamEvent<T extends StreamChunk>(
+  private parseStreamEvent<T extends MessageStreamChunk>(
     schema: z.ZodSchema<T>,
     evt: SSEEvent,
   ): T | null {
@@ -849,77 +762,5 @@ export class ConvexChatRepository extends BaseRepository {
       return null;
     }
     return parsed.data;
-  }
-
-  // Helper methods
-  private convexToUnifiedChat(chat: unknown): UnifiedChat {
-    const c = chat as Record<string, unknown>;
-    return {
-      id: IdUtils.toUnifiedId(c._id as Id<"chats">),
-      title: c.title as string,
-      createdAt: c._creationTime as number,
-      updatedAt: (c.updatedAt || c._creationTime) as number,
-      privacy: (c.privacy || "private") as "private" | "shared" | "public",
-      shareId: c.shareId as string | undefined,
-      publicId: c.publicId as string | undefined,
-      rollingSummary: c.rollingSummary as string | undefined,
-      source: "convex",
-      synced: true,
-      isLocal: false,
-      lastSyncAt: Date.now(),
-    };
-  }
-
-  private convexToUnifiedMessage(msg: unknown): UnifiedMessage {
-    const m = msg as Record<string, unknown>;
-    const contextReferences = Array.isArray(m.contextReferences)
-      ? (m.contextReferences as UnifiedMessage["contextReferences"])
-      : undefined;
-    const searchResultsFromDoc =
-      Array.isArray(m.searchResults) && m.searchResults.length > 0
-        ? (m.searchResults as UnifiedMessage["searchResults"])
-        : undefined;
-    const derivedSearchResults =
-      !searchResultsFromDoc && contextReferences
-        ? contextReferences
-            .filter(
-              (ref) =>
-                ref &&
-                typeof ref.url === "string" &&
-                (ref.title || ref.url) &&
-                typeof ref.timestamp === "number",
-            )
-            .map((ref) => {
-              const safeUrl = ref.url as string;
-              const title = ref.title || safeUrl;
-              return {
-                title,
-                url: safeUrl,
-                snippet: "",
-                relevanceScore: ref.relevanceScore ?? 0.5,
-              };
-            })
-        : undefined;
-
-    return {
-      id: IdUtils.toUnifiedId(m._id as Id<"messages">),
-      chatId: IdUtils.toUnifiedId(m.chatId as Id<"chats">),
-      role: m.role as "user" | "assistant" | "system",
-      content: (m.content || "") as string,
-      timestamp: (m.timestamp || m._creationTime) as number,
-      searchResults: searchResultsFromDoc ?? derivedSearchResults,
-      sources: m.sources as string[] | undefined,
-      reasoning: m.reasoning as string | undefined,
-      searchMethod: m.searchMethod as UnifiedMessage["searchMethod"],
-      hasRealResults: m.hasRealResults as boolean | undefined,
-      isStreaming: m.isStreaming as boolean | undefined,
-      streamedContent: m.streamedContent as string | undefined,
-      thinking: m.thinking as string | undefined,
-      source: "convex",
-      synced: true,
-      lastSyncAt: Date.now(),
-      contextReferences,
-      workflowId: m.workflowId as string | undefined,
-    };
   }
 }

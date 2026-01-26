@@ -18,17 +18,17 @@ import {
   useParams,
 } from "react-router-dom";
 import { Toaster } from "sonner";
-import { ErrorBoundary } from "./components/ErrorBoundary";
-import { LoadingBoundary } from "./components/LoadingBoundary";
-import { SignInModal } from "./components/SignInModal";
-import { SignUpModal } from "./components/SignUpModal";
-import { ThemeProvider } from "./components/ThemeProvider";
-import { ThemeToggle } from "./components/ThemeToggle";
-import { SignOutButton } from "./SignOutButton";
-import { useClaimAnonymousChats } from "./hooks/useClaimAnonymousChats";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { LoadingBoundary } from "@/components/LoadingBoundary";
+import { SignInModal } from "@/components/SignInModal";
+import { SignUpModal } from "@/components/SignUpModal";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { SignOutButton } from "@/SignOutButton";
+import { useClaimAnonymousChats } from "@/hooks/useClaimAnonymousChats";
 
 // Direct import to avoid Suspense delays in E2E/preview
-import ChatInterface from "./components/ChatInterface";
+import ChatInterface from "@/components/ChatInterface";
 
 /**
  * Main App component
@@ -37,18 +37,11 @@ import ChatInterface from "./components/ChatInterface";
  * - Handles navigation to home
  */
 interface ChatPageProps {
-  onRequestSignUp: () => void;
-  onRequestSignIn: () => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
 }
 
-function ChatPage({
-  onRequestSignUp,
-  onRequestSignIn,
-  isSidebarOpen,
-  onToggleSidebar,
-}: ChatPageProps) {
+function ChatPage({ isSidebarOpen, onToggleSidebar }: ChatPageProps) {
   const { chatId, shareId, publicId } = useParams();
   const location = useLocation();
   const isLocalPreview =
@@ -63,9 +56,7 @@ function ChatPage({
     if (typeof window === "undefined") return;
     const canonicalHref =
       window.location.origin + location.pathname + (location.search || "");
-    let link = document.querySelector(
-      'link[rel="canonical"]',
-    ) as HTMLLinkElement | null;
+    let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!link) {
       link = document.createElement("link");
       link.setAttribute("rel", "canonical");
@@ -74,13 +65,13 @@ function ChatPage({
     link.href = canonicalHref;
 
     // Best-effort update for sharing metas
-    const og = document.querySelector(
+    const og = document.querySelector<HTMLMetaElement>(
       'meta[property="og:url"]',
-    ) as HTMLMetaElement | null;
+    );
     if (og) og.setAttribute("content", canonicalHref);
-    const tw = document.querySelector(
+    const tw = document.querySelector<HTMLMetaElement>(
       'meta[name="twitter:url"]',
-    ) as HTMLMetaElement | null;
+    );
     if (tw) tw.setAttribute("content", canonicalHref);
   }, [location.pathname, location.search]);
 
@@ -95,8 +86,6 @@ function ChatPage({
             chatId={chatId}
             shareId={shareId}
             publicId={publicId}
-            onRequestSignUp={onRequestSignUp}
-            onRequestSignIn={onRequestSignIn}
           />
         </LoadingBoundary>
       </ErrorBoundary>
@@ -115,8 +104,6 @@ function ChatPage({
               chatId={chatId}
               shareId={shareId}
               publicId={publicId}
-              onRequestSignUp={onRequestSignUp}
-              onRequestSignIn={onRequestSignIn}
             />
           </LoadingBoundary>
         </ErrorBoundary>
@@ -131,8 +118,6 @@ function ChatPage({
               chatId={chatId}
               shareId={shareId}
               publicId={publicId}
-              onRequestSignUp={onRequestSignUp}
-              onRequestSignIn={onRequestSignIn}
             />
           </LoadingBoundary>
         </ErrorBoundary>
@@ -419,8 +404,6 @@ export default function App() {
                     path={path}
                     element={
                       <ChatPage
-                        onRequestSignUp={openSignUp}
-                        onRequestSignIn={openSignIn}
                         isSidebarOpen={isSidebarOpen}
                         onToggleSidebar={toggleSidebar}
                       />

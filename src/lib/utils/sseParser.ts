@@ -5,7 +5,7 @@
  * @see ConvexChatRepository.generateResponse - Authenticated streaming
  */
 
-import { getErrorMessage } from "./errorUtils";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
 
 /** SSE protocol constants */
 export const SSE_DATA_PREFIX = "data: ";
@@ -24,6 +24,9 @@ export interface SSEParseError {
   raw: string;
   error: string;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
 
 /**
  * Parse an SSE stream and yield each event.
@@ -70,7 +73,17 @@ export async function* parseSSEStream(
         if (!data || data === SSE_DONE_SIGNAL) continue;
 
         try {
-          yield JSON.parse(data) as SSEEvent;
+          const parsed: unknown = JSON.parse(data);
+          if (isRecord(parsed) && typeof parsed.type === "string") {
+            const { type, ...rest } = parsed;
+            yield { type, ...rest };
+          } else {
+            yield {
+              type: "parse_error",
+              raw: data,
+              error: "Invalid SSE event shape",
+            } satisfies SSEParseError;
+          }
         } catch (parseError) {
           yield {
             type: "parse_error",

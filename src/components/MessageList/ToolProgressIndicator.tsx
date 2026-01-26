@@ -19,7 +19,8 @@ type ProgressStage =
   | "searching"
   | "scraping"
   | "analyzing"
-  | "generating";
+  | "generating"
+  | "finalizing";
 
 interface ToolProgressIndicatorProps {
   stage: ProgressStage;
@@ -37,6 +38,7 @@ const STAGE_TEXT: Record<string, { label: string; description: string }> = {
   scraping: { label: "Reading", description: "source content" },
   analyzing: { label: "Analyzing", description: "results" },
   generating: { label: "Writing", description: "response" },
+  finalizing: { label: "Finalizing", description: "response" },
 };
 
 const DEFAULT_STAGE_TEXT = { label: "Working", description: "on request" };
@@ -53,8 +55,8 @@ function StageIcon({ stage }: { stage: ProgressStage }) {
     fill: "none",
     stroke: "currentColor",
     viewBox: "0 0 24 24",
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
     strokeWidth: 1.5,
   };
 

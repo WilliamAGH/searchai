@@ -7,9 +7,50 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { logger } from "../lib/logger";
-import { copyToClipboard } from "../lib/clipboard";
-import { formatConversationMarkdown } from "../lib/utils";
+import { logger } from "@/lib/logger";
+import { copyToClipboard } from "@/lib/clipboard";
+import { formatConversationMarkdown } from "@/lib/utils";
+
+type PrivacyOption = "private" | "shared" | "public" | "llm";
+type PersistedPrivacy = Exclude<PrivacyOption, "llm">;
+
+const toPersistedPrivacy = (option: PrivacyOption): PersistedPrivacy =>
+  option === "llm" ? "shared" : option;
+
+/**
+ * Build share URL based on privacy type and available IDs.
+ */
+function buildShareUrl(
+  privacy: PrivacyOption,
+  ids: { shareId?: string; publicId?: string },
+  exportBase?: string,
+  llmTxtUrl?: string,
+): string {
+  if (privacy === "llm") {
+    if (ids.shareId && exportBase) {
+      return `${exportBase}?shareId=${encodeURIComponent(ids.shareId)}&format=txt`;
+    }
+    return llmTxtUrl ?? "";
+  }
+
+  if (privacy === "shared") {
+    if (ids.shareId) {
+      return `${window.location.origin}/s/${ids.shareId}`;
+    }
+    logger.error("Share failed: no shareId available");
+    return "";
+  }
+
+  if (privacy === "public") {
+    if (ids.publicId) {
+      return `${window.location.origin}/p/${ids.publicId}`;
+    }
+    logger.error("Share failed: no publicId available");
+    return "";
+  }
+
+  return "";
+}
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -17,7 +58,6 @@ interface ShareModalProps {
   onShare: (
     privacy: "private" | "shared" | "public",
   ) => Promise<{ shareId?: string; publicId?: string } | void>;
-  shareUrl: string;
   privacy: "private" | "shared" | "public";
   /** Optional machine-readable Markdown .txt URL */
   llmTxtUrl?: string;
@@ -39,11 +79,10 @@ export function ShareModal({
   isOpen,
   onClose,
   onShare,
-  shareUrl: _shareUrl,
   privacy,
   llmTxtUrl,
   shareId,
-  publicId: _publicId,
+  publicId,
   exportBase,
   messages,
 }: ShareModalProps) {
@@ -55,7 +94,7 @@ export function ShareModal({
   const [busy, setBusy] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string>("");
   const [generatedFor, setGeneratedFor] = useState<
-    "shared" | "public" | "llm" | null
+    "private" | "shared" | "public" | "llm" | null
   >(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,8 +148,8 @@ export function ShareModal({
 
   const _handleShare = React.useCallback(async () => {
     // Map LLM to shared privacy when persisting
-    const effective = selectedPrivacy === "llm" ? "shared" : selectedPrivacy;
-    await onShare(effective as "private" | "shared" | "public");
+    const effective = toPersistedPrivacy(selectedPrivacy);
+    await onShare(effective);
   }, [onShare, selectedPrivacy]);
 
   // The URL box should start empty and only populate once generated
@@ -158,44 +197,20 @@ export function ShareModal({
 
     setBusy(true);
     try {
-      const effective = selectedPrivacy === "llm" ? "shared" : selectedPrivacy;
-      const maybe = await onShare(effective as "private" | "shared" | "public");
-      const ret =
-        (maybe as unknown as { shareId?: string; publicId?: string }) || {};
+      const effective = toPersistedPrivacy(selectedPrivacy);
+      const response = await onShare(effective);
 
-      let newUrl = "";
-      if (selectedPrivacy === "llm") {
-        // Always build fresh LLM URL from returned shareId when available
-        if (ret.shareId && exportBase) {
-          newUrl = `${exportBase}?shareId=${encodeURIComponent(ret.shareId)}&format=txt`;
-        } else if (shareId && exportBase) {
-          newUrl = `${exportBase}?shareId=${encodeURIComponent(shareId)}&format=txt`;
-        } else if (llmTxtUrl) {
-          newUrl = llmTxtUrl;
-        }
-      } else if (selectedPrivacy === "shared") {
-        // CRITICAL: Only use shareId from server response or existing prop
-        // Never generate random IDs client-side - they won't exist in the database
-        const sid = ret.shareId || shareId;
-        if (sid) {
-          newUrl = `${window.location.origin}/s/${sid}`;
-        } else {
-          logger.error("Share failed: no shareId returned from server");
-        }
-      } else if (selectedPrivacy === "public") {
-        // CRITICAL: Only use publicId from server response or existing prop
-        // Never generate random IDs client-side - they won't exist in the database
-        const pid = ret.publicId || _publicId;
-        if (pid) {
-          newUrl = `${window.location.origin}/p/${pid}`;
-        } else {
-          logger.error("Share failed: no publicId returned from server");
-        }
-      }
+      // Merge server response with existing prop IDs (server takes precedence)
+      const ids = {
+        shareId: response?.shareId || shareId,
+        publicId: response?.publicId || publicId,
+      };
+
+      const newUrl = buildShareUrl(selectedPrivacy, ids, exportBase, llmTxtUrl);
 
       if (newUrl) {
         setGeneratedUrl(newUrl);
-        setGeneratedFor(selectedPrivacy);
+        setGeneratedFor(selectedPrivacy === "private" ? null : selectedPrivacy);
       }
     } catch (error) {
       logger.error("Failed to generate URL", { error });
@@ -209,7 +224,7 @@ export function ShareModal({
     selectedPrivacy,
     exportBase,
     shareId,
-    _publicId,
+    publicId,
     llmTxtUrl,
   ]);
 

@@ -6,15 +6,15 @@
 
 import { useId } from "react";
 
+export type LocalIdType = "chat" | "message" | "share" | "public";
+
 /** Prefixes for local IDs - single source of truth */
-export const LOCAL_ID_PREFIXES = {
+export const LOCAL_ID_PREFIXES: Record<LocalIdType, string> = {
   chat: "local_",
   message: "msg_",
   share: "share_",
   public: "public_",
-} as const;
-
-export type LocalIdType = keyof typeof LOCAL_ID_PREFIXES;
+};
 
 /**
  * Core local ID generation logic - used by all local ID utilities.

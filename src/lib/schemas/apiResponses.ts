@@ -27,7 +27,7 @@ export const SearchResultSchema = z.object({
   relevanceScore: z.number().min(0).max(1).default(0.5),
 });
 
-export type SearchResultFromSchema = z.infer<typeof SearchResultSchema>;
+export type SearchResult = z.infer<typeof SearchResultSchema>;
 
 // ============================================
 // Search Response Schema
@@ -45,6 +45,41 @@ export const SearchMethodSchema = z.enum([
 
 export type SearchMethod = z.infer<typeof SearchMethodSchema>;
 
+// ============================================
+// SERP Enrichment Schema
+// ============================================
+
+const SerpQuestionSchema = z.object({
+  question: z.string(),
+  snippet: z.string().optional(),
+});
+
+const KnowledgeGraphSchema = z.object({
+  title: z.string().optional(),
+  type: z.string().optional(),
+  description: z.string().optional(),
+  attributes: z.record(z.string(), z.string()).optional(),
+  url: z.string().optional(),
+});
+
+const AnswerBoxSchema = z.object({
+  type: z.string().optional(),
+  answer: z.string().optional(),
+  snippet: z.string().optional(),
+  source: z.string().optional(),
+  url: z.string().optional(),
+});
+
+export const SerpEnrichmentSchema = z.object({
+  knowledgeGraph: KnowledgeGraphSchema.optional(),
+  answerBox: AnswerBoxSchema.optional(),
+  relatedQuestions: z.array(SerpQuestionSchema).optional(),
+  peopleAlsoAsk: z.array(SerpQuestionSchema).optional(),
+  relatedSearches: z.array(z.string()).optional(),
+});
+
+export type SerpEnrichment = z.infer<typeof SerpEnrichmentSchema>;
+
 /**
  * Full search API response.
  */
@@ -52,10 +87,10 @@ export const SearchResponseSchema = z.object({
   results: z.array(SearchResultSchema),
   searchMethod: SearchMethodSchema,
   hasRealResults: z.boolean(),
-  enrichment: z.unknown().optional(), // SerpEnrichment type is complex, keep as unknown
+  enrichment: SerpEnrichmentSchema.optional(),
 });
 
-export type SearchResponseFromSchema = z.infer<typeof SearchResponseSchema>;
+export type SearchResponse = z.infer<typeof SearchResponseSchema>;
 
 // ============================================
 // AI Response Schema
@@ -69,7 +104,7 @@ export const AIResponseSchema = z.object({
   reasoning: z.string().optional(),
 });
 
-export type AIResponseFromSchema = z.infer<typeof AIResponseSchema>;
+export type AIResponse = z.infer<typeof AIResponseSchema>;
 
 // ============================================
 // Share Response Schema
@@ -97,7 +132,7 @@ export type ShareResponseFromSchema = ShareChatResponse;
 /**
  * Default search response when validation fails.
  */
-export const DEFAULT_SEARCH_RESPONSE: SearchResponseFromSchema = {
+export const DEFAULT_SEARCH_RESPONSE: SearchResponse = {
   results: [],
   searchMethod: "fallback",
   hasRealResults: false,
@@ -106,6 +141,6 @@ export const DEFAULT_SEARCH_RESPONSE: SearchResponseFromSchema = {
 /**
  * Default AI response when validation fails.
  */
-export const DEFAULT_AI_RESPONSE: AIResponseFromSchema = {
+export const DEFAULT_AI_RESPONSE: AIResponse = {
   response: "Failed to generate response. Please try again.",
 };

@@ -7,8 +7,7 @@
  * @see {@link ../schemas/apiResponses.ts} - Zod schemas
  */
 
-import type { SearchResult } from "../types/message";
-import type { SerpEnrichment } from "../../../convex/lib/types/search";
+import type { SearchResult } from "@/lib/types/message";
 import {
   SearchResultSchema,
   SearchMethodSchema,
@@ -16,7 +15,12 @@ import {
   ShareResponseSchema,
   DEFAULT_AI_RESPONSE,
   type SearchMethod,
-} from "../schemas/apiResponses";
+  SerpEnrichmentSchema,
+  type SerpEnrichment,
+} from "@/lib/schemas/apiResponses";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
 
 /**
  * Default search response when validation fails.
@@ -47,7 +51,7 @@ export function validateSearchResponse(data: unknown): {
     return DEFAULT_SEARCH_RESPONSE_TYPED;
   }
 
-  const response = data as Record<string, unknown>;
+  const response = isRecord(data) ? data : {};
 
   // Validate and sanitize results array with length limits
   const results: SearchResult[] = [];
@@ -72,15 +76,13 @@ export function validateSearchResponse(data: unknown): {
 
   // Validate boolean
   const hasRealResults = response.hasRealResults === true;
+  const enrichmentResult = SerpEnrichmentSchema.safeParse(response.enrichment);
 
   return {
     results,
     searchMethod,
     hasRealResults,
-    enrichment:
-      response.enrichment && typeof response.enrichment === "object"
-        ? (response.enrichment as SerpEnrichment)
-        : undefined,
+    enrichment: enrichmentResult.success ? enrichmentResult.data : undefined,
   };
 }
 
@@ -98,13 +100,12 @@ export function validateAIResponse(data: unknown): {
   }
 
   // Fallback: try to extract response field manually
-  if (data && typeof data === "object") {
-    const aiData = data as Record<string, unknown>;
-    if (typeof aiData.response === "string") {
+  if (isRecord(data)) {
+    if (typeof data.response === "string") {
       return {
-        response: aiData.response,
+        response: data.response,
         reasoning:
-          typeof aiData.reasoning === "string" ? aiData.reasoning : undefined,
+          typeof data.reasoning === "string" ? data.reasoning : undefined,
       };
     }
   }

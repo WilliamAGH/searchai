@@ -4,9 +4,10 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import { useIsMobile } from "./useIsMobile";
-import { useIsVirtualKeyboardOpen } from "./useIsVirtualKeyboardOpen";
-import { throttle, isNearBottom, isScrolledPastPercent } from "../lib/utils";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { useIsVirtualKeyboardOpen } from "@/hooks/useIsVirtualKeyboardOpen";
+import { throttle, isNearBottom, isScrolledPastPercent } from "@/lib/utils";
+import type { SearchProgress } from "@/lib/types/message";
 
 /** Duration of smooth scroll animation (ms) */
 const SCROLL_ANIMATION_MS = 600;
@@ -23,7 +24,7 @@ interface UseMessageListScrollOptions {
   /** External scroll container ref (when parent handles scrolling) */
   externalScrollRef?: React.RefObject<HTMLDivElement | null>;
   /** Search progress to trigger scroll on tool updates */
-  searchProgress?: unknown;
+  searchProgress?: SearchProgress;
 }
 
 interface UseMessageListScrollResult {

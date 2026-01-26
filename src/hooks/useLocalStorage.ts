@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { logger } from "../lib/logger";
+import { logger } from "@/lib/logger";
 
 /**
  * LocalStorage hook with debounced persistence.
@@ -16,10 +16,32 @@ export function useLocalStorage<T>(
 ): [T, (value: T | ((prev: T) => T)) => void] {
   const { debounceMs = 500 } = options; // Lower write frequency during streams
 
+  const isCompatible = (value: unknown, fallback: T): value is T => {
+    if (value === null || value === undefined) return false;
+
+    const fallbackType = typeof fallback;
+    const valueType = typeof value;
+
+    if (Array.isArray(fallback)) {
+      return Array.isArray(value);
+    }
+
+    if (fallbackType === "object") {
+      return valueType === "object";
+    }
+
+    return fallbackType === valueType;
+  };
+
+  const isUpdater = (value: T | ((prev: T) => T)): value is (prev: T) => T =>
+    typeof value === "function";
+
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? (JSON.parse(item) as T) : initialValue;
+      if (!item) return initialValue;
+      const parsed: unknown = JSON.parse(item);
+      return isCompatible(parsed, initialValue) ? parsed : initialValue;
     } catch (error) {
       logger.error(`Error reading localStorage key "${key}":`, error);
       return initialValue;
@@ -51,8 +73,7 @@ export function useLocalStorage<T>(
 
   const setValue = (value: T | ((prev: T) => T)) => {
     setStoredValue((prev) => {
-      const next =
-        value instanceof Function ? (value as (p: T) => T)(prev) : (value as T);
+      const next = isUpdater(value) ? value(prev) : value;
       latestRef.current = next;
       schedulePersist();
       return next;

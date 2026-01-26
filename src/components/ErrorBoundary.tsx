@@ -6,7 +6,7 @@
  */
 
 import React, { Component, ReactNode } from "react";
-import { logger } from "../lib/logger";
+import { logger } from "@/lib/logger";
 
 /**
  * Props for the ErrorBoundary component

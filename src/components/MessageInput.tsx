@@ -7,11 +7,11 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
-import { logger } from "../lib/logger";
+import { logger } from "@/lib/logger";
 
 interface MessageInputProps {
   /** Callback when message is sent */
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => void | Promise<void>;
   /** Open share modal */
   onShare?: () => void;
   /** Disable input during generation */
@@ -80,7 +80,8 @@ export function MessageInput({
    */
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.isComposing) return; // avoid sending mid-IME composition
+      const isComposing = e.nativeEvent.isComposing ?? false;
+      if (isComposing) return; // avoid sending mid-IME composition
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         sendCurrentMessage();

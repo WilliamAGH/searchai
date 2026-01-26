@@ -11,7 +11,7 @@
  * - Computes `exportBase` via optional `resolveApi` helper or window.origin.
  */
 import { useMemo } from "react";
-import { ShareModal } from "./ShareModal";
+import { ShareModal } from "@/components/ShareModal";
 
 type ChatPrivacy = "private" | "shared" | "public";
 
@@ -70,14 +70,6 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
     return `${window.location.origin}/api/chatTextMarkdown`;
   }, [resolveApi]);
 
-  const shareUrl = useMemo(() => {
-    if (privacy === "shared" && shareId)
-      return `${window.location.origin}/s/${shareId}`;
-    if (privacy === "public" && publicId)
-      return `${window.location.origin}/p/${publicId}`;
-    return "";
-  }, [privacy, shareId, publicId]);
-
   const onShare = async (
     p: ChatPrivacy,
   ): Promise<{ shareId?: string; publicId?: string } | void> => {
@@ -98,8 +90,7 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
       isOpen={props.isOpen}
       onClose={props.onClose}
       onShare={onShare}
-      shareUrl={shareUrl}
-      privacy={privacy as ChatPrivacy}
+      privacy={privacy}
       llmTxtUrl={
         shareId
           ? `${exportBase}?shareId=${encodeURIComponent(shareId)}`

@@ -10,10 +10,21 @@
  * @see {@link ../../../../convex/lib/validators.ts} - backend version
  */
 
-import type { Id } from "../../../convex/_generated/dataModel";
+import type { Id, TableNames } from "../../../convex/_generated/dataModel";
 
 const LOCAL_ID_PREFIXES = ["local_", "chat_", "msg_"];
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
+
+/**
+ * Check if a string is a local (frontend-generated) ID
+ * Local IDs use prefixes like "local_", "chat_", "msg_"
+ */
+export function isLocalId(str: string | null | undefined): boolean {
+  if (!str || typeof str !== "string") {
+    return false;
+  }
+  return LOCAL_ID_PREFIXES.some((prefix) => str.startsWith(prefix));
+}
 
 function extractRawIdentifier(str: string): string | null {
   if (LOCAL_ID_PREFIXES.some((prefix) => str.startsWith(prefix))) {
@@ -40,6 +51,12 @@ export function isValidConvexId(str: string | null | undefined): boolean {
   return extractRawIdentifier(str) !== null;
 }
 
+export function isConvexId<TableName extends TableNames>(
+  str: string,
+): str is Id<TableName> {
+  return isValidConvexId(str);
+}
+
 /**
  * Safely cast a string to a Convex ID with runtime validation
  * Returns null if the string is not a valid Convex ID format
@@ -56,26 +73,11 @@ export function isValidConvexId(str: string | null | undefined): boolean {
  *   await convex.query(api.chats.getChat, { chatId });
  * }
  */
-export function toConvexId<TableName extends string>(
+export function toConvexId<TableName extends TableNames>(
   str: string | null | undefined,
 ): Id<TableName> | null {
-  if (!isValidConvexId(str)) {
+  if (!str || !isConvexId<TableName>(str)) {
     return null;
   }
-  return str as Id<TableName>;
-}
-
-/**
- * Check if an ID is a local (non-Convex) ID
- * Local IDs do not contain the pipe separator
- *
- * @param id - ID to check
- * @returns True if the ID is a local (non-synced) ID
- */
-export function isLocalId(id: string | null | undefined): boolean {
-  if (!id || typeof id !== "string") {
-    return false;
-  }
-
-  return LOCAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
+  return str;
 }

@@ -46,14 +46,15 @@ export function CloseIcon() {
  * Extract error message from unknown error type.
  * Handles the common pattern used in auth modals.
  */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
 export function extractAuthErrorMessage(error: unknown): string {
-  if (
-    typeof error === "object" &&
-    error &&
-    "message" in error &&
-    typeof (error as { message?: unknown }).message === "string"
-  ) {
-    return (error as { message: string }).message;
+  if (isRecord(error)) {
+    const message = error.message;
+    if (typeof message === "string") {
+      return message;
+    }
   }
   return "";
 }
@@ -98,7 +99,9 @@ export function AuthModalBase({
   useEffect(() => {
     if (!isOpen) return;
 
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    const activeElement = document.activeElement;
+    previouslyFocusedRef.current =
+      activeElement instanceof HTMLElement ? activeElement : null;
     dialogRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -117,7 +120,9 @@ export function AuthModalBase({
         if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
-        const active = document.activeElement as HTMLElement | null;
+        const activeElement = document.activeElement;
+        const active =
+          activeElement instanceof HTMLElement ? activeElement : null;
 
         if (e.shiftKey) {
           if (active === first || !container.contains(active)) {

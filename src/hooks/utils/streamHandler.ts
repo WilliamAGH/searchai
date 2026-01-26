@@ -1,12 +1,12 @@
 import { Dispatch, SetStateAction } from "react";
-import { ChatState } from "../useChatState";
-import {
-  StreamChunk,
-  UnifiedMessage,
+import { ChatState } from "@/hooks/useChatState";
+import type {
+  Message,
+  MessageStreamChunk,
   PersistedPayload,
-} from "../../lib/types/unified";
-import { logger } from "../../lib/logger";
-import { updateLastAssistantMessage } from "./messageStateUpdaters";
+} from "@/lib/types/message";
+import { logger } from "@/lib/logger";
+import { updateLastAssistantMessage } from "@/hooks/utils/messageStateUpdaters";
 import { safeParseUrl } from "../../../convex/lib/url";
 
 /**
@@ -46,7 +46,7 @@ export class StreamEventHandler {
     return this.workflowNonce;
   }
 
-  public handle(chunk: StreamChunk): void {
+  public handle(chunk: MessageStreamChunk): void {
     if (chunk.type === "workflow_start") {
       this.handleWorkflowStart(chunk);
       return;
@@ -61,11 +61,6 @@ export class StreamEventHandler {
     }
     if (chunk.type === "content") {
       this.handleContent(chunk);
-      return;
-    }
-    if (chunk.type === "chunk") {
-      // Legacy support for simple text chunks
-      this.handleContent({ type: "content", content: chunk.content });
       return;
     }
     if (chunk.type === "metadata") {
@@ -85,7 +80,9 @@ export class StreamEventHandler {
     }
   }
 
-  private handleProgress(chunk: Extract<StreamChunk, { type: "progress" }>) {
+  private handleProgress(
+    chunk: Extract<MessageStreamChunk, { type: "progress" }>,
+  ) {
     this.setState((prev) => ({
       ...prev,
       searchProgress: {
@@ -107,7 +104,7 @@ export class StreamEventHandler {
   }
 
   private handleWorkflowStart(
-    chunk: Extract<StreamChunk, { type: "workflow_start" }>,
+    chunk: Extract<MessageStreamChunk, { type: "workflow_start" }>,
   ) {
     this.workflowId = chunk.workflowId;
     this.workflowNonce = chunk.nonce;
@@ -124,7 +121,9 @@ export class StreamEventHandler {
     });
   }
 
-  private handleReasoning(chunk: Extract<StreamChunk, { type: "reasoning" }>) {
+  private handleReasoning(
+    chunk: Extract<MessageStreamChunk, { type: "reasoning" }>,
+  ) {
     this.accumulatedReasoning += chunk.content;
     updateLastAssistantMessage(this.setState, {
       reasoning: this.accumulatedReasoning,
@@ -134,7 +133,7 @@ export class StreamEventHandler {
   }
 
   private handleContent(chunk: {
-    type: "content" | "chunk";
+    type: "content";
     content?: string;
     delta?: string;
   }) {
@@ -154,56 +153,43 @@ export class StreamEventHandler {
     }
   }
 
-  private handleMetadata(chunk: Extract<StreamChunk, { type: "metadata" }>) {
-    if (chunk.metadata && typeof chunk.metadata === "object") {
-      const metadata = chunk.metadata as Record<string, unknown>;
-      const workflowIdFromMetadata = metadata.workflowId as string | undefined;
-      const contextRefs = Array.isArray(metadata.contextReferences)
-        ? (metadata.contextReferences as UnifiedMessage["contextReferences"])
-        : undefined;
-      const metadataSources = Array.isArray(metadata.sources)
-        ? (metadata.sources as string[])
-        : undefined;
-      // Guard against non-array searchResults from SSE payload
-      const fallbackSearchResults = Array.isArray(metadata.searchResults)
-        ? metadata.searchResults
-        : [];
-      const searchResults = contextRefs
-        ? contextRefs.map((ref) => {
-            const parsedUrl = ref.url ? safeParseUrl(ref.url) : null;
-            return {
-              title: ref.title || parsedUrl?.hostname || "Unknown",
-              url: parsedUrl ? ref.url || "" : "",
-              snippet: "",
-              relevanceScore: ref.relevanceScore ?? 0.5,
-              kind: ref.type,
-            };
-          })
-        : fallbackSearchResults;
+  private handleMetadata(
+    chunk: Extract<MessageStreamChunk, { type: "metadata" }>,
+  ) {
+    const metadata = chunk.metadata;
+    const contextRefs = metadata.contextReferences;
+    const metadataSources = metadata.sources;
+    const fallbackSearchResults = metadata.searchResults ?? [];
+    const searchResults = contextRefs
+      ? contextRefs.map((ref) => {
+          const parsedUrl = ref.url ? safeParseUrl(ref.url) : null;
+          return {
+            title: ref.title || parsedUrl?.hostname || "Unknown",
+            url: parsedUrl ? ref.url || "" : "",
+            snippet: "",
+            relevanceScore: ref.relevanceScore ?? 0.5,
+          };
+        })
+      : fallbackSearchResults;
 
-      // Cast searchResults to any to bypass strict UnifiedMessage type check for now
-      // This is safe because the UI handles these fields flexibly
-      const messageUpdates: Partial<UnifiedMessage> = {
-        isStreaming: true,
-        thinking: undefined,
-        searchResults:
-          searchResults as unknown as UnifiedMessage["searchResults"],
-      };
-      if (workflowIdFromMetadata !== undefined) {
-        messageUpdates.workflowId = workflowIdFromMetadata;
-      }
-      const nonce = (chunk as { nonce?: string }).nonce;
-      if (nonce !== undefined) {
-        messageUpdates.workflowNonce = nonce;
-      }
-      if (contextRefs !== undefined) {
-        messageUpdates.contextReferences = contextRefs;
-      }
-      if (metadataSources !== undefined) {
-        messageUpdates.sources = metadataSources;
-      }
-      updateLastAssistantMessage(this.setState, messageUpdates);
+    const messageUpdates: Partial<Message> = {
+      isStreaming: true,
+      thinking: undefined,
+      searchResults,
+    };
+    if (metadata.workflowId !== undefined) {
+      messageUpdates.workflowId = metadata.workflowId;
     }
+    if (chunk.nonce !== undefined) {
+      messageUpdates.workflowNonce = chunk.nonce;
+    }
+    if (contextRefs !== undefined) {
+      messageUpdates.contextReferences = contextRefs;
+    }
+    if (metadataSources !== undefined) {
+      messageUpdates.sources = metadataSources;
+    }
+    updateLastAssistantMessage(this.setState, messageUpdates);
     logger.debug("Metadata received");
   }
 
@@ -221,7 +207,9 @@ export class StreamEventHandler {
     logger.debug("Stream complete, awaiting persisted event...");
   }
 
-  private handlePersisted(chunk: Extract<StreamChunk, { type: "persisted" }>) {
+  private handlePersisted(
+    chunk: Extract<MessageStreamChunk, { type: "persisted" }>,
+  ) {
     this.persistedConfirmed = true;
     this.persistedDetails = chunk.payload;
 
@@ -232,11 +220,9 @@ export class StreamEventHandler {
         url: ref.url || "",
         snippet: "",
         relevanceScore: ref.relevanceScore ?? 0.5,
-        kind: ref.type,
       }));
 
-    // Cast searchResults to any here as well
-    const messageUpdates: Partial<UnifiedMessage> = {
+    const messageUpdates: Partial<Message> = {
       workflowId: chunk.payload.workflowId,
       sources: chunk.payload.sources,
       contextReferences: chunk.payload.contextReferences,
@@ -252,8 +238,7 @@ export class StreamEventHandler {
       messageUpdates.workflowSignature = chunk.signature;
     }
     if (persistedSearchResults !== undefined) {
-      messageUpdates.searchResults =
-        persistedSearchResults as unknown as UnifiedMessage["searchResults"];
+      messageUpdates.searchResults = persistedSearchResults;
     }
 
     updateLastAssistantMessage(this.setState, messageUpdates, {

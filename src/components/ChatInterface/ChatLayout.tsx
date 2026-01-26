@@ -4,21 +4,25 @@
  */
 
 import React, { useRef } from "react";
-import { ChatSidebar } from "../ChatSidebar";
-import { MobileSidebar } from "../MobileSidebar";
-import { MessageList } from "../MessageList";
-import { MessageInput } from "../MessageInput";
-import { FollowUpPrompt } from "../FollowUpPrompt";
-import { UndoBanner } from "../UndoBanner";
-import { ShareModalContainer } from "../ShareModalContainer";
+import { ChatSidebar } from "@/components/ChatSidebar";
+import { MobileSidebar } from "@/components/MobileSidebar";
+import { MessageList } from "@/components/MessageList";
+import { MessageInput } from "@/components/MessageInput";
+import { FollowUpPrompt } from "@/components/FollowUpPrompt";
+import { UndoBanner } from "@/components/UndoBanner";
+import { ShareModalContainer } from "@/components/ShareModalContainer";
 // Global agent status overlay removed; inline statuses handle all feedback
-import type { Chat } from "../../lib/types/chat";
-import type { ChatActions } from "../../hooks/types";
+import type { Chat } from "@/lib/types/chat";
+import type { ChatActions } from "@/hooks/types";
 
 type ChatSidebarProps = React.ComponentProps<typeof ChatSidebar>;
 type MobileSidebarProps = React.ComponentProps<typeof MobileSidebar>;
 type MessageListProps = React.ComponentProps<typeof MessageList>;
 type MessageInputProps = React.ComponentProps<typeof MessageInput>;
+type SwipeHandlers = Pick<
+  React.HTMLAttributes<HTMLDivElement>,
+  "onTouchStart" | "onTouchEnd"
+>;
 
 interface ChatLayoutProps {
   // Layout state
@@ -44,7 +48,7 @@ interface ChatLayoutProps {
   mobileSidebarProps: MobileSidebarProps;
   messageListProps: MessageListProps;
   messageInputProps: MessageInputProps;
-  swipeHandlers: Record<string, unknown>;
+  swipeHandlers: SwipeHandlers;
 
   // Callbacks
   setShowShareModal: (show: boolean) => void;

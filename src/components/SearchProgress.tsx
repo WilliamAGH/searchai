@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { getFaviconUrl, getSafeHostname } from "../lib/utils/favicon";
+import { getFaviconUrl, getSafeHostname } from "@/lib/utils/favicon";
 
 interface SearchProgressProps {
   progress: {
@@ -150,16 +150,19 @@ export function SearchProgress({ progress }: SearchProgressProps) {
 
           {progress.currentUrl && (
             <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 mb-2 min-w-0">
-              {getFaviconUrl(progress.currentUrl) ? (
-                <img
-                  src={getFaviconUrl(progress.currentUrl) as string}
-                  alt=""
-                  width={12}
-                  height={12}
-                  className="w-3 h-3 object-contain rounded-sm"
-                  onError={handleFaviconError}
-                />
-              ) : null}
+              {(() => {
+                const favicon = getFaviconUrl(progress.currentUrl);
+                return favicon ? (
+                  <img
+                    src={favicon}
+                    alt=""
+                    width={12}
+                    height={12}
+                    className="w-3 h-3 object-contain rounded-sm"
+                    onError={handleFaviconError}
+                  />
+                ) : null;
+              })()}
               <span className="truncate min-w-0">
                 {getSafeHostname(progress.currentUrl) || progress.currentUrl}
               </span>
@@ -186,16 +189,19 @@ export function SearchProgress({ progress }: SearchProgressProps) {
                   key={`${url}-${idx}`}
                   className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-700 rounded-md text-xs min-w-0"
                 >
-                  {getFaviconUrl(url) ? (
-                    <img
-                      src={getFaviconUrl(url) as string}
-                      alt=""
-                      width={12}
-                      height={12}
-                      className="w-3 h-3 object-contain rounded-sm"
-                      onError={handleFaviconError}
-                    />
-                  ) : null}
+                  {(() => {
+                    const favicon = getFaviconUrl(url);
+                    return favicon ? (
+                      <img
+                        src={favicon}
+                        alt=""
+                        width={12}
+                        height={12}
+                        className="w-3 h-3 object-contain rounded-sm"
+                        onError={handleFaviconError}
+                      />
+                    ) : null;
+                  })()}
                   <span className="text-gray-600 dark:text-gray-400 break-all whitespace-normal min-w-0">
                     {getSafeHostname(url) || url}
                   </span>

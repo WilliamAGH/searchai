@@ -6,13 +6,14 @@
  */
 
 // Import PersistedPayload from the single source of truth
-import type { StreamingPersistPayload } from "../../../convex/agents/schema";
+import type { PersistedPayload } from "../types/message";
 
-/**
- * PersistedPayload type for browser signature verification.
- * Re-exported from convex/agents/schema.ts (single source of truth).
- */
-export type PersistedPayload = StreamingPersistPayload;
+export type PersistedPayloadWire = Omit<
+  PersistedPayload,
+  "assistantMessageId"
+> & {
+  assistantMessageId: string;
+};
 
 /**
  * Convert Uint8Array to hex string
@@ -33,7 +34,7 @@ function bytesToHex(bytes: Uint8Array): string {
  * @returns Promise<boolean> - true if signature is valid
  */
 export async function verifyPersistedPayload(
-  payload: PersistedPayload,
+  payload: PersistedPayloadWire,
   nonce: string,
   signature: string,
   signingKey: string,

@@ -14,58 +14,50 @@ import React, {
 } from "react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { logger } from "../lib/logger";
+import { logger } from "@/lib/logger";
 
 /**
  * Storage keys for theme persistence
  */
-const STORAGE_KEYS = {
-  THEME: "searchai_theme",
-} as const;
+const THEME_STORAGE_KEY = "searchai_theme";
 
 /**
  * Minimal storage service for theme persistence
  * Provides safe localStorage access with error handling
  */
 const storageService = {
-  /**
-   * Get parsed value from localStorage
-   * @template T - Expected type of stored value
-   * @param {string} key - Storage key
-   * @returns {T | null} Parsed value or null if not found/invalid
-   */
-  get<T>(key: string): T | null {
+  getTheme(): Theme | null {
     try {
-      const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as T) : null;
+      const raw = localStorage.getItem(THEME_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed: unknown = JSON.parse(raw);
+      return parsed === "light" || parsed === "dark" ? parsed : null;
     } catch (error) {
-      logger.error("Failed to read theme from localStorage", { key, error });
+      logger.error("Failed to read theme from localStorage", {
+        key: THEME_STORAGE_KEY,
+        error,
+      });
       return null;
     }
   },
-  /**
-   * Store value in localStorage
-   * @template T - Type of value to store
-   * @param {string} key - Storage key
-   * @param {T} value - Value to store
-   */
-  set<T>(key: string, value: T): void {
+  setTheme(value: Theme): void {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(value));
     } catch (error) {
-      logger.error("Failed to persist theme to localStorage", { key, error });
+      logger.error("Failed to persist theme to localStorage", {
+        key: THEME_STORAGE_KEY,
+        error,
+      });
     }
   },
-  /**
-   * Check if key exists in localStorage
-   * @param {string} key - Storage key
-   * @returns {boolean} True if key exists
-   */
-  has(key: string): boolean {
+  hasTheme(): boolean {
     try {
-      return localStorage.getItem(key) !== null;
+      return localStorage.getItem(THEME_STORAGE_KEY) !== null;
     } catch (error) {
-      logger.error("Failed to check localStorage key", { key, error });
+      logger.error("Failed to check localStorage key", {
+        key: THEME_STORAGE_KEY,
+        error,
+      });
       return false;
     }
   },
@@ -105,7 +97,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     // Initialize based on system preference or localStorage
     if (typeof window !== "undefined") {
-      const stored = storageService.get<Theme>(STORAGE_KEYS.THEME);
+      const stored = storageService.getTheme();
       if (stored === "light" || stored === "dark") {
         return stored;
       }
@@ -126,7 +118,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (
       userPrefs?.theme &&
       userPrefs.theme !== "system" &&
-      !storageService.has(STORAGE_KEYS.THEME)
+      !storageService.hasTheme()
     ) {
       setThemeState(userPrefs.theme);
     }
@@ -142,7 +134,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     async (newTheme: Theme) => {
       // Update state immediately for instant UI response
       setThemeState(newTheme);
-      storageService.set(STORAGE_KEYS.THEME, newTheme);
+      storageService.setTheme(newTheme);
 
       // Only update user preferences if authenticated
       if (isAuthenticated) {
@@ -158,7 +150,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const contextValue = useMemo(
-    () => ({ theme, setTheme, actualTheme: theme as Theme }),
+    () => ({ theme, setTheme, actualTheme: theme }),
     [theme, setTheme],
   );
 

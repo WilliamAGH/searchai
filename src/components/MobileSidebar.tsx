@@ -3,10 +3,10 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment, useRef, useCallback } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { Chat } from "../lib/types/chat";
-import { isLocalId as isLocalChatId } from "../lib/types/chat";
-import { logger } from "../lib/logger";
-import { useSessionAwareDeleteChat } from "../hooks/useSessionAwareDeleteChat";
+import type { Chat } from "@/lib/types/chat";
+import { logger } from "@/lib/logger";
+import { useSessionAwareDeleteChat } from "@/hooks/useSessionAwareDeleteChat";
+import { toConvexId } from "@/lib/utils/idValidation";
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -15,7 +15,6 @@ interface MobileSidebarProps {
   currentChatId: Id<"chats"> | string | null;
   onSelectChat: (chatId: Id<"chats"> | string | null) => void;
   onNewChat: () => void;
-  onDeleteLocalChat?: (chatId: string) => void;
   onRequestDeleteChat?: (chatId: Id<"chats"> | string) => void;
   isCreatingChat?: boolean;
 }
@@ -27,7 +26,6 @@ export function MobileSidebar({
   currentChatId,
   onSelectChat,
   onNewChat,
-  onDeleteLocalChat,
   onRequestDeleteChat,
   isCreatingChat = false,
 }: MobileSidebarProps) {
@@ -70,29 +68,27 @@ export function MobileSidebar({
       try {
         if (!window.confirm("Delete this chat? This cannot be undone.")) return;
 
+        const resolvedChatId =
+          typeof chatId === "string" ? toConvexId<"chats">(chatId) : chatId;
+        if (!resolvedChatId) {
+          throw new Error(`Invalid chat ID for deletion: ${chatId}`);
+        }
         if (onRequestDeleteChat) {
-          onRequestDeleteChat(chatId);
+          onRequestDeleteChat(resolvedChatId);
         } else {
-          // Infer local vs server using our shared local ID prefixes
-          const isLocal =
-            typeof chatId === "string" ? isLocalChatId(chatId) : false;
-          if (isLocal) {
-            onDeleteLocalChat?.(chatId as string);
-          } else {
-            await deleteChat(chatId as Id<"chats">);
-          }
+          await deleteChat(resolvedChatId);
         }
 
         if (isCurrentChat) {
           onSelectChat(null);
         }
       } catch (err) {
-        if ((import.meta as unknown as { env?: { DEV?: boolean } })?.env?.DEV) {
+        if (import.meta.env?.DEV) {
           logger.warn("Chat deletion failed:", err);
         }
       }
     },
-    [onRequestDeleteChat, onDeleteLocalChat, deleteChat, onSelectChat],
+    [onRequestDeleteChat, deleteChat, onSelectChat],
   );
 
   const handleDeleteChatFromBtn = useCallback(
@@ -281,11 +277,6 @@ export function MobileSidebar({
                                 {chat.title}
                               </div>
                               <div className="text-[11px] text-gray-500 flex items-center gap-1 min-w-0 mt-0.5">
-                                {"isLocal" in chat && chat.isLocal && (
-                                  <span className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-1 rounded flex-shrink-0">
-                                    Local
-                                  </span>
-                                )}
                                 <span className="truncate">
                                   {new Date(
                                     chat.updatedAt,
