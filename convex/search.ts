@@ -267,6 +267,7 @@ export const planSearch = action({
     // Strengthen cache key with message count to avoid over-hit on same prefix
     // @ts-ignore - Known Convex TS2589 issue with complex type inference
     const recentMessages = await ctx.runQuery(
+      // @ts-ignore - Known Convex TS2589 issue with complex type inference
       api.chats.messagesPaginated.getRecentChatMessages,
       {
         chatId: args.chatId,
