@@ -2,12 +2,41 @@
 
 /**
  * Agent Tools for Search and Research
- * Proper tool definitions with UUIDv7 context tracking
+ *
+ * This module defines tools for the OpenAI Agents SDK with proper type patterns.
+ *
+ * ## Type Annotation Policy (OpenAI Agents SDK) — [SDK1]
+ *
+ * **Individual tools**: Use `FunctionTool<any, any, unknown>` annotation.
+ * This is required because:
+ * 1. Complex execute functions create circular type inference (TS7022)
+ * 2. The SDK's type constraints make `unknown` incompatible (TParameters extends ToolInputParameters)
+ * 3. Context contravariance prevents assignment to `Tool<unknown>`
+ *
+ * **Tool arrays**: Use `Tool[]` for Agent.create() compatibility.
+ * The `Tool` union type defaults to `Tool<unknown>` which Agent expects.
+ *
+ * **Why `any` is required here** (exception to [TY1a]):
+ * - The SDK's FunctionTool generic has `TParameters extends ToolInputParameters` constraint
+ * - `unknown` does NOT satisfy this constraint
+ * - `any` is bivariant and works with all SDK type requirements
+ * - This is documented SDK behavior, not a workaround
+ *
+ * @see https://openai.github.io/openai-agents-js/guides/tools
+ * @see .cursor/rules/sdk-integration.mdc for canonical policy
+ *
+ * ## Zod Version Boundary
+ *
+ * OpenAI Agents SDK requires Zod v3 for tool parameter schemas (peer dependency).
+ * This file imports from "zod" (v3). All other application code uses "zod/v4".
+ * Keep v3 usage isolated to this SDK integration layer.
+ *
+ * @module convex/agents/tools
  */
 
-import { z } from "zod";
+import { z } from "zod"; // v3 - required by @openai/agents peer dependency
 import { tool } from "@openai/agents";
-import type { FunctionTool, RunContext } from "@openai/agents";
+import type { FunctionTool, Tool, RunContext } from "@openai/agents";
 import type { ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { generateMessageId } from "../lib/id_generator";
@@ -15,12 +44,31 @@ import { AGENT_LIMITS } from "../lib/constants/cache";
 import { getErrorMessage } from "../lib/errors";
 
 /**
- * Web Search Tool
- * Searches the web and returns results with context tracking
+ * Get the current year for temporal context in tool descriptions.
+ * This ensures the LLM knows the current date when formulating search queries.
  */
-type AgentToolRunContext =
-  | RunContext<{ actionCtx?: ActionCtx } | undefined>
-  | undefined;
+function getCurrentYear(): number {
+  return new Date().getFullYear();
+}
+
+/**
+ * Get a formatted current date string for tool descriptions.
+ */
+function getCurrentDateString(): string {
+  return new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+}
+
+/**
+ * Context type for agent tool execution.
+ * Provides access to Convex ActionCtx for database operations and action calls.
+ */
+type AgentToolContext = { actionCtx?: ActionCtx } | undefined;
+
+/**
+ * RunContext wrapper for tool execute functions.
+ * The SDK passes this to tool execute handlers.
+ */
+type AgentToolRunContext = RunContext<AgentToolContext> | undefined;
 
 const getActionCtx = (ctx?: AgentToolRunContext): ActionCtx => {
   const actionCtx = ctx?.context?.actionCtx;
@@ -32,13 +80,20 @@ const getActionCtx = (ctx?: AgentToolRunContext): ActionCtx => {
   return actionCtx;
 };
 
-export const searchWebTool: FunctionTool<any, any, unknown> = tool({
+/**
+ * Web Search Tool
+ *
+ * Searches the web and returns results with UUIDv7 context tracking.
+ * Uses FunctionTool<any, any, unknown> per [SDK1] policy — required for SDK compatibility.
+ */
+// prettier-ignore
+export const searchWebTool: FunctionTool<any, any, unknown> = tool({ // eslint-disable-line @typescript-eslint/no-explicit-any
   name: "search_web",
   description: `Search the web for current information. 
 
-IMPORTANT: The current date is provided in your system instructions.
-When searching for "current", "latest", "best", or "recent" information, include the current year in your query.
-Do NOT use outdated years in queries for current information.
+IMPORTANT: Today's date is ${getCurrentDateString()} (year ${getCurrentYear()}). 
+When searching for "current", "latest", "best", or "recent" information, include ${getCurrentYear()} in your query.
+Do NOT use outdated years like 2024 in queries for current information.
 
 Use this when you need to find:
 - Recent facts or news
@@ -167,9 +222,12 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
 
 /**
  * Web Scraping Tool
- * Fetches and parses webpage content for detailed information
+ *
+ * Fetches and parses webpage content for detailed information.
+ * Uses FunctionTool<any, any, unknown> per [SDK1] policy — required for SDK compatibility.
  */
-export const scrapeWebpageTool: FunctionTool<any, any, unknown> = tool({
+// prettier-ignore
+export const scrapeWebpageTool: FunctionTool<any, any, unknown> = tool({ // eslint-disable-line @typescript-eslint/no-explicit-any
   name: "scrape_webpage",
   description: `Fetch and parse the full content of a specific webpage. Use this when you need:
 - Detailed information from a specific URL
@@ -291,15 +349,18 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
 
 /**
  * Research Planning Tool
+ *
  * Uses LLM to generate targeted search queries when research is needed.
- * This is called by the conversational agent when it determines research is required.
+ * Called by the conversational agent when it determines research is required.
+ * Uses FunctionTool<any, any, unknown> per [SDK1] policy — required for SDK compatibility.
  *
  * NOTE: Parameters are intentionally flat (not nested) because:
  * 1. LLMs generate tool calls more reliably with flat schemas
  * 2. OpenAI's function calling API prefers flat parameter objects
  * 3. The three parameters form a cohesive "research plan" unit together
  */
-export const planResearchTool: FunctionTool<any, any, unknown> = tool({
+// prettier-ignore
+export const planResearchTool: FunctionTool<any, any, unknown> = tool({ // eslint-disable-line @typescript-eslint/no-explicit-any
   name: "plan_research",
   description: `Plan a research strategy by generating targeted search queries.
 Call this tool ONLY when you need to research information you don't know or aren't confident about.
@@ -387,18 +448,23 @@ export const agentTools: {
 };
 
 /**
- * Tool list for the conversational agent (includes planning)
+ * Tool list for the conversational agent (includes planning).
+ *
+ * Uses `Tool[]` — the SDK-idiomatic type for tool collections passed to Agent.create().
+ * The `Tool` union type uses `any` for TParams because heterogeneous tool arrays
+ * cannot share a common parameter type. Context is passed at runtime via run().
+ *
+ * @see Module JSDoc for type annotation policy
  */
-export const conversationalToolsList: Array<FunctionTool<any, any, unknown>> = [
+export const conversationalToolsList: Tool[] = [
   planResearchTool,
   searchWebTool,
   scrapeWebpageTool,
 ];
 
 /**
- * Tool list for research-only agents (no planning needed)
+ * Tool list for research-only agents (no planning needed).
+ *
+ * Uses `Tool[]` — the SDK-idiomatic type for tool collections.
  */
-export const toolsList: Array<FunctionTool<any, any, unknown>> = [
-  searchWebTool,
-  scrapeWebpageTool,
-];
+export const toolsList: Tool[] = [searchWebTool, scrapeWebpageTool];

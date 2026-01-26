@@ -40,11 +40,14 @@ import type {
  * Uses Pick<ActionCtx, ...> pattern matching StreamingWorkflowCtx in orchestration.ts
  * for proper type inference on Convex mutation/query/action calls.
  */
-type PersistenceCtx = Pick<ActionCtx, "runMutation" | "runQuery" | "runAction">;
+export type WorkflowActionCtx = Pick<
+  ActionCtx,
+  "runMutation" | "runQuery" | "runAction"
+>;
 
 /** Parameters for chat title update */
 export interface UpdateChatTitleParams {
-  ctx: PersistenceCtx;
+  ctx: WorkflowActionCtx;
   chatId: Id<"chats">;
   currentTitle: string | undefined;
   intent: string;
@@ -56,7 +59,7 @@ export interface UpdateChatTitleParams {
  */
 export interface PersistAssistantMessageParams {
   /** Convex action context for running mutations */
-  ctx: PersistenceCtx;
+  ctx: WorkflowActionCtx;
   /** Target chat for the message */
   chatId: Id<"chats">;
   /** Message content (markdown text) */
@@ -80,7 +83,7 @@ export interface PersistAssistantMessageParams {
 
 /** Parameters for workflow completion */
 export interface CompleteWorkflowParams {
-  ctx: PersistenceCtx;
+  ctx: WorkflowActionCtx;
   workflowTokenId: Id<"workflowTokens"> | null;
   payload: StreamingPersistPayload;
   nonce: string;

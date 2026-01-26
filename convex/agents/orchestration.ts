@@ -48,7 +48,6 @@
 
 import { v } from "convex/values";
 import { action } from "../_generated/server";
-import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { run } from "@openai/agents";
 import { getErrorMessage } from "../lib/errors";
@@ -72,8 +71,6 @@ import {
 // Timeout Utilities
 // ============================================
 // Agent calls have no built-in timeout, so we wrap them to prevent indefinite hangs.
-const MAX_AGENT_TURNS = 6;
-const MAX_TOOL_ERRORS = 3;
 
 /**
  * Throws if tool error count exceeds threshold. Centralizes error-threshold logic
@@ -83,7 +80,7 @@ function assertToolErrorThreshold(
   errorCount: number,
   workflowName: string,
 ): void {
-  if (errorCount >= MAX_TOOL_ERRORS) {
+  if (errorCount >= AGENT_LIMITS.MAX_TOOL_ERRORS) {
     throw new Error(
       `${workflowName} failed: too many tool errors (${errorCount})`,
     );
@@ -262,47 +259,61 @@ import {
   updateChatTitleIfNeeded,
   persistAssistantMessage,
   completeWorkflowWithSignature,
+  type WorkflowActionCtx,
 } from "./orchestration_persistence";
 export type { ResearchContextReference } from "./schema";
 
-type CustomEventParams<T> = {
+/**
+ * CustomEvent Polyfill for Node.js runtime
+ * Required because OpenAI Agents SDK uses CustomEvent internally.
+ * Typed interface to avoid `any` casts per [TY1f].
+ */
+interface CustomEventParams<T> {
   detail?: T;
   bubbles?: boolean;
   cancelable?: boolean;
   composed?: boolean;
-};
+}
 
-const ensureCustomEventPolyfill = () => {
-  const globalAny = globalThis as Record<string, any>;
-  if (typeof globalAny.CustomEvent !== "undefined") {
+interface CustomEventConstructor {
+  new <T>(type: string, params?: CustomEventParams<T>): CustomEvent<T>;
+}
+
+interface GlobalWithCustomEvent {
+  CustomEvent?: CustomEventConstructor;
+}
+
+const ensureCustomEventPolyfill = (): void => {
+  const global = globalThis as GlobalWithCustomEvent;
+  if (typeof global.CustomEvent !== "undefined") {
     return;
   }
 
   try {
     // Attempt to extend native Event (works in modern runtimes)
-    class NodeCustomEvent<T = any> extends Event {
+    class NodeCustomEvent<T = unknown> extends Event {
       detail: T;
       constructor(type: string, params?: CustomEventParams<T>) {
         super(type, params);
-        this.detail = (params?.detail as T) ?? (undefined as T);
+        this.detail = params?.detail as T;
       }
     }
-    globalAny.CustomEvent = NodeCustomEvent;
-  } catch (error) {
+    global.CustomEvent = NodeCustomEvent as unknown as CustomEventConstructor;
+  } catch (extendError) {
     // Fallback for environments where Event is not extendable (e.g., older Node.js)
     console.warn(
       "CustomEvent polyfill: Event not extendable, using standalone fallback class",
-      { error },
+      { error: extendError },
     );
-    class NodeCustomEvent<T = any> {
+    class NodeCustomEvent<T = unknown> {
       type: string;
       detail: T;
       constructor(type: string, params?: CustomEventParams<T>) {
         this.type = type;
-        this.detail = (params?.detail as T) ?? (undefined as T);
+        this.detail = params?.detail as T;
       }
     }
-    globalAny.CustomEvent = NodeCustomEvent;
+    global.CustomEvent = NodeCustomEvent as unknown as CustomEventConstructor;
   }
 };
 
@@ -399,7 +410,7 @@ export const orchestrateResearchWorkflow = action({
       timestamp: v.number(),
     }),
   }),
-  // @ts-ignore deep generics
+  // @ts-ignore TS2589 - Convex type instantiation is excessively deep with complex return validators
   handler: async (ctx, args) => {
     const { agents } = require("./definitions");
     const workflowId = generateMessageId();
@@ -413,7 +424,7 @@ export const orchestrateResearchWorkflow = action({
     const planningResult = await withTimeout(
       run(agents.queryPlanner, planningInput, {
         context: { actionCtx: ctx },
-        maxTurns: MAX_AGENT_TURNS,
+        maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,
       }),
       AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "planning",
@@ -432,16 +443,12 @@ export const orchestrateResearchWorkflow = action({
     // Research
     const researchStart = Date.now();
     let researchDuration = 0;
+    // Note: `any` is used here because OpenAI Agents SDK uses Zod v3 while codebase uses v4.
+    // Cross-version type inference doesn't work; runtime validation via Zod schemas ensures correctness.
+    // See _ResearchAgentOutput interface for documented expected shape.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let researchOutput: any;
-    let toolCallLog: Array<{
-      toolName: string;
-      timestamp: number;
-      reasoning: string;
-      input: any;
-      resultSummary: string;
-      durationMs: number;
-      success: boolean;
-    }> = [];
+    let toolCallLog: ToolCallLogEntry[] = [];
 
     if (!hasPlannedQueries) {
       researchDuration = Date.now() - researchStart;
@@ -450,7 +457,6 @@ export const orchestrateResearchWorkflow = action({
           "No web research required for this query. Generate the answer using existing context.",
         keyFindings: [],
         sourcesUsed: [],
-        informationGaps: undefined,
         researchQuality: "adequate",
       };
     } else {
@@ -476,7 +482,7 @@ export const orchestrateResearchWorkflow = action({
       const researchResult = await withTimeout(
         run(agents.research, researchInstructions, {
           context: { actionCtx: ctx },
-          maxTurns: MAX_AGENT_TURNS,
+          maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,
         }),
         AGENT_TIMEOUTS.TOOL_EXECUTION_MS,
         "research",
@@ -548,7 +554,7 @@ export const orchestrateResearchWorkflow = action({
     const synthesisResult = await withTimeout(
       run(agents.answerSynthesis, synthesisInstructions, {
         context: { actionCtx: ctx },
-        maxTurns: MAX_AGENT_TURNS,
+        maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,
       }),
       AGENT_TIMEOUTS.AGENT_STAGE_MS,
       "synthesis",
@@ -603,12 +609,76 @@ export type StreamingWorkflowArgs = {
   contextReferences?: ResearchContextReference[];
 };
 
-type StreamingWorkflowCtx = Pick<
-  ActionCtx,
-  "runMutation" | "runQuery" | "runAction"
->;
+type StreamingWorkflowCtx = WorkflowActionCtx;
 
 type WorkflowStreamEvent = Record<string, unknown>;
+
+// ============================================
+// Agent Output Types [TY1f]
+// ============================================
+// These interfaces match the Zod v3 schemas in definitions.ts but are defined
+// as plain TypeScript to avoid cross-version Zod inference issues.
+
+/** Output from queryPlannerAgent - matches definitions.ts outputType */
+interface _QueryPlannerOutput {
+  userIntent: string;
+  informationNeeded: string[];
+  searchQueries: Array<{
+    query: string;
+    reasoning: string;
+    priority: number;
+  }>;
+  needsWebScraping: boolean;
+  anticipatedChallenges?: string[] | null;
+  confidenceLevel: number;
+}
+
+/**
+ * Output from researchAgent - matches definitions.ts outputType
+ * Note: Using broader types for fields that vary at runtime to avoid excessive assertions
+ */
+interface _ResearchAgentOutput {
+  researchSummary: string;
+  keyFindings: Array<{
+    finding: string;
+    sources: string[];
+    confidence: string; // "high" | "medium" | "low" but SDK returns string
+  }>;
+  sourcesUsed: Array<{
+    url?: string;
+    title?: string;
+    contextId: string;
+    type: "search_result" | "scraped_page";
+    relevance?: string;
+  }>;
+  informationGaps?: string[] | null | undefined;
+  scrapedContent?:
+    | Array<{
+        url: string;
+        title: string;
+        content: string;
+        summary: string;
+        contentLength: number;
+        scrapedAt: number;
+        contextId: string;
+        relevanceScore?: number | null;
+      }>
+    | null
+    | undefined;
+  serpEnrichment?: SerpEnrichment | null | undefined;
+  researchQuality: "comprehensive" | "adequate" | "limited";
+}
+
+/** Tool call log entry for debugging/metrics */
+interface ToolCallLogEntry {
+  toolName: string;
+  timestamp: number;
+  reasoning: string;
+  input: unknown; // Varied by tool type - unknown is safer than any
+  resultSummary: string;
+  durationMs: number;
+  success: boolean;
+}
 
 // ============================================
 // Shared Workflow Utilities
@@ -736,6 +806,7 @@ async function initializeWorkflowSession(
     "Failed to create workflow token",
     () =>
       ctx.runMutation(
+        // @ts-ignore - Convex api type instantiation is too deep here
         internal.workflowTokens.createToken,
         workflowTokenPayload,
       ),
@@ -757,6 +828,7 @@ async function initializeWorkflowSession(
   let chat: any;
   if (useAuthVariant) {
     chat = await withErrorContext("Failed to retrieve chat", () =>
+      // @ts-ignore - Convex api type instantiation is too deep here
       ctx.runQuery(api.chats.getChatById, getChatArgs),
     );
   } else {
@@ -882,7 +954,7 @@ export async function* streamConversationalWorkflow(
     const agentResult = await run(agents.conversational, agentInput, {
       stream: true,
       context: { actionCtx: ctx },
-      maxTurns: MAX_AGENT_TURNS,
+      maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,
     });
 
     let accumulatedResponse = "";
@@ -1361,9 +1433,11 @@ export async function* streamResearchWorkflow(
     const planningResult = await run(agents.queryPlanner, planningInput, {
       stream: true,
       context: { actionCtx: ctx },
-      maxTurns: MAX_AGENT_TURNS,
+      maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,
     });
 
+    // Note: `any` used for SDK compatibility; see _QueryPlannerOutput for documented shape
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let planningOutput: any = null;
     for await (const event of planningResult) {
       if (
@@ -1488,7 +1562,7 @@ export async function* streamResearchWorkflow(
         {
           stream: true,
           context: { actionCtx: ctx },
-          maxTurns: MAX_AGENT_TURNS,
+          maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,
         },
       );
 
@@ -1624,7 +1698,9 @@ export async function* streamResearchWorkflow(
       yield writeEvent("progress", {
         stage: "searching",
         message: `${searchQueriesCount} ${searchQueriesCount === 1 ? "query" : "queries"} in parallel...`,
-        queries: planningOutput.searchQueries.map((q: any) => q.query),
+        queries: planningOutput.searchQueries.map(
+          (q: { query: string }) => q.query,
+        ),
       });
 
       // Execute ALL searches in parallel
@@ -1636,7 +1712,7 @@ export async function* streamResearchWorkflow(
         async (sq: { query: string; reasoning: string; priority: number }) => {
           const searchStart = Date.now();
           try {
-            // @ts-ignore - ActionCtx type mismatch
+            // @ts-ignore TS2589 - ActionCtx type inference depth exceeded with api.search.searchWeb
             const result = await ctx.runAction(api.search.searchWeb, {
               query: sq.query,
               maxResults: 8,
@@ -1792,6 +1868,8 @@ export async function* streamResearchWorkflow(
       }));
 
     // Build research output directly from harvested data (skip research agent entirely)
+    // Note: `any` used for SDK compatibility; see _ResearchAgentOutput for documented shape
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const researchOutput: any = {
       researchSummary:
         harvested.searchResults.length > 0
@@ -1799,12 +1877,14 @@ export async function* streamResearchWorkflow(
           : "No search results found.",
       keyFindings: syntheticKeyFindings,
       sourcesUsed: [],
-      informationGaps: undefined,
-      scrapedContent: harvested.scrapedContent,
+      scrapedContent: harvested.scrapedContent.map((sc) => ({
+        ...sc,
+        relevanceScore: sc.relevanceScore ?? null,
+      })),
       serpEnrichment:
         Object.keys(harvested.serpEnrichment).length > 0
           ? harvested.serpEnrichment
-          : undefined,
+          : null,
       researchQuality:
         harvested.scrapedContent.length >= 2
           ? "comprehensive"
@@ -1901,7 +1981,11 @@ export async function* streamResearchWorkflow(
     const synthesisResult = await run(
       agents.answerSynthesis,
       synthesisInstructions,
-      { stream: true, context: { actionCtx: ctx }, maxTurns: MAX_AGENT_TURNS },
+      {
+        stream: true,
+        context: { actionCtx: ctx },
+        maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,
+      },
     );
     let accumulatedAnswer = "";
     const synthesisStreamStart = Date.now();
@@ -2102,7 +2186,7 @@ export const runAgentWorkflowAndPersist = action({
     contextReferences: v.array(vContextReference),
     signature: v.string(),
   }),
-  // @ts-ignore deep generics
+  // @ts-ignore TS2589 - Convex type instantiation is excessively deep with complex return validators
   handler: async (ctx, args) => {
     const eventStream = streamConversationalWorkflow(ctx, {
       chatId: args.chatId,

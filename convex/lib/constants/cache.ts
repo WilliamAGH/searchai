@@ -18,6 +18,10 @@ export const AGENT_LIMITS = {
   MAX_SEARCH_QUERIES: 3,
   MIN_SCRAPE_URLS: 2,
   MAX_SCRAPE_URLS: 4,
+  /** Maximum agent turns (API round-trips) before forcing completion */
+  MAX_AGENT_TURNS: 6,
+  /** Maximum consecutive tool errors before aborting workflow */
+  MAX_TOOL_ERRORS: 3,
 } as const;
 
 /**

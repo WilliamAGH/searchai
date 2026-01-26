@@ -11,7 +11,13 @@ import { RunToolCallItem, RunToolCallOutputItem } from "@openai/agents";
 import { generateMessageId } from "../lib/id_generator";
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
 import { isUuidV7, normalizeUrl } from "./orchestration_helpers";
-import type { HarvestedData } from "./schema";
+import {
+  safeParseSearchToolOutput,
+  safeParseScrapeToolOutput,
+  type HarvestedData,
+  type SearchToolOutput,
+  type ScrapeToolOutput,
+} from "./schema";
 
 // Re-export SDK types for orchestration.ts
 export { RunToolCallItem, RunToolCallOutputItem };
@@ -239,7 +245,29 @@ export function getProgressMessage(stage: ProgressStage): string {
 // ============================================
 // Tool Output Harvesting
 // ============================================
-// Types for search results and scraped pages are defined in schema.ts (HarvestedData)
+// Tool outputs are validated against canonical Zod v4 schemas before harvesting.
+
+const parseSearchToolOutput = (value: unknown): SearchToolOutput | null => {
+  const parsed = safeParseSearchToolOutput(value);
+  if (!parsed) {
+    console.warn("Invalid search_web tool output", {
+      output: value,
+    });
+    return null;
+  }
+  return parsed;
+};
+
+const parseScrapeToolOutput = (value: unknown): ScrapeToolOutput | null => {
+  const parsed = safeParseScrapeToolOutput(value);
+  if (!parsed) {
+    console.warn("Invalid scrape_webpage tool output", {
+      output: value,
+    });
+    return null;
+  }
+  return parsed;
+};
 
 /**
  * Harvest search results from a tool output.
@@ -247,28 +275,19 @@ export function getProgressMessage(stage: ProgressStage): string {
  * Preserves tool contextId for provenance tracking if present.
  */
 export function harvestSearchResults(
-  output: Record<string, unknown>,
+  output: unknown,
   harvested: HarvestedData,
 ): number {
-  const results = output.results as
-    | Array<{
-        url?: string;
-        title?: string;
-        snippet?: string;
-        relevanceScore?: number;
-      }>
-    | undefined;
-
-  if (!Array.isArray(results)) return 0;
+  const parsed = parseSearchToolOutput(output);
+  if (!parsed) return 0;
 
   // Capture tool-level contextId for provenance (shared across all results from this call)
-  const toolContextId =
-    typeof output.contextId === "string" && isUuidV7(output.contextId)
-      ? output.contextId
-      : undefined;
+  const toolContextId = isUuidV7(parsed.contextId)
+    ? parsed.contextId
+    : undefined;
 
   let count = 0;
-  for (const r of results) {
+  for (const r of parsed.results) {
     if (r.url && r.title) {
       harvested.searchResults.push({
         title: r.title,
@@ -288,11 +307,12 @@ export function harvestSearchResults(
  * Returns true if content was harvested, false if skipped (duplicate or invalid).
  */
 export function harvestScrapedContent(
-  output: Record<string, unknown>,
+  output: unknown,
   harvested: HarvestedData,
 ): boolean {
-  const rawUrl = output.url as string | undefined;
-  const content = output.content as string | undefined;
+  const parsed = parseScrapeToolOutput(output);
+  if (!parsed) return false;
+  const { url: rawUrl, content } = parsed;
 
   if (!rawUrl || !content) return false;
 
@@ -305,18 +325,17 @@ export function harvestScrapedContent(
   harvested.scrapedUrls.add(normalizedUrl);
 
   // Extract or generate context ID
-  const contextId =
-    typeof output.contextId === "string" && isUuidV7(output.contextId)
-      ? output.contextId
-      : generateMessageId();
+  const contextId = isUuidV7(parsed.contextId)
+    ? parsed.contextId
+    : generateMessageId();
 
   harvested.scrapedContent.push({
     url: rawUrl,
-    title: String(output.title || ""),
-    content: String(content),
-    summary: String(output.summary || ""),
+    title: parsed.title || "",
+    content,
+    summary: parsed.summary || "",
     contentLength: content.length || 0,
-    scrapedAt: (output.scrapedAt as number) || Date.now(),
+    scrapedAt: parsed.scrapedAt ?? Date.now(),
     contextId,
     relevanceScore: RELEVANCE_SCORES.SCRAPED_PAGE,
   });

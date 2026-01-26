@@ -1,6 +1,11 @@
 "use node";
 
-import type { ResearchContextReference } from "./schema";
+import {
+  safeParsePlanResearchToolOutput,
+  safeParseScrapeToolOutput,
+  safeParseSearchToolOutput,
+  type ResearchContextReference,
+} from "./schema";
 import { buildTemporalHeader } from "../lib/dateTime";
 import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
 import { normalizeUrl as normalizeUrlUtil } from "../lib/url";
@@ -168,9 +173,19 @@ export function formatSerpEnrichmentForPrompt(
 }
 
 export const extractContextIdFromOutput = (output: unknown): string | null => {
-  if (!output || typeof output !== "object") return null;
-  const candidate = (output as { contextId?: string }).contextId;
-  return candidate && isUuidV7(candidate) ? candidate : null;
+  const searchOutput = safeParseSearchToolOutput(output);
+  if (searchOutput && isUuidV7(searchOutput.contextId)) {
+    return searchOutput.contextId;
+  }
+  const scrapeOutput = safeParseScrapeToolOutput(output);
+  if (scrapeOutput && isUuidV7(scrapeOutput.contextId)) {
+    return scrapeOutput.contextId;
+  }
+  const planOutput = safeParsePlanResearchToolOutput(output);
+  if (planOutput && isUuidV7(planOutput.contextId)) {
+    return planOutput.contextId;
+  }
+  return null;
 };
 
 // ============================================
@@ -616,20 +631,22 @@ export function buildUrlContextMap(
     if (!contextId) continue;
 
     if (entry.toolName === "search_web") {
-      const results = (entry.output as { results?: Array<{ url?: string }> })
-        .results;
-      if (Array.isArray(results)) {
-        for (const result of results) {
-          const normalized = normalizeUrl(result?.url);
+      const parsed = safeParseSearchToolOutput(entry.output);
+      if (parsed) {
+        for (const result of parsed.results) {
+          const normalized = normalizeUrl(result.url);
           if (normalized) {
             urlContextMap.set(normalized, contextId);
           }
         }
       }
     } else if (entry.toolName === "scrape_webpage") {
-      const normalized = normalizeUrl((entry.output as { url?: string }).url);
-      if (normalized) {
-        urlContextMap.set(normalized, contextId);
+      const parsed = safeParseScrapeToolOutput(entry.output);
+      if (parsed) {
+        const normalized = normalizeUrl(parsed.url);
+        if (normalized) {
+          urlContextMap.set(normalized, contextId);
+        }
       }
     }
   }

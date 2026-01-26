@@ -96,6 +96,17 @@ export const vContextReference = v.object({
   metadata: v.optional(v.any()),
 });
 
+/** TypeScript type for context references (derived from validator) */
+export interface ContextReference {
+  contextId: string;
+  type: "search_result" | "scraped_page" | "research_summary";
+  url?: string;
+  title?: string;
+  timestamp: number;
+  relevanceScore?: number;
+  metadata?: unknown;
+}
+
 // Re-export the TS type used across orchestration to keep validator and TS shape aligned.
 // NOTE: This indirection prevents V8 runtimes from importing `orchestration_helpers.ts`
 // (which uses `node:crypto`). Always import the type from `../agents/schema` or from this
@@ -132,6 +143,12 @@ export function isValidConvexIdFormat(str: string): boolean {
   return extractRawIdentifier(str) !== null;
 }
 
+export function isConvexId<TableName extends TableNames>(
+  str: string,
+): str is Id<TableName> {
+  return isValidConvexIdFormat(str);
+}
+
 /**
  * Safely cast a string to a Convex ID with runtime validation
  * Returns null if the string is not a valid Convex ID format
@@ -148,9 +165,9 @@ export function isValidConvexIdFormat(str: string): boolean {
 export function safeConvexId<TableName extends TableNames>(
   str: string | null | undefined,
 ): Id<TableName> | null {
-  if (!str || !isValidConvexIdFormat(str)) {
+  if (!str || !isConvexId<TableName>(str)) {
     return null;
   }
 
-  return str as Id<TableName>;
+  return str;
 }

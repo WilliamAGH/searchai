@@ -1,6 +1,10 @@
 import { z } from "zod/v4";
 import type { Id } from "../_generated/dataModel";
 
+/**
+ * Canonical agent domain schemas (Zod v4).
+ * OpenAI Agents integration uses Zod v3 only for tool parameter schemas.
+ */
 // ============================================
 // Zod Schemas (Single Source of Truth)
 // ============================================
@@ -117,6 +121,14 @@ export const HarvestedSerpEnrichmentSchema = z.object({
       }),
     )
     .optional(),
+  relatedQuestions: z
+    .array(
+      z.object({
+        question: z.string(),
+        snippet: z.string().optional(),
+      }),
+    )
+    .optional(),
   relatedSearches: z.array(z.string()).optional(),
 });
 
@@ -164,3 +176,98 @@ export function createEmptyHarvestedData(): HarvestedData {
     scrapedUrls: new Set(),
   };
 }
+
+// ============================================
+// OpenAI Tool Output Schemas (v4 canonical)
+// ============================================
+// These schemas define the canonical shapes for tool outputs after they cross
+// the OpenAI Agents integration boundary. Tool parameter schemas live in
+// convex/agents/tools.ts using Zod v3 per SDK requirement.
+
+const ToolCallMetadataSchema = z.object({
+  toolName: z.string(),
+  callStart: z.number(),
+  durationMs: z.number(),
+});
+
+export const ToolSearchResultSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  snippet: z.string(),
+  relevanceScore: z.number(),
+});
+
+export type ToolSearchResult = z.infer<typeof ToolSearchResultSchema>;
+
+export const SearchToolOutputSchema = z.object({
+  contextId: z.string(),
+  query: z.string(),
+  reasoning: z.string(),
+  resultCount: z.number(),
+  searchMethod: z.enum(["serp", "openrouter", "duckduckgo", "fallback"]),
+  hasRealResults: z.boolean(),
+  enrichment: HarvestedSerpEnrichmentSchema.optional(),
+  results: z.array(ToolSearchResultSchema),
+  timestamp: z.number(),
+  error: z.string().optional(),
+  errorMessage: z.string().optional(),
+  _toolCallMetadata: ToolCallMetadataSchema.optional(),
+});
+
+export type SearchToolOutput = z.infer<typeof SearchToolOutputSchema>;
+
+export const ScrapeToolOutputSchema = z.object({
+  contextId: z.string(),
+  url: z.string(),
+  reasoning: z.string(),
+  title: z.string(),
+  content: z.string(),
+  summary: z.string(),
+  contentLength: z.number().optional(),
+  scrapedAt: z.number().optional(),
+  error: z.string().optional(),
+  errorMessage: z.string().optional(),
+  _toolCallMetadata: ToolCallMetadataSchema.optional(),
+});
+
+export type ScrapeToolOutput = z.infer<typeof ScrapeToolOutputSchema>;
+
+export const PlanResearchToolOutputSchema = z.object({
+  contextId: z.string(),
+  status: z.literal("research_planned"),
+  userQuestion: z.string(),
+  researchGoal: z.string(),
+  searchQueries: z.array(
+    z.object({
+      query: z.string(),
+      priority: z.number().min(1).max(3),
+    }),
+  ),
+  instruction: z.string(),
+  timestamp: z.number(),
+});
+
+export type PlanResearchToolOutput = z.infer<
+  typeof PlanResearchToolOutputSchema
+>;
+
+export const safeParseSearchToolOutput = (
+  value: unknown,
+): SearchToolOutput | null => {
+  const parsed = SearchToolOutputSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
+
+export const safeParseScrapeToolOutput = (
+  value: unknown,
+): ScrapeToolOutput | null => {
+  const parsed = ScrapeToolOutputSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
+
+export const safeParsePlanResearchToolOutput = (
+  value: unknown,
+): PlanResearchToolOutput | null => {
+  const parsed = PlanResearchToolOutputSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
