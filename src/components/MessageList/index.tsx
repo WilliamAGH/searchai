@@ -66,9 +66,6 @@ interface MessageListProps {
 }
 
 /**
- * Main message list component
- */
-/**
  * Render the message list for a chat conversation with pagination support.
  */
 export function MessageList({
@@ -90,85 +87,32 @@ export function MessageList({
   scrollContainerRef: externalScrollRef,
 }: MessageListProps) {
   const deleteMessage = useMutation(api.messages.deleteMessage);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const internalScrollRef = useRef<HTMLDivElement>(null);
-  // Use external scroll container if provided, otherwise use internal
-  const scrollContainerRef = externalScrollRef || internalScrollRef;
-  const useExternalScroll = !!externalScrollRef;
-  const previousMessagesLengthRef = useRef(messages.length);
-  const isLoadingMoreRef = useRef(false);
-  const lastSeenMessageCountRef = useRef(messages.length);
-  const autoScrollEnabledRef = useRef(true);
-  const isTouchingRef = useRef(false);
-  const smoothScrollInProgressRef = useRef(false);
 
-  const isMobile = useIsMobile();
-  const isVirtualKeyboardOpen = useIsVirtualKeyboardOpen();
+  // Use the scroll behavior hook
+  const {
+    scrollContainerRef: _scrollContainerRef,
+    messagesEndRef,
+    internalScrollRef,
+    useExternalScroll,
+    userHasScrolled,
+    unseenMessageCount,
+    handleScrollToBottom,
+    handleLoadMore: hookHandleLoadMore,
+  } = useMessageListScroll({
+    messageCount: messages.length,
+    isGenerating,
+    externalScrollRef,
+    searchProgress,
+  });
+
   const [collapsedById, setCollapsedById] = useState<Record<string, boolean>>(
     {},
   );
-  const [userHasScrolled, setUserHasScrolled] = useState(false);
-  const [unseenMessageCount, setUnseenMessageCount] = useState(0);
   const [hoveredSourceUrl, setHoveredSourceUrl] = useState<string | null>(null);
   // Citation hover callback - currently unused but passed to children for future highlight sync
   const handleCitationHover = useCallback((_url: string | null) => {
     // No-op: citation hover state not currently consumed
   }, []);
-
-  // Dynamic thresholds based on viewport
-  const NEAR_BOTTOM_THRESHOLD = isMobile ? 100 : 200;
-  const STUCK_THRESHOLD = isMobile ? 50 : 100;
-  // Percentage threshold: hide FAB when user is 95%+ of the way down
-  const SCROLL_PERCENT_THRESHOLD = 95;
-
-  /**
-   * Cancel any ongoing smooth scroll
-   */
-  const cancelSmoothScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (container && smoothScrollInProgressRef.current) {
-      const currentPos = container.scrollTop;
-      container.scrollTo({ top: currentPos, behavior: "instant" });
-      smoothScrollInProgressRef.current = false;
-    }
-  }, [scrollContainerRef]);
-
-  /**
-   * Scroll to bottom of messages
-   */
-  const scrollToBottom = useCallback(
-    (behavior: ScrollBehavior = "smooth") => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
-
-      if (behavior === "smooth") {
-        smoothScrollInProgressRef.current = true;
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        // Reset flag after animation completes (~500ms) and ensure FAB is hidden
-        setTimeout(() => {
-          smoothScrollInProgressRef.current = false;
-          // After scroll animation, verify we're near bottom and keep FAB hidden
-          const stillNearBottom =
-            isNearBottom(container, STUCK_THRESHOLD) ||
-            isScrolledPastPercent(container, SCROLL_PERCENT_THRESHOLD);
-          if (stillNearBottom) {
-            setUserHasScrolled(false);
-          }
-        }, SCROLL_ANIMATION_MS);
-      } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
-      }
-    },
-    [scrollContainerRef, STUCK_THRESHOLD, SCROLL_PERCENT_THRESHOLD],
-  );
-
-  const handleScrollToBottom = useCallback(() => {
-    scrollToBottom("smooth");
-    setUserHasScrolled(false);
-    setUnseenMessageCount(0);
-    autoScrollEnabledRef.current = true;
-    lastSeenMessageCountRef.current = messages.length;
-  }, [scrollToBottom, messages.length]);
 
   const handleDeleteMessage = React.useCallback(
     async (messageId: Id<"messages"> | string | undefined) => {
@@ -199,39 +143,6 @@ export function MessageList({
     [onRequestDeleteMessage, onDeleteLocalMessage, deleteMessage, sessionId],
   );
 
-  // Intelligent auto-scroll: scroll when near bottom or actively generating
-  // Also triggers on searchProgress changes to keep tool status visible
-  // IMPORTANT: Pauses when virtual keyboard is open to prevent viewport theft
-  // on mobile during input composition (see useIsVirtualKeyboardOpen)
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // On mobile, the virtual keyboard hook detects when the keyboard is open
-    // and pauses auto-scroll to prevent layout shifts during typing.
-    // On desktop, focus alone shouldn't disable auto-scroll since there's no
-    // viewport shift - only the virtual keyboard causes that issue.
-    const shouldAutoScroll =
-      autoScrollEnabledRef.current &&
-      !isVirtualKeyboardOpen &&
-      (isNearBottom(container, NEAR_BOTTOM_THRESHOLD) ||
-        (isGenerating && !userHasScrolled));
-
-    if (shouldAutoScroll) {
-      scrollToBottom("smooth");
-      lastSeenMessageCountRef.current = messages.length;
-    }
-  }, [
-    messages,
-    isGenerating,
-    userHasScrolled,
-    isVirtualKeyboardOpen,
-    scrollToBottom,
-    NEAR_BOTTOM_THRESHOLD,
-    scrollContainerRef,
-    searchProgress, // Include to scroll when tool progress updates
-  ]);
-
   // Debug logging
   useEffect(() => {
     if (Array.isArray(messages)) {
@@ -241,105 +152,6 @@ export function MessageList({
       });
     }
   }, [messages]);
-
-  // Track unseen messages when user is scrolled up
-  useEffect(() => {
-    if (userHasScrolled) {
-      const newMessages = messages.length - lastSeenMessageCountRef.current;
-      if (newMessages > 0) {
-        setUnseenMessageCount(newMessages);
-      }
-    }
-  }, [messages.length, userHasScrolled]);
-
-  // Reset auto-scroll when new assistant message starts streaming
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    if (
-      lastMessage?.role === "assistant" &&
-      lastMessage?.isStreaming &&
-      isGenerating
-    ) {
-      // Re-enable auto-scroll for new responses if near bottom
-      const container = scrollContainerRef.current;
-      if (container && isNearBottom(container, NEAR_BOTTOM_THRESHOLD * 2)) {
-        autoScrollEnabledRef.current = true;
-        setUserHasScrolled(false);
-      }
-    }
-  }, [messages, isGenerating, NEAR_BOTTOM_THRESHOLD, scrollContainerRef]);
-
-  // Detect when user scrolls manually with touch/scroll awareness
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const handleTouchStart = () => {
-      isTouchingRef.current = true;
-      cancelSmoothScroll();
-    };
-
-    const handleTouchEnd = () => {
-      isTouchingRef.current = false;
-    };
-
-    const handleWheel = () => {
-      cancelSmoothScroll();
-    };
-
-    const handleScroll = throttle(() => {
-      // If smooth scroll is in progress, don't update state
-      if (smoothScrollInProgressRef.current) return;
-
-      // Use both pixel threshold AND percentage-based check for reliability
-      // This ensures FAB hides at ~95% scroll even on very tall content
-      const nearBottomPixels = isNearBottom(container, STUCK_THRESHOLD);
-      const nearBottomPercent = isScrolledPastPercent(
-        container,
-        SCROLL_PERCENT_THRESHOLD,
-      );
-      const nearBottom = nearBottomPixels || nearBottomPercent;
-      const wasScrolledUp = userHasScrolled;
-
-      // User is near bottom - enable auto-scroll
-      if (nearBottom) {
-        if (wasScrolledUp) {
-          setUserHasScrolled(false);
-          setUnseenMessageCount(0);
-          lastSeenMessageCountRef.current = messages.length;
-        }
-        autoScrollEnabledRef.current = true;
-      }
-      // User scrolled up - disable auto-scroll
-      else {
-        if (!wasScrolledUp) {
-          setUserHasScrolled(true);
-          lastSeenMessageCountRef.current = messages.length;
-        }
-        autoScrollEnabledRef.current = false;
-      }
-    }, THROTTLE_MS);
-
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    container.addEventListener("touchstart", handleTouchStart, {
-      passive: true,
-    });
-    container.addEventListener("touchend", handleTouchEnd, { passive: true });
-    container.addEventListener("wheel", handleWheel, { passive: true });
-
-    return () => {
-      container.removeEventListener("scroll", handleScroll);
-      container.removeEventListener("touchstart", handleTouchStart);
-      container.removeEventListener("touchend", handleTouchEnd);
-      container.removeEventListener("wheel", handleWheel);
-    };
-  }, [
-    userHasScrolled,
-    messages.length,
-    STUCK_THRESHOLD,
-    cancelSmoothScroll,
-    scrollContainerRef,
-  ]);
 
   // Auto-collapse sources and reasoning appropriately
   useEffect(() => {
@@ -388,50 +200,11 @@ export function MessageList({
     setCollapsedById((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  // Handle load more with scroll position preservation
+  // Wrap the hook's handleLoadMore to pass our onLoadMore callback
   const handleLoadMore = React.useCallback(async () => {
-    if (!onLoadMore || isLoadingMoreRef.current) return;
-
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // Save scroll height before loading
-    const prevScrollHeight = container.scrollHeight;
-    const prevScrollTop = container.scrollTop;
-
-    isLoadingMoreRef.current = true;
-
-    try {
-      await onLoadMore();
-
-      // After messages are loaded, restore scroll position
-      requestAnimationFrame(() => {
-        if (container) {
-          const newScrollHeight = container.scrollHeight;
-          const scrollDiff = newScrollHeight - prevScrollHeight;
-          container.scrollTop = prevScrollTop + scrollDiff;
-        }
-      });
-    } finally {
-      isLoadingMoreRef.current = false;
-    }
-  }, [onLoadMore, scrollContainerRef]);
-
-  // Track when messages change to preserve scroll on load more
-  useEffect(() => {
-    const prevLength = previousMessagesLengthRef.current;
-    const currLength = messages.length;
-
-    // If messages increased and we were loading more, preserve scroll
-    if (currLength > prevLength && isLoadingMoreRef.current) {
-      const container = scrollContainerRef.current;
-      if (container) {
-        // Scroll preservation is handled in handleLoadMore
-      }
-    }
-
-    previousMessagesLengthRef.current = currLength;
-  }, [messages.length, scrollContainerRef]);
+    if (!onLoadMore) return;
+    await hookHandleLoadMore(onLoadMore);
+  }, [onLoadMore, hookHandleLoadMore]);
 
   // Content to render (shared between internal and external scroll modes)
   const content = (
