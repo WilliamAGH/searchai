@@ -6,8 +6,9 @@ import type { ResearchContextReference as ResearchContextReferenceType } from ".
 // Note: Do not re-export Convex-generated types from _generated/*
 
 /**
- * Search method validator - single source of truth for search provider types.
- * Used in schema.ts, messages.ts, search.ts, and migration files.
+ * Search method validator.
+ * Values must match SEARCH_METHODS const in types/search.ts (source of truth).
+ * @see {@link ./types/search.ts} SEARCH_METHODS - canonical list
  */
 export const vSearchMethod = v.union(
   v.literal("serp"),

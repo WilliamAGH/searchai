@@ -57,9 +57,22 @@ export interface SearchProviderResult {
 }
 
 /**
- * Search method type - matches vSearchMethod validator
+ * Available search provider methods.
+ * Single source of truth - used by vSearchMethod validator and Zod schemas.
  */
-export type SearchMethod = "serp" | "openrouter" | "duckduckgo" | "fallback";
+export const SEARCH_METHODS = [
+  "serp",
+  "openrouter",
+  "duckduckgo",
+  "fallback",
+] as const;
+
+/**
+ * Search method type - derived from SEARCH_METHODS const array.
+ * @see {@link ./validators.ts} vSearchMethod - Convex validator
+ * @see {@link ../../../src/lib/schemas/apiResponses.ts} SearchMethodSchema - Zod schema
+ */
+export type SearchMethod = (typeof SEARCH_METHODS)[number];
 
 /**
  * Cached search response structure
