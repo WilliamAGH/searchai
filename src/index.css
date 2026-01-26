@@ -468,17 +468,20 @@ html.dark .prose code {
 /* GFM table overflow protection - tables can contain wide content */
 .prose table {
   display: block;
-  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .prose thead,
-.prose tbody,
-.prose tr {
+.prose tbody {
   display: table;
-  width: 100%;
-  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+}
+
+.prose tr {
+  display: table-row;
 }
 
 .prose th,

@@ -204,7 +204,7 @@ export function MessageItem({
           )}
 
         {/* 5) AI/user content last – always appears under sources/thinking */}
-        <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-auto text-[15px] sm:text-base leading-6 message-content-safe">
+        <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden text-[15px] sm:text-base leading-6">
           {message.role === "assistant" ? (
             <ContentWithCitations
               content={message.content || ""}
@@ -213,7 +213,7 @@ export function MessageItem({
               onCitationHover={onCitationHover}
             />
           ) : (
-            <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed break-words slashed-zero lining-nums tabular-nums message-content-safe">
+            <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed break-words slashed-zero lining-nums tabular-nums">
               {message.content}
             </div>
           )}
