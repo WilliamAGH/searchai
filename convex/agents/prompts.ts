@@ -231,7 +231,9 @@ IMPORTANT:
 - Don't say "based on my search" - just answer
 - Only mention limitations if genuinely relevant
 - Use GitHub-Flavored Markdown for formatting
-- Write your complete answer directly - it will be used as-is`;
+- Write your complete answer directly - it will be used as-is
+- DO NOT add a separate "Sources:" section at the end - cite inline only
+- When showing URLs, NEVER include "https://" or "http://" prefixes - use bare domain format (example.com/path)`;
 
 // ============================================
 // Conversational Agent Prompt
@@ -271,5 +273,7 @@ RESPONSE GUIDELINES:
 - Be specific and precise with facts
 - Cite sources inline: [domain.com]
 - Use Markdown formatting
-- If uncertain, research instead of guessing`;
+- If uncertain, research instead of guessing
+- DO NOT add a trailing "Sources:" or "References:" section - the UI displays sources separately
+- When showing URLs in text, omit "https://" prefixes - use domain.com/path format`;
 }

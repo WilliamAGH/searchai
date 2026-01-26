@@ -4,6 +4,36 @@
  */
 
 /**
+ * Strip trailing "Sources:" or "References:" sections that the AI may add.
+ * These duplicate our UI's source display and show full URLs instead of domains.
+ * Matches patterns like:
+ * - "Sources:\n- Title: URL\n- Title: URL"
+ * - "**Sources:**\n• Title: URL"
+ * - "## Sources\n1. Title: URL"
+ */
+export function stripTrailingSources(text: string): string {
+  // Match various "Sources:" or "References:" section headers at end of text
+  // These patterns match the header and everything after it
+  const trailingSourcesPatterns = [
+    // Markdown headers: ## Sources, ### References, etc.
+    /\n#{1,3}\s*(?:Sources?|References?):?\s*\n[\s\S]*$/i,
+    // Bold headers: **Sources:** or **References:**
+    /\n\*\*(?:Sources?|References?)\*\*:?\s*\n[\s\S]*$/i,
+    // Plain headers: Sources: or References: on their own line
+    /\n(?:Sources?|References?):?\s*\n(?:\s*[-•*\d]+\.?\s+.+\n?)+$/i,
+    // Sources at very end with bullet/numbered list
+    /\n(?:Sources?|References?):?\s*\n(?:\s*[-•*]\s+.+(?:\n|$))+$/i,
+  ];
+
+  let result = text;
+  for (const pattern of trailingSourcesPatterns) {
+    result = result.replace(pattern, "");
+  }
+
+  return result.trim();
+}
+
+/**
  * Parse citations from markdown text
  * Matches patterns like [domain.com] or [domain.com, domain2.com]
  */

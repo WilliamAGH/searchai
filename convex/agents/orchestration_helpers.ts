@@ -392,7 +392,9 @@ YOUR TASK:
 4. Only mention limitations if genuinely relevant
 5. Use markdown formatting for readability
 6. Prefer scraped content excerpts when available; use SERP enrichment as supplemental context
-7. PRIORITIZE authoritative context over web search results when available${systemInstructions}
+7. PRIORITIZE authoritative context over web search results when available
+8. DO NOT add a separate "Sources:" section at the end - cite inline only
+9. When showing URLs, NEVER include "https://" or "http://" prefixes - use bare domain format (example.com/path)${systemInstructions}
 
 Remember the user wants to know: ${params.userIntent}
 `;

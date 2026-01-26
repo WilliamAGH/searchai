@@ -220,7 +220,7 @@ async function withTimeout<T>(
 }
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
-import { parseAnswerText } from "./answerParser";
+import { parseAnswerText, stripTrailingSources } from "./answerParser";
 import {
   vContextReference,
   vScrapedContent,
