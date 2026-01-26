@@ -149,7 +149,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
           </div>
 
           {progress.currentUrl && (
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 mb-2">
+            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 mb-2 min-w-0">
               {getFaviconUrl(progress.currentUrl) ? (
                 <img
                   src={getFaviconUrl(progress.currentUrl) as string}
@@ -160,7 +160,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
                   onError={handleFaviconError}
                 />
               ) : null}
-              <span className="truncate">
+              <span className="truncate min-w-0">
                 {getSafeHostname(progress.currentUrl) || progress.currentUrl}
               </span>
             </div>
@@ -171,7 +171,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
               <div className="font-medium mb-1">Search queries:</div>
               <ul className="list-disc list-inside space-y-0.5">
                 {progress.queries.map((query, idx) => (
-                  <li key={idx} className="truncate">
+                  <li key={idx} className="truncate min-w-0">
                     {query}
                   </li>
                 ))}
@@ -184,7 +184,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
               {progress.urls.map((url, idx) => (
                 <div
                   key={`${url}-${idx}`}
-                  className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-700 rounded-md text-xs"
+                  className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-700 rounded-md text-xs min-w-0"
                 >
                   {getFaviconUrl(url) ? (
                     <img
@@ -196,7 +196,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
                       onError={handleFaviconError}
                     />
                   ) : null}
-                  <span className="text-gray-600 dark:text-gray-400">
+                  <span className="text-gray-600 dark:text-gray-400 break-all whitespace-normal min-w-0">
                     {getSafeHostname(url) || url}
                   </span>
                 </div>
