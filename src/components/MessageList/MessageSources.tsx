@@ -174,7 +174,7 @@ export function MessageSources({
                   className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors"
                 >
                   <img
-                    src={getFaviconUrl(source.url)}
+                    src={getFaviconUrl(source.url) ?? undefined}
                     alt=""
                     className="w-3 h-3 rounded"
                     onError={(e) => {
@@ -250,7 +250,7 @@ export function MessageSources({
               >
                 <div className="flex items-start gap-2">
                   <img
-                    src={getFaviconUrl(source.url)}
+                    src={getFaviconUrl(source.url) ?? undefined}
                     alt=""
                     className="w-4 h-4 mt-0.5 rounded"
                     onError={(e) => {

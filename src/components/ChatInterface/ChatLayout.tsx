@@ -107,13 +107,13 @@ export function ChatLayout({
       {/* Main content - full width scroll container, scrollbar at browser edge */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 flex flex-col h-full min-h-0 overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
+        className={`flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
         {...swipeHandlers}
       >
         {/* Content wrapper: grow to fill when content is small, don't shrink when content is large */}
         {/* grow = flex-grow:1, shrink-0 = flex-shrink:0, combined with default flex-basis:auto */}
         <div
-          className={`grow shrink-0 flex flex-col w-full ${!showDesktopSidebar ? "max-w-4xl mx-auto" : ""}`}
+          className={`grow shrink-0 flex flex-col w-full min-w-0 ${!showDesktopSidebar ? "max-w-4xl mx-auto" : ""}`}
         >
           <MessageList
             key={String(currentChatId)}

@@ -3,7 +3,7 @@
  * Refactored to use sub-components for better organization
  */
 
-import React, { useEffect, useRef, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -18,24 +18,18 @@ import {
   LoadErrorState,
 } from "./MessageSkeleton";
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
-import type { Chat } from "../../lib/types/chat";
 import type { Message } from "../../lib/types/message";
-import { useIsMobile } from "../../hooks/useIsMobile";
-import { useIsVirtualKeyboardOpen } from "../../hooks/useIsVirtualKeyboardOpen";
-import { throttle, isNearBottom, isScrolledPastPercent } from "../../lib/utils";
+import { useMessageListScroll } from "../../hooks/useMessageListScroll";
 import { resolveMessageKey } from "./messageKey";
+import { ReasoningDisplay } from "./ReasoningDisplay";
 
-/**
- * Public props for `MessageList` UI component.
- * This component renders a scrollable list of chat messages with pagination,
- * error states, skeletons, and controls.
- */
+/** Virtualize message list when exceeding this count for performance */
+const VIRTUALIZATION_THRESHOLD = 100;
+
 interface MessageListProps {
   messages: Message[];
   isGenerating: boolean;
   onToggleSidebar: () => void;
-  onShare?: () => void;
-  currentChat?: Chat;
   searchProgress?: {
     stage:
       | "idle"
@@ -81,8 +75,6 @@ export function MessageList({
   messages,
   isGenerating,
   onToggleSidebar,
-  onShare: _onShare,
-  currentChat: _currentChat,
   searchProgress,
   onDeleteLocalMessage,
   onRequestDeleteMessage,
@@ -118,9 +110,10 @@ export function MessageList({
   const [userHasScrolled, setUserHasScrolled] = useState(false);
   const [unseenMessageCount, setUnseenMessageCount] = useState(0);
   const [hoveredSourceUrl, setHoveredSourceUrl] = useState<string | null>(null);
-  const [_hoveredCitationUrl, setHoveredCitationUrl] = useState<string | null>(
-    null,
-  );
+  // Citation hover callback - currently unused but passed to children for future highlight sync
+  const handleCitationHover = useCallback((_url: string | null) => {
+    // No-op: citation hover state not currently consumed
+  }, []);
 
   // Dynamic thresholds based on viewport
   const NEAR_BOTTOM_THRESHOLD = isMobile ? 100 : 200;
@@ -161,7 +154,7 @@ export function MessageList({
           if (stillNearBottom) {
             setUserHasScrolled(false);
           }
-        }, 600);
+        }, SCROLL_ANIMATION_MS);
       } else {
         messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
       }
@@ -325,7 +318,7 @@ export function MessageList({
         }
         autoScrollEnabledRef.current = false;
       }
-    }, 100);
+    }, THROTTLE_MS);
 
     container.addEventListener("scroll", handleScroll, { passive: true });
     container.addEventListener("touchstart", handleTouchStart, {
@@ -457,7 +450,7 @@ export function MessageList({
       ) : messages.length === 0 ? (
         <EmptyState onToggleSidebar={onToggleSidebar} />
       ) : (
-        <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8 min-w-0">
           {/* Error state for pagination */}
           {loadError && onClearError && (
             <LoadErrorState
@@ -484,8 +477,8 @@ export function MessageList({
           {/* Loading indicator when fetching more messages */}
           {isLoadingMore && !loadError && <LoadingMoreIndicator />}
 
-          {/* Use virtualization for large message lists (100+ messages) */}
-          {messages.length > 100 ? (
+          {/* Use virtualization for large message lists */}
+          {messages.length > VIRTUALIZATION_THRESHOLD ? (
             <VirtualizedMessageList
               messages={messages}
               className="space-y-6 sm:space-y-8"
@@ -505,7 +498,7 @@ export function MessageList({
                     onToggleCollapsed={toggleCollapsed}
                     onDeleteMessage={handleDeleteMessage}
                     onSourceHover={setHoveredSourceUrl}
-                    onCitationHover={setHoveredCitationUrl}
+                    onCitationHover={handleCitationHover}
                     searchProgress={
                       index === messages.length - 1 && isGenerating
                         ? searchProgress
@@ -521,8 +514,8 @@ export function MessageList({
               const messageKey = resolveMessageKey(message, `linear-${index}`);
 
               // Debug undefined keys in development
-              if (!message._id && !message.id && import.meta.env.DEV) {
-                console.warn("Message missing both _id and id:", {
+              if (!message._id && import.meta.env.DEV) {
+                console.warn("Message missing _id:", {
                   index,
                   role: message.role,
                   content: message.content?.substring(0, 50),
@@ -539,7 +532,7 @@ export function MessageList({
                   onToggleCollapsed={toggleCollapsed}
                   onDeleteMessage={handleDeleteMessage}
                   onSourceHover={setHoveredSourceUrl}
-                  onCitationHover={setHoveredCitationUrl}
+                  onCitationHover={handleCitationHover}
                   searchProgress={
                     index === messages.length - 1 && isGenerating
                       ? searchProgress
@@ -558,34 +551,7 @@ export function MessageList({
               return (
                 lastMessage?.role === "assistant" &&
                 lastMessage?.reasoning && (
-                  <div className="flex gap-2 sm:gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-4 h-4 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                        />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700">
-                        <div className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-2 flex items-center gap-2">
-                          <span>💭</span>
-                          <span>Thinking process</span>
-                        </div>
-                        <div className="text-xs text-purple-600 dark:text-purple-400 whitespace-pre-wrap font-mono">
-                          {lastMessage.reasoning}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <ReasoningDisplay reasoning={lastMessage.reasoning} />
                 )
               );
             })()}
