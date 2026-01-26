@@ -55,3 +55,19 @@ export interface SearchProviderResult {
   results: SearchResult[];
   enrichment?: SerpEnrichment;
 }
+
+/**
+ * Search method type - matches vSearchMethod validator
+ */
+export type SearchMethod = "serp" | "openrouter" | "duckduckgo" | "fallback";
+
+/**
+ * Cached search response structure
+ * Used by searchResultCache in search/cache.ts
+ */
+export interface CachedSearchResponse {
+  results: SearchResult[];
+  searchMethod: SearchMethod;
+  hasRealResults: boolean;
+  enrichment?: SerpEnrichment;
+}

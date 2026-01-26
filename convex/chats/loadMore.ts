@@ -6,7 +6,41 @@
 import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
+import { vContextReference, type ContextReference } from "../lib/validators";
 import { getErrorMessage } from "../lib/errors";
+
+/**
+ * Paginated messages result type
+ * Explicit type to avoid TS7022/TS7023 implicit any errors from @ts-ignore
+ */
+interface PaginatedMessagesResult {
+  messages: Array<{
+    _id: Id<"messages">;
+    _creationTime: number;
+    chatId: Id<"chats">;
+    role: "user" | "assistant" | "system";
+    content?: string;
+    timestamp?: number;
+    isStreaming?: boolean;
+    streamedContent?: string;
+    thinking?: string;
+    searchResults?: Array<{
+      title: string;
+      url: string;
+      snippet: string;
+      relevanceScore: number;
+    }>;
+    sources?: string[];
+    reasoning?: string;
+    contextReferences?: ContextReference[];
+    workflowId?: string;
+  }>;
+  nextCursor?: Id<"messages">;
+  hasMore: boolean;
+  error?: string;
+  errorCode?: string;
+}
 
 /**
  * Load more messages for a chat
@@ -22,11 +56,14 @@ export const loadMoreMessages = action({
     chatId: v.id("chats"),
     cursor: v.id("messages"),
     limit: v.optional(v.number()),
+    sessionId: v.optional(v.string()),
   },
   returns: v.object({
     messages: v.array(
       v.object({
         _id: v.id("messages"),
+        _creationTime: v.number(),
+        chatId: v.id("chats"),
         role: v.union(
           v.literal("user"),
           v.literal("assistant"),
@@ -49,27 +86,27 @@ export const loadMoreMessages = action({
         ),
         sources: v.optional(v.array(v.string())),
         reasoning: v.optional(v.string()),
+        contextReferences: v.optional(v.array(vContextReference)),
+        workflowId: v.optional(v.string()),
       }),
     ),
     nextCursor: v.optional(v.id("messages")),
     hasMore: v.boolean(),
-    // Error fields - present when load failed
     error: v.optional(v.string()),
     errorCode: v.optional(v.string()),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<PaginatedMessagesResult> => {
     try {
-      const result: any = await ctx.runQuery(
-        // @ts-ignore - Known Convex TS2589 issue with complex type inference
+      // @ts-ignore - Known Convex TS2589 issue with complex type inference
+      return await ctx.runQuery(
         api.chats.messagesPaginated.getChatMessagesPaginated,
         {
           chatId: args.chatId,
           cursor: args.cursor,
           limit: args.limit,
+          sessionId: args.sessionId,
         },
       );
-
-      return result;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       console.error("Failed to load more messages:", {
@@ -78,7 +115,6 @@ export const loadMoreMessages = action({
         error: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
       });
-      // Return error state so callers can distinguish "no messages" from "query failed"
       return {
         messages: [],
         nextCursor: undefined,

@@ -108,8 +108,8 @@ export const updateChatPrivacy = mutation({
     if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
     // Ensure share/public IDs exist when moving to shared/public for legacy rows
-    let shareId = (chat as unknown as { shareId?: string }).shareId;
-    let publicId = (chat as unknown as { publicId?: string }).publicId;
+    let shareId = chat.shareId;
+    let publicId = chat.publicId;
     if (args.privacy === "shared" && !shareId) {
       shareId = generateShareId();
     }
@@ -120,21 +120,15 @@ export const updateChatPrivacy = mutation({
     await ctx.db.patch(args.chatId, {
       privacy: args.privacy,
       // Only set ids if newly generated (preserve existing values)
-      ...(shareId && !(chat as unknown as { shareId?: string }).shareId
-        ? { shareId }
-        : {}),
-      ...(publicId && !(chat as unknown as { publicId?: string }).publicId
-        ? { publicId }
-        : {}),
+      ...(shareId && !chat.shareId ? { shareId } : {}),
+      ...(publicId && !chat.publicId ? { publicId } : {}),
       updatedAt: Date.now(),
     });
 
     // Return identifiers so the client can update immediately without refetch
     return {
-      shareId:
-        shareId ?? (chat as unknown as { shareId?: string }).shareId ?? null,
-      publicId:
-        publicId ?? (chat as unknown as { publicId?: string }).publicId ?? null,
+      shareId: shareId ?? chat.shareId ?? null,
+      publicId: publicId ?? chat.publicId ?? null,
     };
   },
 });

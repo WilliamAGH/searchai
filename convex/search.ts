@@ -12,12 +12,10 @@ import {
 } from "./lib/validators";
 import { api } from "./_generated/api";
 
-// Import search providers
-import {
-  searchWithOpenRouter,
-  searchWithSerpApiDuckDuckGo,
-  searchWithDuckDuckGo,
-} from "./search/providers";
+// Import search providers - direct imports per [IM1a]
+import { searchWithOpenRouter } from "./search/providers/openrouter";
+import { searchWithSerpApiDuckDuckGo } from "./search/providers/serpapi";
+import { searchWithDuckDuckGo } from "./search/providers/duckduckgo";
 import { getErrorMessage } from "./lib/errors";
 
 // Import utilities
@@ -103,6 +101,7 @@ export const searchWeb = action({
         results: [],
         searchMethod: "fallback" as const,
         hasRealResults: false,
+        enrichment: undefined,
       };
     }
 
@@ -216,6 +215,7 @@ export const searchWeb = action({
       results: fallbackResults,
       searchMethod: "fallback" as const,
       hasRealResults: false,
+      enrichment: undefined,
       providerErrors: providerErrors.length > 0 ? providerErrors : undefined,
       allProvidersFailed: providerErrors.length > 0,
     };
@@ -265,6 +265,7 @@ export const planSearch = action({
     // Cache key: chat + normalized message (first 200 chars)
     const normMsg = args.newMessage.toLowerCase().trim().slice(0, 200);
     // Strengthen cache key with message count to avoid over-hit on same prefix
+    // @ts-ignore - Known Convex TS2589 issue with complex type inference
     const recentMessages = await ctx.runQuery(
       api.chats.messagesPaginated.getRecentChatMessages,
       {

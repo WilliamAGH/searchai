@@ -4,6 +4,7 @@
 
 import { v } from "convex/values";
 import { internalMutation, action } from "../_generated/server";
+import { internal } from "../_generated/api";
 
 /**
  * Record metric for analytics
@@ -69,9 +70,8 @@ export const recordClientMetric = action({
     // Directly insert metrics to avoid circular dependency
     try {
       // const date = new Date().toISOString().slice(0, 10);
-      // Use runMutation with explicit type annotation to avoid deep instantiation
-      await (ctx.runMutation as any)(recordMetric, {
-        name: args.name as any,
+      await ctx.runMutation(internal.search.metrics.recordMetric, {
+        name: args.name,
         chatId: args.chatId,
       });
     } catch (e) {

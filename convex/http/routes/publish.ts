@@ -14,39 +14,97 @@ import {
 } from "../utils";
 
 /**
+ * Helper: determine allowed origin (env-driven; defaults to *)
+ */
+function getAllowedOrigin(origin: string | null): string {
+  const allowed = process.env.CONVEX_ALLOWED_ORIGINS;
+  if (!allowed || allowed === "*") return "*";
+  const list = allowed
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!origin) return list[0] || "*";
+  return list.includes(origin) ? origin : list[0] || "*";
+}
+
+/**
+ * Build a JSON response with CORS headers [DRY1]
+ */
+function buildCorsJsonResponse(
+  request: Request,
+  body: Record<string, unknown> | string,
+  status: number,
+  extraHeaders?: Record<string, string>,
+): Response {
+  const origin = request.headers.get("Origin");
+  const allowOrigin = getAllowedOrigin(origin);
+  const jsonBody = typeof body === "string" ? body : JSON.stringify(body);
+  return new Response(jsonBody, {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": allowOrigin,
+      Vary: "Origin",
+      ...extraHeaders,
+    },
+  });
+}
+
+/**
+ * Build a text/HTML response with CORS headers [DRY1]
+ */
+function buildCorsTextResponse(
+  request: Request,
+  body: string,
+  status: number,
+  contentType: string,
+  extraHeaders?: Record<string, string>,
+): Response {
+  const origin = request.headers.get("Origin");
+  const allowOrigin = getAllowedOrigin(origin);
+  return new Response(body, {
+    status,
+    headers: {
+      "Content-Type": contentType,
+      "Access-Control-Allow-Origin": allowOrigin,
+      Vary: "Origin",
+      ...extraHeaders,
+    },
+  });
+}
+
+/**
+ * Build a CORS preflight response
+ */
+function buildCorsPreflightResponse(
+  request: Request,
+  methods: string,
+): Response {
+  const requested = request.headers.get("Access-Control-Request-Headers");
+  const origin = request.headers.get("Origin");
+  const allowOrigin = getAllowedOrigin(origin);
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": allowOrigin,
+      "Access-Control-Allow-Methods": methods,
+      "Access-Control-Allow-Headers": requested || "Content-Type",
+      "Access-Control-Max-Age": "600",
+      Vary: "Origin",
+    },
+  });
+}
+
+/**
  * Register publish and export routes on the HTTP router
  */
 export function registerPublishRoutes(http: HttpRouter) {
-  // Helper: determine allowed origin (env-driven; defaults to *)
-  const getAllowedOrigin = (origin: string | null): string => {
-    const allowed = process.env.CONVEX_ALLOWED_ORIGINS;
-    if (!allowed || allowed === "*") return "*";
-    const list = allowed
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (!origin) return list[0] || "*";
-    return list.includes(origin) ? origin : list[0] || "*";
-  };
-
   // CORS preflight for /api/publishChat
   http.route({
     path: "/api/publishChat",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
-      const requested = request.headers.get("Access-Control-Request-Headers");
-      const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin);
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": allowOrigin,
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": requested || "Content-Type",
-          "Access-Control-Max-Age": "600",
-          Vary: "Origin",
-        },
-      });
+      return buildCorsPreflightResponse(request, "POST, OPTIONS");
     }),
   });
 
@@ -59,21 +117,11 @@ export function registerPublishRoutes(http: HttpRouter) {
       try {
         rawPayload = await request.json();
       } catch (error) {
-        const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
         console.error("❌ PUBLISH INVALID JSON:", serializeError(error));
-        return new Response(
-          JSON.stringify({
-            error: "Invalid JSON body",
-            errorDetails: serializeError(error),
-          }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": allowOrigin,
-            },
-          },
+        return buildCorsJsonResponse(
+          request,
+          { error: "Invalid JSON body", errorDetails: serializeError(error) },
+          400,
         );
       }
 
@@ -83,17 +131,10 @@ export function registerPublishRoutes(http: HttpRouter) {
           ? (rawPayload as Record<string, unknown>)
           : null;
       if (!payload) {
-        const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
-        return new Response(
-          JSON.stringify({ error: "Invalid request payload" }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": allowOrigin,
-            },
-          },
+        return buildCorsJsonResponse(
+          request,
+          { error: "Invalid request payload" },
+          400,
         );
       }
 
@@ -111,34 +152,41 @@ export function registerPublishRoutes(http: HttpRouter) {
 
       // Validate and normalize messages
       const messages = Array.isArray(payload.messages)
-        ? payload.messages.slice(0, 100).map((m: any) => ({
-            role:
-              m.role === "user" || m.role === "assistant"
-                ? m.role
-                : "assistant",
-            content: m.content ? String(m.content).slice(0, 50000) : undefined,
-            searchResults: Array.isArray(m.searchResults)
-              ? m.searchResults.slice(0, 20).map((r: any) => ({
-                  title: String(r.title || "").slice(0, 200),
-                  url: String(r.url || "").slice(0, 2048),
-                  snippet: String(r.snippet || "").slice(0, 500),
-                  relevanceScore:
-                    typeof r.relevanceScore === "number"
-                      ? Math.max(0, Math.min(1, r.relevanceScore))
-                      : 0.5,
-                }))
-              : undefined,
-            sources: Array.isArray(m.sources)
-              ? m.sources
-                  .slice(0, 20)
-                  .filter((s: any) => typeof s === "string")
-                  .map((s: any) => String(s).slice(0, 2048))
-              : undefined,
-            timestamp:
-              typeof m.timestamp === "number" && isFinite(m.timestamp)
-                ? Math.floor(m.timestamp)
+        ? payload.messages.slice(0, 100).map((m: unknown) => {
+            const msg = m as Record<string, unknown>;
+            const role: "user" | "assistant" =
+              msg.role === "user" ? "user" : "assistant";
+            return {
+              role,
+              content: msg.content
+                ? String(msg.content).slice(0, 50000)
                 : undefined,
-          }))
+              searchResults: Array.isArray(msg.searchResults)
+                ? msg.searchResults.slice(0, 20).map((r: unknown) => {
+                    const result = r as Record<string, unknown>;
+                    return {
+                      title: String(result.title || "").slice(0, 200),
+                      url: String(result.url || "").slice(0, 2048),
+                      snippet: String(result.snippet || "").slice(0, 500),
+                      relevanceScore:
+                        typeof result.relevanceScore === "number"
+                          ? Math.max(0, Math.min(1, result.relevanceScore))
+                          : 0.5,
+                    };
+                  })
+                : undefined,
+              sources: Array.isArray(msg.sources)
+                ? msg.sources
+                    .slice(0, 20)
+                    .filter((s: unknown) => typeof s === "string")
+                    .map((s: unknown) => String(s).slice(0, 2048))
+                : undefined,
+              timestamp:
+                typeof msg.timestamp === "number" && isFinite(msg.timestamp)
+                  ? Math.floor(msg.timestamp)
+                  : undefined,
+            };
+          })
         : [];
 
       try {
@@ -168,32 +216,18 @@ export function registerPublishRoutes(http: HttpRouter) {
           : `/api/exportChat`;
         const llmTxtUrl = `${exportBase}?shareId=${encodeURIComponent(result.shareId)}&format=txt`;
 
-        return new Response(
-          JSON.stringify({ ...result, shareUrl, publicUrl, llmTxtUrl }),
-          {
-            status: 200,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": allowOrigin,
-            },
-          },
+        return buildCorsJsonResponse(
+          request,
+          { ...result, shareUrl, publicUrl, llmTxtUrl },
+          200,
         );
-      } catch (e: any) {
-        const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
+      } catch (e: unknown) {
         const errorInfo = serializeError(e);
-        return new Response(
-          JSON.stringify({
-            error: String(e?.message || e),
-            errorDetails: errorInfo,
-          }),
-          {
-            status: 500,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": allowOrigin,
-            },
-          },
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        return buildCorsJsonResponse(
+          request,
+          { error: errorMessage, errorDetails: errorInfo },
+          500,
         );
       }
     }),
@@ -204,19 +238,7 @@ export function registerPublishRoutes(http: HttpRouter) {
     path: "/api/exportChat",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
-      const requested = request.headers.get("Access-Control-Request-Headers");
-      const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin);
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": allowOrigin,
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
-          "Access-Control-Allow-Headers": requested || "Content-Type",
-          "Access-Control-Max-Age": "600",
-          Vary: "Origin",
-        },
-      });
+      return buildCorsPreflightResponse(request, "GET, OPTIONS");
     }),
   });
 
@@ -240,17 +262,10 @@ export function registerPublishRoutes(http: HttpRouter) {
         : undefined;
 
       if (!shareId && !publicId) {
-        const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
-        return new Response(
-          JSON.stringify({ error: "Missing shareId or publicId" }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": allowOrigin,
-            },
-          },
+        return buildCorsJsonResponse(
+          request,
+          { error: "Missing shareId or publicId" },
+          400,
         );
       }
 
@@ -273,17 +288,10 @@ export function registerPublishRoutes(http: HttpRouter) {
           });
 
       if (!chat) {
-        const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
-        return new Response(
-          JSON.stringify({ error: "Chat not found or not accessible" }),
-          {
-            status: 404,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": allowOrigin,
-            },
-          },
+        return buildCorsJsonResponse(
+          request,
+          { error: "Chat not found or not accessible" },
+          404,
         );
       }
 
@@ -441,19 +449,7 @@ export function registerPublishRoutes(http: HttpRouter) {
     path: "/api/chatTextMarkdown",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
-      const requested = request.headers.get("Access-Control-Request-Headers");
-      const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin);
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": allowOrigin,
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
-          "Access-Control-Allow-Headers": requested || "Content-Type",
-          "Access-Control-Max-Age": "600",
-          Vary: "Origin",
-        },
-      });
+      return buildCorsPreflightResponse(request, "GET, OPTIONS");
     }),
   });
 
@@ -475,17 +471,10 @@ export function registerPublishRoutes(http: HttpRouter) {
         : undefined;
 
       if (!shareId && !publicId) {
-        const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
-        return new Response(
-          JSON.stringify({ error: "Missing shareId or publicId" }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": allowOrigin,
-            },
-          },
+        return buildCorsJsonResponse(
+          request,
+          { error: "Missing shareId or publicId" },
+          400,
         );
       }
       const chat = shareId
@@ -494,17 +483,10 @@ export function registerPublishRoutes(http: HttpRouter) {
             publicId: publicId!,
           });
       if (!chat) {
-        const origin = request.headers.get("Origin");
-        const allowOrigin = getAllowedOrigin(origin);
-        return new Response(
-          JSON.stringify({ error: "Chat not found or not accessible" }),
-          {
-            status: 404,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": allowOrigin,
-            },
-          },
+        return buildCorsJsonResponse(
+          request,
+          { error: "Chat not found or not accessible" },
+          404,
         );
       }
       const messages = await ctx.runQuery(api.chats.getChatMessagesHttp, {
@@ -531,21 +513,19 @@ export function registerPublishRoutes(http: HttpRouter) {
         exportedChat.privacy === "public"
           ? "index, follow"
           : "noindex, nofollow";
-      const origin = request.headers.get("Origin");
-      const allowOrigin = getAllowedOrigin(origin);
-      return new Response(md, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "Access-Control-Allow-Origin": allowOrigin,
+      const cacheControl =
+        exportedChat.privacy === "public" ? "public, max-age=60" : "no-cache";
+      return buildCorsTextResponse(
+        request,
+        md,
+        200,
+        "text/plain; charset=utf-8",
+        {
           "X-Robots-Tag": robots,
+          "Cache-Control": cacheControl,
           Vary: "Accept, Origin",
-          "Cache-Control":
-            exportedChat.privacy === "public"
-              ? "public, max-age=60"
-              : "no-cache",
         },
-      });
+      );
     }),
   });
 }

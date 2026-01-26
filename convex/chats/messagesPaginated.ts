@@ -8,8 +8,13 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
-import { vSearchResult } from "../lib/validators";
+import {
+  hasSessionAccess,
+  hasUserAccess,
+  isUnownedChat,
+  isSharedOrPublicChat,
+} from "../lib/auth";
+import { vContextReference, vSearchResult } from "../lib/validators";
 
 /**
  * Get paginated chat messages
@@ -23,13 +28,16 @@ import { vSearchResult } from "../lib/validators";
 export const getChatMessagesPaginated = query({
   args: {
     chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
     limit: v.optional(v.number()),
-    cursor: v.optional(v.string()),
+    cursor: v.optional(v.id("messages")),
   },
   returns: v.object({
     messages: v.array(
       v.object({
         _id: v.id("messages"),
+        _creationTime: v.number(),
+        chatId: v.id("chats"),
         role: v.union(
           v.literal("user"),
           v.literal("assistant"),
@@ -43,9 +51,11 @@ export const getChatMessagesPaginated = query({
         searchResults: v.optional(v.array(vSearchResult)),
         sources: v.optional(v.array(v.string())),
         reasoning: v.optional(v.string()),
+        contextReferences: v.optional(v.array(vContextReference)),
+        workflowId: v.optional(v.string()),
       }),
     ),
-    nextCursor: v.optional(v.string()),
+    nextCursor: v.optional(v.id("messages")),
     hasMore: v.boolean(),
   }),
   handler: async (ctx, args) => {
@@ -55,27 +65,34 @@ export const getChatMessagesPaginated = query({
     if (!chat) {
       return {
         messages: [],
+        nextCursor: undefined,
         hasMore: false,
       };
     }
 
-    // Allow access to:
-    // - Anonymous chats (no userId)
-    // - The owner's chats
-    // - Publicly shared chats (privacy: "shared" or "public")
-    const privacy = chat.privacy;
-    const isSharedOrPublic = privacy === "shared" || privacy === "public";
-    if (chat.userId && chat.userId !== userId && !isSharedOrPublic) {
+    const isSharedOrPublic = isSharedOrPublicChat(chat);
+    const isUserOwner = hasUserAccess(chat, userId);
+    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
+    const isUnowned = isUnownedChat(chat);
+
+    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner && !isUnowned) {
       return {
         messages: [],
+        nextCursor: undefined,
         hasMore: false,
       };
     }
 
     const pageSize = Math.min(args.limit || 50, 100); // Max 100 messages per page
 
+    // Build the query
+    let baseQuery = ctx.db
+      .query("messages")
+      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
+      .order("desc"); // Get newest first, we'll reverse later
+
     // Helper: fetch a page (newest first, then reverse) with nextCursor/hasMore
-    const fetchPage = async (q: any) => {
+    const fetchPage = async (q: typeof baseQuery) => {
       const docs = await q.take(pageSize + 1);
       const hasMorePage = docs.length > pageSize;
       const pageDocs = docs.slice(0, pageSize);
@@ -83,8 +100,10 @@ export const getChatMessagesPaginated = query({
         hasMorePage && pageDocs.length > 0
           ? pageDocs[pageDocs.length - 1]._id
           : undefined;
-      const formatted = [...pageDocs].reverse().map((m: any) => ({
+      const formatted = [...pageDocs].reverse().map((m) => ({
         _id: m._id,
+        _creationTime: m._creationTime,
+        chatId: m.chatId,
         role: m.role,
         content: m.content,
         timestamp: m.timestamp,
@@ -94,6 +113,8 @@ export const getChatMessagesPaginated = query({
         searchResults: m.searchResults || [],
         sources: m.sources || [],
         reasoning: m.reasoning,
+        contextReferences: m.contextReferences,
+        workflowId: m.workflowId,
       }));
       return {
         messages: formatted,
@@ -102,25 +123,15 @@ export const getChatMessagesPaginated = query({
       };
     };
 
-    // Build the query
-    let baseQuery = ctx.db
-      .query("messages")
-      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-      .order("desc"); // Get newest first, we'll reverse later
-
     // If we have a cursor, validate it BEFORE using it in any query
     if (args.cursor) {
-      // The cursor we return is a message _id. Type it to narrow return type
-      const cursorMessage = await ctx.db.get(args.cursor as Id<"messages">);
-
+      const cursorMessage = await ctx.db.get(args.cursor);
       // SECURITY: Validate cursor belongs to the requested chat BEFORE any query execution
       // This prevents a malicious cursor from a different chat exposing unauthorized data
       if (!cursorMessage || cursorMessage.chatId !== args.chatId) {
-        // Invalid/expired cursor OR cursor from different chat:
-        // Return empty result to prevent any data leakage
-        // Client should handle this by refreshing from the beginning
         return {
           messages: [],
+          nextCursor: undefined,
           hasMore: false,
         };
       }

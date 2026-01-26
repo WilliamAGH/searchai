@@ -6,6 +6,7 @@
  */
 
 import { CACHE_TTL } from "../lib/constants/cache";
+import type { CachedSearchResponse } from "../lib/types/search";
 
 // Types
 export type PlanResult = {
@@ -28,8 +29,10 @@ export const planCache: Map<string, { expires: number; result: PlanResult }> =
   new Map();
 
 // Search result cache for avoiding duplicate searches
-export const searchResultCache: Map<string, { expires: number; results: any }> =
-  new Map();
+export const searchResultCache: Map<
+  string,
+  { expires: number; results: CachedSearchResponse }
+> = new Map();
 
 // Simple per-chat leaky bucket limiter
 export const planRate: Map<string, number[]> = new Map();
@@ -111,7 +114,7 @@ export function setCachedPlan(
 export function getCachedSearchResults(
   cacheKey: string,
   now: number = Date.now(),
-): any | null {
+): CachedSearchResponse | null {
   const cached = searchResultCache.get(cacheKey);
   if (cached && cached.expires > now) {
     console.info("🎯 Using cached search results for cache key:", cacheKey);
@@ -125,7 +128,7 @@ export function getCachedSearchResults(
  */
 export function setCachedSearchResults(
   cacheKey: string,
-  results: any,
+  results: CachedSearchResponse,
   ttlMs: number = SEARCH_CACHE_TTL_MS,
   now: number = Date.now(),
 ): void {

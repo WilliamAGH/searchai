@@ -98,12 +98,15 @@ export const importLocalChats = mutation({
           content: m.content as string | undefined,
           timestamp: m.timestamp ?? Date.now(),
           // Preserve optional metadata when present
-          searchResults: m.searchResults?.map((result: any) => ({
-            title: result.title,
-            url: result.url,
-            snippet: result.snippet,
-            relevanceScore: result.relevanceScore ?? 0.5, // Default to 0.5 if missing
-          })) as
+          searchResults: m.searchResults?.map((result: unknown) => {
+            const r = result as Record<string, unknown>;
+            return {
+              title: r.title as string,
+              url: r.url as string,
+              snippet: r.snippet as string,
+              relevanceScore: (r.relevanceScore as number) ?? 0.5, // Default to 0.5 if missing
+            };
+          }) as
             | Array<{
                 title: string;
                 url: string;

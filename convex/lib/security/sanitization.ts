@@ -203,18 +203,20 @@ export function sanitizeJson(jsonString: string): string | null {
     const parsed = JSON.parse(jsonString);
 
     // Recursively sanitize all string values in the JSON
-    const sanitizeObject = (obj: any): any => {
+    const sanitizeObject = (obj: unknown): unknown => {
       if (typeof obj === "string") {
         return robustSanitize(obj);
       } else if (Array.isArray(obj)) {
         return obj.map(sanitizeObject);
       } else if (obj !== null && typeof obj === "object") {
-        const result: any = {};
-        for (const key in obj) {
-          if (obj.hasOwnProperty(key)) {
+        const result: Record<string, unknown> = {};
+        for (const key in obj as Record<string, unknown>) {
+          if (Object.prototype.hasOwnProperty.call(obj, key)) {
             // Sanitize the key as well
             const sanitizedKey = robustSanitize(key);
-            result[sanitizedKey] = sanitizeObject(obj[key]);
+            result[sanitizedKey] = sanitizeObject(
+              (obj as Record<string, unknown>)[key],
+            );
           }
         }
         return result;
@@ -239,7 +241,7 @@ export function sanitizeJson(jsonString: string): string | null {
  * @param result - Raw search result from external source
  * @returns Normalized SearchResult with guaranteed fields
  */
-export function normalizeSearchResult(result: any): {
+export function normalizeSearchResult(result: unknown): {
   title: string;
   url: string;
   snippet: string;
@@ -255,23 +257,26 @@ export function normalizeSearchResult(result: any): {
     };
   }
 
+  // Type narrow to access properties safely
+  const r = result as Record<string, unknown>;
+
   // Normalize relevanceScore - must be a number between 0 and 1
   let relevanceScore = 0.5; // Default
-  if (typeof result.relevanceScore === "number") {
+  if (typeof r.relevanceScore === "number") {
     // Clamp to valid range [0, 1]
-    relevanceScore = Math.max(0, Math.min(1, result.relevanceScore));
-  } else if (result.relevanceScore !== undefined) {
+    relevanceScore = Math.max(0, Math.min(1, r.relevanceScore));
+  } else if (r.relevanceScore !== undefined) {
     // Try to parse if it's a string number
-    const parsed = parseFloat(result.relevanceScore);
+    const parsed = parseFloat(String(r.relevanceScore));
     if (!isNaN(parsed)) {
       relevanceScore = Math.max(0, Math.min(1, parsed));
     }
   }
 
   return {
-    title: robustSanitize(String(result.title || "Untitled")),
-    url: String(result.url || ""), // Don't sanitize URLs - might break them
-    snippet: robustSanitize(String(result.snippet || "")),
+    title: robustSanitize(String(r.title || "Untitled")),
+    url: String(r.url || ""), // Don't sanitize URLs - might break them
+    snippet: robustSanitize(String(r.snippet || "")),
     relevanceScore,
   };
 }
@@ -282,7 +287,7 @@ export function normalizeSearchResult(result: any): {
  * @param results - Raw array of search results
  * @returns Array of normalized SearchResult objects
  */
-export function normalizeSearchResults(results: any): Array<{
+export function normalizeSearchResults(results: unknown): Array<{
   title: string;
   url: string;
   snippet: string;

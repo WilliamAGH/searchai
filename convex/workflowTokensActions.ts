@@ -3,10 +3,11 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { createHmac } from "node:crypto";
-import type { StreamingPersistPayload } from "./agents/schema";
+import { StreamingPersistPayloadSchema } from "./agents/schema";
 
 export const signPersistedPayload = internalAction({
   args: {
+    // v.any() used here because payload is validated by Zod schema inside handler
     payload: v.any(),
     nonce: v.string(),
   },
@@ -19,7 +20,11 @@ export const signPersistedPayload = internalAction({
       );
     }
 
-    const payload = args.payload as StreamingPersistPayload;
+    const parsedPayload = StreamingPersistPayloadSchema.safeParse(args.payload);
+    if (!parsedPayload.success) {
+      throw new Error("Invalid persisted payload");
+    }
+    const payload = parsedPayload.data;
     const body = JSON.stringify({ payload, nonce: args.nonce });
     return createHmac("sha256", signingKey).update(body).digest("hex");
   },

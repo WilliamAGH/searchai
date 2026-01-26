@@ -15,7 +15,6 @@ import type {
 } from "convex/server";
 import type * as agents_answerParser from "../agents/answerParser.js";
 import type * as agents_definitions from "../agents/definitions.js";
-import type * as agents_index from "../agents/index.js";
 import type * as agents_orchestration from "../agents/orchestration.js";
 import type * as agents_orchestration_helpers from "../agents/orchestration_helpers.js";
 import type * as agents_orchestration_persistence from "../agents/orchestration_persistence.js";
@@ -72,12 +71,10 @@ import type * as migrations_remove_system_role from "../migrations/remove_system
 import type * as preferences from "../preferences.js";
 import type * as search_cache from "../search/cache.js";
 import type * as search_executor from "../search/executor.js";
-import type * as search_index from "../search/index.js";
 import type * as search_metrics from "../search/metrics.js";
 import type * as search_planner from "../search/planner.js";
 import type * as search_prompts from "../search/prompts.js";
 import type * as search_providers_duckduckgo from "../search/providers/duckduckgo.js";
-import type * as search_providers_index from "../search/providers/index.js";
 import type * as search_providers_openrouter from "../search/providers/openrouter.js";
 import type * as search_providers_serpapi from "../search/providers/serpapi.js";
 import type * as search_scraper from "../search/scraper.js";
@@ -100,7 +97,6 @@ import type * as workflowTokensActions from "../workflowTokensActions.js";
 declare const fullApi: ApiFromModules<{
   "agents/answerParser": typeof agents_answerParser;
   "agents/definitions": typeof agents_definitions;
-  "agents/index": typeof agents_index;
   "agents/orchestration": typeof agents_orchestration;
   "agents/orchestration_helpers": typeof agents_orchestration_helpers;
   "agents/orchestration_persistence": typeof agents_orchestration_persistence;
@@ -157,12 +153,10 @@ declare const fullApi: ApiFromModules<{
   preferences: typeof preferences;
   "search/cache": typeof search_cache;
   "search/executor": typeof search_executor;
-  "search/index": typeof search_index;
   "search/metrics": typeof search_metrics;
   "search/planner": typeof search_planner;
   "search/prompts": typeof search_prompts;
   "search/providers/duckduckgo": typeof search_providers_duckduckgo;
-  "search/providers/index": typeof search_providers_index;
   "search/providers/openrouter": typeof search_providers_openrouter;
   "search/providers/serpapi": typeof search_providers_serpapi;
   "search/scraper": typeof search_scraper;

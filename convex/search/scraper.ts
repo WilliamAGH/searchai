@@ -6,8 +6,9 @@
  * and optionally falls back to Playwright for JS-rendered pages.
  */
 
-import * as cheerio from "cheerio";
+import { load } from "cheerio";
 import type { CheerioAPI } from "cheerio";
+import type { Element } from "domhandler";
 import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { CACHE_TTL } from "../lib/constants/cache";
@@ -27,6 +28,16 @@ export type ScrapeResult = {
   error?: string;
   errorCode?: string;
 };
+
+type CacheEntry = {
+  exp: number;
+  val: ScrapeResult;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __scrapeCache: Map<string, CacheEntry> | undefined;
+}
 
 const cleanText = (text: string): string =>
   text
@@ -56,7 +67,7 @@ const extractPageMetadata = ($: CheerioAPI) => {
 };
 
 const extractLargestTextBlock = ($: CheerioAPI): string => {
-  let bestNode: any = null;
+  let bestNode: Element | null = null;
   let bestLen = 0;
   $("p, article, section, div").each((_, el) => {
     const text = cleanText($(el).text());
@@ -103,18 +114,11 @@ export const needsJsRendering = (
   return (hasReactRoot && minimalContent) || hasNoscript;
 };
 
-const getScrapeCache = () => {
-  type CacheEntry = {
-    exp: number;
-    val: ScrapeResult;
-  };
-  const globalWithCache = globalThis as typeof globalThis & {
-    __scrapeCache?: Map<string, CacheEntry>;
-  };
-  if (!globalWithCache.__scrapeCache) {
-    globalWithCache.__scrapeCache = new Map<string, CacheEntry>();
+const getScrapeCache = (): Map<string, CacheEntry> => {
+  if (!globalThis.__scrapeCache) {
+    globalThis.__scrapeCache = new Map<string, CacheEntry>();
   }
-  return globalWithCache.__scrapeCache;
+  return globalThis.__scrapeCache;
 };
 
 export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
@@ -215,7 +219,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       timestamp: new Date().toISOString(),
     });
 
-    const $ = cheerio.load(html);
+    const $ = load(html);
     const metadata = extractPageMetadata($);
     // Check for JS rendering BEFORE stripJunk removes noscript elements
     const bodyText = cleanText($("body").text());
