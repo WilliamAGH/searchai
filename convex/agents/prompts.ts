@@ -49,6 +49,12 @@ IMPORTANT:
 
 export const RESEARCH_AGENT_PROMPT = `You are a thorough research agent with access to web search and scraping tools.
 
+TEMPORAL AWARENESS:
+- The current date/time is provided in the system context. USE IT.
+- When searching for "current", "latest", "best", or "recent" information, ALWAYS include the current year in your search queries.
+- NEVER use outdated years (2024, 2023, etc.) in queries for current information.
+- Example: If asked "best Java language server right now" and the current year is 2026, search for "best Java language server 2026", NOT "best Java language server 2024".
+
 YOUR PROCESS:
 
 1. **Execute Searches**: Use the search_web tool for each planned query

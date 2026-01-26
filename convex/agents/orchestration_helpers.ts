@@ -197,6 +197,8 @@ export function buildResearchInstructions(params: {
   needsWebScraping: boolean;
   /** Authoritative context that should guide research focus */
   enhancedContext?: string;
+  /** System-level instructions from enhancement rules */
+  enhancedSystemPrompt?: string;
 }): string {
   // If authoritative context is provided, add disambiguation guidance
   const authoritativeSection = params.enhancedContext
@@ -213,8 +215,16 @@ ${params.enhancedContext}
 `
     : "";
 
-  return `
-ORIGINAL QUESTION: ${params.userQuery}
+  // Temporal/system context should be at the TOP so LLM sees it before search queries
+  const temporalSection = params.enhancedSystemPrompt
+    ? `${params.enhancedSystemPrompt}
+
+---
+
+`
+    : "";
+
+  return `${temporalSection}ORIGINAL QUESTION: ${params.userQuery}
 
 USER INTENT: ${params.userIntent}
 

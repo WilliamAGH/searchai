@@ -457,6 +457,7 @@ export const orchestrateResearchWorkflow = action({
       // Apply enhancement rules to inject authoritative context for research
       const researchEnhancements = applyEnhancements(args.userQuery, {
         enhanceContext: true,
+        enhanceSystemPrompt: true, // Include temporal context for current-year searches
       });
 
       const researchInstructions = buildResearchInstructions({
@@ -468,6 +469,8 @@ export const orchestrateResearchWorkflow = action({
         searchQueries: plannedQueries,
         needsWebScraping: planningResult.finalOutput.needsWebScraping,
         enhancedContext: researchEnhancements.enhancedContext || undefined,
+        enhancedSystemPrompt:
+          researchEnhancements.enhancedSystemPrompt || undefined,
       });
 
       const researchResult = await withTimeout(
