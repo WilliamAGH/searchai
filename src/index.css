@@ -270,13 +270,18 @@ html,
 body,
 #root {
   height: 100%;
-  min-height: var(--app-dvh, 100dvh);
+  width: 100%;
+  overflow: hidden;
 }
 
-/* The app provides its own scroll containers; never allow page-level scrolling. */
+/* 
+ * Lock body scroll to prevent bounce effects and address bar quirks on iOS.
+ * This effectively makes the body a fixed container matching the visual viewport.
+ */
 html,
 body {
-  overflow: hidden;
+  position: fixed;
+  overscroll-behavior: none;
 }
 
 /*
