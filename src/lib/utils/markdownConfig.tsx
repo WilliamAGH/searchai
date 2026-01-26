@@ -69,9 +69,9 @@ export const REHYPE_PLUGINS: PluggableList = [
 
 /**
  * Code block renderer that ensures children are stringified.
- * Static - no need for useCallback.
+ * Static component - no need for useCallback wrapper.
  */
-export const codeRenderer: NonNullable<Components["code"]> = ({
+export const CodeRenderer: NonNullable<Components["code"]> = ({
   className,
   children,
   ...props

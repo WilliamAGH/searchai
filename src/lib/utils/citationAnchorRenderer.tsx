@@ -28,17 +28,20 @@ const CITATION_PILL_HIGHLIGHTED =
  * @param onCitationHover - Callback for hover state changes
  */
 export function createCitationAnchorRenderer(
-  citationUrls: Set<string>,
+  citationUrls: Set<string> | null | undefined,
   hoveredSourceUrl: string | null | undefined,
   onCitationHover: ((url: string | null) => void) | undefined,
 ): NonNullable<Components["a"]> {
+  // Defensive: treat null/undefined as empty set
+  const urls = citationUrls ?? new Set<string>();
+
   return function CitationAnchor({
     href,
     children,
     ...props
   }: React.ComponentPropsWithoutRef<"a">) {
     const url = String(href || "");
-    const isCitation = url !== "" && citationUrls.has(url);
+    const isCitation = url !== "" && urls.has(url);
     const isHighlighted = hoveredSourceUrl === url;
 
     // For citations, ensure we display clean domain (no protocol/www)

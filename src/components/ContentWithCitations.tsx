@@ -5,14 +5,14 @@
  */
 
 import React from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown from "react-markdown";
 import { useDomainToUrlMap } from "../hooks/utils/useDomainToUrlMap";
 import { useCitationProcessor } from "../hooks/utils/useCitationProcessor";
 import { createCitationAnchorRenderer } from "../lib/utils/citationAnchorRenderer";
 import {
   REMARK_PLUGINS,
   REHYPE_PLUGINS,
-  codeRenderer,
+  CodeRenderer,
 } from "../lib/utils/markdownConfig";
 
 interface ContentWithCitationsProps {
@@ -59,17 +59,12 @@ export function ContentWithCitations({
     [citationUrls, hoveredSourceUrl, onCitationHover],
   );
 
-  const markdownComponents: Components = React.useMemo(
-    () => ({ a: anchorRenderer, code: codeRenderer }),
-    [anchorRenderer],
-  );
-
   return (
     <div>
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}
-        components={markdownComponents}
+        components={{ a: anchorRenderer, code: CodeRenderer }}
       >
         {processedContent}
       </ReactMarkdown>
