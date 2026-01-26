@@ -8,6 +8,7 @@
 
 import React, { useRef } from "react";
 import { getDomainFromUrl } from "../lib/utils/favicon";
+import { useDomainToUrlMap } from "../hooks/utils/useDomainToUrlMap";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -36,16 +37,7 @@ export function ContentWithCitations({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Create a map of domains to URLs for quick lookup
-  const domainToUrlMap = React.useMemo(() => {
-    const map = new Map<string, string>();
-    searchResults.forEach((result) => {
-      const domain = getDomainFromUrl(result.url);
-      if (domain) {
-        map.set(domain, result.url);
-      }
-    });
-    return map;
-  }, [searchResults]);
+  const domainToUrlMap = useDomainToUrlMap(searchResults);
 
   // Convert [domain] or [URL] to markdown links where domain is known
   const processedContent = React.useMemo(() => {
@@ -172,6 +164,20 @@ export function ContentWithCitations({
       const url = String(href || "");
       const isCitation = url && [...domainToUrlMap.values()].includes(url);
       const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
+
+      // Strip protocol/www from displayed text if it's a citation pill and looks like a URL
+      let displayedContent = children;
+      if (
+        isCitation &&
+        typeof children === "string" &&
+        (children.startsWith("http://") || children.startsWith("https://"))
+      ) {
+        const domain = getDomainFromUrl(children);
+        if (domain) {
+          displayedContent = domain;
+        }
+      }
+
       const baseClass =
         "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-medium no-underline align-baseline transition-colors citation-pill";
       const normalClass =
@@ -189,7 +195,7 @@ export function ContentWithCitations({
           onMouseLeave={() => isCitation && onCitationHover?.(null)}
           {...props}
         >
-          <span className="citation-pill-text">{children}</span>
+          <span className="citation-pill-text">{displayedContent}</span>
         </a>
       );
     },

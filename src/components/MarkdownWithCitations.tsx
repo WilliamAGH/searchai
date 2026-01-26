@@ -16,6 +16,7 @@ import { defaultSchema } from "hast-util-sanitize";
 import type { Schema } from "hast-util-sanitize";
 import type { PluggableList } from "unified";
 import { getDomainFromUrl } from "../lib/utils/favicon";
+import { useDomainToUrlMap } from "../hooks/utils/useDomainToUrlMap";
 import { logger } from "../lib/logger";
 
 interface MarkdownWithCitationsProps {
@@ -36,16 +37,7 @@ export function MarkdownWithCitations({
   onCitationHover,
 }: MarkdownWithCitationsProps) {
   // Create a map of domains to URLs for quick lookup
-  const domainToUrlMap = React.useMemo(() => {
-    const map = new Map<string, string>();
-    searchResults.forEach((result) => {
-      const domain = getDomainFromUrl(result.url);
-      if (domain) {
-        map.set(domain, result.url);
-      }
-    });
-    return map;
-  }, [searchResults]);
+  const domainToUrlMap = useDomainToUrlMap(searchResults);
 
   // Process content to replace citations before markdown rendering
   const processedContent = React.useMemo(() => {
@@ -161,11 +153,32 @@ export function MarkdownWithCitations({
   );
 
   const anchorRenderer: NonNullable<Components["a"]> = React.useCallback(
-    ({ children, ...props }) => (
-      <a {...props} target="_blank" rel="noopener noreferrer">
-        {children}
-      </a>
-    ),
+    (props: any) => {
+      const { children, href, ...rest } = props;
+      const url = String(href || "");
+
+      // Strip protocol/www from displayed text if it looks like a URL
+      let displayedContent = children;
+      if (
+        typeof children === "string" &&
+        (children.startsWith("http://") || children.startsWith("https://"))
+      ) {
+        try {
+          const domain = new URL(children).hostname.replace("www.", "");
+          if (domain) {
+            displayedContent = domain;
+          }
+        } catch {
+          // Keep original content if parsing fails
+        }
+      }
+
+      return (
+        <a href={url} {...rest} target="_blank" rel="noopener noreferrer">
+          {displayedContent}
+        </a>
+      );
+    },
     [],
   );
 

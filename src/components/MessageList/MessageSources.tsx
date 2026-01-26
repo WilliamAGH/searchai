@@ -8,7 +8,11 @@
 
 import React from "react";
 import type { SearchResult } from "../../lib/types/message";
-import { getFaviconUrl, getSafeHostname } from "../../lib/utils/favicon";
+import {
+  getDomainFromUrl,
+  getFaviconUrl,
+  getSafeHostname,
+} from "../../lib/utils/favicon";
 import { logger } from "../../lib/logger";
 
 type ContextReference = {
@@ -158,7 +162,8 @@ export function MessageSources({
         {collapsed && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             {previewSources.map((source, i) => {
-              const hostname = getSafeHostname(source.url);
+              const hostname =
+                getDomainFromUrl(source.url) || getSafeHostname(source.url);
               return (
                 <a
                   key={`${messageId}-preview-${i}`}
@@ -192,7 +197,8 @@ export function MessageSources({
       {!collapsed && (
         <div className="mt-2 space-y-2 px-2 max-h-[300px] overflow-y-auto">
           {displaySources.map((source, i) => {
-            const hostname = getSafeHostname(source.url);
+            const hostname =
+              getDomainFromUrl(source.url) || getSafeHostname(source.url);
             const isHovered = hoveredSourceUrl === source.url;
 
             // Determine relevance badge color
