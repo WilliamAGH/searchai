@@ -1,20 +1,19 @@
 /**
- * Adds interactive citations without DOM mutation
- * - Converts [domain.com] patterns to markdown links when domain maps to a source URL
- * - Renders anchors with hover callbacks and highlight state
- * - Avoids direct DOM manipulation to prevent React reconciliation errors
+ * Markdown renderer with interactive citation support.
+ * - Converts [domain.com] patterns to styled citation pills
+ * - Handles hover highlighting between citations and sources
  */
 
 import React from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import { useDomainToUrlMap } from "../hooks/utils/useDomainToUrlMap";
 import { useCitationProcessor } from "../hooks/utils/useCitationProcessor";
 import { createCitationAnchorRenderer } from "../lib/utils/citationAnchorRenderer";
-import { MARKDOWN_SANITIZE_SCHEMA } from "../lib/utils/markdownSanitizeSchema";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkBreaks from "remark-breaks";
-import rehypeSanitize from "rehype-sanitize";
-import type { PluggableList } from "unified";
+import {
+  REMARK_PLUGINS,
+  REHYPE_PLUGINS,
+  codeRenderer,
+} from "../lib/utils/markdownConfig";
 
 interface ContentWithCitationsProps {
   content: string;
@@ -49,16 +48,7 @@ export function ContentWithCitations({
     [domainToUrlMap],
   );
 
-  const remarkPlugins: PluggableList = React.useMemo(
-    () => [remarkGfm, remarkBreaks],
-    [],
-  );
-  const rehypePlugins: PluggableList = React.useMemo(
-    () => [[rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]],
-    [],
-  );
-
-  // Shared citation anchor renderer handles both regular links and citation pills
+  // Anchor renderer needs memoization because it depends on hover state
   const anchorRenderer = React.useMemo(
     () =>
       createCitationAnchorRenderer(
@@ -69,29 +59,16 @@ export function ContentWithCitations({
     [citationUrls, hoveredSourceUrl, onCitationHover],
   );
 
-  const codeRenderer: NonNullable<Components["code"]> = React.useCallback(
-    ({
-      className,
-      children,
-      ...props
-    }: React.ComponentPropsWithoutRef<"code">) => (
-      <code className={className} {...props}>
-        {String(children)}
-      </code>
-    ),
-    [],
-  );
-
   const markdownComponents: Components = React.useMemo(
     () => ({ a: anchorRenderer, code: codeRenderer }),
-    [anchorRenderer, codeRenderer],
+    [anchorRenderer],
   );
 
   return (
     <div>
       <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
+        remarkPlugins={REMARK_PLUGINS}
+        rehypePlugins={REHYPE_PLUGINS}
         components={markdownComponents}
       >
         {processedContent}
