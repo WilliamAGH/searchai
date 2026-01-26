@@ -58,6 +58,7 @@ import type * as lib_providers_openai_config from "../lib/providers/openai_confi
 import type * as lib_providers_openai_health from "../lib/providers/openai_health.js";
 import type * as lib_providers_openrouter_types from "../lib/providers/openrouter_types.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
+import type * as lib_schemas_search from "../lib/schemas/search.js";
 import type * as lib_security_patterns from "../lib/security/patterns.js";
 import type * as lib_security_sanitization from "../lib/security/sanitization.js";
 import type * as lib_security_webContent from "../lib/security/webContent.js";
@@ -140,6 +141,7 @@ declare const fullApi: ApiFromModules<{
   "lib/providers/openai_health": typeof lib_providers_openai_health;
   "lib/providers/openrouter_types": typeof lib_providers_openrouter_types;
   "lib/rateLimit": typeof lib_rateLimit;
+  "lib/schemas/search": typeof lib_schemas_search;
   "lib/security/patterns": typeof lib_security_patterns;
   "lib/security/sanitization": typeof lib_security_sanitization;
   "lib/security/webContent": typeof lib_security_webContent;
