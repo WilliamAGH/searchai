@@ -37,7 +37,7 @@ interface ChatLayoutProps {
   plannerHint?: {
     reason?: string;
     confidence?: number;
-  };
+  } | null;
 
   // Component props
   chatSidebarProps: ChatSidebarProps;
@@ -88,7 +88,7 @@ export function ChatLayout({
   const showDesktopSidebar = !isMobile && sidebarOpen;
 
   // Ref for the scroll container - passed to MessageList for scroll handling
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <div className="flex-1 flex h-full min-h-0 relative">
@@ -105,14 +105,14 @@ export function ChatLayout({
       {sidebarOpen && isMobile && <MobileSidebar {...mobileSidebarProps} />}
 
       {/* Main content - full width scroll container, scrollbar at browser edge */}
+      {/*
+        DO NOT REMOVE OR OVERRIDE: Layout Stability Strategy
+        - pl-80: Uses padding instead of margin (ml-80) to keep the scrollbar at the browser edge
+          while reserving space for the fixed sidebar. Margin pushes the scrollbar off-screen.
+        - min-w-0: Critical for allowing flex children to shrink below their content size.
+      */}
       <div
         ref={scrollContainerRef}
-        /**
-         * DO NOT REMOVE OR OVERRIDE: Layout Stability Strategy
-         * - pl-80: Uses padding instead of margin (ml-80) to keep the scrollbar at the browser edge
-         *   while reserving space for the fixed sidebar. Margin pushes the scrollbar off-screen.
-         * - min-w-0: Critical for allowing flex children to shrink below their content size.
-         */
         className={`flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-y-auto overscroll-contain ${showDesktopSidebar ? "pl-80" : ""}`}
         {...swipeHandlers}
       >
