@@ -294,7 +294,7 @@ export function MessageInput({
               autoComplete="off"
               className={`w-full pl-3 sm:pl-4 pr-28 text-base tracking-tight font-ui slashed-zero lining-nums tabular-nums ${
                 message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"
-              } rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-y-auto message-input-textarea message-textarea`}
+              } rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-y-auto overflow-x-hidden break-words whitespace-pre-wrap message-input-textarea message-textarea`}
             />
             <div className="absolute right-11 sm:right-10 top-1/2 -translate-y-1/2 h-8 flex items-center gap-1">
               <button

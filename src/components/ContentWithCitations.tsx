@@ -60,14 +60,27 @@ export function ContentWithCitations({
   );
 
   return (
-    <div className="min-w-0">
-      <ReactMarkdown
-        remarkPlugins={REMARK_PLUGINS}
-        rehypePlugins={REHYPE_PLUGINS}
-        components={{ a: anchorRenderer, code: CodeRenderer }}
-      >
-        {processedContent}
-      </ReactMarkdown>
-    </div>
+    <>
+      {/* 
+        DO NOT REMOVE OR OVERRIDE: Overflow Protection Wrapper
+        This wrapper is CRITICAL for preventing horizontal layout blowout from:
+        1. Long continuous strings (URLs, base64, etc.)
+        2. Wide tables
+        3. Unbreakable inline code blocks
+        
+        - min-w-0: Allows flex child to shrink below content size
+        - max-w-full: Enforces boundary respect
+        - overflow-hidden: Clips any remaining rogue content
+      */}
+      <div className="min-w-0 max-w-full overflow-hidden">
+        <ReactMarkdown
+          remarkPlugins={REMARK_PLUGINS}
+          rehypePlugins={REHYPE_PLUGINS}
+          components={{ a: anchorRenderer, code: CodeRenderer }}
+        >
+          {processedContent}
+        </ReactMarkdown>
+      </div>
+    </>
   );
 }
