@@ -1,87 +1,65 @@
 /**
  * Message Type Definitions
  *
- * Uses Convex's auto-generated types directly (Doc<"messages">) for server data.
- * LocalMessage is derived from Zod schema (single source of truth).
- * Complies with AGENT.md: NO redundant type definitions for Convex entities
+ * Uses Convex's auto-generated types directly and normalizes to UI-safe IDs.
+ * Complies with AGENTS.md: single path, no legacy types.
  */
 
-import type { Doc, Id } from "../../../convex/_generated/dataModel";
+import type { Doc } from "../../../convex/_generated/dataModel";
 // Import from the dedicated types module (not orchestration_helpers) so we don't pull
 // any Node-only helpers into browser bundles.
 import type { StreamingPersistPayload } from "../../../convex/agents/schema";
 import type { SearchResult } from "../../../convex/lib/types/search";
-import { generateLocalId } from "../utils/id";
-
+import type {
+  ContextReference,
+  MessageMetadata,
+} from "@/lib/schemas/messageStream";
 // Re-export types from canonical sources
-export type { ResearchContextReference } from "../../../convex/agents/schema";
 export type { SearchResult } from "../../../convex/lib/types/search";
-
-// Re-export LocalMessage from schema (single source of truth)
-export type { LocalMessage } from "../schemas/localStorage";
-import type { LocalMessage } from "../schemas/localStorage";
-
-/**
- * Union type for components that work with both storage backends
- * Uses Doc<"messages"> directly for server data (no wrapper type)
- * Per AGENT.md: Leverage Convex's automatic type generation
- */
-export type Message = LocalMessage | Doc<"messages">;
+export type {
+  ContextReference,
+  MessageMetadata,
+} from "@/lib/schemas/messageStream";
 
 /**
- * Type guard to check if message is from localStorage
+ * UI-specific message fields for streaming state tracking.
+ * These fields are NOT persisted to Convex - they exist only in UI state.
  */
-export const isLocalMessage = (message: Message): message is LocalMessage => {
-  return "isLocal" in message && message.isLocal === true;
-};
+export interface UIMessageFields {
+  /** Workflow nonce for signature verification (UI-only) */
+  workflowNonce?: string;
+  /** Workflow signature for verification (UI-only) */
+  workflowSignature?: string;
+  /** Whether the message has been confirmed persisted (UI-only) */
+  persisted?: boolean;
+}
 
 /**
- * Type guard to check if message is from Convex
- * Checks for _creationTime which all Convex documents have
+ * Canonical UI message type (single path).
+ * Convex Ids are string-backed, so we normalize to string IDs in UI state.
  */
-export const isServerMessage = (
-  message: Message,
-): message is Doc<"messages"> => {
-  return "_creationTime" in message;
-};
-
-/**
- * Type guard to check if ID is a local message ID
- */
-export const isLocalMessageId = (id: string): boolean => {
-  return id.startsWith("msg_") || id.startsWith("local_");
-};
-
-// REMOVED: convexMessageToMessage function - violates AGENT.md
-// Doc<"messages"> should be used directly without wrapper types or conversions
-
-/**
- * Create a new local message matching Convex structure
- */
-export const createLocalMessage = (
-  chatId: string,
-  role: "user" | "assistant" | "system",
-  content: string,
-): LocalMessage => {
-  return {
-    _id: generateLocalId("message"),
-    chatId,
-    role,
-    content,
-    timestamp: Date.now(),
-    isLocal: true,
-    source: "local",
-  };
-};
+export type Message = Omit<
+  Doc<"messages">,
+  "_id" | "chatId" | "contextReferences" | "reasoning"
+> & {
+  _id: string;
+  chatId: string;
+  contextReferences?: ContextReference[];
+  reasoning?: string;
+} & UIMessageFields;
 
 /**
  * Message stream chunk for real-time updates
  * Extended to support agent workflow streaming events
  */
-export type PersistedPayload = StreamingPersistPayload;
+export type PersistedPayload = Omit<
+  StreamingPersistPayload,
+  "contextReferences"
+> & {
+  contextReferences: ContextReference[];
+};
 
 export type MessageStreamChunk =
-  | { type: "chunk"; content: string } // Legacy: text content chunk
   | { type: "content"; content?: string; delta?: string } // Answer content (with optional delta)
   | {
       type: "progress";
@@ -107,8 +85,8 @@ export type MessageStreamChunk =
     }
   | { type: "reasoning"; content: string } // Thinking/reasoning from agents
   | { type: "tool_result"; toolName: string; result: string } // Tool execution results
-  | { type: "metadata"; metadata: unknown; nonce?: string } // Final metadata (sources, etc.)
-  | { type: "complete"; workflow?: unknown } // Workflow completion
+  | { type: "metadata"; metadata: MessageMetadata; nonce?: string } // Final metadata (sources, etc.)
+  | { type: "complete" } // Workflow completion
   | { type: "error"; error: string } // Error events
   | { type: "done" } // Stream completion
   | {
@@ -151,9 +129,52 @@ export interface SearchProgress {
 }
 
 /**
- * Migration mapping for tracking local to server ID changes
+ * Factory for creating local UI messages (not yet persisted to Convex).
+ * Use this instead of inline object literals to ensure type safety.
  */
-export interface MessageMigrationMapping {
-  localId: string;
-  serverId: Id<"messages">;
+export function createLocalUIMessage(params: {
+  id: string;
+  chatId: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  isStreaming?: boolean;
+  reasoning?: string;
+  searchResults?: SearchResult[];
+  sources?: string[];
+}): Message {
+  const now = Date.now();
+  return {
+    _id: params.id,
+    _creationTime: now,
+    chatId: params.chatId,
+    role: params.role,
+    content: params.content,
+    timestamp: now,
+    // Optional fields
+    isStreaming: params.isStreaming,
+    reasoning: params.reasoning,
+    searchResults: params.searchResults ?? [],
+    sources: params.sources ?? [],
+  };
+}
+
+/**
+ * Pagination state for message loading
+ * Groups related pagination fields to reduce prop drilling
+ */
+export interface PaginationState {
+  /** Whether more messages are being loaded */
+  isLoadingMore: boolean;
+  /** Whether there are more messages to load */
+  hasMore: boolean;
+  /** Callback to load more messages */
+  onLoadMore?: () => Promise<void>;
+  /** Whether initial messages are loading */
+  isLoadingMessages: boolean;
+  /** Error from pagination operations */
+  loadError: Error | null;
+  /** Number of retry attempts for failed loads */
+  retryCount: number;
+  /** Callback to clear pagination error */
+  onClearError?: () => void;
 }
