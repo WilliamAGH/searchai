@@ -1,20 +1,19 @@
-// Refactored to use memoized plugins and components; no inline arrays/objects
 /**
- * Adds interactive citations without DOM mutation
- * - Converts [domain.com] patterns to markdown links when domain maps to a source URL
- * - Renders anchors with hover callbacks and highlight state
- * - Avoids direct DOM manipulation to prevent React reconciliation errors
+ * Markdown renderer with interactive citation support.
+ * - Converts [domain.com] patterns to styled citation pills
+ * - Handles hover highlighting between citations and sources
  */
 
-import React, { useRef } from "react";
-import { getDomainFromUrl } from "../lib/utils/favicon";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkBreaks from "remark-breaks";
-import rehypeSanitize from "rehype-sanitize";
-import type { PluggableList } from "unified";
-import { defaultSchema } from "hast-util-sanitize";
-import type { Schema } from "hast-util-sanitize";
+import React from "react";
+import ReactMarkdown from "react-markdown";
+import { useDomainToUrlMap } from "../hooks/utils/useDomainToUrlMap";
+import { useCitationProcessor } from "../hooks/utils/useCitationProcessor";
+import { createCitationAnchorRenderer } from "../lib/utils/citationAnchorRenderer";
+import {
+  REMARK_PLUGINS,
+  REHYPE_PLUGINS,
+  CodeRenderer,
+} from "../lib/utils/markdownConfig";
 
 interface ContentWithCitationsProps {
   content: string;
@@ -33,192 +32,55 @@ export function ContentWithCitations({
   hoveredSourceUrl,
   onCitationHover,
 }: ContentWithCitationsProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
   // Create a map of domains to URLs for quick lookup
-  const domainToUrlMap = React.useMemo(() => {
-    const map = new Map<string, string>();
-    searchResults.forEach((result) => {
-      const domain = getDomainFromUrl(result.url);
-      if (domain) {
-        map.set(domain, result.url);
-      }
-    });
-    return map;
-  }, [searchResults]);
+  const domainToUrlMap = useDomainToUrlMap(searchResults);
 
   // Convert [domain] or [URL] to markdown links where domain is known
-  const processedContent = React.useMemo(() => {
-    const citationRegex = /\[([^\]]+)\]/g;
-    return content.replace(citationRegex, (match, citedText) => {
-      let domain = citedText;
-      let url: string | undefined;
-
-      // Check if cited text is a full URL
-      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
-        // Extract domain from the full URL citation
-        domain = getDomainFromUrl(citedText);
-        // Try to find exact URL match first
-        const exactMatch = searchResults.find((r) => r.url === citedText);
-        if (exactMatch) {
-          url = exactMatch.url;
-        } else {
-          // Fallback to domain matching
-          url = domainToUrlMap.get(domain);
-        }
-      } else if (citedText.includes("/")) {
-        // Handle cases like "github.com/user/repo" - extract just the domain
-        const domainPart = citedText.split("/")[0];
-        domain = domainPart;
-
-        // Try multiple matching strategies
-        // 1. Exact path match
-        const exactPathMatch = searchResults.find((r) =>
-          r.url.includes(citedText),
-        );
-        if (exactPathMatch) {
-          url = exactPathMatch.url;
-        } else {
-          // 2. Domain match from map
-          url = domainToUrlMap.get(domain);
-          if (!url) {
-            // 3. Any URL from this domain
-            const domainMatch = searchResults.find((r) => {
-              const sourceDomain = getDomainFromUrl(r.url);
-              return (
-                sourceDomain === domain || sourceDomain === `www.${domain}`
-              );
-            });
-            if (domainMatch) {
-              url = domainMatch.url;
-            }
-          }
-        }
-
-        // If still no match but it looks like a valid domain, force match to first result from that domain
-        if (!url && domain.includes(".")) {
-          const anyMatch = searchResults.find((r) => r.url.includes(domain));
-          if (anyMatch) {
-            url = anyMatch.url;
-          }
-        }
-      } else {
-        // Simple domain citation - check if it looks like a domain
-        if (citedText.includes(".")) {
-          url = domainToUrlMap.get(citedText);
-          domain = citedText;
-        }
-      }
-
-      // Only convert to markdown link if we found a matching URL
-      // Always show just the domain in the link text
-      // Remove unmatched brackets to prevent display artifacts
-      return url ? `[${domain}](${url})` : "";
-    });
-  }, [content, domainToUrlMap, searchResults]);
-
-  // Custom sanitize schema (stable)
-  const sanitizeSchema: Schema = React.useMemo(
-    () => ({
-      ...defaultSchema,
-      tagNames: [
-        ...(defaultSchema.tagNames ?? []),
-        "u",
-        "table",
-        "thead",
-        "tbody",
-        "tr",
-        "th",
-        "td",
-        "blockquote",
-        "hr",
-        "strong",
-        "em",
-        "del",
-        "br",
-        "p",
-        "ul",
-        "ol",
-        "li",
-        "pre",
-        "code",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-      ],
-      attributes: {
-        ...defaultSchema.attributes,
-        a: ["href", "target", "rel"],
-        code: ["className"],
-      },
-    }),
-    [],
+  const processedContent = useCitationProcessor(
+    content,
+    searchResults,
+    domainToUrlMap,
   );
 
-  const remarkPlugins: PluggableList = React.useMemo(
-    () => [remarkGfm, remarkBreaks],
-    [],
-  );
-  const rehypePlugins: PluggableList = React.useMemo(
-    () => [[rehypeSanitize, sanitizeSchema]],
-    [sanitizeSchema],
+  // Pre-compute citation URL set for O(1) lookup
+  const citationUrls = React.useMemo(
+    () => new Set(domainToUrlMap.values()),
+    [domainToUrlMap],
   );
 
-  const anchorRenderer: NonNullable<Components["a"]> = React.useCallback(
-    ({ href, children, ...props }) => {
-      const url = String(href || "");
-      const isCitation = url && [...domainToUrlMap.values()].includes(url);
-      const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
-      const baseClass =
-        "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-medium no-underline align-baseline transition-colors citation-pill";
-      const normalClass =
-        "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[15px] sm:text-base hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300";
-      const hiClass =
-        "bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 ring-2 ring-yellow-400 dark:ring-yellow-600 text-[15px] sm:text-base";
-      return (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-citation-url={isCitation ? url : undefined}
-          className={`${baseClass} ${highlighted ? hiClass : normalClass}`}
-          onMouseEnter={() => isCitation && onCitationHover?.(url)}
-          onMouseLeave={() => isCitation && onCitationHover?.(null)}
-          {...props}
-        >
-          <span className="citation-pill-text">{children}</span>
-        </a>
-      );
-    },
-    [domainToUrlMap, hoveredSourceUrl, onCitationHover],
-  );
-
-  const codeRenderer: NonNullable<Components["code"]> = React.useCallback(
-    ({ className, children, ...props }) => (
-      <code className={className} {...props}>
-        {String(children)}
-      </code>
-    ),
-    [],
-  );
-
-  const markdownComponents: Components = React.useMemo(
-    () => ({ a: anchorRenderer, code: codeRenderer }),
-    [anchorRenderer, codeRenderer],
+  // Anchor renderer needs memoization because it depends on hover state
+  const anchorRenderer = React.useMemo(
+    () =>
+      createCitationAnchorRenderer(
+        citationUrls,
+        hoveredSourceUrl,
+        onCitationHover,
+      ),
+    [citationUrls, hoveredSourceUrl, onCitationHover],
   );
 
   return (
-    <div ref={containerRef}>
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
-        components={markdownComponents}
-      >
-        {processedContent}
-      </ReactMarkdown>
-    </div>
+    <>
+      {/* 
+        DO NOT REMOVE OR OVERRIDE: Overflow Protection Wrapper
+        This wrapper is CRITICAL for preventing horizontal layout blowout from:
+        1. Long continuous strings (URLs, base64, etc.)
+        2. Wide tables
+        3. Unbreakable inline code blocks
+        
+        - min-w-0: Allows flex child to shrink below content size
+        - max-w-full: Enforces boundary respect
+        - overflow-hidden: Clips any remaining rogue content
+      */}
+      <div className="min-w-0 max-w-full overflow-hidden">
+        <ReactMarkdown
+          remarkPlugins={REMARK_PLUGINS}
+          rehypePlugins={REHYPE_PLUGINS}
+          components={{ a: anchorRenderer, code: CodeRenderer }}
+        >
+          {processedContent}
+        </ReactMarkdown>
+      </div>
+    </>
   );
 }

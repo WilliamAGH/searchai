@@ -185,10 +185,16 @@
   }
 
   .citation-pill-text {
-    max-width: 200px;
+    max-width: min(200px, 40vw); /* Responsive: smaller on mobile */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Safe wrapping for long, unbroken user/assistant content */
+  .message-content-safe {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   /* Default: broad compatibility */
@@ -352,8 +358,9 @@ body {
   font-family: inherit;
   font-variant-numeric: lining-nums;
   /* Prevent long strings from breaking mobile viewport */
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   word-wrap: break-word; /* Legacy fallback */
+  word-break: break-word;
 }
 
 /* Ensure nested text elements inherit numeric features */
@@ -441,17 +448,71 @@ html.dark .prose code {
 .prose a {
   @apply text-primary hover:text-primary/80;
   /* Allow long URLs to wrap without breaking words arbitrarily */
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose code {
   @apply bg-muted px-1 py-0.5 rounded text-sm;
   font-family: "JetBrains Mono", "Fira Code", monospace;
+  /* 
+   * DO NOT REMOVE OR OVERRIDE: Layout Safety
+   * overflow-wrap: anywhere + word-break: break-word ensures long strings
+   * (like URLs or tokens) wrap instead of pushing the layout wide.
+   * white-space: pre-wrap preserves formatting but allows wrapping.
+   */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .prose pre {
   @apply bg-muted p-4 rounded-lg overflow-x-auto;
   font-family: "JetBrains Mono", "Fira Code", monospace;
+  /*
+   * DO NOT REMOVE OR OVERRIDE: max-width: 100%
+   * Forces code blocks to respect parent container width and trigger
+   * internal scrolling (overflow-x-auto) instead of expanding the page.
+   */
+  max-width: 100%;
+}
+
+/* GFM table overflow protection - tables can contain wide content */
+.prose table {
+  /*
+   * DO NOT REMOVE OR OVERRIDE: Table Containment
+   * Tables must be block-level with max-width: 100% to trigger scrolling
+   * instead of forcing the parent container to expand.
+   */
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prose thead,
+.prose tbody {
+  display: table;
+  width: max-content;
+  min-width: 100%;
+}
+
+.prose tr {
+  display: table-row;
+}
+
+.prose th,
+.prose td {
+  @apply px-3 py-2 border border-gray-200 dark:border-gray-700;
+  word-break: break-word;
+}
+
+.prose th {
+  @apply bg-gray-50 dark:bg-gray-800 font-semibold text-left;
+}
+
+.prose tbody tr:nth-child(even) {
+  @apply bg-gray-50/50 dark:bg-gray-800/50;
 }
 
 .prose blockquote {

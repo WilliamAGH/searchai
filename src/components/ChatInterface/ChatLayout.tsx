@@ -107,14 +107,23 @@ export function ChatLayout({
       {/* Main content - full width scroll container, scrollbar at browser edge */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 flex flex-col h-full min-h-0 overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
+        /**
+         * DO NOT REMOVE OR OVERRIDE: Layout Stability Strategy
+         * - pl-80: Uses padding instead of margin (ml-80) to keep the scrollbar at the browser edge
+         *   while reserving space for the fixed sidebar. Margin pushes the scrollbar off-screen.
+         * - min-w-0: Critical for allowing flex children to shrink below their content size.
+         */
+        className={`flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-y-auto overscroll-contain ${showDesktopSidebar ? "pl-80" : ""}`}
         {...swipeHandlers}
       >
-        {/* Content wrapper: grow to fill when content is small, don't shrink when content is large */}
-        {/* grow = flex-grow:1, shrink-0 = flex-shrink:0, combined with default flex-basis:auto */}
-        <div
-          className={`grow shrink-0 flex flex-col w-full ${!showDesktopSidebar ? "max-w-4xl mx-auto" : ""}`}
-        >
+        {/* 
+          DO NOT REMOVE OR OVERRIDE: Content Containment
+          - max-w-4xl mx-auto: Enforces consistent reading width regardless of sidebar state.
+            Removing this causes jarring layout shifts and "blown out" content when sidebar opens.
+          - w-full: Ensures alignment within the flex container.
+          - min-w-0: Prevents flex items from overflowing their container.
+        */}
+        <div className="grow shrink-0 flex flex-col min-w-0 max-w-4xl mx-auto w-full">
           <MessageList
             key={String(currentChatId)}
             {...messageListProps}
@@ -129,9 +138,7 @@ export function ChatLayout({
           This prevents the "floating gap" bug where double padding creates
           visible whitespace between app content and browser chrome on iOS.
         */}
-        <div
-          className={`flex-shrink-0 sticky bottom-0 relative bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 pb-[env(safe-area-inset-bottom)] ${!showDesktopSidebar ? "max-w-4xl mx-auto w-full" : ""}`}
-        >
+        <div className="flex-shrink-0 sticky bottom-0 relative bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 pb-[env(safe-area-inset-bottom)] max-w-4xl mx-auto w-full">
           <FollowUpPrompt
             isOpen={showFollowUpPrompt}
             onContinue={handleContinueChat}

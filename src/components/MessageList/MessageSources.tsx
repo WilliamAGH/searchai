@@ -8,7 +8,11 @@
 
 import React from "react";
 import type { SearchResult } from "../../lib/types/message";
-import { getFaviconUrl, getSafeHostname } from "../../lib/utils/favicon";
+import {
+  getDomainFromUrl,
+  getFaviconUrl,
+  getSafeHostname,
+} from "../../lib/utils/favicon";
 import { logger } from "../../lib/logger";
 
 type ContextReference = {
@@ -101,7 +105,7 @@ export function MessageSources({
   );
 
   return (
-    <div className="mt-3 max-w-full overflow-hidden">
+    <div className="mt-3 max-w-full min-w-0 overflow-hidden">
       <button
         type="button"
         onClick={handleToggleClick}
@@ -158,7 +162,8 @@ export function MessageSources({
         {collapsed && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             {previewSources.map((source, i) => {
-              const hostname = getSafeHostname(source.url);
+              const hostname =
+                getDomainFromUrl(source.url) || getSafeHostname(source.url);
               return (
                 <a
                   key={`${messageId}-preview-${i}`}
@@ -169,7 +174,7 @@ export function MessageSources({
                   className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors"
                 >
                   <img
-                    src={getFaviconUrl(source.url)}
+                    src={getFaviconUrl(source.url) ?? undefined}
                     alt=""
                     className="w-3 h-3 rounded"
                     onError={(e) => {
@@ -192,7 +197,8 @@ export function MessageSources({
       {!collapsed && (
         <div className="mt-2 space-y-2 px-2 max-h-[300px] overflow-y-auto">
           {displaySources.map((source, i) => {
-            const hostname = getSafeHostname(source.url);
+            const hostname =
+              getDomainFromUrl(source.url) || getSafeHostname(source.url);
             const isHovered = hoveredSourceUrl === source.url;
 
             // Determine relevance badge color
@@ -244,7 +250,7 @@ export function MessageSources({
               >
                 <div className="flex items-start gap-2">
                   <img
-                    src={getFaviconUrl(source.url)}
+                    src={getFaviconUrl(source.url) ?? undefined}
                     alt=""
                     className="w-4 h-4 mt-0.5 rounded"
                     onError={(e) => {

@@ -4,6 +4,41 @@
  */
 
 /**
+ * Patterns to detect trailing source/reference sections the AI may add.
+ * These duplicate our UI's source display and expose full URLs.
+ */
+
+/** Matches `## Sources` or `### References` heading followed by any content */
+const MARKDOWN_HEADING_SOURCES =
+  /\n#{1,3}\s*(?:Sources?|References?):?\s*\n[\s\S]*$/i;
+
+/** Matches `**Sources:**` or `**References:**` bold header followed by any content */
+const BOLD_HEADER_SOURCES =
+  /\n\*\*(?:Sources?|References?)\*\*:?\s*\n[\s\S]*$/i;
+
+/** Matches plain `Sources:` or `References:` followed by bullet/numbered list items */
+const PLAIN_HEADER_SOURCES =
+  /\n(?:Sources?|References?):?\s*\n(?:\s*[-•*\d]+\.?\s+.+(?:\n|$))+$/i;
+
+const TRAILING_SOURCES_PATTERNS = [
+  MARKDOWN_HEADING_SOURCES,
+  BOLD_HEADER_SOURCES,
+  PLAIN_HEADER_SOURCES,
+];
+
+/**
+ * Strip trailing "Sources:" or "References:" sections that the AI may add.
+ * These duplicate our UI's source display and show full URLs instead of domains.
+ */
+export function stripTrailingSources(text: string): string {
+  let result = text;
+  for (const pattern of TRAILING_SOURCES_PATTERNS) {
+    result = result.replace(pattern, "");
+  }
+  return result.trim();
+}
+
+/**
  * Parse citations from markdown text
  * Matches patterns like [domain.com] or [domain.com, domain2.com]
  */

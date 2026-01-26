@@ -197,6 +197,8 @@ export function buildResearchInstructions(params: {
   needsWebScraping: boolean;
   /** Authoritative context that should guide research focus */
   enhancedContext?: string;
+  /** System-level instructions from enhancement rules */
+  enhancedSystemPrompt?: string;
 }): string {
   // If authoritative context is provided, add disambiguation guidance
   const authoritativeSection = params.enhancedContext
@@ -213,8 +215,16 @@ ${params.enhancedContext}
 `
     : "";
 
-  return `
-ORIGINAL QUESTION: ${params.userQuery}
+  // Temporal/system context should be at the TOP so LLM sees it before search queries
+  const temporalSection = params.enhancedSystemPrompt
+    ? `${params.enhancedSystemPrompt}
+
+---
+
+`
+    : "";
+
+  return `${temporalSection}ORIGINAL QUESTION: ${params.userQuery}
 
 USER INTENT: ${params.userIntent}
 
@@ -382,7 +392,9 @@ YOUR TASK:
 4. Only mention limitations if genuinely relevant
 5. Use markdown formatting for readability
 6. Prefer scraped content excerpts when available; use SERP enrichment as supplemental context
-7. PRIORITIZE authoritative context over web search results when available${systemInstructions}
+7. PRIORITIZE authoritative context over web search results when available
+8. DO NOT add a separate "Sources:" section at the end - cite inline only
+9. When showing URLs, NEVER include "https://" or "http://" prefixes - use bare domain format (example.com/path)${systemInstructions}
 
 Remember the user wants to know: ${params.userIntent}
 `;

@@ -15,6 +15,21 @@ import { AGENT_LIMITS } from "../lib/constants/cache";
 import { getErrorMessage } from "../lib/errors";
 
 /**
+ * Get the current year for temporal context in tool descriptions.
+ * This ensures the LLM knows the current date when formulating search queries.
+ */
+function getCurrentYear(): number {
+  return new Date().getFullYear();
+}
+
+/**
+ * Get a formatted current date string for tool descriptions.
+ */
+function getCurrentDateString(): string {
+  return new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+}
+
+/**
  * Web Search Tool
  * Searches the web and returns results with context tracking
  */
@@ -34,7 +49,13 @@ const getActionCtx = (ctx?: AgentToolRunContext): ActionCtx => {
 
 export const searchWebTool: FunctionTool<any, any, unknown> = tool({
   name: "search_web",
-  description: `Search the web for current information. Use this when you need to find:
+  description: `Search the web for current information. 
+
+IMPORTANT: Today's date is ${getCurrentDateString()} (year ${getCurrentYear()}). 
+When searching for "current", "latest", "best", or "recent" information, include ${getCurrentYear()} in your query.
+Do NOT use outdated years like 2024 in queries for current information.
+
+Use this when you need to find:
 - Recent facts or news
 - Company information
 - Product details

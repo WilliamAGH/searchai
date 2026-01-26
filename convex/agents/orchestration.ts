@@ -220,7 +220,7 @@ async function withTimeout<T>(
 }
 import { generateMessageId } from "../lib/id_generator";
 import { api, internal } from "../_generated/api";
-import { parseAnswerText } from "./answerParser";
+import { parseAnswerText, stripTrailingSources } from "./answerParser";
 import {
   vContextReference,
   vScrapedContent,
@@ -457,6 +457,7 @@ export const orchestrateResearchWorkflow = action({
       // Apply enhancement rules to inject authoritative context for research
       const researchEnhancements = applyEnhancements(args.userQuery, {
         enhanceContext: true,
+        enhanceSystemPrompt: true, // Include temporal context for current-year searches
       });
 
       const researchInstructions = buildResearchInstructions({
@@ -468,6 +469,8 @@ export const orchestrateResearchWorkflow = action({
         searchQueries: plannedQueries,
         needsWebScraping: planningResult.finalOutput.needsWebScraping,
         enhancedContext: researchEnhancements.enhancedContext || undefined,
+        enhancedSystemPrompt:
+          researchEnhancements.enhancedSystemPrompt || undefined,
       });
 
       const researchResult = await withTimeout(
@@ -555,7 +558,8 @@ export const orchestrateResearchWorkflow = action({
     const rawAnswerText = synthesisResult.finalOutput as string;
     if (!rawAnswerText || typeof rawAnswerText !== "string")
       throw new Error("Synthesis failed: no text output");
-    const parsedAnswer = parseAnswerText(rawAnswerText);
+    const strippedAnswer = stripTrailingSources(rawAnswerText);
+    const parsedAnswer = parseAnswerText(strippedAnswer);
 
     const normalizedPlanning = {
       ...planningResult.finalOutput,
@@ -1009,8 +1013,10 @@ export async function* streamConversationalWorkflow(
       "conversational",
     );
 
-    const finalOutput =
+    const rawFinalOutput =
       (agentResult.finalOutput as string) || accumulatedResponse;
+    // Strip trailing "Sources:" sections that AI may add (we display sources separately)
+    const finalOutput = stripTrailingSources(rawFinalOutput);
     const totalDuration = Date.now() - startTime;
 
     // Validate output is not empty (consistent with streamResearchWorkflow validation)
@@ -1512,7 +1518,8 @@ export async function* streamResearchWorkflow(
         throw new Error("Fast synthesis failed: agent returned empty output.");
       }
 
-      const fastParsedAnswer = parseAnswerText(fastSynthesisOutput);
+      const strippedFastAnswer = stripTrailingSources(fastSynthesisOutput);
+      const fastParsedAnswer = parseAnswerText(strippedFastAnswer);
       const fastFinalAnswerText =
         fastParsedAnswer.answer || fastAccumulatedAnswer;
 
@@ -1939,7 +1946,8 @@ export async function* streamResearchWorkflow(
       throw new Error("Synthesis failed: agent returned empty or null output.");
     }
 
-    const parsedAnswer = parseAnswerText(synthesisOutput);
+    const strippedSynthesisOutput = stripTrailingSources(synthesisOutput);
+    const parsedAnswer = parseAnswerText(strippedSynthesisOutput);
     const finalAnswerText = parsedAnswer.answer || accumulatedAnswer;
 
     // If no content was streamed, send the final answer now

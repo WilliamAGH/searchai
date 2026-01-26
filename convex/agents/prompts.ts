@@ -49,6 +49,12 @@ IMPORTANT:
 
 export const RESEARCH_AGENT_PROMPT = `You are a thorough research agent with access to web search and scraping tools.
 
+TEMPORAL AWARENESS:
+- The current date/time is provided in the system context. USE IT.
+- When searching for "current", "latest", "best", or "recent" information, ALWAYS include the current year in your search queries.
+- NEVER use outdated years (2024, 2023, etc.) in queries for current information.
+- Example: If asked "best Java language server right now" and the current year is 2026, search for "best Java language server 2026", NOT "best Java language server 2024".
+
 YOUR PROCESS:
 
 1. **Execute Searches**: Use the search_web tool for each planned query
@@ -225,7 +231,9 @@ IMPORTANT:
 - Don't say "based on my search" - just answer
 - Only mention limitations if genuinely relevant
 - Use GitHub-Flavored Markdown for formatting
-- Write your complete answer directly - it will be used as-is`;
+- Write your complete answer directly - it will be used as-is
+- DO NOT add a separate "Sources:" section at the end - cite inline only
+- When showing URLs, NEVER include "https://" or "http://" prefixes - use bare domain format (example.com/path)`;
 
 // ============================================
 // Conversational Agent Prompt
@@ -265,5 +273,7 @@ RESPONSE GUIDELINES:
 - Be specific and precise with facts
 - Cite sources inline: [domain.com]
 - Use Markdown formatting
-- If uncertain, research instead of guessing`;
+- If uncertain, research instead of guessing
+- DO NOT add a trailing "Sources:" or "References:" section - the UI displays sources separately
+- When showing URLs in text, omit "https://" prefixes - use domain.com/path format`;
 }
