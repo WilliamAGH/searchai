@@ -90,9 +90,17 @@ export function useCitationProcessor(
       }
 
       if (url) {
-        // Use a special marker that won't be escaped by markdown
-        return `@@CITATION@@${domain}@@${url}@@`;
+        // Output standard markdown link - anchor renderer handles citation styling
+        return `[${domain}](${url})`;
       }
+
+      // Citation pattern found but no matching URL - log for debugging
+      logger.debug("Citation not resolved: no matching URL found in sources", {
+        citedText,
+        domain,
+        mapSize: domainToUrlMap.size,
+        hasSearchResults: searchResults.length > 0,
+      });
       return match;
     });
   }, [content, domainToUrlMap, searchResults]);
