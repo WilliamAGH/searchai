@@ -101,8 +101,7 @@ export function useCitationProcessor(
         mapSize: domainToUrlMap.size,
         hasSearchResults: searchResults.length > 0,
       });
-      // Remove unmatched citations to prevent display artifacts (e.g. empty brackets or raw text)
-      return "";
+      return match;
     });
   }, [content, domainToUrlMap, searchResults]);
 }

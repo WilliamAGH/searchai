@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '22.17.0'
 
       - name: Install dependencies
         run: npm ci
@@ -40,4 +40,3 @@ jobs:
           name: playwright-report
           path: playwright-report
           if-no-files-found: ignore
-
