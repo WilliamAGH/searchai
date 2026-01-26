@@ -4,8 +4,8 @@
  */
 
 import React, { useEffect, useCallback, useState } from "react";
+import { useConvex } from "convex/react";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { logger } from "../../lib/logger";
 import { EmptyState } from "./EmptyState";
@@ -18,7 +18,7 @@ import {
   LoadErrorState,
 } from "./MessageSkeleton";
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
-import type { Message } from "../../lib/types/message";
+import type { Message, SearchProgress } from "../../lib/types/message";
 import { useMessageListScroll } from "../../hooks/useMessageListScroll";
 import { resolveMessageKey } from "./messageKey";
 import { ReasoningDisplay } from "./ReasoningDisplay";
@@ -30,27 +30,9 @@ interface MessageListProps {
   messages: Message[];
   isGenerating: boolean;
   onToggleSidebar: () => void;
-  searchProgress?: {
-    stage:
-      | "idle"
-      | "planning"
-      | "searching"
-      | "scraping"
-      | "analyzing"
-      | "generating";
-    message?: string;
-    urls?: string[];
-    currentUrl?: string;
-    queries?: string[];
-    /** LLM's schema-enforced reasoning for this tool call */
-    toolReasoning?: string;
-    /** Search query being executed */
-    toolQuery?: string;
-    /** URL being scraped */
-    toolUrl?: string;
-  } | null;
+  searchProgress?: SearchProgress | null;
   onDeleteLocalMessage?: (messageId: string) => void;
-  onRequestDeleteMessage?: (messageId: string) => void;
+  onRequestDeleteMessage?: (messageId: string | Id<"messages">) => void;
   // Pagination props
   isLoadingMore?: boolean;
   hasMore?: boolean;
@@ -62,7 +44,7 @@ interface MessageListProps {
   // Session ID for authorization (anonymous users)
   sessionId?: string;
   // Optional external scroll container ref (when parent handles scrolling)
-  scrollContainerRef?: React.RefObject<HTMLDivElement>;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -86,8 +68,7 @@ export function MessageList({
   sessionId,
   scrollContainerRef: externalScrollRef,
 }: MessageListProps) {
-  const deleteMessage = useMutation(api.messages.deleteMessage);
-
+  const convex = useConvex();
   // Use the scroll behavior hook
   const {
     scrollContainerRef: _scrollContainerRef,
@@ -123,24 +104,26 @@ export function MessageList({
           return;
         if (onRequestDeleteMessage) {
           onRequestDeleteMessage(String(messageId));
+          return;
+        }
+
+        if (
+          String(messageId).startsWith("local_") ||
+          String(messageId).startsWith("msg_")
+        ) {
+          onDeleteLocalMessage?.(String(messageId));
         } else {
-          if (
-            String(messageId).startsWith("local_") ||
-            String(messageId).startsWith("msg_")
-          ) {
-            onDeleteLocalMessage?.(String(messageId));
-          } else {
-            await deleteMessage({
-              messageId: messageId as Id<"messages">,
-              sessionId,
-            });
-          }
+          // @ts-ignore - Convex api type instantiation is excessively deep [TS1c]
+          await convex.mutation(api.messages.deleteMessage, {
+            messageId: messageId as Id<"messages">,
+            sessionId,
+          });
         }
       } catch (err) {
         logger.error("Failed to delete message", err);
       }
     },
-    [onRequestDeleteMessage, onDeleteLocalMessage, deleteMessage, sessionId],
+    [onRequestDeleteMessage, onDeleteLocalMessage, sessionId, convex],
   );
 
   // Debug logging
