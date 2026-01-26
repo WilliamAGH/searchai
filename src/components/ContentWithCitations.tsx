@@ -9,6 +9,7 @@
 import React, { useRef } from "react";
 import { getDomainFromUrl } from "../lib/utils/favicon";
 import { useDomainToUrlMap } from "../hooks/utils/useDomainToUrlMap";
+import { useCitationProcessor } from "../hooks/utils/useCitationProcessor";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -40,74 +41,11 @@ export function ContentWithCitations({
   const domainToUrlMap = useDomainToUrlMap(searchResults);
 
   // Convert [domain] or [URL] to markdown links where domain is known
-  const processedContent = React.useMemo(() => {
-    const citationRegex = /\[([^\]]+)\]/g;
-    return content.replace(citationRegex, (match, citedText) => {
-      let domain = citedText;
-      let url: string | undefined;
-
-      // Check if cited text is a full URL
-      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
-        // Extract domain from the full URL citation
-        domain = getDomainFromUrl(citedText);
-        // Try to find exact URL match first
-        const exactMatch = searchResults.find((r) => r.url === citedText);
-        if (exactMatch) {
-          url = exactMatch.url;
-        } else {
-          // Fallback to domain matching
-          url = domainToUrlMap.get(domain);
-        }
-      } else if (citedText.includes("/")) {
-        // Handle cases like "github.com/user/repo" - extract just the domain
-        const domainPart = citedText.split("/")[0];
-        domain = domainPart;
-
-        // Try multiple matching strategies
-        // 1. Exact path match
-        const exactPathMatch = searchResults.find((r) =>
-          r.url.includes(citedText),
-        );
-        if (exactPathMatch) {
-          url = exactPathMatch.url;
-        } else {
-          // 2. Domain match from map
-          url = domainToUrlMap.get(domain);
-          if (!url) {
-            // 3. Any URL from this domain
-            const domainMatch = searchResults.find((r) => {
-              const sourceDomain = getDomainFromUrl(r.url);
-              return (
-                sourceDomain === domain || sourceDomain === `www.${domain}`
-              );
-            });
-            if (domainMatch) {
-              url = domainMatch.url;
-            }
-          }
-        }
-
-        // If still no match but it looks like a valid domain, force match to first result from that domain
-        if (!url && domain.includes(".")) {
-          const anyMatch = searchResults.find((r) => r.url.includes(domain));
-          if (anyMatch) {
-            url = anyMatch.url;
-          }
-        }
-      } else {
-        // Simple domain citation - check if it looks like a domain
-        if (citedText.includes(".")) {
-          url = domainToUrlMap.get(citedText);
-          domain = citedText;
-        }
-      }
-
-      // Only convert to markdown link if we found a matching URL
-      // Always show just the domain in the link text
-      // Remove unmatched brackets to prevent display artifacts
-      return url ? `[${domain}](${url})` : "";
-    });
-  }, [content, domainToUrlMap, searchResults]);
+  const processedContent = useCitationProcessor(
+    content,
+    searchResults,
+    domainToUrlMap,
+  );
 
   // Custom sanitize schema (stable)
   const sanitizeSchema: Schema = React.useMemo(
@@ -160,7 +98,7 @@ export function ContentWithCitations({
   );
 
   const anchorRenderer: NonNullable<Components["a"]> = React.useCallback(
-    ({ href, children, ...props }) => {
+    ({ href, children, ...props }: React.ComponentPropsWithoutRef<"a">) => {
       const url = String(href || "");
       const isCitation = url && [...domainToUrlMap.values()].includes(url);
       const highlighted = hoveredSourceUrl && url === hoveredSourceUrl;
@@ -203,7 +141,11 @@ export function ContentWithCitations({
   );
 
   const codeRenderer: NonNullable<Components["code"]> = React.useCallback(
-    ({ className, children, ...props }) => (
+    ({
+      className,
+      children,
+      ...props
+    }: React.ComponentPropsWithoutRef<"code">) => (
       <code className={className} {...props}>
         {String(children)}
       </code>

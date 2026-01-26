@@ -15,9 +15,8 @@ import rehypeSanitize from "rehype-sanitize";
 import { defaultSchema } from "hast-util-sanitize";
 import type { Schema } from "hast-util-sanitize";
 import type { PluggableList } from "unified";
-import { getDomainFromUrl } from "../lib/utils/favicon";
 import { useDomainToUrlMap } from "../hooks/utils/useDomainToUrlMap";
-import { logger } from "../lib/logger";
+import { useCitationProcessor } from "../hooks/utils/useCitationProcessor";
 
 interface MarkdownWithCitationsProps {
   content: string;
@@ -40,65 +39,11 @@ export function MarkdownWithCitations({
   const domainToUrlMap = useDomainToUrlMap(searchResults);
 
   // Process content to replace citations before markdown rendering
-  const processedContent = React.useMemo(() => {
-    // Replace [domain.com] or [full URL] with custom markers that survive markdown processing
-    const citationRegex = /\[([^\]]+)\]/g;
-
-    const processed = content.replace(citationRegex, (match, citedText) => {
-      let domain = citedText;
-      let url: string | undefined;
-
-      // Check if cited text is a full URL
-      if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
-        // Extract domain from the full URL citation
-        try {
-          domain = new URL(citedText).hostname.replace("www.", "");
-          // Try to find exact URL match first
-          const exactMatch = searchResults?.find((r) => r.url === citedText);
-          if (exactMatch) {
-            url = exactMatch.url;
-          } else {
-            // Fallback to domain matching
-            url = domainToUrlMap.get(domain);
-          }
-        } catch (error) {
-          logger.warn("Failed to parse cited URL for markdown citation", {
-            citedText,
-            error,
-          });
-          url = domainToUrlMap.get(citedText);
-        }
-      } else if (citedText.includes("/")) {
-        // Handle cases like "github.com/user/repo" - extract just the domain
-        const domainPart = citedText.split("/")[0];
-        domain = domainPart;
-        // Look for any URL from this domain
-        url = domainToUrlMap.get(domain);
-        // If not found, try to find a URL that contains this path
-        if (!url) {
-          const matchingResult = searchResults?.find(
-            (r) =>
-              r.url.includes(citedText) ||
-              (r.url.includes(domain) && r.url.includes("/")),
-          );
-          if (matchingResult) {
-            url = matchingResult.url;
-          }
-        }
-      } else {
-        // Simple domain citation
-        url = domainToUrlMap.get(citedText);
-        domain = citedText;
-      }
-
-      if (url) {
-        // Use a special marker that won't be escaped by markdown
-        return `@@CITATION@@${domain}@@${url}@@`;
-      }
-      return match;
-    });
-    return processed;
-  }, [content, domainToUrlMap, searchResults]);
+  const processedContent = useCitationProcessor(
+    content,
+    searchResults,
+    domainToUrlMap,
+  );
 
   // Custom sanitize schema (stable)
   const sanitizeSchema: Schema = React.useMemo(
@@ -183,7 +128,11 @@ export function MarkdownWithCitations({
   );
 
   const codeRenderer: NonNullable<Components["code"]> = React.useCallback(
-    ({ className, children, ...props }) => (
+    ({
+      className,
+      children,
+      ...props
+    }: React.ComponentPropsWithoutRef<"code">) => (
       <code className={className} {...props}>
         {String(children)}
       </code>
@@ -192,7 +141,7 @@ export function MarkdownWithCitations({
   );
 
   const paragraphRenderer: NonNullable<Components["p"]> = React.useCallback(
-    ({ children, ...props }) => {
+    ({ children, ...props }: React.ComponentPropsWithoutRef<"p">) => {
       const processChildren = (nodes: React.ReactNode): React.ReactNode => {
         return React.Children.map(nodes, (child) => {
           if (typeof child === "string") {
@@ -251,7 +200,7 @@ export function MarkdownWithCitations({
   );
 
   const listItemRenderer: NonNullable<Components["li"]> = React.useCallback(
-    ({ children, ...props }) => {
+    ({ children, ...props }: React.ComponentPropsWithoutRef<"li">) => {
       const processChildren = (nodes: React.ReactNode): React.ReactNode => {
         return React.Children.map(nodes, (child) => {
           if (typeof child === "string") {
