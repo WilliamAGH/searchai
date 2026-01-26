@@ -105,7 +105,7 @@ export function MessageSources({
   );
 
   return (
-    <div className="mt-3 max-w-full overflow-hidden">
+    <div className="mt-3 max-w-full min-w-0 overflow-x-auto">
       <button
         type="button"
         onClick={handleToggleClick}

@@ -60,7 +60,7 @@ export function ContentWithCitations({
   );
 
   return (
-    <div>
+    <div className="min-w-0">
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}

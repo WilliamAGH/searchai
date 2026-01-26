@@ -27,7 +27,7 @@ export function ReasoningDisplay({
   const wordCount = reasoning.split(/\s+/).filter(Boolean).length;
 
   return (
-    <div className="mt-1 max-w-full overflow-hidden">
+    <div className="mt-1 max-w-full overflow-x-auto">
       <button
         type="button"
         onClick={handleToggle}
@@ -74,8 +74,8 @@ export function ReasoningDisplay({
         </div>
       </button>
       {!collapsed && (
-        <div className="mt-1 p-2 rounded bg-blue-50/30 dark:bg-blue-900/10 border border-blue-200/30 dark:border-blue-800/30 max-w-full overflow-hidden">
-          <div className="text-[10px] sm:text-xs text-blue-700/90 dark:text-blue-300/90 font-mono leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-y-auto opacity-90">
+        <div className="mt-1 p-2 rounded bg-blue-50/30 dark:bg-blue-900/10 border border-blue-200/30 dark:border-blue-800/30 max-w-full overflow-x-auto">
+          <div className="text-[10px] sm:text-xs text-blue-700/90 dark:text-blue-300/90 font-mono leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-auto opacity-90">
             {reasoning}
             {isStreaming && !hasStartedContent && (
               <span className="animate-pulse ml-0.5">▊</span>
