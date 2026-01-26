@@ -29,16 +29,13 @@ import { useAutoCreateFirstChat } from "../../hooks/useAutoCreateFirstChat";
 import { useConvexQueries } from "../../hooks/useConvexQueries";
 import { useSidebarTiming } from "../../hooks/useSidebarTiming";
 import { usePaginatedMessages } from "../../hooks/usePaginatedMessages";
+import { useEffectiveMessages } from "../../hooks/useEffectiveMessages";
 import { logger } from "../../lib/logger";
 import { ChatLayout } from "./ChatLayout";
 import type { Chat } from "../../lib/types/chat";
 import { createChatFromData } from "../../lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "../../lib/constants/topicDetection";
-import {
-  buildApiBase,
-  resolveApiPath,
-  fetchJsonWithRetry,
-} from "../../lib/utils/httpUtils";
+import { buildApiBase, resolveApiPath } from "../../lib/utils/httpUtils";
 import { isTopicChange } from "../../lib/utils/topicDetection";
 import { mapMessagesToLocal } from "../../lib/utils/messageMapper";
 import { buildUserHistory } from "../../lib/utils/chatHistory";
@@ -125,17 +122,13 @@ function ChatInterfaceComponent({
     return baseChats;
   }, [chats]);
 
-  const {
-    navigateWithVerification,
-    buildChatPath,
-    handleSelectChat: navHandleSelectChat,
-  } = useChatNavigation({
-    currentChatId,
-    allChats,
-    isAuthenticated,
-    onSelectChat: chatActions.selectChat,
-  });
-  const updateChatPrivacy = useMutation(api.chats.updateChatPrivacy);
+  const { navigateWithVerification, handleSelectChat: navHandleSelectChat } =
+    useChatNavigation({
+      currentChatId,
+      allChats,
+      isAuthenticated,
+      onSelectChat: chatActions.selectChat,
+    });
   const planSearch = useAction(api.search.planSearch);
   const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
@@ -200,78 +193,14 @@ function ChatInterfaceComponent({
     await loadMore();
   }, [loadMore]);
 
-  // Use paginated messages when available, fallback to regular messages
-  // CRITICAL: Prioritize unified messages during active generation (optimistic state)
-  const effectiveMessages = useMemo(() => {
-    // Check if unified messages have optimistic state (isStreaming or unpersisted)
-    const hasOptimisticMessages = messages.some(
-      (m) => m.isStreaming === true || m.persisted === false,
-    );
-
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find((m) => m.role === "assistant");
-    // Extract stable ID from the last assistant message (prefer messageId > _id > id)
-    const lastAssistantKey =
-      lastAssistantMessage?.messageId ??
-      lastAssistantMessage?._id ??
-      lastAssistantMessage?.id ??
-      null;
-    const persistedAssistantMissingInPaginated =
-      !!lastAssistantMessage &&
-      lastAssistantMessage.persisted === true &&
-      !lastAssistantMessage.isStreaming &&
-      typeof lastAssistantMessage.content === "string" &&
-      lastAssistantMessage.content.length > 0 &&
-      // Use ID-based comparison when available, fall back to content comparison
-      (lastAssistantKey
-        ? !paginatedMessages.some(
-            (m) => (m.messageId ?? m._id ?? m.id ?? null) === lastAssistantKey,
-          )
-        : !paginatedMessages.some(
-            (m) =>
-              m.role === "assistant" &&
-              typeof m.content === "string" &&
-              m.content === lastAssistantMessage.content,
-          ));
-
-    // If we have optimistic messages (or a just-persisted message not yet in paginated),
-    // always use unified messages (source of truth during generation)
-    if (hasOptimisticMessages || persistedAssistantMissingInPaginated) {
-      logger.debug("Using unified messages - optimistic state present", {
-        count: messages.length,
-        chatId: currentChatId,
-      });
-      return messages;
-    }
-
-    // Otherwise, use paginated messages if available (for authenticated users with DB data)
-    if (
-      isAuthenticated &&
-      currentChatId &&
-      !currentChat?.isLocal &&
-      paginatedMessages.length > 0
-    ) {
-      logger.debug("Using paginated messages - no optimistic state", {
-        count: paginatedMessages.length,
-        chatId: currentChatId,
-      });
-      return paginatedMessages;
-    }
-
-    // Fallback to unified messages
-    logger.debug("Using unified messages - fallback", {
-      count: messages.length,
-      chatId: currentChatId,
-    });
-    return messages;
-  }, [
+  // Use the extracted hook for message source selection
+  const effectiveMessages = useEffectiveMessages({
+    messages,
+    paginatedMessages,
     isAuthenticated,
     currentChatId,
-    currentChat?.isLocal,
-    paginatedMessages,
-    messages,
-  ]);
+    currentChat,
+  });
 
   const currentMessages = useMemo(
     () => mapMessagesToLocal(effectiveMessages, isAuthenticated),
@@ -509,8 +438,6 @@ function ChatInterfaceComponent({
       showFollowUpPrompt={showFollowUpPrompt}
       currentChatId={currentChatId}
       currentChat={currentChat}
-      isAuthenticated={isAuthenticated}
-      allChats={allChats}
       undoBanner={undoBanner}
       plannerHint={plannerHint}
       chatSidebarProps={chatSidebarProps}
@@ -520,16 +447,10 @@ function ChatInterfaceComponent({
       swipeHandlers={swipeHandlers}
       setShowShareModal={setShowShareModal}
       setUndoBanner={setUndoBanner}
-      openShareModal={openShareModal}
       handleContinueChat={handleContinueChat}
       handleNewChatForFollowUp={handleNewChatForFollowUp}
       handleNewChatWithSummary={handleNewChatWithSummary}
-      chatState={chatState}
       chatActions={chatActions}
-      updateChatPrivacy={updateChatPrivacy}
-      navigateWithVerification={navigateWithVerification}
-      buildChatPath={buildChatPath}
-      fetchJsonWithRetry={fetchJsonWithRetry}
       resolveApi={resolveApi}
     />
   );

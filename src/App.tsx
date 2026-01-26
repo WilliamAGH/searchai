@@ -215,6 +215,46 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
 
+  // Keep the app pinned to the Visual Viewport on iOS Safari (address bar + keyboard).
+  // This prevents the "gap under composer" where 100dvh can desync from the visible area.
+  useEffect(() => {
+    const setAppDvh = () => {
+      const vv = window.visualViewport;
+      const height = vv?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty("--app-dvh", `${height}px`);
+    };
+
+    setAppDvh();
+
+    // When the page itself can't scroll (we use internal scroll containers),
+    // Safari's browser chrome can still expand/collapse during *element* scroll.
+    // Capture scroll events and refresh dvh once per frame to avoid stale sizing.
+    let rafId: number | null = null;
+    const scheduleSetAppDvh = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        setAppDvh();
+      });
+    };
+
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", setAppDvh);
+    vv?.addEventListener("scroll", setAppDvh);
+    window.addEventListener("resize", setAppDvh);
+    window.addEventListener("orientationchange", setAppDvh);
+    window.addEventListener("scroll", scheduleSetAppDvh, true);
+
+    return () => {
+      vv?.removeEventListener("resize", setAppDvh);
+      vv?.removeEventListener("scroll", setAppDvh);
+      window.removeEventListener("resize", setAppDvh);
+      window.removeEventListener("orientationchange", setAppDvh);
+      window.removeEventListener("scroll", scheduleSetAppDvh, true);
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   // Claim anonymous chats when user signs in
   useClaimAnonymousChats();
 
@@ -287,7 +327,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <div className="h-dvh overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
+        <div className="h-full overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
           <div className="h-full flex flex-col">
             <header className="flex-shrink-0 sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30">
               <div className="h-[3.75rem] sm:h-16 flex items-center justify-between pl-3 sm:pl-4 pr-4 sm:pr-6 lg:pr-8">
@@ -365,63 +405,28 @@ export default function App() {
               </div>
             </header>
 
-            <main className="flex-1 flex overflow-hidden">
+            <main className="flex-1 flex min-h-0 overflow-hidden">
               <Routes>
-                <Route
-                  path="/"
-                  element={
-                    <ChatPage
-                      onRequestSignUp={openSignUp}
-                      onRequestSignIn={openSignIn}
-                      isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={toggleSidebar}
-                    />
-                  }
-                />
-                <Route
-                  path="/chat"
-                  element={
-                    <ChatPage
-                      onRequestSignUp={openSignUp}
-                      onRequestSignIn={openSignIn}
-                      isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={toggleSidebar}
-                    />
-                  }
-                />
-                <Route
-                  path="/chat/:chatId"
-                  element={
-                    <ChatPage
-                      onRequestSignUp={openSignUp}
-                      onRequestSignIn={openSignIn}
-                      isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={toggleSidebar}
-                    />
-                  }
-                />
-                <Route
-                  path="/s/:shareId"
-                  element={
-                    <ChatPage
-                      onRequestSignUp={openSignUp}
-                      onRequestSignIn={openSignIn}
-                      isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={toggleSidebar}
-                    />
-                  }
-                />
-                <Route
-                  path="/p/:publicId"
-                  element={
-                    <ChatPage
-                      onRequestSignUp={openSignUp}
-                      onRequestSignIn={openSignIn}
-                      isSidebarOpen={isSidebarOpen}
-                      onToggleSidebar={toggleSidebar}
-                    />
-                  }
-                />
+                {[
+                  "/",
+                  "/chat",
+                  "/chat/:chatId",
+                  "/s/:shareId",
+                  "/p/:publicId",
+                ].map((path) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={
+                      <ChatPage
+                        onRequestSignUp={openSignUp}
+                        onRequestSignIn={openSignIn}
+                        isSidebarOpen={isSidebarOpen}
+                        onToggleSidebar={toggleSidebar}
+                      />
+                    }
+                  />
+                ))}
               </Routes>
             </main>
 

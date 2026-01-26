@@ -226,10 +226,11 @@
 
   /* Dynamic viewport units to avoid mobile 100vh bugs */
   .h-dvh {
-    height: 100dvh;
+    /* JS can set --app-dvh using VisualViewport for iOS Safari edge cases */
+    height: var(--app-dvh, 100dvh);
   }
   .min-h-dvh {
-    min-height: 100dvh;
+    min-height: var(--app-dvh, 100dvh);
   }
 
   /* Floating action button bottom offset with safe-area support */
@@ -269,7 +270,18 @@ html,
 body,
 #root {
   height: 100%;
-  min-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 
+ * Lock body scroll to prevent bounce effects and address bar quirks on iOS.
+ * This effectively makes the body a fixed container matching the visual viewport.
+ */
+html,
+body {
+  position: fixed;
+  overscroll-behavior: none;
 }
 
 /*

@@ -13,7 +13,7 @@ import { UndoBanner } from "../UndoBanner";
 import { ShareModalContainer } from "../ShareModalContainer";
 // Global agent status overlay removed; inline statuses handle all feedback
 import type { Chat } from "../../lib/types/chat";
-import type { ChatState, ChatActions } from "../../hooks/types";
+import type { ChatActions } from "../../hooks/types";
 
 type ChatSidebarProps = React.ComponentProps<typeof ChatSidebar>;
 type MobileSidebarProps = React.ComponentProps<typeof MobileSidebar>;
@@ -28,8 +28,6 @@ interface ChatLayoutProps {
   showFollowUpPrompt: boolean;
   currentChatId: string | null;
   currentChat: Chat | null;
-  isAuthenticated: boolean;
-  allChats: Chat[];
 
   // UI state
   undoBanner: {
@@ -53,23 +51,14 @@ interface ChatLayoutProps {
   setUndoBanner: (
     banner: { message: string; action?: () => void } | null,
   ) => void;
-  openShareModal: () => void;
   handleContinueChat: () => void;
   handleNewChatForFollowUp: () => void;
   handleNewChatWithSummary: () => void;
 
   // Chat data
-  chatState: ChatState;
   chatActions: ChatActions;
 
   // API functions
-  updateChatPrivacy: (args: {
-    chatId: string;
-    privacy: "private" | "shared" | "public";
-  }) => Promise<void>;
-  navigateWithVerification: (path: string) => Promise<void>;
-  buildChatPath: (chatId: string) => string;
-  fetchJsonWithRetry: <T>(url: string, init?: RequestInit) => Promise<T>;
   resolveApi: (path: string) => string;
 }
 
@@ -80,8 +69,6 @@ export function ChatLayout({
   showFollowUpPrompt,
   currentChatId,
   currentChat,
-  isAuthenticated: _isAuthenticated,
-  allChats: _allChats,
   undoBanner,
   plannerHint,
   chatSidebarProps,
@@ -91,16 +78,10 @@ export function ChatLayout({
   swipeHandlers,
   setShowShareModal,
   setUndoBanner,
-  openShareModal: _openShareModal,
   handleContinueChat,
   handleNewChatForFollowUp,
   handleNewChatWithSummary,
-  chatState: _chatState,
   chatActions,
-  updateChatPrivacy: _updateChatPrivacy,
-  navigateWithVerification: _navigateWithVerification,
-  buildChatPath: _buildChatPath,
-  fetchJsonWithRetry: _fetchJsonWithRetry,
   resolveApi,
 }: ChatLayoutProps) {
   // Desktop sidebar visible: not mobile AND sidebar is open
@@ -110,10 +91,10 @@ export function ChatLayout({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="flex-1 flex h-full relative">
+    <div className="flex-1 flex h-full min-h-0 relative">
       {/* Desktop Sidebar - Fixed position so scroll appears at browser edge */}
       {showDesktopSidebar && (
-        <div className="fixed left-0 top-[3.75rem] sm:top-16 w-80 h-[calc(100dvh-3.75rem)] sm:h-[calc(100dvh-4rem)] z-40">
+        <div className="fixed left-0 top-[3.75rem] sm:top-16 w-80 h-[calc(var(--app-dvh,100dvh)_-_3.75rem)] sm:h-[calc(var(--app-dvh,100dvh)_-_4rem)] z-40">
           <div className="h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
             <ChatSidebar {...chatSidebarProps} />
           </div>
@@ -126,7 +107,7 @@ export function ChatLayout({
       {/* Main content - full width scroll container, scrollbar at browser edge */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 flex flex-col h-full overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
+        className={`flex-1 flex flex-col h-full min-h-0 overflow-y-auto overscroll-contain ${showDesktopSidebar ? "ml-80" : ""}`}
         {...swipeHandlers}
       >
         {/* Content wrapper: grow to fill when content is small, don't shrink when content is large */}
