@@ -5,7 +5,7 @@ globs: "**/*.ts,**/*.tsx"
 
 # Type Safety & Zod Validation
 
-Core rules in `CLAUDE.md`: [TY1], [VL1]
+Core rules in `AGENTS.md`: [TY1], [VL1], [ZV1]
 
 ## [TS1] Strict Type Safety
 
@@ -24,6 +24,7 @@ Core rules in `CLAUDE.md`: [TY1], [VL1]
 - [ZD2a] **Canonical Zod schemas**: `convex/lib/schemas/` (importable by both `src/` and `convex/`)
 - [ZD2b] **Convex validators**: `convex/lib/validators.ts` (required for database, cannot use Zod)
 - [ZD2c] **No duplication**: Import from canonical location. Never redefine same schema.
+- [ZD2d] **Validation utilities**: `convex/lib/validation/zodUtils.ts` — canonical location for `logZodFailure`, `safeParseWithLog`, `safeParseOrNull`, `parseArrayWithLogging`, `ValidationResult<T>`, and `isRecord`.
 
 ## [ZD3] When to Validate
 
@@ -39,3 +40,41 @@ Core rules in `CLAUDE.md`: [TY1], [VL1]
 - Use `.safeParse()` on untrusted data (never `.parse()` on network payloads).
 - Derive types via `z.infer<typeof Schema>`.
 - Use `.strict()` for stable API contracts.
+
+## [ZD5] Error Handling — Per [ZV1]
+
+- [ZD5a] **Never swallow errors**: Use `logZodFailure(context, error, payload)` for all validation failures.
+- [ZD5b] **Include record identifiers**: Context must identify WHICH record failed (e.g., `"parseUser [id=abc123]"`).
+- [ZD5c] **Discriminated unions**: Return `{ success: true, data }` or `{ success: false, error }`, not `null`.
+- [ZD5d] **Use canonical utilities**:
+
+```typescript
+import { logZodFailure, safeParseWithLog, safeParseOrNull } from "convex/lib/validation/zodUtils";
+
+// Best: Discriminated union (new code)
+const result = safeParseWithLog(UserSchema, data, `parseUser [id=${id}]`);
+if (result.success) {
+  // result.data is typed
+} else {
+  // result.error is ZodError (already logged)
+}
+
+// Legacy compatibility: Returns null (logs on failure)
+const user = safeParseOrNull(UserSchema, data, `parseUser [id=${id}]`);
+```
+
+## [ZD6] Forbidden Patterns
+
+```typescript
+// FORBIDDEN: parse() throws and crashes rendering
+const data = schema.parse(raw);
+
+// FORBIDDEN: silent fallback swallows errors
+const data = schema.safeParse(raw).data ?? defaultValue;
+
+// FORBIDDEN: empty catch hides failures
+try { schema.parse(raw); } catch { return null; }
+
+// FORBIDDEN: no record identifier - can't debug
+logZodFailure("parseResponse", error, raw);  // Which record??
+```

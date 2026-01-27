@@ -7,13 +7,16 @@ alwaysApply: true
 
 ## Document Organization [ORG]
 
-- [ORG1] Purpose: keep every critical rule within the first ~250 lines; move long examples/notes to Appendix.
+- [ORG1] Purpose: keep every critical rule within the first ~250 lines; move long examples/notes to Appendix (within this file only; no external “appendix” docs).
 - [ORG2] Structure: Rule Summary first, then detailed sections keyed by short hashes (e.g., `[GT1a]`).
 - [ORG3] Usage: cite hashes when giving guidance or checking compliance; add new rules without renumbering older ones.
+- [ORG4] One Hash, One Rule: each `[XX#x]` bullet is a single, succinct rule statement. Put HOW/WHY in `docs/` (<= 350 LOC each) and reference it from the rule.
 
 ## Rule Summary [SUM]
 
 - [ZA1a-c] Zero Tolerance Policy (zero assumptions, validation workflow, forbidden practices)
+- [LOC1a-d] Repository File Length Limit (<= 350 LOC; excludes generated files)
+- [DOC1a-f] Documentation Architecture (AGENTS = rules; docs = how/why; no barrels; no .cursor rules)
 - [GT1a-j] Git, history safety, hooks/signing, lock files, and clean commits
 - [CX1a-h] Convex runtimes: `"use node";` boundaries for Node-only imports
 - [RC1a-d] Root Cause Resolution (single implementation, no fallbacks, no shims/workarounds)
@@ -24,11 +27,29 @@ alwaysApply: true
 - [EH1a-c] Error Handling (no swallowing, no silent degradation)
 - [TY1a-f] Type Safety & Zod (Zod v4, strict types, no `any`)
 - [VL1a-d] Validation Architecture (no duplication, trust Convex, Zod at external boundaries only)
+- [ZV1a-e] Zod Validation Errors (log failures, record identifiers, discriminated unions)
 - [UI1a-c] UI Status & Overlays (inline-only; never block input)
 - [HP1a-c] HTTP Endpoints (Convex): validation, clarity, no ambiguous routing
 - [CS1a-c] Code Search Policy (semantic-first; validate Convex code before commit)
 - [VR1a-e] Verification Loops (build/typecheck/lint/tests/e2e)
 - [LG1a] Language (American English only)
+
+## [LOC1] Repository File Length Limit (Mandatory)
+
+- [LOC1a] **Hard Cap**: All written, non-generated source files in this repo MUST be <= 350 lines. This includes `AGENTS.md` itself.
+- [LOC1b] **SRP Enforcer**: This 350-line "stick" forces modularity (DDD/SRP); > 350 lines = too many responsibilities (see [MO1d]).
+- [LOC1c] **Zero Tolerance**: No edits allowed to files > 350 LOC (even legacy); you MUST split/retrofit before applying your change.
+- [LOC1d] **Enforcement**: `npm run lint:loc` MUST pass. `npm run validate` MUST include `lint:loc` and fail if any non-generated file exceeds the limit.
+- [LOC1e] **Exclusions**: Generated files (lockfiles, Convex `_generated/`, build outputs).
+
+## [DOC1] Documentation Architecture (Mandatory)
+
+- [DOC1a] **Canonical Rules**: `AGENTS.md` is the ONLY canonical source for agent rules. Rules live here as single hash bullets (see [ORG4]).
+- [DOC1b] **Docs Purpose**: `docs/` files explain HOW and WHY to follow rules. Docs MUST NOT restate/redefine rules; they reference rule IDs (e.g., "See [IM1d]").
+- [DOC1c] **Docs Scope**: Each `docs/*.md` file covers one narrow topic and MUST be <= 350 lines (see [LOC1]).
+- [DOC1d] **No Doc Barrels**: Do not create documentation "index"/"barrel" files whose primary purpose is to list other docs (e.g., `docs/**/index.md`). Every doc must be substantive.
+- [DOC1e] **No .cursor Rules**: Do not add new `.cursor/rules/*.mdc` files. Migrate any existing `.cursor/rules` content into `docs/` and delete the `.cursor/rules` source.
+- [DOC1f] **Prerequisite Reading**: When a workflow requires a doc to be read first, the rule MUST name the exact doc path (e.g., "Before editing `tests/e2e/*`, read `docs/testing-e2e.md`.").
 
 ## [ZA1] Zero Tolerance Policy
 
@@ -109,6 +130,17 @@ alwaysApply: true
 - [FS1d] **One Way**: There is one single way to do everything. No exceptions. If something is updated, update all consumers immediately and remove the old code.
 - [FS1e] **No Duplication**: Single sources of truth. Do not scatter duplicate constants or config fragments.
 
+## [MO1] No Monoliths
+
+- [MO1a] **No Monoliths**: Avoid multi-concern files and catch-all modules.
+- [MO1b] **Split**: New work starts in new files; when touching a monolith, extract at least one seam.
+- [MO1c] **Halt**: If safe extraction impossible, halt and ask.
+- [MO1d] **Strict SRP**: Each unit serves one actor; separate logic that changes for different reasons.
+- [MO1e] **Boundary Rule**: Cross-module interaction happens only through explicit, typed contracts with dependencies pointing inward; don’t reach into other modules’ internals.
+- [MO1f] **Decision Logic**: New feature → New file; Bug fix → Edit existing; Logic change → Extract/Replace.
+- [MO1g] **Extension (OCP)**: Add functionality via new classes/composition; do not modify stable code to add features.
+- **Contract**: `docs/contracts/code-change.md`
+
 ## [AB1] Abstraction Discipline
 
 - [AB1a] **No Anemic Wrappers**: Do not add classes/modules that only forward calls or rename fields without adding behavior.
@@ -128,7 +160,7 @@ alwaysApply: true
 - [TY1c] **Zod v4**: Import from `zod/v4`. Exception: OpenAI Agents tool params use v3.
 - [TY1d] **Schema Location**: Canonical Zod schemas live in `convex/lib/schemas/`. See [VL1].
 - [TY1e] **Validation**: External data (third-party APIs) MUST be validated. Convex-returned data needs NO re-validation.
-- [TY1f] **No `any`**: Do not use `any` to silence errors. Fix the types.
+- [TY1f] **No `any`**: See [ZA1c].
 
 ## [VL1] Validation Architecture — No Duplication
 
@@ -136,6 +168,14 @@ alwaysApply: true
 - [VL1b] **Zod schemas**: Use ONLY at external API boundaries (data Convex doesn't see). Canonical location: `convex/lib/schemas/`.
 - [VL1c] **Trust Convex**: Data from Convex queries/mutations is already validated. Do NOT re-validate with Zod.
 - [VL1d] **No Duplication**: Never define the same schema in multiple files. Import from canonical location.
+
+## [ZV1] Zod Validation Error Handling — No Silent Failures
+
+- [ZV1a] **Use `safeParse()`**: Never use `.parse()` on external data. It throws and crashes rendering. Always use `.safeParse()`.
+- [ZV1b] **Discriminated Unions**: Return `{ success: true, data }` or `{ success: false, error }`, not `null` or silent fallbacks.
+- [ZV1c] **Log with Record Identifiers**: Every validation failure log MUST include context identifying WHICH record failed (URL, ID, index, etc.). Use `logZodFailure(context, error, payload)`.
+- [ZV1d] **Canonical Utilities**: Use `convex/lib/validation/zodUtils.ts` for `logZodFailure`, `safeParseWithLog`, `safeParseOrNull`, `parseArrayWithLogging`, and `ValidationResult<T>` type.
+- [ZV1e] **No Silent Degradation**: If validation fails, log it. Never silently return defaults without logging the failure first.
 
 ## [UI1] UI Status & Overlays Policy (Inline-only)
 

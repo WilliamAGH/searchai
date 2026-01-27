@@ -106,8 +106,9 @@ export default defineSchema({
 - Add type hints for circular references: `const result: string = await ctx.runQuery(...)`
 - Use `as const` for discriminated unions
 - **Recursion Depth**: Use `@ts-ignore` with comment for "excessively deep" errors.
-- **Validation Architecture**: See `CLAUDE.md` [VL1]. Convex `v` validators for database; Zod only at external boundaries.
+- **Validation Architecture**: See `AGENTS.md` [VL1]. Convex `v` validators for database; Zod only at external boundaries.
 - **Zod Schemas**: Canonical location is `convex/lib/schemas/`. See [ZD2] in `type-safety-zod-validation.mdc`.
+- **Zod Validation Utilities**: Use `convex/lib/validation/zodUtils.ts` for `logZodFailure`, `safeParseWithLog`, `safeParseOrNull`. See [ZV1] in `AGENTS.md`.
 
 ## Pagination
 
