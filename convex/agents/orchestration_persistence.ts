@@ -175,3 +175,36 @@ export async function completeWorkflowWithSignature(
 
   return signature;
 }
+
+/**
+ * Combined helper to persist message and complete workflow.
+ * Encapsulates the common pattern: persist -> payload -> sign -> return details.
+ */
+export async function persistAndCompleteWorkflow(
+  params: PersistAssistantMessageParams & {
+    workflowTokenId: Id<"workflowTokens"> | null;
+    nonce: string;
+  },
+): Promise<{
+  payload: StreamingPersistPayload;
+  signature: string;
+}> {
+  const assistantMessageId = await persistAssistantMessage(params);
+
+  const payload: StreamingPersistPayload = {
+    assistantMessageId,
+    workflowId: params.workflowId,
+    answer: params.content,
+    sources: params.sources || [],
+    contextReferences: params.contextReferences || [],
+  };
+
+  const signature = await completeWorkflowWithSignature({
+    ctx: params.ctx,
+    workflowTokenId: params.workflowTokenId,
+    payload,
+    nonce: params.nonce,
+  });
+
+  return { payload, signature };
+}

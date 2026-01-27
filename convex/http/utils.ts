@@ -30,6 +30,13 @@ export const dlog = (...args: unknown[]) => {
 };
 
 /**
+ * Format a Server-Sent Event line for JSON payloads.
+ */
+export function formatSseEvent(data: unknown): string {
+  return `data: ${JSON.stringify(data)}\n\n`;
+}
+
+/**
  * Helper function to add CORS headers to responses
  * - Allows all origins (*)
  * - Supports GET, POST, OPTIONS

@@ -37,8 +37,7 @@ export const addMessage = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
-    // Authorization: require ownership to add messages
-    // Shared/public chats are read-only - viewers cannot inject messages
+    // Authorization: require ownership; shared/public chats are read-only.
     const authorized =
       isAuthorized(chat, userId, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
@@ -47,18 +46,18 @@ export const addMessage = internalMutation({
       throw new Error("Unauthorized");
     }
 
-    // Generate UUID v7 for message tracking
+    // Generate UUID v7 for message tracking.
     const messageId = generateMessageId();
 
-    // Get or create thread ID from chat
+    // Get or create thread ID from chat.
     let threadId = chat.threadId;
     if (!threadId) {
       threadId = generateThreadId();
-      // Update chat with threadId if not present
+      // Update chat with threadId if not present.
       await ctx.db.patch(args.chatId, { threadId });
     }
 
-    // Destructure sessionId out - it's only for validation, not storage
+    // Destructure sessionId out - validation only, not storage.
     const { chatId, sessionId: _sessionId, ...rest } = args;
     return await ctx.db.insert("messages", {
       chatId: chatId,
@@ -94,8 +93,7 @@ export const addMessageHttp = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
-    // Authorization: require ownership to add messages
-    // Shared/public chats are read-only - viewers cannot inject messages
+    // Authorization: require ownership; shared/public chats are read-only.
     const authorized =
       hasSessionAccess(chat, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
@@ -222,10 +220,7 @@ export const updateMessage = internalMutation({
   },
 });
 
-/**
- * Count messages for a chat
- * Used to determine if title should be generated
- */
+/** Count user messages for a chat. */
 export const countMessages = internalMutation({
   args: { chatId: v.id("chats") },
   returns: v.number(),
@@ -259,8 +254,7 @@ export const deleteMessage = mutation({
 
     await ctx.db.delete(args.messageId);
 
-    // Schedule cache invalidation - fire-and-forget with explicit error handling
-    // Scheduling failures should not fail the delete operation
+    // Schedule cache invalidation; scheduling failures should not fail delete.
     try {
       // @ts-ignore - Known Convex TS2589 type instantiation issue
       const invalidatePlan: any = internal.search.invalidatePlanCacheForChat;

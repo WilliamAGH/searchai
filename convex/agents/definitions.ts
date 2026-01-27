@@ -16,7 +16,7 @@
 import { z } from "zod";
 import { Agent } from "@openai/agents";
 import { toolsList, conversationalToolsList } from "./tools";
-import { createOpenAIEnvironment, getModelName } from "../lib/providers/openai";
+import { getOpenAIEnvironment, getModelName } from "../lib/providers/openai";
 import { AGENT_LIMITS } from "../lib/constants/cache";
 import {
   QUERY_PLANNER_PROMPT,
@@ -26,7 +26,7 @@ import {
 } from "./prompts";
 
 // Initialize OpenAI environment once
-const env = createOpenAIEnvironment();
+const env = getOpenAIEnvironment();
 const defaultModel = getModelName();
 const agentTools = toolsList satisfies ReturnType<typeof Agent.create>["tools"];
 const conversationalAgentTools = conversationalToolsList satisfies ReturnType<

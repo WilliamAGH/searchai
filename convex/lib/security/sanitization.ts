@@ -8,6 +8,8 @@
  * - Template injections
  */
 
+import { RELEVANCE_SCORES } from "../constants/cache";
+
 /**
  * Main sanitization function that applies all security measures
  * @param input - Raw user input to sanitize
@@ -261,7 +263,7 @@ export function normalizeSearchResult(result: unknown): {
   const r = result as Record<string, unknown>;
 
   // Normalize relevanceScore - must be a number between 0 and 1
-  let relevanceScore = 0.5; // Default
+  let relevanceScore: number = RELEVANCE_SCORES.SEARCH_RESULT; // Default
   if (typeof r.relevanceScore === "number") {
     // Clamp to valid range [0, 1]
     relevanceScore = Math.max(0, Math.min(1, r.relevanceScore));

@@ -18,8 +18,19 @@ export const AGENT_LIMITS = {
   MAX_SEARCH_QUERIES: 3,
   MIN_SCRAPE_URLS: 2,
   MAX_SCRAPE_URLS: 4,
-  /** Maximum agent turns (API round-trips) before forcing completion */
-  MAX_AGENT_TURNS: 6,
+  /**
+   * Maximum agent turns (LLM round-trips) before forcing completion.
+   *
+   * Turn budget calculation for conversational agent:
+   * - 1 turn for plan_research
+   * - Up to MAX_SEARCH_QUERIES turns for search_web (if sequential)
+   * - Up to MAX_SCRAPE_URLS turns for scrape_webpage (if sequential)
+   * - 1 turn for final synthesis
+   *
+   * Worst case: 1 + 3 + 4 + 1 = 9 turns. Set to 12 for safety margin.
+   * Note: If model batches tool calls, actual turns used will be fewer.
+   */
+  MAX_AGENT_TURNS: 12,
   /** Maximum consecutive tool errors before aborting workflow */
   MAX_TOOL_ERRORS: 3,
 } as const;

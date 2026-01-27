@@ -233,3 +233,19 @@ export const isOpenRouterEndpoint = (): boolean => {
     process.env.OPENROUTER_BASE_URL;
   return baseURL?.toLowerCase().includes("openrouter") || false;
 };
+
+/**
+ * Cached OpenAI environment singleton
+ * Ensures createOpenAIEnvironment is only called once per runtime
+ */
+let cachedOpenAIEnvironment: OpenAIEnvironment | null = null;
+
+/**
+ * Get the singleton OpenAI environment, creating it if necessary
+ * This is the preferred way to access the OpenAI client and settings
+ */
+export const getOpenAIEnvironment = (): OpenAIEnvironment => {
+  if (cachedOpenAIEnvironment) return cachedOpenAIEnvironment;
+  cachedOpenAIEnvironment = createOpenAIEnvironment();
+  return cachedOpenAIEnvironment;
+};

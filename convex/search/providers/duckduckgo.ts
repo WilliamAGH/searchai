@@ -8,6 +8,19 @@ import type {
   SearchProviderResult,
 } from "../../lib/types/search";
 
+// Provider-specific relevance scores
+// DuckDuckGo instant answer API returns varying quality data
+const DUCKDUCKGO_SCORES = {
+  /** Abstract/summary from authoritative source - highest confidence */
+  ABSTRACT: 0.8,
+  /** Related topics - curated but less direct */
+  RELATED_TOPIC: 0.7,
+  /** Wikipedia fallback - reliable but generic */
+  WIKIPEDIA_FALLBACK: 0.6,
+  /** DDG search link fallback - lowest, just a redirect */
+  SEARCH_FALLBACK: 0.4,
+} as const;
+
 interface DuckDuckGoResponse {
   RelatedTopics?: Array<{
     FirstURL?: string;
@@ -60,7 +73,7 @@ export async function searchWithDuckDuckGo(
           "Untitled",
         url: topic.FirstURL || "",
         snippet: topic.Text || "",
-        relevanceScore: 0.7,
+        relevanceScore: DUCKDUCKGO_SCORES.RELATED_TOPIC,
       }));
   }
 
@@ -71,7 +84,7 @@ export async function searchWithDuckDuckGo(
         title: data.Heading || query,
         url: data.AbstractURL,
         snippet: data.Abstract,
-        relevanceScore: 0.8,
+        relevanceScore: DUCKDUCKGO_SCORES.ABSTRACT,
       },
     ];
   }
@@ -83,13 +96,13 @@ export async function searchWithDuckDuckGo(
         title: `${query} - Wikipedia`,
         url: `https://en.wikipedia.org/wiki/Special:Search/${encodeURIComponent(query)}`,
         snippet: `Wikipedia search results for "${query}"`,
-        relevanceScore: 0.6,
+        relevanceScore: DUCKDUCKGO_SCORES.WIKIPEDIA_FALLBACK,
       },
       {
         title: `${query} - Search Results`,
         url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
         snippet: `Web search results for "${query}"`,
-        relevanceScore: 0.4,
+        relevanceScore: DUCKDUCKGO_SCORES.SEARCH_FALLBACK,
       },
     ];
 
