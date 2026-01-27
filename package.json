@@ -35,7 +35,7 @@
     "typecheck": "tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
-    "validate": "npm-run-all --parallel lint typecheck format:check lint:convex-imports lint:convex-types lint:duplicates --sequential test:single build",
+    "validate": "npm-run-all --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates --sequential test:single build",
     "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo '✅ Cleaned build caches'",
     "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo '✅ Cleaned everything - run npm install'",
     "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo '✅ Cleaned VSCode caches - restart VSCode'",
@@ -57,6 +57,7 @@
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test -g smoke --reporter=line",
     "prepare": "husky",
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
+    "lint:loc": "node scripts/check-loc.mjs",
     "lint:convex-types": "node scripts/lint-convex-types.mjs",
     "lint:duplicates": "dry --no-cache && dry --no-cache --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
     "lint:duplicates:near": "dry --no-cache --threshold 0.9"
