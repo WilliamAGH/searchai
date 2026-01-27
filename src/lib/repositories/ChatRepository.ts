@@ -32,7 +32,7 @@ export interface SearchWebResponse {
   searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback";
   hasRealResults: boolean;
   enrichment?: SerpEnrichment;
-  providerErrors?: string[];
+  providerErrors?: string[] | { provider: string; error: string }[];
   allProvidersFailed?: boolean;
 }
 

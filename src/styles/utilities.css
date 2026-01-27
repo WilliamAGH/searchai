@@ -1,0 +1,93 @@
+@layer utilities {
+  /* Citation pill overflow protection - constrains long URLs/domains */
+  .citation-pill {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .citation-pill-text {
+    max-width: min(200px, 40vw); /* Responsive: smaller on mobile */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Safe wrapping for long, unbroken user/assistant content */
+  .message-content-safe {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Default: broad compatibility */
+  .text-balance {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
+  /* Use text-wrap: balance only when supported */
+  @supports (text-wrap: balance) {
+    .text-balance {
+      text-wrap: balance;
+    }
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  /* Font utilities for explicit control */
+  .font-serif {
+    font-family:
+      "Playfair Display", "Georgia", "Times New Roman", serif !important;
+  }
+
+  .font-mono {
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace !important;
+  }
+
+  /* Dynamic viewport units to avoid mobile 100vh bugs */
+  .h-dvh {
+    /* JS can set --app-dvh using VisualViewport for iOS Safari edge cases */
+    height: var(--app-dvh, 100dvh);
+  }
+  .min-h-dvh {
+    min-height: var(--app-dvh, 100dvh);
+  }
+
+  /* Floating action button bottom offset with safe-area support */
+  .fab-bottom {
+    bottom: 5rem;
+  }
+  @supports (padding: max(0px)) {
+    .fab-bottom {
+      bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+  }
+
+  /* Prevent background rubber-band when inner container scrolls */
+  .overscroll-contain {
+    overscroll-behavior-y: contain;
+  }
+
+  /* UI sans stack used for user-entered text and UI labels */
+  .font-ui {
+    font-family:
+      "Inter",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      "Apple Color Emoji",
+      "Segoe UI Emoji",
+      "Segoe UI Symbol",
+      sans-serif;
+  }
+}

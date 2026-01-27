@@ -1,8 +1,4 @@
-/**
- * Main chat interface - orchestrates chats/messages for all users
- * Refactored to use sub-components for better organization
- */
-
+/** Main chat interface - orchestrates chats/messages for all users. */
 import { useAction, useMutation } from "convex/react";
 import React, {
   useCallback,
@@ -61,7 +57,6 @@ function ChatInterfaceComponent({
   );
 
   const [localIsGenerating, setIsGenerating] = useState(false);
-  // aiService removed - no longer needed with unified flow
 
   const unified = useUnifiedChat();
   const chatState = unified;

@@ -1,0 +1,181 @@
+/*
+ * Prose styles for message content
+ * - Assistant messages (Markdown) render inside a `.prose` wrapper
+ * - We intentionally inherit the page font here:
+ *     - Light mode: elegant serif (Playfair)
+ *     - Dark mode: compact mono (JetBrains Mono)
+ * - Numeric style is set to `lining-nums` for readability, but we DO NOT
+ *   force a specific font-family here to avoid fighting page-level choices.
+ * - If you need to change assistant output typography, do it by wrapping the
+ *   message block in component code, not by overriding `.prose` globally.
+ */
+.prose {
+  @apply text-foreground;
+  /* Keep prose inheriting page font (Playfair light, Mono dark) */
+  font-family: inherit;
+  font-variant-numeric: lining-nums;
+  /* Prevent long strings from breaking mobile viewport */
+  overflow-wrap: anywhere;
+  word-wrap: break-word; /* Legacy fallback */
+  word-break: break-word;
+}
+
+/* Ensure nested text elements inherit numeric features */
+.prose
+  :where(
+    p,
+    li,
+    span,
+    a,
+    strong,
+    em,
+    small,
+    blockquote,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6
+  ) {
+  font-family: inherit;
+  font-variant-numeric: inherit;
+}
+
+.prose p {
+  margin: 0.5rem 0 0.75rem 0;
+}
+
+.prose ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.prose ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.prose li {
+  margin: 0.25rem 0;
+}
+
+.prose strong {
+  @apply font-semibold;
+}
+
+/* Strengthen bold contrast in dark mode */
+html.dark .prose strong,
+html.dark .prose b {
+  @apply font-extrabold;
+  color: hsl(var(--foreground));
+}
+
+.prose em {
+  @apply italic;
+}
+
+.prose u {
+  text-decoration: underline;
+}
+
+/* Increase bold contrast in dark mode by slightly dimming normal text */
+html.dark .prose p,
+html.dark .prose li {
+  color: hsl(var(--foreground) / 0.85);
+}
+
+/* Keep links and code fully legible */
+html.dark .prose a,
+html.dark .prose code {
+  color: hsl(var(--foreground));
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  @apply text-foreground;
+}
+
+.prose a {
+  @apply text-primary hover:text-primary/80;
+  /* Allow long URLs to wrap without breaking words arbitrarily */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.prose code {
+  @apply bg-muted px-1 py-0.5 rounded text-sm;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  /*
+   * DO NOT REMOVE OR OVERRIDE: Layout Safety
+   * overflow-wrap: anywhere + word-break: break-word ensures long strings
+   * (like URLs or tokens) wrap instead of pushing the layout wide.
+   * white-space: pre-wrap preserves formatting but allows wrapping.
+   */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.prose pre {
+  @apply bg-muted p-4 rounded-lg overflow-x-auto;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  /*
+   * DO NOT REMOVE OR OVERRIDE: max-width: 100%
+   * Forces code blocks to respect parent container width and trigger
+   * internal scrolling (overflow-x-auto) instead of expanding the page.
+   */
+  max-width: 100%;
+}
+
+/* GFM table overflow protection - tables can contain wide content */
+.prose table {
+  /*
+   * DO NOT REMOVE OR OVERRIDE: Table Containment
+   * Tables must be block-level with max-width: 100% to trigger scrolling
+   * instead of forcing the parent container to expand.
+   */
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prose thead,
+.prose tbody {
+  display: table;
+  width: max-content;
+  min-width: 100%;
+}
+
+.prose tr {
+  display: table-row;
+}
+
+.prose th,
+.prose td {
+  @apply px-3 py-2 border border-gray-200 dark:border-gray-700;
+  word-break: break-word;
+}
+
+.prose th {
+  @apply bg-gray-50 dark:bg-gray-800 font-semibold text-left;
+}
+
+.prose tbody tr:nth-child(even) {
+  @apply bg-gray-50/50 dark:bg-gray-800/50;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary pl-4 italic;
+}
+
+.prose hr {
+  @apply my-4 border-gray-300 dark:border-gray-700;
+}

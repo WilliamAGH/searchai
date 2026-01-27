@@ -1,0 +1,91 @@
+/* Animation for follow-up prompt */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up {
+    animation: none !important;
+  }
+}
+
+/*
+ * Hide scrollbar on message input textarea
+ * - This affects only the input control the user types into.
+ * - Do not reuse for message content.
+ */
+.message-input-textarea::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Message textarea sizing and typography (USER INPUT ONLY)
+ * - Uses UI sans stack (Inter/system) for clarity while typing
+ * - Applies numeric features for unambiguous digits
+ * - Assistant/user OUTPUT fonts are NOT controlled here
+ */
+.message-textarea {
+  /* Ensure intrinsic line-height-based centering for single-line height */
+  min-height: 48px;
+  max-height: 200px;
+  -ms-overflow-style: none; /* IE/Edge legacy */
+  /* Override serif body for better numeral clarity while typing */
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  font-variant-numeric: slashed-zero lining-nums tabular-nums;
+  font-feature-settings:
+    "zero" 1,
+    "lnum" 1,
+    "tnum" 1;
+}
+
+/* Slightly reduce input height on small screens to feel less bulky */
+@media (max-width: 480px) {
+  .message-textarea {
+    min-height: 44px;
+  }
+}
+
+/* Normalize textarea vertical alignment and placeholder alignment */
+.message-textarea,
+.message-textarea::placeholder {
+  line-height: 1.5;
+}
+
+/* Dark mode input/editor: tighter leading and no extra tracking to reduce perceived size */
+html.dark .message-textarea {
+  line-height: 1.35; /* slightly tighter for perceived smaller size */
+  letter-spacing: -0.005em; /* subtle negative tracking shrinks appearance */
+}
+
+/* Ensure consistent padding-box sizing so text stays centered with auto-resize */
+.message-textarea {
+  box-sizing: border-box;
+  /* Slightly tighter horizontal letterspacing in dark mono to reduce perceived crowding */
+  letter-spacing: 0.01em;
+}
+
+/* Apply Firefox-specific scrollbar suppression only when supported */
+@supports (scrollbar-width: none) {
+  .message-textarea {
+    scrollbar-width: none; /* Firefox */
+  }
+}

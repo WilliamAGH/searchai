@@ -6,8 +6,9 @@
  * - Disabled state during generation
  */
 
-import React, { useState, useRef, useEffect } from "react";
-import { logger } from "@/lib/logger";
+import React, { useState, useRef } from "react";
+import { useAutoResizeTextarea } from "@/hooks/useAutoResizeTextarea";
+import { useMessageInputFocus } from "@/hooks/useMessageInputFocus";
 
 interface MessageInputProps {
   /** Callback when message is sent */
@@ -172,53 +173,12 @@ export function MessageInput({
     ],
   );
 
-  // Auto-resize height only, don't mess with padding
-  const adjustTextarea = () => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-
-    ta.style.height = "auto";
-
-    const style = window.getComputedStyle(ta);
-    const minH = parseFloat(style.minHeight) || 0;
-    const scrollH = ta.scrollHeight;
-    const target = Math.min(Math.max(scrollH, minH), MAX_TEXTAREA_HEIGHT);
-
-    ta.style.height = target + "px";
-  };
-
-  // Autofocus once and manage focus
-  useEffect(() => {
-    if (disabled) return;
-    const el = textareaRef.current;
-    if (!el) return;
-    try {
-      el.focus({ preventScroll: true });
-    } catch (error) {
-      logger.warn("MessageInput focus with preventScroll failed", { error });
-      try {
-        el.focus();
-      } catch (fallbackError) {
-        logger.warn("MessageInput focus fallback failed", {
-          error: fallbackError,
-        });
-      }
-    }
-  }, [disabled]);
-
-  // Consolidated adjustTextarea triggers: content changes, env changes, and viewport changes
-  useEffect(() => {
-    adjustTextarea();
-  }, [message, placeholder, disabled]);
-  useEffect(() => {
-    const handler: EventListener = () => requestAnimationFrame(adjustTextarea);
-    window.addEventListener("resize", handler);
-    window.addEventListener("orientationchange", handler);
-    return () => {
-      window.removeEventListener("resize", handler);
-      window.removeEventListener("orientationchange", handler);
-    };
-  }, []);
+  useAutoResizeTextarea({
+    textareaRef,
+    maxHeight: MAX_TEXTAREA_HEIGHT,
+    dependencies: [message, placeholder, disabled],
+  });
+  useMessageInputFocus({ textareaRef, disabled });
 
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -232,50 +192,6 @@ export function MessageInput({
     },
     [historyIndex, onDraftChange],
   );
-
-  // Politely auto-focus the input once (desktop only, no modals)
-  const hasAutoFocusedRef = useRef(false);
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    if (disabled) return;
-    if (hasAutoFocusedRef.current) return;
-
-    // Skip on touch-centric devices to avoid popping the keyboard
-    const isCoarse =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(pointer: coarse)").matches;
-
-    // Avoid stealing focus if something else is active or a modal is open
-    const hasModalOpen = !!document.querySelector(
-      '[role="dialog"][aria-modal="true"]',
-    );
-    const canStealFocus =
-      document.activeElement === document.body &&
-      document.visibilityState === "visible" &&
-      !isCoarse &&
-      !hasModalOpen;
-
-    // Only focus if the element is visible and enabled
-    const isVisible = el.offsetParent !== null && !el.disabled;
-    if (!canStealFocus || !isVisible) return;
-
-    const raf = requestAnimationFrame(() => {
-      try {
-        // Prevent scroll jumps on focus
-        el.focus({ preventScroll: true });
-      } catch (error) {
-        logger.warn("MessageInput auto-focus with preventScroll failed", {
-          error,
-        });
-        el.focus();
-      }
-    });
-
-    hasAutoFocusedRef.current = true;
-    return () => cancelAnimationFrame(raf);
-  }, [disabled]);
 
   return (
     <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
