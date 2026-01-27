@@ -9,7 +9,11 @@
  */
 import { api } from "../_generated/api";
 import { generateMessageId } from "../lib/id_generator";
-import { AGENT_LIMITS } from "../lib/constants/cache";
+import {
+  AGENT_LIMITS,
+  CONTENT_LIMITS,
+  RELEVANCE_SCORES,
+} from "../lib/constants/cache";
 import { createEmptyHarvestedData, type HarvestedData } from "./schema";
 import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
@@ -265,7 +269,7 @@ export async function* executeParallelResearch(
         );
 
         // Skip if we got an error response or minimal content
-        if (content.content.length < 100) {
+        if (content.content.length < CONTENT_LIMITS.MIN_CONTENT_LENGTH) {
           logScrapeSkip(
             Date.now() - singleScrapeStart,
             url,
@@ -284,11 +288,17 @@ export async function* executeParallelResearch(
           url,
           title: content.title,
           content: content.content,
-          summary: content.summary || content.content.substring(0, 500),
+          summary:
+            content.summary ||
+            content.content.substring(
+              0,
+              CONTENT_LIMITS.SUMMARY_TRUNCATE_LENGTH,
+            ),
           contentLength: content.content.length,
           scrapedAt: Date.now(),
           contextId,
-          relevanceScore: urlInfo.relevanceScore || 0.85,
+          relevanceScore:
+            urlInfo.relevanceScore || RELEVANCE_SCORES.SCRAPED_PAGE,
         };
         return scraped;
       } catch (error) {
@@ -357,12 +367,17 @@ export function buildSyntheticKeyFindings(
   const MEDIUM_RELEVANCE_THRESHOLD = 0.5;
 
   return scrapedContent
-    .filter((scraped) => scraped.summary && scraped.summary.length > 50)
+    .filter(
+      (scraped) =>
+        scraped.summary &&
+        scraped.summary.length > CONTENT_LIMITS.MIN_SUMMARY_LENGTH,
+    )
     .slice(0, maxFindings)
     .map((scraped) => ({
       finding:
-        scraped.summary.length > 300
-          ? scraped.summary.substring(0, 297) + "..."
+        scraped.summary.length > CONTENT_LIMITS.LOG_DISPLAY_LENGTH + 3
+          ? scraped.summary.substring(0, CONTENT_LIMITS.LOG_DISPLAY_LENGTH) +
+            "..."
           : scraped.summary,
       sources: [scraped.url],
       confidence:

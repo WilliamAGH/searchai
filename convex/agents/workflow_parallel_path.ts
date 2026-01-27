@@ -6,7 +6,7 @@ import {
 } from "./workflow_logger";
 import { executeParallelResearch } from "./parallel_research";
 import { executeSynthesis } from "./synthesis_executor";
-import { RELEVANCE_SCORES } from "../lib/constants/cache";
+import { RELEVANCE_SCORES, CONTENT_LIMITS } from "../lib/constants/cache";
 import {
   convertToContextReferences,
   buildSearchResultsFromContextRefs,
@@ -91,12 +91,17 @@ export async function* executeParallelPath({
     `Total: ${parallelStats.totalDurationMs}ms`,
   );
   const syntheticKeyFindings = harvested.scrapedContent
-    .filter((scraped) => scraped.summary && scraped.summary.length > 50)
+    .filter(
+      (scraped) =>
+        scraped.summary &&
+        scraped.summary.length > CONTENT_LIMITS.MIN_SUMMARY_LENGTH,
+    )
     .slice(0, 5)
     .map((scraped) => ({
       finding:
-        scraped.summary.length > 300
-          ? scraped.summary.substring(0, 297) + "..."
+        scraped.summary.length > CONTENT_LIMITS.LOG_DISPLAY_LENGTH + 3
+          ? scraped.summary.substring(0, CONTENT_LIMITS.LOG_DISPLAY_LENGTH) +
+            "..."
           : scraped.summary,
       sources: [scraped.url],
       confidence:

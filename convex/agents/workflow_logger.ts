@@ -10,6 +10,7 @@
  *
  * @see {@link ./orchestration.ts} - consumer of this module
  */
+import { CONTENT_LIMITS } from "../lib/constants/cache";
 
 // ============================================
 // Log Event Types
@@ -138,7 +139,9 @@ export function logWorkflowStart(
   query: string,
 ): void {
   const truncatedQuery =
-    query.length > 50 ? `${query.substring(0, 50)}...` : query;
+    query.length > CONTENT_LIMITS.QUERY_DISPLAY_LENGTH
+      ? `${query.substring(0, CONTENT_LIMITS.QUERY_DISPLAY_LENGTH)}...`
+      : query;
   logWorkflow(
     "WORKFLOW_START",
     `${workflowType.toUpperCase()} WORKFLOW START: "${truncatedQuery}"`,

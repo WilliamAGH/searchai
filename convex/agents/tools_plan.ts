@@ -4,7 +4,7 @@ import { z } from "zod"; // v3 - required by @openai/agents peer dependency
 import { tool } from "@openai/agents";
 import type { FunctionTool } from "@openai/agents";
 import { generateMessageId } from "../lib/id_generator";
-import { AGENT_LIMITS } from "../lib/constants/cache";
+import { AGENT_LIMITS, CONTENT_LIMITS } from "../lib/constants/cache";
 import type { AgentToolRunContext } from "./tools_context";
 
 /**
@@ -73,8 +73,8 @@ The tool returns search queries you should then execute with search_web.`,
 
     console.info("📋 PLAN_RESEARCH TOOL CALLED:", {
       contextId,
-      userQuestion: input.userQuestion.substring(0, 100),
-      researchGoal: input.researchGoal.substring(0, 100),
+      userQuestion: input.userQuestion.substring(0, CONTENT_LIMITS.SHORT_FIELD_LENGTH),
+      researchGoal: input.researchGoal.substring(0, CONTENT_LIMITS.SHORT_FIELD_LENGTH),
       queryCount: input.searchQueries.length,
       queries: input.searchQueries.map((q) => q.query),
     });

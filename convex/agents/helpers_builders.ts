@@ -2,6 +2,7 @@
 
 import { buildTemporalHeader } from "../lib/dateTime";
 import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
+import { CONTENT_LIMITS } from "../lib/constants/cache";
 import {
   formatScrapedContentForPrompt,
   formatSerpEnrichmentForPrompt,
@@ -138,7 +139,10 @@ export function buildSynthesisInstructions(params: {
       ),
       pages: params.scrapedContent.map((p) => ({
         url: p.url,
-        contentPreview: truncate(p.content || "", 200),
+        contentPreview: truncate(
+          p.content || "",
+          CONTENT_LIMITS.PREVIEW_MAX_CHARS,
+        ),
       })),
     });
   }
@@ -229,13 +233,13 @@ export function buildConversationContext(
   }>,
 ): string {
   return messages
-    .slice(-20)
+    .slice(-CONTENT_LIMITS.MAX_CONTEXT_MESSAGES)
     .map(
       (m) =>
         `${m.role === "user" ? "User" : m.role === "assistant" ? "Assistant" : "System"}: ${m.content || ""}`,
     )
     .join("\n")
-    .slice(0, 4000);
+    .slice(0, CONTENT_LIMITS.MAX_CONTEXT_CHARS);
 }
 
 export function buildConversationBlock(

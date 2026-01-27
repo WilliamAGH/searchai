@@ -12,7 +12,7 @@
 
 import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
-import { CACHE_TTL } from "../lib/constants/cache";
+import { CACHE_TTL, CONTENT_LIMITS } from "../lib/constants/cache";
 import { getErrorMessage } from "../lib/errors";
 import { buildConversationContext } from "./orchestration_helpers";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
@@ -157,7 +157,7 @@ export async function initializeWorkflowSession(
     limit?: number;
   } = {
     chatId: args.chatId,
-    limit: 20,
+    limit: CONTENT_LIMITS.MAX_CONTEXT_MESSAGES,
   };
   if (args.sessionId) getMessagesArgs.sessionId = args.sessionId;
 

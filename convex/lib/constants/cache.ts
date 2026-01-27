@@ -79,3 +79,39 @@ export const AGENT_TIMEOUTS = {
   /** Timeout for research stage with tool calls (search + scrape) */
   TOOL_EXECUTION_MS: 120_000,
 } as const;
+
+/**
+ * Content length limits for truncation and previews.
+ * Centralizes magic numbers used across agent modules.
+ */
+export const CONTENT_LIMITS = {
+  /** Maximum characters for content preview in logs */
+  PREVIEW_MAX_CHARS: 200,
+  /** Maximum recent messages to include in context */
+  MAX_CONTEXT_MESSAGES: 20,
+  /** Maximum characters for full conversation context */
+  MAX_CONTEXT_CHARS: 4000,
+  /** Minimum content length to consider valid (filters noise) */
+  MIN_CONTENT_LENGTH: 100,
+  /** Minimum summary length to consider useful */
+  MIN_SUMMARY_LENGTH: 50,
+  /** Standard summary truncation length */
+  SUMMARY_TRUNCATE_LENGTH: 500,
+  /** Log display truncation (297 + "..." = 300) */
+  LOG_DISPLAY_LENGTH: 297,
+  /** Short field truncation (e.g., userQuestion, researchGoal) */
+  SHORT_FIELD_LENGTH: 100,
+  /** Query display length in logs */
+  QUERY_DISPLAY_LENGTH: 50,
+} as const;
+
+/**
+ * Token budgets for prompt construction.
+ * Controls how much content is included in LLM prompts.
+ */
+export const TOKEN_BUDGETS = {
+  /** Total tokens allocated for scraped content in synthesis prompt */
+  TOTAL_CONTENT_TOKENS: 12_000,
+  /** Maximum tokens per individual page */
+  MAX_TOKENS_PER_PAGE: 3_000,
+} as const;

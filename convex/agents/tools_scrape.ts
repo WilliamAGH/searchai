@@ -6,6 +6,7 @@ import type { FunctionTool } from "@openai/agents";
 import { api } from "../_generated/api";
 import { generateMessageId } from "../lib/id_generator";
 import { getErrorMessage } from "../lib/errors";
+import { CONTENT_LIMITS } from "../lib/constants/cache";
 import { getActionCtx, type AgentToolRunContext } from "./tools_context";
 
 /**
@@ -84,7 +85,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
         reasoning: input.reasoning,
         title: content.title,
         content: content.content,
-        summary: content.summary || content.content.substring(0, 500) + "...",
+        summary: content.summary || content.content.substring(0, CONTENT_LIMITS.SUMMARY_TRUNCATE_LENGTH) + "...",
         contentLength: content.content.length,
         scrapedAt: Date.now(),
         _toolCallMetadata: {

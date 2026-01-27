@@ -1,10 +1,9 @@
 "use node";
 
 import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
+import { TOKEN_BUDGETS, CONTENT_LIMITS } from "../lib/constants/cache";
 import { truncate } from "./helpers_utils";
 
-const TOTAL_CONTENT_TOKEN_BUDGET = 12000;
-const MAX_TOKENS_PER_PAGE = 3000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 
 export function formatScrapedContentForPrompt(
@@ -13,8 +12,10 @@ export function formatScrapedContentForPrompt(
   if (!scrapedContent?.length) return "";
 
   const tokensPerPage = Math.min(
-    MAX_TOKENS_PER_PAGE,
-    Math.floor(TOTAL_CONTENT_TOKEN_BUDGET / Math.max(scrapedContent.length, 1)),
+    TOKEN_BUDGETS.MAX_TOKENS_PER_PAGE,
+    Math.floor(
+      TOKEN_BUDGETS.TOTAL_CONTENT_TOKENS / Math.max(scrapedContent.length, 1),
+    ),
   );
   const charsPerPage = tokensPerPage * CHARS_PER_TOKEN_ESTIMATE;
 
@@ -29,7 +30,9 @@ export function formatScrapedContentForPrompt(
     .map((page, idx) => {
       const safeContent = page.content || "";
       const excerpt = truncate(safeContent, charsPerPage);
-      const summary = page.summary ? truncate(page.summary, 500) : "";
+      const summary = page.summary
+        ? truncate(page.summary, CONTENT_LIMITS.SUMMARY_TRUNCATE_LENGTH)
+        : "";
       return `#${idx + 1} ${page.title || "Untitled"}
 URL: ${page.url}
 ContextId: ${page.contextId ?? "n/a"}
