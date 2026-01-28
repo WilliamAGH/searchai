@@ -147,31 +147,43 @@ export class ConvexStreamHandler {
 
     const signingKey = env.agentSigningKey;
 
-    if (
-      signingKey &&
-      isSignatureVerificationAvailable() &&
-      parsed.data.payload &&
-      parsed.data.nonce &&
-      parsed.data.signature
-    ) {
-      const isValid = await verifyPersistedPayload(
-        parsed.data.payload,
-        parsed.data.nonce,
-        parsed.data.signature,
-        signingKey,
-      );
+    // If event has signature fields, attempt verification
+    if (parsed.data.signature && parsed.data.nonce) {
+      if (!signingKey) {
+        // Security warning: Backend signs all persisted events, but frontend key is missing
+        // This means we cannot verify the event wasn't tampered with in transit
+        logger.warn(
+          "[WARN] Accepting unverified persisted event: VITE_AGENT_SIGNING_KEY not configured",
+          { workflowId: parsed.data.payload.workflowId },
+        );
+      } else if (!isSignatureVerificationAvailable()) {
+        logger.warn(
+          "[WARN] Accepting unverified persisted event: Web Crypto API unavailable",
+          { workflowId: parsed.data.payload.workflowId },
+        );
+      } else {
+        const isValid = await verifyPersistedPayload(
+          parsed.data.payload,
+          parsed.data.nonce,
+          parsed.data.signature,
+          signingKey,
+        );
 
-      if (!isValid) {
-        logger.error("🚫 Invalid signature detected on persisted event", {
+        if (!isValid) {
+          logger.error(
+            "[BLOCKED] Invalid signature detected on persisted event",
+            {
+              workflowId: parsed.data.payload.workflowId,
+              nonce: parsed.data.nonce,
+            },
+          );
+          return null;
+        }
+
+        logger.debug("[OK] Signature verified for persisted event", {
           workflowId: parsed.data.payload.workflowId,
-          nonce: parsed.data.nonce,
         });
-        return null;
       }
-
-      logger.debug("✅ Signature verified for persisted event", {
-        workflowId: parsed.data.payload.workflowId,
-      });
     }
 
     let payloadWithTypedId: StreamingPersistPayload;

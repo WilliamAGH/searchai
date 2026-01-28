@@ -7,7 +7,7 @@ import React from "react";
 import clsx from "clsx";
 import type { Components } from "react-markdown";
 import { getDomainFromUrl } from "./favicon";
-import { logger } from "../logger";
+import { logger } from "@/lib/logger";
 
 /** Style classes for citation pills */
 const CITATION_PILL_BASE =

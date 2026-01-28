@@ -4,13 +4,13 @@
  */
 
 import type { Dispatch, SetStateAction } from "react";
-import type { IChatRepository } from "../lib/repositories/ChatRepository";
+import type { IChatRepository } from "@/lib/repositories/ChatRepository";
 import type { ChatState } from "./useChatState";
-import type { Message } from "../lib/types/message";
+import type { Message } from "@/lib/types/message";
 import type { Doc } from "../../convex/_generated/dataModel";
-import { TitleUtils } from "../lib/types/unified";
-import { getErrorMessage } from "../lib/utils/errorUtils";
-import { logger } from "../lib/logger";
+import { TitleUtils } from "@/lib/types/unified";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { logger } from "@/lib/logger";
 import { sendMessageWithStreaming } from "@/hooks/chatActions/sendMessage";
 
 export interface ChatActions {

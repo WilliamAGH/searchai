@@ -1,0 +1,37 @@
+# [TY1a] No Explicit any
+# Explicit `any` type is forbidden (except for Convex recursion limits).
+# See AGENTS.md [TY1a], [ZA1e]
+
+id: no-explicit-any
+language: typescript
+severity: error
+message: |
+  [TY1a] Explicit 'any' type detected. Use a specific type instead.
+  Options:
+  - Define a proper interface/type
+  - Use 'unknown' at boundaries and validate with Zod
+  - Use generic constraints
+  See AGENTS.md [TY1a]: "Explicit any is FORBIDDEN"
+
+rule:
+  any:
+    # : any
+    - pattern: "$VAR: any"
+    # as any
+    - pattern: $EXPR as any
+    # <any>
+    - pattern: "<any>$EXPR"
+    # Array<any>
+    - pattern: "Array<any>"
+    # Promise<any>
+    - pattern: "Promise<any>"
+    # Record<$K, any>
+    - pattern: "Record<$K, any>"
+
+files:
+  - "src/**/*.ts"
+  - "src/**/*.tsx"
+  - "convex/**/*.ts"
+
+# Note: Convex recursion limits may need 'any' - those are exceptions
+# that should be documented in comments

@@ -106,7 +106,7 @@ export function MessageList({
   // Debug logging
   useEffect(() => {
     if (Array.isArray(messages)) {
-      logger.debug("🖼️ MessageList render", {
+      logger.debug("MessageList render", {
         count: messages.length,
         firstRole: messages[0]?.role,
       });

@@ -1,5 +1,5 @@
 // src/lib/utils/chatValidation.ts
-import { logger } from "../logger";
+import { logger } from "@/lib/logger";
 
 export interface ChatValidationResult {
   isValid: boolean;

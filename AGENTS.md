@@ -22,7 +22,7 @@ alwaysApply: true
 - [RC1a-d] Root Cause Resolution (single implementation, no fallbacks, no shims/workarounds)
 - [IM1a-d] Import Rules (no barrel files, `@/` alias only, no relative imports)
 - [LGY1a-c] No Legacy Code (no new code in legacy paths; migrate touched logic)
-- [FS1a-n] File Creation & Clean Architecture (search first, strict types, single responsibility)
+- [FS1a-e] File Creation & Clean Architecture (search first, strict types, single responsibility)
 - [AB1a-c] Abstraction Discipline (reuse-first, no anemic wrappers)
 - [EH1a-c] Error Handling (no swallowing, no silent degradation)
 - [TY1a-f] Type Safety & Zod (Zod v4, strict types, no `any`)
@@ -51,16 +51,18 @@ alwaysApply: true
 - [DOC1e] **No .cursor Rules**: Do not add new `.cursor/rules/*.mdc` files. Migrate any existing `.cursor/rules` content into `docs/` and delete the `.cursor/rules` source.
 - [DOC1f] **Prerequisite Reading**: When a workflow requires a doc to be read first, the rule MUST name the exact doc path (e.g., "Before editing `tests/e2e/*`, read `docs/testing-e2e.md`.").
 
-## [ZA1] Zero Tolerance Policy
+## [ZA1] Epistemic Humility (Zero Assumptions)
 
-- [ZA1a] **Zero Assumptions**: Do not assume behavior, APIs, or versions. Verify in the codebase/docs first.
-- [ZA1b] **Validation**: `npm run validate` must pass with 0 errors before asking for review.
-- [ZA1c] **Forbidden Practices**:
+- [ZA1a] **Assume Blindness**: Your training data for APIs/versions is FALSE until verified.
+- [ZA1b] **Scout Phase**: Before coding, use tools (`context7`, `perplexity`, `npm list`) and check `node_modules/` to verify existence/signatures of APIs.
+- [ZA1c] **Local Truth**: Never assume library behavior; verify against the installed version in `package.json` and `node_modules/`.
+- [ZA1d] **Validation**: `npm run validate` must pass with 0 errors before asking for review.
+- [ZA1e] **Forbidden Practices**:
   - No `any`, loose typing, `as` assertions, or `as unknown as`.
   - No polyfills for modern browsers/runtimes.
   - No trusting memory—verify every import/API/config against current docs.
-- [ZA1d] **Dependency Verification**: You MUST research dependency questions and correct usage to ensure idiomatic patterns. Never use legacy or `@deprecated` features. Verification is facilitated by reviewing related code directly in `node_modules` and using online tool calls.
-- [ZA1e] **Dependency Search**: To search `node_modules` efficiently with `ast-grep`, target specific packages: `ast-grep run --pattern '...' node_modules/<package>`. Do NOT scan the entire `node_modules` folder.
+- [ZA1f] **Dependency Verification**: You MUST research dependency questions and correct usage to ensure idiomatic patterns. Never use legacy or `@deprecated` features. Verification is facilitated by reviewing related code directly in `node_modules` and using online tool calls.
+- [ZA1g] **Dependency Search**: To search `node_modules` efficiently with `ast-grep`, target specific packages: `ast-grep run --pattern '...' node_modules/<package>`. Do NOT scan the entire `node_modules` folder.
 
 ## [GT1] Git, History, Hooks, Lock Files
 
@@ -129,6 +131,7 @@ alwaysApply: true
 - [FS1c] **Clean Architecture**: Dependencies point inward. Domain logic has zero framework imports.
 - [FS1d] **One Way**: There is one single way to do everything. No exceptions. If something is updated, update all consumers immediately and remove the old code.
 - [FS1e] **No Duplication**: Single sources of truth. Do not scatter duplicate constants or config fragments.
+- [FS1f] **Facade Pattern**: Convex backend features MUST use the `feature.ts` (public facade) + `feature/` (private module) pattern. Facades re-export only; modules contain logic. See `docs/contracts/code-change.md`.
 
 ## [MO1] No Monoliths
 
@@ -157,15 +160,16 @@ alwaysApply: true
 
 - [TY1a] **Strictness**: `noImplicitAny` is enabled. Explicit `any` is **FORBIDDEN** (except for Convex recursion limits).
 - [TY1b] **No `unknown` Propagation**: `unknown` is allowed ONLY at system boundaries. Validate immediately via Zod.
-- [TY1c] **Zod v4**: Import from `zod/v4`. Exception: OpenAI Agents tool params use v3.
-- [TY1d] **Schema Location**: Canonical Zod schemas live in `convex/lib/schemas/`. See [VL1].
+- [TY1c] **Zod v4**: Import from `zod/v4`. Exception: OpenAI Agents tool params use v3 (see `docs/contracts/sdk-integration.md`).
+- [TY1d] **Schema Location**: Canonical Zod schemas live in `convex/schemas/`. See [VL1].
 - [TY1e] **Validation**: External data (third-party APIs) MUST be validated. Convex-returned data needs NO re-validation.
 - [TY1f] **No `any`**: See [ZA1c].
+- [TY1g] **SDK Tool Types**: See `docs/contracts/sdk-integration.md` for required OpenAI Agent tool type annotations.
 
 ## [VL1] Validation Architecture — No Duplication
 
 - [VL1a] **Convex `v` validators**: Required for database schema and function args. Cannot be replaced.
-- [VL1b] **Zod schemas**: Use ONLY at external API boundaries (data Convex doesn't see). Canonical location: `convex/lib/schemas/`.
+- [VL1b] **Zod schemas**: Use ONLY at external API boundaries (data Convex doesn't see). Canonical location: `convex/schemas/`.
 - [VL1c] **Trust Convex**: Data from Convex queries/mutations is already validated. Do NOT re-validate with Zod.
 - [VL1d] **No Duplication**: Never define the same schema in multiple files. Import from canonical location.
 

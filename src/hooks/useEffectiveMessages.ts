@@ -10,8 +10,8 @@
  */
 
 import { useMemo } from "react";
-import type { Message } from "../lib/types/message";
-import { logger } from "../lib/logger";
+import type { Message } from "@/lib/types/message";
+import { logger } from "@/lib/logger";
 
 interface UseEffectiveMessagesOptions {
   /** Messages from unified chat state (includes optimistic updates) */

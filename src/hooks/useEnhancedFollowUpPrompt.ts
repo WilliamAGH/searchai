@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
 import type { MutableRefObject } from "react";
-import { logger } from "../lib/logger";
+import { logger } from "@/lib/logger";
 import type { Id } from "../../convex/_generated/dataModel";
-import { toConvexId } from "../lib/utils/idValidation";
-import { isTopicChange } from "../lib/utils/topicDetection";
+import { toConvexId } from "@/lib/utils/idValidation";
+import { isTopicChange } from "@/lib/utils/topicDetection";
 
 interface UseEnhancedFollowUpPromptProps {
   currentChatId: string | null;

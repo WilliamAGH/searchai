@@ -1,4 +1,4 @@
-import { logger } from "../logger";
+import { logger } from "@/lib/logger";
 
 /**
  * Extract domain from URL, stripping www. prefix

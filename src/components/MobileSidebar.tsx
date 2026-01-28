@@ -34,7 +34,7 @@ export function MobileSidebar({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const handleNewChat = useCallback(() => {
-    logger.info("🖱️ New Chat button clicked in MobileSidebar");
+    logger.info("New Chat button clicked in MobileSidebar");
     onNewChat();
     onClose();
   }, [onNewChat, onClose]);

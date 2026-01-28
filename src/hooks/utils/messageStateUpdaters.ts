@@ -6,8 +6,8 @@
  */
 
 import type { Dispatch, SetStateAction } from "react";
-import type { ChatState } from "../useChatState";
-import type { Message } from "../../lib/types/message";
+import type { ChatState } from "@/hooks/useChatState";
+import type { Message } from "@/lib/types/message";
 
 /**
  * Update the last assistant message in chat state.

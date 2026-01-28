@@ -79,7 +79,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
             ? firstMsg.chatId
             : undefined;
         if (existingChatId) {
-          logger.info("✅ Found existing chat from messages", {
+          logger.info("[OK] Found existing chat from messages", {
             existingChatId,
           });
           activeChatId = existingChatId;
@@ -90,10 +90,10 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
       // Only create new chat if truly needed
       if (!activeChatId) {
-        logger.debug("📝 No chat exists, creating new one");
+        logger.debug("No chat exists, creating new one");
         const newChatId = await deps.handleNewChat();
         if (!newChatId) {
-          logger.error("❌ Failed to create chat for message");
+          logger.error("[ERROR] Failed to create chat for message");
           return;
         }
         // Frontend uses string chat IDs; avoid unsafe casts

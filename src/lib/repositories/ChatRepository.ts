@@ -3,10 +3,10 @@
  * Provides unified access to Convex chat data for all users
  *
  * MIGRATION COMPLETE (Phase 3):
- * ✅ LocalChatRepository deleted
- * ✅ MigrationService deleted
- * ✅ Migration hooks removed
- * ✅ All users (auth + anon) now use Convex directly via sessionId
+ * - LocalChatRepository deleted
+ * - MigrationService deleted
+ * - Migration hooks removed
+ * - All users (auth + anon) now use Convex directly via sessionId
  *
  * ARCHITECTURE:
  * - ConvexChatRepository is the ONLY implementation
@@ -21,7 +21,7 @@ import type { Doc } from "../../../convex/_generated/dataModel";
 import type {
   SearchResult,
   SerpEnrichment,
-} from "../../../convex/lib/types/search";
+} from "../../../convex/schemas/search";
 
 /**
  * Search web response type - mirrors Convex action return type without importing convex/server.

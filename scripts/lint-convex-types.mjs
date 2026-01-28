@@ -114,7 +114,7 @@ function walkDir(dir) {
 }
 
 // Run the linter
-console.log("🔍 Checking for manual Convex type definitions...\n");
+console.log("Checking for manual Convex type definitions...\n");
 
 checkPaths.forEach((checkPath) => {
   const fullPath = path.join(rootDir, checkPath);
@@ -124,7 +124,7 @@ checkPaths.forEach((checkPath) => {
 });
 
 if (violations.length > 0) {
-  console.error("❌ Found manual Convex type definitions:\n");
+  console.error("[ERROR] Found manual Convex type definitions:\n");
 
   violations.forEach((violation) => {
     console.error(`  ${violation.file}:${violation.line}`);
@@ -132,7 +132,7 @@ if (violations.length > 0) {
     console.error("");
   });
 
-  console.error("\n📚 How to fix:");
+  console.error("\nHow to fix:");
   console.error("  1. Remove manual type definitions");
   console.error("  2. Import from convex/_generated/dataModel instead:");
   console.error(
@@ -145,6 +145,6 @@ if (violations.length > 0) {
 
   process.exit(1);
 } else {
-  console.log("✅ No manual Convex type definitions found!\n");
+  console.log("[OK] No manual Convex type definitions found!\n");
   process.exit(0);
 }

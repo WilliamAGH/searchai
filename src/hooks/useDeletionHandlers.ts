@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { logger } from "../lib/logger";
-import { getErrorMessage } from "../lib/utils/errorUtils";
-import { toConvexId } from "../lib/utils/idValidation";
+import { logger } from "@/lib/logger";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { toConvexId } from "@/lib/utils/idValidation";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Message } from "@/lib/types/message";
 

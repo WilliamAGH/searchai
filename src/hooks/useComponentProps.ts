@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { Chat } from "../lib/types/chat";
+import type { Chat } from "@/lib/types/chat";
 import type {
   Message,
   SearchProgress,
   PaginationState,
-} from "../lib/types/message";
+} from "@/lib/types/message";
 
 interface UseComponentPropsArgs {
   allChats: Chat[];

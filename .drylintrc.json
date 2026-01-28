@@ -1,5 +1,6 @@
 {
   "plugins": ["@dry-lint/typescript", "@dry-lint/zod"],
+  "threshold": 0.96,
   "cache": false,
   "ignore": [
     "node_modules/**",

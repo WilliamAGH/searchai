@@ -6,7 +6,7 @@
  */
 
 // Import PersistedPayload from the single source of truth
-import type { PersistedPayload } from "../types/message";
+import type { PersistedPayload } from "@/lib/types/message";
 
 export type PersistedPayloadWire = Omit<
   PersistedPayload,
@@ -71,7 +71,7 @@ export async function verifyPersistedPayload(
 
     return mismatch === 0;
   } catch (error) {
-    console.error("🚫 Signature verification failed:", error);
+    console.error("[BLOCKED] Signature verification failed:", error);
     return false;
   }
 }

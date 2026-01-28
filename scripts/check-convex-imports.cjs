@@ -136,7 +136,7 @@ function main() {
     !pathAliasViolations.length;
 
   if (allPassed) {
-    console.log("✅ Convex import/type/path-alias checks passed");
+    console.log("[OK] Convex import/type/path-alias checks passed");
   }
 
   // Non-fatal to avoid blocking local dev as per policy; CI can enforce via wrapper

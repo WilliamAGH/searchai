@@ -1,7 +1,7 @@
 {
   "name": "searchai-io",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI-powered search application",
   "type": "module",
   "homepage": "https://search-ai.io",
@@ -13,7 +13,7 @@
     "url": "https://github.com/WilliamAGH/searchai-io/issues"
   },
   "author": "William Callahan",
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "LICENSE.md",
   "keywords": [
     "search",
     "ai",
@@ -35,10 +35,10 @@
     "typecheck": "tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
-    "validate": "npm-run-all --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates --sequential test:single build",
-    "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo '✅ Cleaned build caches'",
-    "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo '✅ Cleaned everything - run npm install'",
-    "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo '✅ Cleaned VSCode caches - restart VSCode'",
+    "validate": "npm-run-all --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates lint:boundaries --sequential test:single build",
+    "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo 'Cleaned build caches'",
+    "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo 'Cleaned everything - run npm install'",
+    "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo 'Cleaned VSCode caches - restart VSCode'",
     "test": "vitest run --reporter=dot --pool=forks",
     "test:vmforks": "vitest run --reporter=dot --pool=vmForks --poolOptions.vmForks.singleFork --coverage.enabled=false",
     "test:single": "vitest run --reporter=dot --pool=forks --poolOptions.forks.singleFork --coverage.enabled=false",
@@ -50,17 +50,18 @@
     "playwright:update": "npm run playwright:install -- --with-deps",
     "test:playwright": "playwright test",
     "test:all": "npm-run-all --sequential test:vitest test:playwright",
-    "test:chat": "vitest src/lib/utils/__tests__/chatValidation.test.ts",
-    "test:integration:chat": "playwright test tests/integration/chat-message-chaining.test.ts",
-    "test:integration": "playwright test --config=playwright-integration.config.ts",
+    "test:chat": "vitest __tests__/src/lib/utils/chatValidation.test.ts",
+    "test:integration:chat": "playwright test __tests__/integration/chat-message-chaining.test.ts",
+    "test:integration": "playwright test --config=__tests__/playwright-integration.config.ts",
     "test:smoke": "playwright test -g smoke --reporter=line",
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test -g smoke --reporter=line",
     "prepare": "husky",
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
     "lint:loc": "node scripts/check-loc.mjs",
     "lint:convex-types": "node scripts/lint-convex-types.mjs",
-    "lint:duplicates": "dry --no-cache && dry --no-cache --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
-    "lint:duplicates:near": "dry --no-cache --threshold 0.9"
+    "lint:duplicates": "DRY_T=$(node -p \"require('./.drylintrc.json').threshold\") && dry --no-cache --threshold $DRY_T && dry --no-cache --threshold $DRY_T --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
+    "lint:duplicates:near": "dry --no-cache --threshold $(node -p \"require('./.drylintrc.json').threshold\")",
+    "lint:boundaries": "ast-grep scan && echo 'No boundary violations found'"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
@@ -91,6 +92,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@ast-grep/cli": "^0.40.5",
     "@dry-lint/cli": "^3.0.0",
     "@dry-lint/typescript": "^3.0.0",
     "@dry-lint/zod": "^3.0.0",

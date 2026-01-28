@@ -5,8 +5,8 @@
  */
 
 import type { Id } from "../../../convex/_generated/dataModel";
-import { toConvexId as convertToConvexId } from "../utils/idValidation";
-import { generateLocalId as generateLocalIdUtil } from "../utils/id";
+import { toConvexId as convertToConvexId } from "@/lib/utils/idValidation";
+import { generateLocalId as generateLocalIdUtil } from "@/lib/utils/id";
 
 /**
  * ID Conversion Utilities

@@ -8,14 +8,11 @@
 import type { Doc } from "../../../convex/_generated/dataModel";
 // Import from the dedicated types module (not orchestration_helpers) so we don't pull
 // any Node-only helpers into browser bundles.
-import type { StreamingPersistPayload } from "../../../convex/agents/schema";
-import type { SearchResult } from "../../../convex/lib/types/search";
-import type {
-  ContextReference,
-  MessageMetadata,
-} from "@/lib/schemas/messageStream";
+import type { StreamingPersistPayload } from "../../../convex/schemas/agentOutput";
+import type { SearchResult } from "../../../convex/schemas/search";
+
 // Re-export types from canonical sources
-export type { SearchResult } from "../../../convex/lib/types/search";
+export type { SearchResult } from "../../../convex/schemas/search";
 export type {
   ContextReference,
   MessageMetadata,

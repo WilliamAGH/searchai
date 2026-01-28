@@ -54,7 +54,7 @@ RUN apk add --no-cache wget
 
 # Copy built application only
 COPY --from=builder /app/dist ./dist
-COPY server.mjs ./server.mjs
+COPY scripts/server.mjs ./server.mjs
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \

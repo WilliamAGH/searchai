@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { getDomainFromUrl } from "../../lib/utils/favicon";
+import { getDomainFromUrl } from "@/lib/utils/favicon";
 
 /**
  * Creates a map of domains to URLs from search results for quick lookup.

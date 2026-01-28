@@ -189,6 +189,6 @@ export function initializeEnv(): void {
       "Continuing with invalid environment configuration (local/dev mode)",
     );
   } else {
-    logger.info("✅ Environment configuration validated");
+    logger.info("[OK] Environment configuration validated");
   }
 }

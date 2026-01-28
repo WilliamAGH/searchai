@@ -33,7 +33,7 @@
               "**/convex-types",
               "**/types/convex"
             ],
-            "message": "❌ NEVER create abstraction layers over Convex _generated types. Import directly from 'convex/_generated/' as per Convex best practices."
+            "message": "NEVER create abstraction layers over Convex _generated types. Import directly from 'convex/_generated/' as per Convex best practices."
           },
           {
             "group": [
@@ -41,7 +41,7 @@
               "../lib/convexTypes",
               "../../lib/convexTypes"
             ],
-            "message": "❌ CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See AGENTS.md for correct patterns."
+            "message": "CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See AGENTS.md for correct patterns."
           },
           {
             "group": [
@@ -49,7 +49,7 @@
               "**/wrappers/convex*",
               "**/abstractions/convex*"
             ],
-            "message": "❌ Do not create wrapper files for Convex types. The _generated directory IS the abstraction layer."
+            "message": "Do not create wrapper files for Convex types. The _generated directory IS the abstraction layer."
           }
         ]
       }
@@ -124,7 +124,7 @@
             "patterns": [
               {
                 "group": ["./lib/convexTypes", "../lib/convexTypes"],
-                "message": "❌ In Convex backend files, import from './_generated/' not from wrapper files"
+                "message": "In Convex backend files, import from './_generated/' not from wrapper files"
               }
             ]
           }
@@ -140,7 +140,7 @@
             "patterns": [
               {
                 "group": ["**/convex/lib/convexTypes", "**/convexTypes"],
-                "message": "❌ In frontend files, import from 'convex/_generated/' not from wrapper files"
+                "message": "In frontend files, import from 'convex/_generated/' not from wrapper files"
               }
             ]
           }

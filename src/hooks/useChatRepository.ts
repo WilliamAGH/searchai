@@ -5,8 +5,8 @@
 
 import { useMemo } from "react";
 import { useConvex } from "convex/react";
-import type { IChatRepository } from "../lib/repositories/ChatRepository";
-import { ConvexChatRepository } from "../lib/repositories/ConvexChatRepository";
+import type { IChatRepository } from "@/lib/repositories/ChatRepository";
+import { ConvexChatRepository } from "@/lib/repositories/ConvexChatRepository";
 import { useAnonymousSession } from "./useAnonymousSession";
 
 export function useChatRepository(): IChatRepository | null {

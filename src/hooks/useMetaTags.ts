@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { Chat } from "../lib/types/chat";
+import type { Chat } from "@/lib/types/chat";
 
 interface MetaTagsProps {
   currentChatId: string | null;

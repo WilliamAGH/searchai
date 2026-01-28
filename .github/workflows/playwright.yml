@@ -31,7 +31,7 @@ jobs:
       - name: Run Playwright tests (integration)
         env:
           CI: '1'
-        run: npx playwright test --config=playwright-integration.config.ts --reporter=line
+        run: npx playwright test --config=__tests__/playwright-integration.config.ts --reporter=line
 
       - name: Upload Playwright report
         if: always()
