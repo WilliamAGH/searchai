@@ -32,9 +32,6 @@ export interface StreamingEvent {
   item?: StreamingEventItem;
 }
 
-/** Alias for use in stream processor modules */
-export type AgentStreamEvent = StreamingEvent;
-
 /**
  * Tool call arguments extracted from streaming events.
  * Used to surface the LLM's reasoning before tool execution completes.

@@ -84,11 +84,6 @@ export type HarvestedData = HarvestedDataSerializable & {
   scrapedUrls: Set<string>;
 };
 
-/** Expose canonical types for consumers */
-export type HarvestedSearchResult = SearchResultStrict;
-export type HarvestedScrapedContent = ScrapedContent;
-export type HarvestedSerpEnrichment = SerpEnrichment;
-
 export function createEmptyHarvestedData(): HarvestedData {
   return {
     scrapedContent: [],

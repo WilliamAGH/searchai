@@ -147,9 +147,6 @@ export const SearchResponseSchema = z.object({
 
 export type SearchResponse = z.infer<typeof SearchResponseSchema>;
 
-/** Alias for cache layer compatibility */
-export type CachedSearchResponse = SearchResponse;
-
 // ============================================
 // Default Values
 // ============================================
