@@ -1,10 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
-import { desktopViewport } from "./tests/config/viewports";
+import { desktopViewport } from "./__tests__/config/viewports";
 
 const useProxyRuntime = process.env.PLAYWRIGHT_RUNTIME === "proxy";
 
 export default defineConfig({
-  testDir: "./tests/e2e",
+  testDir: "./__tests__/e2e",
   timeout: 30_000,
   retries: 0,
   reporter: "list",
@@ -30,7 +30,7 @@ export default defineConfig({
   ],
   webServer: {
     command: useProxyRuntime
-      ? "node server.mjs"
+      ? "node scripts/server.mjs"
       : "bash -c 'npm run build && vite preview --strictPort --port 4173 --host 127.0.0.1'",
     url: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,

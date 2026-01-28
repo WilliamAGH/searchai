@@ -18,23 +18,19 @@ export default defineConfig({
     },
   },
   test: {
-    setupFiles: ["./tests/setup.ts"],
+    setupFiles: ["./__tests__/setup.ts"],
     environment: "node",
     silent: false, // Set to true to suppress console output during tests
+    // Top-level __tests__/ with mirrored structure: __tests__/src/* and __tests__/convex/*
     include: [
-      "tests/**/*.test.{ts,tsx}",
-      "src/**/__tests__/**/*.{test,spec}.{ts,tsx}",
-      "convex/**/*.test.{ts,tsx}",
-      "convex/**/__tests__/**/*.{test,spec}.{ts,tsx}",
+      "__tests__/src/**/*.test.{ts,tsx}",
+      "__tests__/convex/**/*.test.{ts,tsx}",
     ],
     exclude: [
       "node_modules",
       "dist",
-      "tests/e2e/**",
-      "tests/integration/**",
-      "tests/**/*.spec.ts",
-      "tests/smoke/**",
-      "convex/_generated/**",
+      "__tests__/e2e/**",
+      "__tests__/integration/**",
     ],
     reporters: process.env.CI ? ["default", "json", "html"] : ["default"],
     ...(process.env.CI && {
@@ -49,11 +45,8 @@ export default defineConfig({
         test: {
           name: "jsdom",
           environment: "jsdom",
-          include: [
-            "tests/**/*.test.tsx",
-            "src/**/__tests__/**/*.test.tsx",
-            "tests/critical/**",
-          ],
+          // React component tests need jsdom
+          include: ["__tests__/src/**/*.test.tsx"],
           exclude: ["node_modules/**", "dist/**"],
         },
       },
@@ -63,20 +56,17 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
+          // Backend and pure logic tests use node
           include: [
-            "tests/**/*.test.ts",
-            "src/**/__tests__/**/*.test.ts",
-            "convex/**/*.test.ts",
+            "__tests__/src/**/*.test.ts",
+            "__tests__/convex/**/*.test.ts",
           ],
           exclude: [
             "node_modules/**",
             "dist/**",
             "**/*.test.tsx",
-            "tests/critical/**",
-            "tests/e2e/**",
-            "tests/integration/**",
-            "tests/**/*.spec.ts",
-            "tests/smoke/**",
+            "__tests__/e2e/**",
+            "__tests__/integration/**",
           ],
         },
       },
@@ -86,15 +76,7 @@ export default defineConfig({
       reporter: ["text", "json", "html", "lcov"],
       reportsDirectory: "./coverage",
       include: ["src/**/*.{ts,tsx}", "convex/**/*.{ts,tsx}"],
-      exclude: [
-        "src/**/*.test.{ts,tsx}",
-        "src/**/__tests__/**",
-        "src/**/*.d.ts",
-        "src/main.tsx",
-        "convex/_generated/**",
-        "convex/**/*.test.{ts,tsx}",
-        "convex/**/__tests__/**",
-      ],
+      exclude: ["src/**/*.d.ts", "src/main.tsx", "convex/_generated/**"],
       thresholds: {
         global: {
           branches: 80,
