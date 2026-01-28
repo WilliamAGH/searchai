@@ -52,6 +52,7 @@ export const planSearch = action({
   args: {
     chatId: v.id("chats"),
     newMessage: v.string(),
+    sessionId: v.optional(v.string()),
     maxContextMessages: v.optional(v.number()),
   },
   returns: v.object({
