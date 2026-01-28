@@ -1,11 +1,11 @@
 /**
  * Message streaming schemas
  *
- * Per [VL1]: Uses canonical schemas from convex/lib/schemas/.
+ * Per [VL1]: Uses canonical schemas from convex/schemas/.
  */
 
 import { z } from "zod/v4";
-import { ResearchContextReferenceSchema } from "../../../convex/agents/schema";
+import { ResearchContextReferenceSchema } from "../../../convex/schemas/agents";
 import { SearchResultSchema } from "@/lib/schemas/apiResponses";
 
 export const ContextReferenceSchema = ResearchContextReferenceSchema.omit({

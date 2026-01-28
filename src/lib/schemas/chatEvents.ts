@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import { MessageMetadataSchema } from "@/lib/schemas/messageStream";
-import { StreamingPersistPayloadSchema } from "../../../convex/agents/schema";
+import { StreamingPersistPayloadSchema } from "../../../convex/schemas/agents";
 
 export const ProgressEventSchema = z.object({
   type: z.literal("progress"),

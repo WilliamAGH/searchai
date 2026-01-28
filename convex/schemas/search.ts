@@ -2,29 +2,28 @@
  * Canonical Zod schemas for search-related types.
  *
  * Single source of truth for runtime validation at external boundaries.
- * Convex v validators (in ../validators.ts) handle database operations.
- *
- * @see {@link ../types/search.ts} - TypeScript interfaces (compile-time)
- * @see {@link ../validators.ts} - Convex validators (database)
+ * Convex v validators (in ../lib/validators.ts) handle database operations.
  */
 
 import { z } from "zod/v4";
-import { SEARCH_METHODS } from "../types/search";
+import { SEARCH_METHODS, SOURCE_KINDS } from "../lib/constants/search";
 
 // ============================================
-// Shared Constants
+// Shared Constants (Re-exported from constants)
 // ============================================
 
-/** Source kind values - shared between SearchResult and ScrapedContent */
-export const SOURCE_KINDS = ["search_result", "scraped_page"] as const;
-export type SourceKind = (typeof SOURCE_KINDS)[number];
+export {
+  SEARCH_METHODS,
+  SOURCE_KINDS,
+  type SearchMethod,
+  type SourceKind,
+} from "../lib/constants/search";
 
 // ============================================
 // Search Method
 // ============================================
 
 export const SearchMethodSchema = z.enum(SEARCH_METHODS);
-export type SearchMethod = z.infer<typeof SearchMethodSchema>;
 
 // ============================================
 // Search Result
@@ -125,6 +124,17 @@ export const SerpEnrichmentSchema = z.object({
 export type SerpEnrichment = z.infer<typeof SerpEnrichmentSchema>;
 
 // ============================================
+// Search Provider Result
+// ============================================
+
+export const SearchProviderResultSchema = z.object({
+  results: z.array(SearchResultSchema),
+  enrichment: SerpEnrichmentSchema.optional(),
+});
+
+export type SearchProviderResult = z.infer<typeof SearchProviderResultSchema>;
+
+// ============================================
 // Search Response
 // ============================================
 
@@ -136,6 +146,9 @@ export const SearchResponseSchema = z.object({
 });
 
 export type SearchResponse = z.infer<typeof SearchResponseSchema>;
+
+/** Alias for cache layer compatibility */
+export type CachedSearchResponse = SearchResponse;
 
 // ============================================
 // Default Values

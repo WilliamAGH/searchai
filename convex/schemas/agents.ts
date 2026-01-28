@@ -3,8 +3,6 @@
  *
  * Per [VL1]: Imports search schemas from canonical location.
  * Agent-specific schemas (context references, tool outputs) defined here.
- *
- * @see {@link ../lib/schemas/search.ts} - canonical search schemas
  */
 
 import { z } from "zod/v4";
@@ -17,14 +15,11 @@ import {
   type SearchResultStrict,
   type ScrapedContent,
   type SerpEnrichment,
-} from "../lib/schemas/search";
+} from "./search";
 import { safeParseOrNull } from "../lib/validation/zodUtils";
 
 // Re-export canonical types for consumers (no aliasing)
-export {
-  SerpEnrichmentSchema,
-  type SerpEnrichment,
-} from "../lib/schemas/search";
+export { SerpEnrichmentSchema, type SerpEnrichment } from "./search";
 
 // ============================================
 // Context Reference Schema
@@ -214,7 +209,7 @@ export const safeParsePlanResearchToolOutput = (
 // ============================================
 // Agent Output Schemas (re-export from canonical location)
 // ============================================
-// Per [TY1d]: Canonical Zod schemas live in convex/lib/schemas/
+// Per [TY1d]: This is the canonical location (convex/schemas/)
 // Per [VL1d]: No duplication - import from canonical location
 
 export {
@@ -227,7 +222,7 @@ export {
   type PlannedSearchQuery,
   type KeyFinding,
   type SourceUsed,
-} from "../lib/schemas/agentOutput";
+} from "./agentOutput";
 
 // ============================================
 // Convex Query Result Types
@@ -258,13 +253,3 @@ export interface MessageQueryResult {
   content?: string;
   createdAt?: number;
 }
-
-// Legacy type aliases for backward compatibility during refactor
-// TODO: Remove after orchestration.ts fully migrates to PlanningOutput/ResearchOutput
-/** @deprecated Use PlanningOutput from agentOutput.ts */
-export type PlanningAgentOutput =
-  import("../lib/schemas/agentOutput").PlanningOutput;
-
-/** @deprecated Use ResearchOutput from agentOutput.ts */
-export type ResearchAgentOutput =
-  import("../lib/schemas/agentOutput").ResearchOutput;

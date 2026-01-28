@@ -10,7 +10,7 @@
 
 import { z } from "zod/v4";
 import { ScrapedContentSchema, SerpEnrichmentSchema } from "./search";
-import { safeParseOrNull } from "../validation/zodUtils";
+import { safeParseOrNull } from "../lib/validation/zodUtils";
 
 // ============================================
 // Planning Output Schema

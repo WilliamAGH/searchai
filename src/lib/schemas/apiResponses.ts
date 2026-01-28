@@ -2,9 +2,9 @@
  * API Response Schemas
  *
  * Re-exports search schemas from canonical location and defines API-specific schemas.
- * Per [VL1]: Canonical Zod schemas live in convex/lib/schemas/.
+ * Per [VL1]: Canonical Zod schemas live in convex/schemas/.
  *
- * @see {@link ../../../convex/lib/schemas/search.ts} - canonical search schemas
+ * @see {@link ../../../convex/schemas/search.ts} - canonical search schemas
  * @see {@link ../validation/apiResponses.ts} - validation functions
  */
 
@@ -27,7 +27,7 @@ export {
   type SearchResponse,
   // Constants
   DEFAULT_SEARCH_RESPONSE,
-} from "../../../convex/lib/schemas/search";
+} from "../../../convex/schemas/search";
 
 // ============================================
 // AI Response Schema (API-specific)
