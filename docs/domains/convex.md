@@ -1,9 +1,4 @@
----
-description: Convex development guidelines for this project
-globs: **/*.ts,**/*.tsx,**/*.js,**/*.jsx
----
-
-# Convex Guidelines
+# Convex Development
 
 ## Core Principles
 
@@ -31,10 +26,10 @@ import { api } from "../convex/_generated/api";
 **Why**: Convex's esbuild bundler does **not** resolve tsconfig `paths`. The `convex/tsconfig.json` has no `paths` configured, and even if added, Convex's CLI does not pass tsconfig options to esbuild. `@/` imports will pass IDE typechecking (because `tsconfig.app.json` includes convex files) but **fail at bundle time**.
 
 ```typescript
-// ❌ WRONG - will fail when Convex bundles
+// WRONG - will fail when Convex bundles
 import { something } from "@/lib/utils";
 
-// ✅ CORRECT - relative imports work in convex/
+// CORRECT - relative imports work in convex/
 import { something } from "../lib/utils";
 ```
 
@@ -46,15 +41,26 @@ import { something } from "../lib/utils";
 // Public query
 export const getChat = query({
   args: { chatId: v.id("chats") },
-  returns: v.union(v.object({ /* ... */ }), v.null()),
-  handler: async (ctx, args) => { /* ... */ }
+  returns: v.union(
+    v.object({
+      /* ... */
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    /* ... */
+  },
 });
 
 // Internal mutation (prefix with internal*)
 export const internalUpdateChat = internalMutation({
-  args: { /* ... */ },
+  args: {
+    /* ... */
+  },
   returns: v.null(),
-  handler: async (ctx, args) => { /* ... */ }
+  handler: async (ctx, args) => {
+    /* ... */
+  },
 });
 ```
 
@@ -71,7 +77,8 @@ export function generateShareId(): string {
 }
 
 export function isValidUuidV7(id: string): boolean {
-  const pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const pattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return pattern.test(id);
 }
 ```
@@ -94,8 +101,8 @@ export default defineSchema({
     title: v.string(),
     userId: v.optional(v.id("users")),
   })
-  .index("by_user", ["userId"])
-  .index("by_share_id", ["shareId"]), // Name includes all fields
+    .index("by_user", ["userId"])
+    .index("by_share_id", ["shareId"]),
 });
 ```
 
@@ -105,10 +112,9 @@ export default defineSchema({
 - Use `Doc<"tableName">` for full documents
 - Add type hints for circular references: `const result: string = await ctx.runQuery(...)`
 - Use `as const` for discriminated unions
-- **Recursion Depth**: Use `@ts-ignore` with comment for "excessively deep" errors.
-- **Validation Architecture**: See `AGENTS.md` [VL1]. Convex `v` validators for database; Zod only at external boundaries.
-- **Zod Schemas**: Canonical location is `convex/lib/schemas/`. See [ZD2] in `type-safety-zod-validation.mdc`.
-- **Zod Validation Utilities**: Use `convex/lib/validation/zodUtils.ts` for `logZodFailure`, `safeParseWithLog`, `safeParseOrNull`. See [ZV1] in `AGENTS.md`.
+- **Recursion Depth**: Use `@ts-ignore` with comment for "excessively deep" errors
+- **Validation Architecture**: See `AGENTS.md` [VL1]. Convex `v` validators for database; Zod only at external boundaries
+- **Zod Schemas**: Canonical location is `convex/schemas/`. See [TY1d] in AGENTS.md
 
 ## Pagination
 
@@ -116,56 +122,27 @@ export default defineSchema({
 import { paginationOptsValidator } from "convex/server";
 
 export const getPaginated = query({
-  args: { 
+  args: {
     paginationOpts: paginationOptsValidator,
-    chatId: v.id("chats") 
+    chatId: v.id("chats"),
   },
   handler: async (ctx, args) => {
     return ctx.db
       .query("messages")
-      .withIndex("by_chat", q => q.eq("chatId", args.chatId))
+      .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
       .order("desc")
       .paginate(args.paginationOpts);
-  }
+  },
 });
 ```
 
 ## Actions
 
-- Add `"use node";` when using Node.js modules
+- Add `"use node";` when using Node.js modules (see [CX1] in AGENTS.md)
 - No database access (`ctx.db` unavailable)
 - Call mutations/queries via `ctx.runMutation`/`ctx.runQuery`
 
-## File Storage
-
-```typescript
-// Get URL
-const url = await ctx.storage.getUrl(storageId);
-
-// Get metadata via system table
-const metadata = await ctx.db.system.get(storageId);
-```
-
-## CLI Commands
-
-```bash
-npx convex dev           # Start dev server
-npx convex deploy        # Deploy to production  
-npx convex logs          # View dev logs
-npx convex logs --prod   # View production logs
-npx convex dashboard     # Open dashboard
-```
-
-## Common Validators
-
-- `v.id("tableName")` - Document ID
-- `v.null()` - Null value (not undefined)
-- `v.int64()` - BigInt (not v.bigint())
-- `v.record(v.string(), v.any())` - Record type
-- `v.union(...)` - Union types
-- `v.literal("value")` - Literal values
-
-## HTTP Endpoints (Updated)
+## HTTP Endpoints
 
 Use agent endpoints; legacy `/api/ai` is removed.
 
@@ -181,12 +158,12 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, req) => {
     const body = await req.json();
-    // Validate inline, don't create type definitions
     return new Response(JSON.stringify(result));
-  })
+  }),
 });
 
 export default http;
+```
 
 ### Agent Streaming Endpoints
 
@@ -200,7 +177,25 @@ export default http;
   - `complete` - Final event with full response
   - `persisted` - Persistence confirmation with signature for verification
   - `error` - Error information
+
+## CLI Commands
+
+```bash
+npx convex dev           # Start dev server
+npx convex deploy        # Deploy to production
+npx convex logs          # View dev logs
+npx convex logs --prod   # View production logs
+npx convex dashboard     # Open dashboard
 ```
+
+## Common Validators
+
+- `v.id("tableName")` - Document ID
+- `v.null()` - Null value (not undefined)
+- `v.int64()` - BigInt (not v.bigint())
+- `v.record(v.string(), v.any())` - Record type
+- `v.union(...)` - Union types
+- `v.literal("value")` - Literal values
 
 ## References
 

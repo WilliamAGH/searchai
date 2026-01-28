@@ -1,17 +1,14 @@
 ---
-description: "SDK integration patterns for OpenAI Agents SDK and similar third-party libraries"
-globs: "convex/agents/**/*.ts"
+title: "SDK Integration Patterns"
+description: "Patterns for OpenAI Agents SDK and similar third-party library integration"
+usage: "Reference when working in convex/agents/**/*.ts files"
 ---
 
 # SDK Integration Patterns
 
-## [SDK1] OpenAI Agents SDK Tool Type Annotations
+See `AGENTS.md` for rule definitions. This document explains HOW and WHY to follow the rules.
 
-### Rule
-
-**Individual tools**: Use `FunctionTool<any, any, unknown>` type annotation.
-
-**Tool arrays**: Use `Tool[]` for `Agent.create()` compatibility.
+## OpenAI Agents SDK Tool Type Annotations
 
 ### Rationale
 
@@ -31,7 +28,10 @@ This is **documented SDK behavior**, not a workaround. The SDK's own `Tool` type
 
 ```typescript
 // From @openai/agents-core/dist/tool.d.ts
-export type Tool<Context = unknown> = FunctionTool<Context, any, any> | ComputerTool | HostedTool;
+export type Tool<Context = unknown> =
+  | FunctionTool<Context, any, any>
+  | ComputerTool
+  | HostedTool;
 ```
 
 ### Correct Pattern
@@ -56,13 +56,13 @@ export const toolsList: Tool[] = [myTool, otherTool];
 ### Incorrect Patterns
 
 ```typescript
-// ❌ WRONG: unknown violates TParameters constraint
+// WRONG: unknown violates TParameters constraint
 export const myTool: FunctionTool<unknown, unknown, unknown> = tool({...});
 
-// ❌ WRONG: Circular inference without annotation
+// WRONG: Circular inference without annotation
 export const myTool = tool({...}); // TS7022 error
 
-// ❌ WRONG: Tool<SpecificContext> not assignable to Tool[]
+// WRONG: Tool<SpecificContext> not assignable to Tool[]
 export const toolsList: Tool<MyContext>[] = [...]; // Won't satisfy Agent.create()
 ```
 
@@ -72,14 +72,7 @@ export const toolsList: Tool<MyContext>[] = [...]; // Won't satisfy Agent.create
 - Tool Type Definition: https://openai.github.io/openai-agents-js/openai/agents-core/type-aliases/tool
 - Canonical implementation: `convex/agents/tools.ts`
 
-## [SDK2] Zod Version Boundary
-
-### Rule
-
-OpenAI Agents SDK requires **Zod v3** for tool parameter schemas (peer dependency).
-
-- **In `convex/agents/tools.ts`**: Import from `"zod"` (v3)
-- **Everywhere else**: Import from `"zod/v4"` per [TY1c]
+## Zod Version Boundary
 
 ### Rationale
 

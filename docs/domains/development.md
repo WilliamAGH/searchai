@@ -50,7 +50,7 @@ npm run validate
 npm run test:all
 ```
 
-More details: [Testing](testing.md).
+More details: [Testing](../contracts/testing.md).
 
 ## Convex `_generated` imports
 
