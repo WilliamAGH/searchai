@@ -79,11 +79,11 @@ export const summarizeRecentAction = action({
   returns: v.string(),
   handler: async (ctx, args): Promise<string> => {
     const lim = Math.max(1, Math.min(args.limit ?? 14, 40));
-    // Load messages via query to respect auth and avoid using ctx.db in actions
-    const all = await ctx.runQuery(api.chats.messages.getChatMessages, {
+    // Load messages via query with limit to avoid fetching entire chat history
+    const ordered = await ctx.runQuery(api.chats.messages.getChatMessages, {
       chatId: args.chatId,
+      limit: lim,
     });
-    const ordered = all.slice(-lim);
     const chatResult = await ctx.runQuery(api.chats.core.getChatById, {
       chatId: args.chatId,
     });

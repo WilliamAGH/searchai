@@ -1,5 +1,5 @@
 import { corsResponse, serializeError } from "../utils";
-import type { ResearchContextReference } from "../../agents/schema";
+import type { ResearchContextReference } from "../../schemas/agents";
 
 type JsonPayloadResult =
   | { ok: true; payload: Record<string, unknown> }
@@ -33,7 +33,7 @@ export async function parseJsonPayload(
   try {
     rawPayload = await request.json();
   } catch (error) {
-    console.error(`❌ ${logPrefix} INVALID JSON:`, serializeError(error));
+    console.error(`[ERROR] ${logPrefix} INVALID JSON:`, serializeError(error));
     return {
       ok: false,
       response: corsResponse(

@@ -5,7 +5,7 @@ import type { Id } from "../_generated/dataModel";
 import { generateMessageId } from "../lib/id_generator";
 import { AGENT_LIMITS, AGENT_TIMEOUTS } from "../lib/constants/cache";
 import { stripTrailingSources } from "./answerParser";
-import { createEmptyHarvestedData } from "./schema";
+import { createEmptyHarvestedData } from "../schemas/agents";
 import { processAgentStream } from "./streaming_processor";
 import type { AgentStreamResult } from "./streaming_processor_types";
 import {
@@ -278,6 +278,19 @@ export async function* streamConversationalWorkflow(
         }),
     );
 
+    // Emit metadata before complete per SSE spec (complete is terminal for some clients)
+    yield writeEvent(
+      "metadata",
+      buildMetadataEvent({
+        workflowId,
+        contextReferences: uniqueContextRefs,
+        hasLimitations: false,
+        confidence: 1,
+        answerLength: finalOutput.length,
+        nonce,
+      }),
+    );
+
     yield writeEvent(
       "complete",
       buildConversationalCompleteEvent({
@@ -288,18 +301,6 @@ export async function* streamConversationalWorkflow(
         contextReferences: uniqueContextRefs,
         searchResultCount: harvested.searchResults.length,
         scrapedPageCount: harvested.scrapedContent.length,
-      }),
-    );
-
-    yield writeEvent(
-      "metadata",
-      buildMetadataEvent({
-        workflowId,
-        contextReferences: uniqueContextRefs,
-        hasLimitations: false,
-        confidence: 1,
-        answerLength: finalOutput.length,
-        nonce,
       }),
     );
 

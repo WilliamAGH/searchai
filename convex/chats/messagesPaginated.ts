@@ -154,21 +154,20 @@ export const getChatMessagesPaginated = query({
 export const getRecentChatMessages = query({
   args: {
     chatId: v.id("chats"),
+    sessionId: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Auth and chat
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
     if (!chat) return [];
 
-    // Authorization aligned with paginated variant:
-    // - allow owner
-    // - allow anonymous chats (no userId)
-    // - allow publicly shared chats (privacy: "shared" | "public")
-    const privacy = chat.privacy;
-    const isSharedOrPublic = privacy === "shared" || privacy === "public";
-    if (chat.userId && chat.userId !== userId && !isSharedOrPublic) {
+    const isSharedOrPublic = isSharedOrPublicChat(chat);
+    const isUserOwner = hasUserAccess(chat, userId);
+    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
+    const isUnowned = isUnownedChat(chat);
+
+    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner && !isUnowned) {
       return [];
     }
 

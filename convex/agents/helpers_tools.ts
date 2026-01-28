@@ -4,8 +4,9 @@ import {
   safeParsePlanResearchToolOutput,
   safeParseScrapeToolOutput,
   safeParseSearchToolOutput,
-} from "./schema";
+} from "../schemas/agents";
 import { isUuidV7 } from "./helpers_utils";
+import type { RunToolCallItem, RunToolCallOutputItem } from "@openai/agents";
 
 const TOOL_RESULT_MAX_LENGTH = 200;
 
@@ -62,16 +63,16 @@ type ToolCallEntry = {
 };
 
 export function processToolCalls(
-  newItems: any[],
+  newItems: unknown[],
   baseTimestamp: number,
-  RunToolCallItem: any,
-  RunToolCallOutputItem: any,
+  RunToolCallItemClass: typeof RunToolCallItem,
+  RunToolCallOutputItemClass: typeof RunToolCallOutputItem,
 ): Map<string, ToolCallEntry> {
   const toolCallEntries = new Map<string, ToolCallEntry>();
 
   newItems.forEach((item, idx) => {
     const timestamp = baseTimestamp + idx * 10;
-    if (item instanceof RunToolCallItem) {
+    if (item instanceof RunToolCallItemClass) {
       const rawCall = item.rawItem;
       if (rawCall.type === "function_call") {
         let parsedArgs: unknown = rawCall.arguments;
@@ -92,7 +93,7 @@ export function processToolCalls(
           order: idx,
         });
       }
-    } else if (item instanceof RunToolCallOutputItem) {
+    } else if (item instanceof RunToolCallOutputItemClass) {
       const rawOutput = item.rawItem;
       if (rawOutput.type === "function_call_result") {
         const entry: ToolCallEntry = toolCallEntries.get(rawOutput.callId) ?? {

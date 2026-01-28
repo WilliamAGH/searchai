@@ -67,9 +67,7 @@ export const recordClientMetric = action({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Directly insert metrics to avoid circular dependency
     try {
-      // const date = new Date().toISOString().slice(0, 10);
       await ctx.runMutation(internal.search.metrics.recordMetric, {
         name: args.name,
         chatId: args.chatId,

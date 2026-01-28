@@ -1,7 +1,26 @@
 import type {
   ResearchContextReference,
   StreamingPersistPayload,
-} from "./schema";
+  PlanningOutput,
+} from "../schemas/agents";
+import type { Id } from "../_generated/dataModel";
+import type { WorkflowActionCtx } from "./orchestration_persistence";
+import type { StreamingWorkflowArgs } from "./orchestration_session";
+
+/**
+ * Shared args for workflow path executors (fast path, parallel path).
+ * Extracted to avoid duplication per [CC1b].
+ */
+export interface WorkflowPathArgs {
+  ctx: WorkflowActionCtx;
+  args: StreamingWorkflowArgs;
+  workflowId: string;
+  nonce: string;
+  workflowTokenId: Id<"workflowTokens"> | null;
+  chat: { title?: string };
+  startTime: number;
+  planningOutput: PlanningOutput;
+}
 
 /**
  * Planning output for complete event.
@@ -22,7 +41,6 @@ export interface PlanningEventPayload {
 
 /**
  * Research output for complete event.
- * Subset of ResearchAgentOutput for serialization.
  */
 export interface ResearchEventPayload {
   researchSummary: string;

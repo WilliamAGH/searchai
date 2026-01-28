@@ -1,6 +1,6 @@
 "use node";
 
-import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
+import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import { TOKEN_BUDGETS, CONTENT_LIMITS } from "../lib/constants/cache";
 import { truncate } from "./helpers_utils";
 

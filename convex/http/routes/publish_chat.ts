@@ -15,7 +15,7 @@ export async function handlePublishChat(
   try {
     rawPayload = await request.json();
   } catch (error) {
-    console.error("❌ PUBLISH INVALID JSON:", serializeError(error));
+    console.error("[ERROR] PUBLISH INVALID JSON:", serializeError(error));
     return buildCorsJsonResponse(
       request,
       { error: "Invalid JSON body", errorDetails: serializeError(error) },

@@ -36,16 +36,19 @@ export async function handleAgentPersist(
   const message = sanitizeTextInput(payload.message, 10000) ?? "";
   const rawChatId = typeof payload.chatId === "string" ? payload.chatId : "";
 
+  // Normalize empty string to undefined, then validate if present
   const sessionIdRaw =
-    typeof payload.sessionId === "string" ? payload.sessionId : undefined;
-  if (sessionIdRaw && !isValidUuidV7(sessionIdRaw)) {
+    typeof payload.sessionId === "string"
+      ? payload.sessionId.trim()
+      : undefined;
+  const sessionId = sessionIdRaw || undefined;
+  if (sessionId && !isValidUuidV7(sessionId)) {
     return corsResponse(
       JSON.stringify({ error: "Invalid sessionId format" }),
       400,
       origin,
     );
   }
-  const sessionId = sessionIdRaw;
 
   const chatId = safeConvexId<"chats">(rawChatId);
   if (!message.trim() || !chatId) {

@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { vContextReference } from "../lib/validators";
 import { streamConversationalWorkflow } from "./workflow_conversational";
-import type { StreamingPersistPayload } from "./schema";
+import type { StreamingPersistPayload } from "../schemas/agents";
 import { ensureCustomEventPolyfill } from "./workflow_utils";
 
 // Ensure polyfill is loaded
@@ -17,7 +17,7 @@ export { streamResearchWorkflow } from "./workflow_research";
 
 // Re-export types
 export type { StreamingWorkflowArgs } from "./orchestration_session";
-export type { ResearchContextReference } from "./schema";
+export type { ResearchContextReference } from "../schemas/agents";
 
 // --------------------------------------------
 // Non-streaming workflow with persistence

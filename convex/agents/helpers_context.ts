@@ -1,7 +1,7 @@
 "use node";
 
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
-import type { ResearchContextReference } from "./schema";
+import type { ResearchContextReference } from "../schemas/agents";
 import { normalizeUrl } from "./helpers_utils";
 
 export function normalizeSourceContextIds(

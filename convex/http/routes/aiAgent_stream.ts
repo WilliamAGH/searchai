@@ -103,9 +103,12 @@ export async function handleAgentStream(
           sendEvent(event);
         }
 
-        dlog("✅ STREAMING CONVERSATIONAL WORKFLOW COMPLETE");
+        dlog("[OK] STREAMING CONVERSATIONAL WORKFLOW COMPLETE");
       } catch (error) {
-        console.error("💥 STREAMING WORKFLOW ERROR:", serializeError(error));
+        console.error(
+          "[ERROR] STREAMING WORKFLOW ERROR:",
+          serializeError(error),
+        );
         sendEvent({
           type: "error",
           error: serializeError(error).message,

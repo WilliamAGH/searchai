@@ -51,16 +51,7 @@ export async function* executeInstantPath({
 
   yield writeEvent("content", { delta: instantResponse });
 
-  yield writeEvent(
-    "complete",
-    buildInstantCompleteEvent({
-      workflowId,
-      userQuery: args.userQuery,
-      answer: instantResponse,
-      startTime,
-    }),
-  );
-
+  // Emit metadata before complete per SSE spec (complete is terminal for some clients)
   yield writeEvent(
     "metadata",
     buildMetadataEvent({
@@ -70,6 +61,16 @@ export async function* executeInstantPath({
       confidence: 1,
       answerLength: instantResponse.length,
       nonce,
+    }),
+  );
+
+  yield writeEvent(
+    "complete",
+    buildInstantCompleteEvent({
+      workflowId,
+      userQuery: args.userQuery,
+      answer: instantResponse,
+      startTime,
     }),
   );
 

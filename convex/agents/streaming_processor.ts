@@ -24,7 +24,7 @@ import {
   getProgressMessage,
   type ProgressStage,
 } from "./streaming_progress";
-import type { HarvestedData } from "./schema";
+import type { HarvestedData } from "../schemas/agents";
 import {
   extractReasoningContent,
   extractToolOutput,

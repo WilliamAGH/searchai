@@ -3,10 +3,7 @@
  * Free, privacy-focused search fallback
  */
 
-import type {
-  SearchResult,
-  SearchProviderResult,
-} from "../../lib/types/search";
+import type { SearchResult, SearchProviderResult } from "../../schemas/search";
 
 // Provider-specific relevance scores
 // DuckDuckGo instant answer API returns varying quality data

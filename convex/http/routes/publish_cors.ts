@@ -83,5 +83,5 @@ export function buildCorsPreflightResponse(
 }
 
 export function logInvalidJson(error: unknown) {
-  console.error("❌ PUBLISH INVALID JSON:", serializeError(error));
+  console.error("[ERROR] PUBLISH INVALID JSON:", serializeError(error));
 }

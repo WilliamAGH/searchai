@@ -117,12 +117,12 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   if (useChatCompletionsAPI) {
     setOpenAIAPI("chat_completions");
     console.info(
-      "🔧 API Mode: chat_completions",
+      "API Mode: chat_completions",
       isOpenRouter ? "(OpenRouter detected)" : "(explicit endpoint)",
     );
   } else {
     setOpenAIAPI("responses");
-    console.info("🔧 API Mode: responses (OpenAI endpoint)");
+    console.info("API Mode: responses (OpenAI endpoint)");
   }
 
   // Configure tracing (only for OpenAI endpoints)
@@ -146,7 +146,7 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   });
   setDefaultModelProvider(modelProvider);
   console.info(
-    "🔧 ModelProvider useResponses:",
+    "ModelProvider useResponses:",
     !useChatCompletionsAPI,
     useChatCompletionsAPI
       ? "(disabled for Chat Completions)"
@@ -170,14 +170,8 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   const provider = parseOpenRouterProvider();
   const reasoning = parseReasoningSettings();
 
-  console.info(
-    "🔍 parseOpenRouterProvider returned:",
-    JSON.stringify(provider),
-  );
-  console.info(
-    "🔍 parseReasoningSettings returned:",
-    JSON.stringify(reasoning),
-  );
+  console.info("parseOpenRouterProvider returned:", JSON.stringify(provider));
+  console.info("parseReasoningSettings returned:", JSON.stringify(reasoning));
 
   const defaultModelSettings: Partial<ModelSettings> = {
     temperature,
@@ -205,7 +199,7 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   }
 
   console.info(
-    "🔍 Final defaultModelSettings:",
+    "Final defaultModelSettings:",
     JSON.stringify(defaultModelSettings),
   );
 

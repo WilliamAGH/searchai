@@ -23,7 +23,7 @@
  * - This is documented SDK behavior, not a workaround
  *
  * @see https://openai.github.io/openai-agents-js/guides/tools
- * @see .cursor/rules/sdk-integration.mdc for canonical policy
+ * @see docs/contracts/sdk-integration.md for canonical policy
  *
  * ## Zod Version Boundary
  *

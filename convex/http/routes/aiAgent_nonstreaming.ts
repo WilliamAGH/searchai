@@ -53,7 +53,7 @@ export async function handleAgentRequest(
     payload.contextReferences,
   );
 
-  dlog("🤖 AGENT AI ENDPOINT CALLED:");
+  dlog("AGENT AI ENDPOINT CALLED:");
   dlog("Message length:", message.length);
   dlog("Has context:", !!conversationContext);
   dlog("Context length:", conversationContext?.length || 0);
@@ -69,7 +69,7 @@ export async function handleAgentRequest(
   dlog("- LLM_MODEL:", process.env.LLM_MODEL || "default");
 
   try {
-    dlog("🚀 Starting agent orchestration workflow...");
+    dlog("Starting agent orchestration workflow...");
 
     const workflowResult = await ctx.runAction(
       api.agents.orchestration.orchestrateResearchWorkflow,
@@ -80,7 +80,7 @@ export async function handleAgentRequest(
       },
     );
 
-    dlog("✅ AGENT WORKFLOW COMPLETE:", {
+    dlog("[OK] AGENT WORKFLOW COMPLETE:", {
       workflowId: workflowResult.workflowId,
       totalDuration: workflowResult.metadata.totalDuration,
       answerLength: workflowResult.answer.answer.length,
@@ -143,12 +143,12 @@ export async function handleAgentRequest(
           : undefined,
     };
 
-    dlog("📤 AGENT RESPONSE:", JSON.stringify(response, null, 2));
+    dlog("AGENT RESPONSE:", JSON.stringify(response, null, 2));
 
     return corsResponse(JSON.stringify(response), 200, origin);
   } catch (error) {
     const errorInfo = serializeError(error);
-    console.error("💥 AGENT WORKFLOW FAILED:", {
+    console.error("[ERROR] AGENT WORKFLOW FAILED:", {
       error: errorInfo.message,
       errorDetails: errorInfo,
       timestamp: new Date().toISOString(),
@@ -167,7 +167,10 @@ export async function handleAgentRequest(
       timestamp: new Date().toISOString(),
     };
 
-    dlog("❌ AGENT ERROR RESPONSE:", JSON.stringify(errorResponse, null, 2));
+    dlog(
+      "[ERROR] AGENT ERROR RESPONSE:",
+      JSON.stringify(errorResponse, null, 2),
+    );
 
     return corsResponse(JSON.stringify(errorResponse), 500, origin);
   }

@@ -8,7 +8,7 @@
  * - AI responses
  */
 
-import type { SearchResult } from "./lib/types/search";
+import type { SearchResult } from "./schemas/search";
 import { safeParseUrl } from "./lib/url";
 import { ENHANCEMENT_RULES } from "./enhancements/rules";
 

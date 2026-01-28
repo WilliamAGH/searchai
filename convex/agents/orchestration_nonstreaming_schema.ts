@@ -56,7 +56,11 @@ export const orchestrateResearchWorkflowReturns = v.object({
         url: v.string(),
         title: v.string(),
         contextId: v.string(),
-        type: v.union(v.literal("search_result"), v.literal("scraped_page")),
+        type: v.union(
+          v.literal("search_result"),
+          v.literal("scraped_page"),
+          v.literal("research_summary"),
+        ),
         relevance: v.union(
           v.literal("high"),
           v.literal("medium"),

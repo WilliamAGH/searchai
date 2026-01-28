@@ -52,6 +52,7 @@ export async function runPlanSearch(
   args: {
     chatId: Id<"chats">;
     newMessage: string;
+    sessionId?: string;
     maxContextMessages?: number;
   },
 ) {
@@ -86,12 +87,21 @@ export async function runPlanSearch(
     api.chats.messagesPaginated.getRecentChatMessages,
     {
       chatId: args.chatId,
+      sessionId: args.sessionId,
       limit: 25,
     },
   );
   const messageCountKey = recentMessages.length;
   const cacheKey = `${args.chatId}|${normMsg}|${messageCountKey}`;
-  // Rate limit check
+
+  // Check cache first - cache hits bypass rate limiting
+  const cachedPlan = getCachedPlan(cacheKey, now);
+  if (cachedPlan) {
+    // Metrics recorded at frontend layer
+    return cachedPlan;
+  }
+
+  // Rate limit check - only applies to non-cached requests
   const { isLimited } = checkRateLimit(args.chatId, now);
   if (isLimited) {
     // Too many plan calls; serve default plan (also cached)
@@ -109,11 +119,6 @@ export async function runPlanSearch(
   }
   // Record this attempt in the rate bucket
   recordRateLimitAttempt(args.chatId, now);
-  const cachedPlan = getCachedPlan(cacheKey, now);
-  if (cachedPlan) {
-    // Metrics recorded at frontend layer
-    return cachedPlan;
-  }
 
   const maxContext = Math.max(1, Math.min(args.maxContextMessages ?? 10, 25));
 

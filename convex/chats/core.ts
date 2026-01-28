@@ -29,6 +29,11 @@ export const createChat = mutation({
   },
   returns: v.id("chats"),
   handler: async (ctx, args) => {
+    // Validate sessionId if provided - reject empty strings
+    if (args.sessionId !== undefined && args.sessionId.trim() === "") {
+      throw new Error("sessionId cannot be an empty string");
+    }
+
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
 

@@ -7,7 +7,7 @@ import {
   safeParseSearchToolOutput,
   safeParseScrapeToolOutput,
   type HarvestedData,
-} from "./schema";
+} from "../schemas/agents";
 
 /**
  * Harvest search results from a tool output.

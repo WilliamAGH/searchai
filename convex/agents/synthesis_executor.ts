@@ -16,8 +16,8 @@ import { buildSynthesisInstructions } from "./orchestration_helpers";
 import { AGENT_TIMEOUTS, AGENT_LIMITS } from "../lib/constants/cache";
 import { processStreamForDeltas } from "./streaming_processor_helpers";
 import type { AgentStreamResult } from "./streaming_processor_types";
-import type { HarvestedData } from "./schema";
-import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
+import type { HarvestedData } from "../schemas/agents";
+import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
 import { logWorkflow, logSynthesisComplete } from "./workflow_logger";
 

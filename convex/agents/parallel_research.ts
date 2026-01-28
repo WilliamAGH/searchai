@@ -14,8 +14,11 @@ import {
   CONTENT_LIMITS,
   RELEVANCE_SCORES,
 } from "../lib/constants/cache";
-import { createEmptyHarvestedData, type HarvestedData } from "./schema";
-import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
+import {
+  createEmptyHarvestedData,
+  type HarvestedData,
+} from "../schemas/agents";
+import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
 import {
   logParallelSearch,
@@ -344,47 +347,4 @@ export async function* executeParallelResearch(
   );
 
   return { harvested, stats };
-}
-
-// ============================================
-// Synthetic Findings Builder
-// ============================================
-
-/**
- * Build synthetic key findings from scraped content summaries.
- * Provides structured context for synthesis without an additional LLM call.
- *
- * @param scrapedContent - Scraped pages with summaries
- * @param maxFindings - Maximum number of findings to generate (default: 5)
- * @returns Array of key findings
- */
-export function buildSyntheticKeyFindings(
-  scrapedContent: ScrapedContent[],
-  maxFindings: number = 5,
-): Array<{ finding: string; sources: string[]; confidence: string }> {
-  // Filter to pages with meaningful summaries
-  const HIGH_RELEVANCE_THRESHOLD = 0.7;
-  const MEDIUM_RELEVANCE_THRESHOLD = 0.5;
-
-  return scrapedContent
-    .filter(
-      (scraped) =>
-        scraped.summary &&
-        scraped.summary.length > CONTENT_LIMITS.MIN_SUMMARY_LENGTH,
-    )
-    .slice(0, maxFindings)
-    .map((scraped) => ({
-      finding:
-        scraped.summary.length > CONTENT_LIMITS.LOG_DISPLAY_LENGTH + 3
-          ? scraped.summary.substring(0, CONTENT_LIMITS.LOG_DISPLAY_LENGTH) +
-            "..."
-          : scraped.summary,
-      sources: [scraped.url],
-      confidence:
-        (scraped.relevanceScore ?? 0) >= HIGH_RELEVANCE_THRESHOLD
-          ? "high"
-          : (scraped.relevanceScore ?? 0) >= MEDIUM_RELEVANCE_THRESHOLD
-            ? "medium"
-            : "low",
-    }));
 }

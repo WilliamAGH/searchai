@@ -2,6 +2,7 @@ import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { formatConversationMarkdown } from "../utils";
 import { buildCorsJsonResponse } from "./publish_cors";
+import { isValidUuidV7 } from "../../lib/uuid";
 
 type ExportedChat = {
   title: string;
@@ -49,6 +50,28 @@ export async function loadExportData(
   const publicId = publicIdParam
     ? String(publicIdParam).trim().slice(0, 100)
     : undefined;
+
+  // Validate UUIDv7 format before querying
+  if (shareId && !isValidUuidV7(shareId)) {
+    return {
+      ok: false,
+      response: buildCorsJsonResponse(
+        request,
+        { error: "Invalid shareId format" },
+        400,
+      ),
+    };
+  }
+  if (publicId && !isValidUuidV7(publicId)) {
+    return {
+      ok: false,
+      response: buildCorsJsonResponse(
+        request,
+        { error: "Invalid publicId format" },
+        400,
+      ),
+    };
+  }
 
   if (!shareId && !publicId) {
     return {

@@ -3,7 +3,7 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { createHmac } from "node:crypto";
-import { StreamingPersistPayloadSchema } from "./agents/schema";
+import { StreamingPersistPayloadSchema } from "./schemas/agents";
 
 export const signPersistedPayload = internalAction({
   args: {

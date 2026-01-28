@@ -81,7 +81,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
     const contextId = generateMessageId();
     const callStart = Date.now();
 
-    console.info("🔍 SEARCH TOOL CALLED:", {
+    console.info("[SEARCH] SEARCH TOOL CALLED:", {
       contextId,
       query: input.query,
       maxResults: input.maxResults || 5,
@@ -97,7 +97,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
       });
 
       const durationMs = Date.now() - callStart;
-      console.info("✅ SEARCH TOOL SUCCESS:", {
+      console.info("[OK] SEARCH TOOL SUCCESS:", {
         contextId,
         resultCount: results.results.length,
         searchMethod: results.searchMethod,
@@ -137,7 +137,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
       return output;
     } catch (error) {
       const durationMs = Date.now() - callStart;
-      console.error("❌ SEARCH TOOL ERROR:", {
+      console.error("[ERROR] SEARCH TOOL ERROR:", {
         contextId,
         error: getErrorMessage(error),
         durationMs,

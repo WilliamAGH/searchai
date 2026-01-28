@@ -1,14 +1,7 @@
-import type { StreamingEventItem } from "./streaming_event_types";
+import type { AgentStreamEvent } from "./streaming_event_types";
 
-/**
- * Stream event from OpenAI Agents SDK.
- * Matches the subset of RunStreamEvent that we process.
- */
-export interface AgentStreamEvent {
-  type: string;
-  name?: string;
-  item?: StreamingEventItem;
-}
+// Re-export for consumers
+export type { AgentStreamEvent } from "./streaming_event_types";
 
 /**
  * Minimal interface for streaming agent results.

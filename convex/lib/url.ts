@@ -2,10 +2,7 @@
  * URL utilities for normalization and validation
  */
 
-/**
- * Safely parse a URL string without throwing or logging.
- * Returns null if the URL is invalid.
- */
+/** Parse a URL string, returning null if invalid. */
 export function safeParseUrl(url: string): URL | null {
   try {
     return new URL(url);

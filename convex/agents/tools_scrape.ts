@@ -55,7 +55,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
     const contextId = generateMessageId();
     const callStart = Date.now();
 
-    console.info("🌐 SCRAPE TOOL CALLED:", {
+    console.info("SCRAPE TOOL CALLED:", {
       contextId,
       url: input.url,
       reasoning: input.reasoning,
@@ -71,7 +71,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
       );
 
       const durationMs = Date.now() - callStart;
-      console.info("✅ SCRAPE TOOL SUCCESS:", {
+      console.info("[OK] SCRAPE TOOL SUCCESS:", {
         contextId,
         url: input.url,
         titleLength: content.title.length,
@@ -96,7 +96,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
       };
     } catch (error) {
       const durationMs = Date.now() - callStart;
-      console.error("❌ SCRAPE TOOL ERROR:", {
+      console.error("[ERROR] SCRAPE TOOL ERROR:", {
         contextId,
         url: input.url,
         error: getErrorMessage(error),

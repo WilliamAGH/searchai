@@ -7,26 +7,15 @@ import {
   buildMetadataEvent,
   createWorkflowEvent,
 } from "./workflow_events";
-import type { WorkflowStreamEvent } from "./workflow_event_types";
+import type {
+  WorkflowStreamEvent,
+  WorkflowPathArgs,
+} from "./workflow_event_types";
 import {
   updateChatTitleIfNeeded,
   persistAndCompleteWorkflow,
-  type WorkflowActionCtx,
 } from "./orchestration_persistence";
-import type { Id } from "../_generated/dataModel";
-import type { StreamingWorkflowArgs } from "./orchestration_session";
-import type { PlanningOutput } from "./schema";
-
-interface FastPathArgs {
-  ctx: WorkflowActionCtx;
-  args: StreamingWorkflowArgs;
-  workflowId: string;
-  nonce: string;
-  workflowTokenId: Id<"workflowTokens"> | null;
-  chat: { title?: string };
-  startTime: number;
-  planningOutput: PlanningOutput;
-}
+import { mapAsyncGenerator, mapSynthesisEvent } from "./workflow_utils";
 
 export async function* executeFastPath({
   ctx,
@@ -37,7 +26,7 @@ export async function* executeFastPath({
   chat,
   startTime,
   planningOutput,
-}: FastPathArgs): AsyncGenerator<WorkflowStreamEvent> {
+}: WorkflowPathArgs): AsyncGenerator<WorkflowStreamEvent> {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { agents } = require("./definitions");
 
@@ -53,22 +42,25 @@ export async function* executeFastPath({
     userIntent: planningOutput.userIntent,
   });
 
-  for await (const synthEvent of fastSynthesisGenerator) {
-    if (synthEvent.type === "progress") {
-      yield writeEvent("progress", {
-        stage: synthEvent.stage,
-        message: synthEvent.message,
-      });
-    } else if (synthEvent.type === "content") {
-      yield writeEvent("content", { delta: synthEvent.delta });
-    }
-  }
-
-  const fastSynthesisResult = await fastSynthesisGenerator.next();
-  const fastResult =
-    fastSynthesisResult.value as import("./synthesis_executor").SynthesisResult;
+  // Use mapAsyncGenerator to consume the generator and capture its return value
+  const fastResult = yield* mapAsyncGenerator(fastSynthesisGenerator, (event) =>
+    mapSynthesisEvent(event, writeEvent),
+  );
   const fastFinalAnswerText = fastResult.answer;
   const fastParsedAnswer = fastResult.parsedAnswer;
+
+  // Emit metadata before complete per SSE spec (complete is terminal for some clients)
+  yield writeEvent(
+    "metadata",
+    buildMetadataEvent({
+      workflowId,
+      contextReferences: [],
+      hasLimitations: fastParsedAnswer.hasLimitations,
+      confidence: fastParsedAnswer.confidence,
+      answerLength: fastFinalAnswerText.length,
+      nonce,
+    }),
+  );
 
   yield writeEvent(
     "complete",
@@ -92,18 +84,6 @@ export async function* executeFastPath({
       hasLimitations: fastParsedAnswer.hasLimitations,
       confidence: fastParsedAnswer.confidence,
       answerCompleteness: fastParsedAnswer.answerCompleteness,
-    }),
-  );
-
-  yield writeEvent(
-    "metadata",
-    buildMetadataEvent({
-      workflowId,
-      contextReferences: [],
-      hasLimitations: fastParsedAnswer.hasLimitations,
-      confidence: fastParsedAnswer.confidence,
-      answerLength: fastFinalAnswerText.length,
-      nonce,
     }),
   );
 

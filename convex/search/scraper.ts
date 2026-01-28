@@ -80,7 +80,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     return cached.val;
   }
 
-  console.info("🌐 Scraping URL initiated:", {
+  console.info("Scraping URL initiated:", {
     url: validatedUrl,
     timestamp: new Date().toISOString(),
   });
@@ -107,7 +107,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       signal: AbortSignal.timeout(10000), // 10 second timeout
     });
 
-    console.info("📊 Scrape response received:", {
+    console.info("Scrape response received:", {
       url: validatedUrl,
       status: response.status,
       statusText: response.statusText,
@@ -121,12 +121,12 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
         statusText: response.statusText,
         timestamp: new Date().toISOString(),
       };
-      console.error("❌ HTTP error during scraping:", errorDetails);
+      console.error("[ERROR] HTTP error during scraping:", errorDetails);
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
     }
 
     const contentType = response.headers.get("content-type") || "";
-    console.info("📄 Content type check:", {
+    console.info("Content type check:", {
       url,
       contentType: contentType,
     });
@@ -137,12 +137,12 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
         contentType: contentType,
         timestamp: new Date().toISOString(),
       };
-      console.error("❌ Non-HTML content type:", errorDetails);
+      console.error("[ERROR] Non-HTML content type:", errorDetails);
       throw new Error(`Not an HTML page. Content-Type: ${contentType}`);
     }
 
     const html = await response.text();
-    console.info("✅ HTML content fetched:", {
+    console.info("[OK] HTML content fetched:", {
       url: validatedUrl,
       contentLength: html.length,
       timestamp: new Date().toISOString(),
@@ -190,7 +190,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     // Trim whitespace after junk removal
     cleanedContent = cleanedContent.trim();
 
-    console.log("🗑️ Junk content removed:", {
+    console.log("Junk content removed:", {
       url: validatedUrl,
       removedCount: removedJunkCount,
       contentLengthBefore: content.length,
@@ -205,7 +205,10 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
         contentLengthAfter: cleanedContent.length,
         timestamp: new Date().toISOString(),
       };
-      console.error("❌ Content too short after junk removal:", errorDetails);
+      console.error(
+        "[ERROR] Content too short after junk removal:",
+        errorDetails,
+      );
       throw new Error(
         `Content too short after cleaning (${cleanedContent.length} characters)`,
       );
@@ -225,7 +228,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     cache.set(validatedUrl, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
     enforceCapacity();
-    console.info("✅ Scraping completed successfully:", {
+    console.info("[OK] Scraping completed successfully:", {
       url: validatedUrl,
       resultLength: cleanedContent.length,
       summaryLength: summary.length,
@@ -246,7 +249,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       errorCode = "CONTENT_TOO_SHORT";
     else if (errorMessage.includes("Not an HTML")) errorCode = "NOT_HTML";
 
-    console.error("💥 Scraping failed with exception:", {
+    console.error("[ERROR] Scraping failed with exception:", {
       url: validatedUrl,
       error: errorMessage,
       errorCode,

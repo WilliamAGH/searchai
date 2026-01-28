@@ -55,7 +55,7 @@ export const cleanupEmptyChats = internalMutation({
 
     if (deletedCount > 0 || skippedCount > 0) {
       console.log(
-        `🧹 Cleanup: deleted ${deletedCount} empty chats, skipped ${skippedCount} recent chats (batch size: ${oldChats.length})`,
+        `[CLEANUP] Deleted ${deletedCount} empty chats, skipped ${skippedCount} recent chats (batch size: ${oldChats.length})`,
       );
     }
 

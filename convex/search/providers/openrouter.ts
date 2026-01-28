@@ -5,10 +5,7 @@
  * Uses Perplexity Sonar model for AI-powered web search
  */
 
-import type {
-  SearchResult,
-  SearchProviderResult,
-} from "../../lib/types/search";
+import type { SearchResult, SearchProviderResult } from "../../schemas/search";
 import { collectOpenRouterChatCompletionText } from "../../lib/providers/openai_streaming";
 
 // Provider-specific relevance scores

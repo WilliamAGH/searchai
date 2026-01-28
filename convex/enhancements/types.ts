@@ -1,4 +1,4 @@
-import type { SearchResult } from "../lib/types/search";
+import type { SearchResult } from "../schemas/search";
 
 /**
  * Enhancement rule that can modify various aspects of the message pipeline

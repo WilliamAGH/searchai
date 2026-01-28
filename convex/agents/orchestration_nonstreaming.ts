@@ -30,9 +30,13 @@ import {
   extractContextIdFromOutput,
   withTimeout,
 } from "./orchestration_helpers";
-import { safeParseResearchOutput, type ResearchOutput } from "./schema";
+import {
+  safeParseResearchOutput,
+  type ResearchOutput,
+} from "../schemas/agents";
 import { applyEnhancements } from "../enhancements";
 import { logWorkflow } from "./workflow_logger";
+import { assertToolErrorThreshold } from "./workflow_utils";
 import {
   orchestrateResearchWorkflowArgs,
   orchestrateResearchWorkflowReturns,
@@ -58,23 +62,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isToolErrorOutput(output: unknown): boolean {
   return isRecord(output) && "error" in output && Boolean(output.error);
-}
-
-// AgentTimeoutError and withTimeout imported from orchestration_helpers.ts per [CC1b] DRY
-
-// ============================================
-// Tool Error Threshold
-// ============================================
-
-function assertToolErrorThreshold(
-  toolErrorCount: number,
-  workflowName: string,
-): void {
-  if (toolErrorCount >= AGENT_LIMITS.MAX_TOOL_ERRORS) {
-    throw new Error(
-      `${workflowName} failed: too many tool errors (${toolErrorCount}/${AGENT_LIMITS.MAX_TOOL_ERRORS})`,
-    );
-  }
 }
 
 // ============================================

@@ -1,7 +1,7 @@
 "use node";
 
 import { buildTemporalHeader } from "../lib/dateTime";
-import type { ScrapedContent, SerpEnrichment } from "../lib/types/search";
+import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import { CONTENT_LIMITS } from "../lib/constants/cache";
 import {
   formatScrapedContentForPrompt,
@@ -32,7 +32,7 @@ export function buildResearchInstructions(params: {
 }): string {
   const authoritativeSection = params.enhancedContext
     ? `
-⚠️ CRITICAL DISAMBIGUATION CONTEXT ⚠️
+[CRITICAL] DISAMBIGUATION CONTEXT
 The following authoritative information is KNOWN to be relevant to this query.
 When researching, PRIORITIZE sources that align with this context.
 If web results conflict with this authoritative information, favor the authoritative source.
@@ -131,7 +131,7 @@ export function buildSynthesisInstructions(params: {
     .join("\n");
 
   if (params.scrapedContent?.length) {
-    console.log("📄 SCRAPED CONTENT FOR SYNTHESIS:", {
+    console.log("SCRAPED CONTENT FOR SYNTHESIS:", {
       pageCount: params.scrapedContent.length,
       totalChars: params.scrapedContent.reduce(
         (sum, p) => sum + (p.content?.length || 0),
@@ -162,7 +162,7 @@ ${formatSerpEnrichmentForPrompt(params.serpEnrichment)}
   const enhancementSection = params.enhancedContext
     ? `
 ════════════════════════════════════════════════════════════════════════════════
-⚠️  MANDATORY AUTHORITATIVE CONTEXT - THIS OVERRIDES WEB SEARCH RESULTS  ⚠️
+[CRITICAL] MANDATORY AUTHORITATIVE CONTEXT - THIS OVERRIDES WEB SEARCH RESULTS
 ════════════════════════════════════════════════════════════════════════════════
 
 The following is VERIFIED, AUTHORITATIVE information that MUST be used as the

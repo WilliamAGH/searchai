@@ -71,7 +71,7 @@ The tool returns search queries you should then execute with search_web.`,
     // The queries are passed through and will be executed by subsequent search_web calls.
     const contextId = generateMessageId();
 
-    console.info("📋 PLAN_RESEARCH TOOL CALLED:", {
+    console.info("PLAN_RESEARCH TOOL CALLED:", {
       contextId,
       userQuestion: input.userQuestion.substring(0, CONTENT_LIMITS.SHORT_FIELD_LENGTH),
       researchGoal: input.researchGoal.substring(0, CONTENT_LIMITS.SHORT_FIELD_LENGTH),

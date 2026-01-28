@@ -52,7 +52,10 @@ export function registerScrapeRoutes(http: HttpRouter) {
       try {
         rawPayload = await request.json();
       } catch (error) {
-        console.error("❌ SCRAPE API INVALID JSON:", serializeError(error));
+        console.error(
+          "[ERROR] SCRAPE API INVALID JSON:",
+          serializeError(error),
+        );
         return corsResponse(
           JSON.stringify({
             error: "Invalid JSON body",
@@ -87,7 +90,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
       }
       const url = validation.url;
 
-      dlog("🌐 SCRAPE ENDPOINT CALLED:");
+      dlog("SCRAPE ENDPOINT CALLED:");
       dlog("URL:", url);
 
       try {
@@ -95,13 +98,13 @@ export function registerScrapeRoutes(http: HttpRouter) {
           url,
         });
 
-        dlog("🌐 SCRAPE RESULT:", JSON.stringify(result, null, 2));
+        dlog("SCRAPE RESULT:", JSON.stringify(result, null, 2));
 
         return corsResponse(JSON.stringify(result), 200, origin);
       } catch (error) {
         const errorInfo = serializeError(error);
         const errorMessage = errorInfo.message;
-        console.error("❌ SCRAPE API ERROR:", {
+        console.error("[ERROR] SCRAPE API ERROR:", {
           url: url.substring(0, 200),
           error: errorMessage,
           errorDetails: errorInfo,
@@ -133,10 +136,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
           summary: `Content unavailable from ${hostname}`,
         };
 
-        dlog(
-          "🌐 SCRAPE ERROR RESPONSE:",
-          JSON.stringify(errorResponse, null, 2),
-        );
+        dlog("SCRAPE ERROR RESPONSE:", JSON.stringify(errorResponse, null, 2));
 
         // Return 502 Bad Gateway - we're proxying external content that failed
         return corsResponse(JSON.stringify(errorResponse), 502, origin);

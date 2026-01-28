@@ -16,31 +16,25 @@ import {
   buildMetadataEvent,
   createWorkflowEvent,
 } from "./workflow_events";
-import type { WorkflowStreamEvent } from "./workflow_event_types";
+import type {
+  WorkflowStreamEvent,
+  WorkflowPathArgs,
+} from "./workflow_event_types";
 import {
   updateChatTitleIfNeeded,
   persistAssistantMessage,
   completeWorkflowWithSignature,
-  type WorkflowActionCtx,
 } from "./orchestration_persistence";
 import { generateMessageId } from "../lib/id_generator";
-import type { Id } from "../_generated/dataModel";
-import type { StreamingWorkflowArgs } from "./orchestration_session";
 import type {
-  PlanningOutput,
   ResearchOutput,
   StreamingPersistPayload,
-} from "./schema";
-interface ParallelPathArgs {
-  ctx: WorkflowActionCtx;
-  args: StreamingWorkflowArgs;
-  workflowId: string;
-  nonce: string;
-  workflowTokenId: Id<"workflowTokens"> | null;
-  chat: { title?: string };
-  startTime: number;
-  planningOutput: PlanningOutput;
-}
+} from "../schemas/agents";
+import {
+  mapAsyncGenerator,
+  mapSynthesisEvent,
+  mapResearchEvent,
+} from "./workflow_utils";
 
 export async function* executeParallelPath({
   ctx,
@@ -51,7 +45,7 @@ export async function* executeParallelPath({
   chat,
   startTime,
   planningOutput,
-}: ParallelPathArgs): AsyncGenerator<WorkflowStreamEvent> {
+}: WorkflowPathArgs): AsyncGenerator<WorkflowStreamEvent> {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { agents } = require("./definitions");
   const writeEvent = (type: string, data: Record<string, unknown>) =>
@@ -61,31 +55,12 @@ export async function* executeParallelPath({
     searchQueries: planningOutput.searchQueries,
   });
 
-  for await (const researchEvent of parallelResearchGenerator) {
-    if (researchEvent.type === "progress") {
-      yield writeEvent("progress", {
-        stage: researchEvent.stage,
-        message: researchEvent.message,
-        ...(researchEvent.queries && { queries: researchEvent.queries }),
-        ...(researchEvent.urls && { urls: researchEvent.urls }),
-      });
-    } else if (researchEvent.type === "search_complete") {
-      logWorkflow(
-        "PARALLEL_SEARCH_COMPLETE",
-        `${researchEvent.resultCount} results`,
-      );
-    } else if (researchEvent.type === "scrape_complete") {
-      logWorkflow(
-        "PARALLEL_SCRAPE_COMPLETE",
-        `${researchEvent.successCount}/${researchEvent.successCount + (researchEvent.durationMs ? 0 : 0)} pages`,
-      );
-    }
-  }
-  const parallelResearchResult = await parallelResearchGenerator.next();
-  if (!parallelResearchResult.done) {
-    throw new Error("Parallel research did not complete.");
-  }
-  const { harvested, stats: parallelStats } = parallelResearchResult.value;
+  // Use mapAsyncGenerator to consume and capture the return value
+  const parallelResearchReturn = yield* mapAsyncGenerator(
+    parallelResearchGenerator,
+    (event) => mapResearchEvent(event, writeEvent),
+  );
+  const { harvested, stats: parallelStats } = parallelResearchReturn;
   logWorkflow(
     "PARALLEL_EXECUTION_COMPLETE",
     `Total: ${parallelStats.totalDurationMs}ms`,
@@ -216,22 +191,10 @@ export async function* executeParallelPath({
     serpEnrichment: mergedSerpEnrichment,
   });
 
-  for await (const synthEvent of synthesisGenerator) {
-    if (synthEvent.type === "progress") {
-      yield writeEvent("progress", {
-        stage: synthEvent.stage,
-        message: synthEvent.message,
-      });
-    } else if (synthEvent.type === "content") {
-      yield writeEvent("content", { delta: synthEvent.delta });
-    }
-  }
-
-  const fullSynthResult = await synthesisGenerator.next();
-  if (!fullSynthResult.done) {
-    throw new Error("Synthesis did not complete.");
-  }
-  const synthResult = fullSynthResult.value;
+  // Use mapAsyncGenerator to consume and capture the return value
+  const synthResult = yield* mapAsyncGenerator(synthesisGenerator, (event) =>
+    mapSynthesisEvent(event, writeEvent),
+  );
   const finalAnswerText = synthResult.answer;
   const parsedAnswer = synthResult.parsedAnswer;
 
@@ -270,6 +233,19 @@ export async function* executeParallelPath({
   });
   const contextReferences = convertToContextReferences(normalizedSources);
 
+  // Emit metadata before complete per SSE spec (complete is terminal for some clients)
+  yield writeEvent(
+    "metadata",
+    buildMetadataEvent({
+      workflowId,
+      contextReferences,
+      hasLimitations: parsedAnswer.hasLimitations,
+      confidence: parsedAnswer.confidence,
+      answerLength: finalAnswerText.length,
+      nonce,
+    }),
+  );
+
   yield writeEvent(
     "complete",
     buildCompleteEvent({
@@ -291,18 +267,6 @@ export async function* executeParallelPath({
       confidence: parsedAnswer.confidence,
       answerCompleteness: parsedAnswer.answerCompleteness,
       sourcesUsed: parsedAnswer.sourcesUsed,
-    }),
-  );
-
-  yield writeEvent(
-    "metadata",
-    buildMetadataEvent({
-      workflowId,
-      contextReferences,
-      hasLimitations: parsedAnswer.hasLimitations,
-      confidence: parsedAnswer.confidence,
-      answerLength: finalAnswerText.length,
-      nonce,
     }),
   );
 

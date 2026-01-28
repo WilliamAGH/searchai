@@ -10,7 +10,7 @@ function getAllowedOrigins(): string[] | null {
   const raw = (process.env.CONVEX_ALLOWED_ORIGINS || "").trim();
   if (!raw) {
     console.warn(
-      "⚠️ CONVEX_ALLOWED_ORIGINS not set - API will reject all cross-origin requests",
+      "[WARN] CONVEX_ALLOWED_ORIGINS not set - API will reject all cross-origin requests",
     );
     return null;
   }
@@ -99,7 +99,7 @@ function validateOrigin(requestOrigin: string | null): string | null {
   }
 
   console.warn(
-    `🚫 Rejected request from unauthorized origin: ${requestOrigin}`,
+    `[BLOCKED] Rejected request from unauthorized origin: ${requestOrigin}`,
   );
   return null;
 }
@@ -119,7 +119,7 @@ export function corsResponse(
   // If no origin provided, reject (backward compatibility issue - caller must pass origin)
   if (requestOrigin === undefined) {
     console.error(
-      "⚠️ corsResponse called without origin - update caller to pass request.headers.get('Origin')",
+      "[WARN] corsResponse called without origin - update caller to pass request.headers.get('Origin')",
     );
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 403,

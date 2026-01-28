@@ -6,7 +6,7 @@
  */
 
 import { CACHE_TTL } from "../lib/constants/cache";
-import type { CachedSearchResponse } from "../lib/types/search";
+import type { CachedSearchResponse } from "../schemas/search";
 
 // Types
 export type PlanResult = {
@@ -117,7 +117,10 @@ export function getCachedSearchResults(
 ): CachedSearchResponse | null {
   const cached = searchResultCache.get(cacheKey);
   if (cached && cached.expires > now) {
-    console.info("🎯 Using cached search results for cache key:", cacheKey);
+    console.info(
+      "[CACHE] Using cached search results for cache key:",
+      cacheKey,
+    );
     return cached.results;
   }
   return null;

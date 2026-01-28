@@ -17,7 +17,7 @@ import { generateChatTitle } from "../chats/utils";
 import type {
   ResearchContextReference,
   StreamingPersistPayload,
-} from "./schema";
+} from "../schemas/agents";
 
 // ============================================
 // Types

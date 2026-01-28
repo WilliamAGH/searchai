@@ -1,14 +1,14 @@
 import { v } from "convex/values";
 import type { Id, TableNames } from "../_generated/dataModel";
-import type { ResearchContextReference as ResearchContextReferenceType } from "../agents/schema";
+import type { ResearchContextReference as ResearchContextReferenceType } from "../schemas/agents";
 
 // Shared validators for backend-only usage
 // Note: Do not re-export Convex-generated types from _generated/*
 
 /**
  * Search method validator.
- * Values must match SEARCH_METHODS const in types/search.ts (source of truth).
- * @see {@link ./types/search.ts} SEARCH_METHODS - canonical list
+ * Values must match SEARCH_METHODS const in constants/search.ts (source of truth).
+ * @see {@link ./constants/search.ts} SEARCH_METHODS - canonical list
  */
 export const vSearchMethod = v.union(
   v.literal("serp"),
@@ -110,7 +110,7 @@ export interface ContextReference {
 
 // Re-export the TS type used across orchestration to keep validator and TS shape aligned.
 // NOTE: This indirection prevents V8 runtimes from importing `orchestration_helpers.ts`
-// (which uses `node:crypto`). Always import the type from `../agents/schema` or from this
+// (which uses `node:crypto`). Always import the type from `../schemas/agents` or from this
 // re-export, never from the Node-only helpers.
 export type ResearchContextReference = ResearchContextReferenceType;
 

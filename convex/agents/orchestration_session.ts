@@ -20,7 +20,7 @@ import type {
   ChatQueryResult,
   MessageQueryResult,
   ResearchContextReference,
-} from "./schema";
+} from "../schemas/agents";
 
 // ============================================
 // Types

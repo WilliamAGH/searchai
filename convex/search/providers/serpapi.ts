@@ -7,9 +7,9 @@ import type {
   SearchResult,
   SearchProviderResult,
   SerpEnrichment,
-} from "../../lib/types/search";
+} from "../../schemas/search";
 import { getErrorMessage } from "../../lib/errors";
-export type { SearchResult } from "../../lib/types/search";
+export type { SearchResult } from "../../schemas/search";
 
 interface SerpApiResponse {
   organic_results?: Array<{
@@ -60,7 +60,7 @@ export async function searchWithSerpApiDuckDuckGo(
     maxResults,
     timestamp: new Date().toISOString(),
   };
-  console.info("🔍 SERP API Request:", requestLog);
+  console.info("[SEARCH] SERP API Request:", requestLog);
 
   try {
     const response = await fetch(apiUrl, {
@@ -77,12 +77,12 @@ export async function searchWithSerpApiDuckDuckGo(
       endpoint: "https://serpapi.com/search.json",
       queryLength: query.length,
     } as const;
-    console.info("📊 SERP API Response:", safeLog);
+    console.info("SERP API Response:", safeLog);
 
     if (!response.ok) {
       const errorText = await response.text();
       const errorMessage = `SERP API returned ${response.status} ${response.statusText}: ${errorText}`;
-      console.error("❌ SERP API Error Details:", {
+      console.error("[ERROR] SERP API Error Details:", {
         status: response.status,
         statusText: response.statusText,
         errorText,
@@ -94,7 +94,7 @@ export async function searchWithSerpApiDuckDuckGo(
     }
 
     const data: SerpApiResponse = await response.json();
-    console.info("✅ SERP API Success:", {
+    console.info("[OK] SERP API Success:", {
       hasOrganic: !!data.organic_results,
       count: data.organic_results?.length || 0,
       queryLength: query.length,
@@ -154,7 +154,7 @@ export async function searchWithSerpApiDuckDuckGo(
           .filter((q): q is string => typeof q === "string" && q.length > 0);
       }
 
-      console.info("📋 SERP API Results Parsed:", {
+      console.info("SERP API Results Parsed:", {
         resultCount: results.length,
         sampleResults: results.slice(0, 2).map((r) => ({
           title: r.title,
@@ -173,13 +173,13 @@ export async function searchWithSerpApiDuckDuckGo(
       return { results, enrichment };
     }
 
-    console.log("⚠️ SERP API No Results:", {
+    console.log("[WARN] SERP API No Results:", {
       queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
     return { results: [] };
   } catch (error) {
-    console.error("💥 SERP API Exception:", {
+    console.error("[ERROR] SERP API Exception:", {
       error: getErrorMessage(error),
       stack: error instanceof Error ? error.stack : "No stack trace",
       queryLength: query.length,
