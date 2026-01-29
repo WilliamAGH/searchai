@@ -77,7 +77,7 @@ export function buildContextReferencesFromHarvested(
       type: "scraped_page",
       url: scraped.url,
       title: scraped.title,
-      timestamp: scraped.scrapedAt || now,
+      timestamp: scraped.scrapedAt ?? now,
       relevanceScore: scraped.relevanceScore ?? RELEVANCE_SCORES.SCRAPED_PAGE,
     });
   }
@@ -135,12 +135,8 @@ export function buildSearchResultsFromContextRefs(
     }));
 }
 
-export function extractSourceUrls(
-  contextReferences: ResearchContextReference[],
-): string[] {
-  return contextReferences
-    .filter((ref) => ref.url)
-    .map((ref) => ref.url as string);
+export function extractSourceUrls(contextReferences: ResearchContextReference[]): string[] {
+  return contextReferences.filter((ref) => ref.url).map((ref) => ref.url as string);
 }
 
 /**
@@ -159,8 +155,7 @@ export function convertToContextReferences(
   const now = Date.now();
   const relevanceToScore: Record<"high" | "medium" | "low", number> = {
     high: RELEVANCE_SCORES.SCRAPED_PAGE, // 0.9
-    medium:
-      (RELEVANCE_SCORES.SCRAPED_PAGE + RELEVANCE_SCORES.SEARCH_RESULT) / 2, // 0.7
+    medium: (RELEVANCE_SCORES.SCRAPED_PAGE + RELEVANCE_SCORES.SEARCH_RESULT) / 2, // 0.7
     low: RELEVANCE_SCORES.SEARCH_RESULT, // 0.5
   };
 

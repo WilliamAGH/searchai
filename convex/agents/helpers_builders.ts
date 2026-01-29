@@ -3,16 +3,10 @@
 import { buildTemporalHeader } from "../lib/dateTime";
 import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import { CONTENT_LIMITS } from "../lib/constants/cache";
-import {
-  formatScrapedContentForPrompt,
-  formatSerpEnrichmentForPrompt,
-} from "./helpers_formatters";
+import { formatScrapedContentForPrompt, formatSerpEnrichmentForPrompt } from "./helpers_formatters";
 import { truncate } from "./helpers_utils";
 
-export function buildPlanningInput(
-  userQuery: string,
-  conversationContext?: string,
-): string {
+export function buildPlanningInput(userQuery: string, conversationContext?: string): string {
   const temporal = buildTemporalHeader();
   return conversationContext
     ? `${temporal}\n\nUser Question: ${userQuery}\n\nConversation Context:\n${conversationContext}`
@@ -92,10 +86,10 @@ export function buildSynthesisInstructions(params: {
     confidence: string;
   }>;
   sourcesUsed: Array<{
-    url: string;
-    title: string;
-    type: string;
-    relevance: string;
+    url?: string;
+    title?: string;
+    type?: string;
+    relevance?: string;
   }>;
   informationGaps?: string[];
   scrapedContent?: ScrapedContent[];
@@ -106,43 +100,40 @@ export function buildSynthesisInstructions(params: {
   const sourcesAvailable = params.sourcesUsed
     .map((source, i) => {
       const index = i + 1;
+      const title = source.title ?? "Untitled";
+      const type = source.type ?? "unknown";
+      const relevance = source.relevance ?? "unknown";
       if (source?.url) {
         try {
           const hostname = new URL(source.url).hostname;
-          return `${index}. [${hostname}] ${source.title}
-   Type: ${source.type}
-   Relevance: ${source.relevance}
+          return `${index}. [${hostname}] ${title}
+   Type: ${type}
+   Relevance: ${relevance}
    URL: ${source.url}`;
         } catch (error) {
           console.warn("Failed to parse source URL for synthesis prompt", {
             url: source.url,
             error,
           });
-          return `${index}. ${source.title}
-   Type: ${source.type}
-   Relevance: ${source.relevance}
+          return `${index}. ${title}
+   Type: ${type}
+   Relevance: ${relevance}
    URL: ${source.url}`;
         }
       }
-      return `${index}. ${source.title}
-   Type: ${source.type}
-   Relevance: ${source.relevance}`;
+      return `${index}. ${title}
+   Type: ${type}
+   Relevance: ${relevance}`;
     })
     .join("\n");
 
   if (params.scrapedContent?.length) {
     console.log("SCRAPED CONTENT FOR SYNTHESIS:", {
       pageCount: params.scrapedContent.length,
-      totalChars: params.scrapedContent.reduce(
-        (sum, p) => sum + (p.content?.length || 0),
-        0,
-      ),
+      totalChars: params.scrapedContent.reduce((sum, p) => sum + (p.content?.length || 0), 0),
       pages: params.scrapedContent.map((p) => ({
         url: p.url,
-        contentPreview: truncate(
-          p.content || "",
-          CONTENT_LIMITS.PREVIEW_MAX_CHARS,
-        ),
+        contentPreview: truncate(p.content || "", CONTENT_LIMITS.PREVIEW_MAX_CHARS),
       })),
     });
   }
@@ -242,10 +233,6 @@ export function buildConversationContext(
     .slice(0, CONTENT_LIMITS.MAX_CONTEXT_CHARS);
 }
 
-export function buildConversationBlock(
-  conversationContext: string | undefined,
-): string {
-  return conversationContext
-    ? `RECENT CONVERSATION CONTEXT:\n${conversationContext}\n\n`
-    : "";
+export function buildConversationBlock(conversationContext: string | undefined): string {
+  return conversationContext ? `RECENT CONVERSATION CONTEXT:\n${conversationContext}\n\n` : "";
 }

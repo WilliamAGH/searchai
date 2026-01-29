@@ -123,7 +123,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
             title: r.title,
             url: r.url,
             snippet: r.snippet,
-            relevanceScore: r.relevanceScore || 0.5,
+            relevanceScore: r.relevanceScore ?? 0.5,
           }),
         ),
         timestamp: Date.now(),

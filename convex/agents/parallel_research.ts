@@ -9,15 +9,8 @@
  */
 import { api } from "../_generated/api";
 import { generateMessageId } from "../lib/id_generator";
-import {
-  AGENT_LIMITS,
-  CONTENT_LIMITS,
-  RELEVANCE_SCORES,
-} from "../lib/constants/cache";
-import {
-  createEmptyHarvestedData,
-  type HarvestedData,
-} from "../schemas/agents";
+import { AGENT_LIMITS, CONTENT_LIMITS, RELEVANCE_SCORES } from "../lib/constants/cache";
+import { createEmptyHarvestedData, type HarvestedData } from "../schemas/agents";
 import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
 import {
@@ -129,18 +122,14 @@ export type ParallelResearchEvent =
 export async function* executeParallelResearch(
   params: ParallelResearchParams,
 ): AsyncGenerator<ParallelResearchEvent, ParallelResearchResult, undefined> {
-  const {
-    ctx,
-    searchQueries,
-    maxScrapeUrls = AGENT_LIMITS.MAX_SCRAPE_URLS,
-  } = params;
+  const { ctx, searchQueries, maxScrapeUrls = AGENT_LIMITS.MAX_SCRAPE_URLS } = params;
 
   // Initialize harvested data container
+  const serpEnrichment: SerpEnrichment = {};
   const harvested: HarvestedData & { serpEnrichment: SerpEnrichment } = {
     ...createEmptyHarvestedData(),
-    serpEnrichment: {} as SerpEnrichment,
+    serpEnrichment,
   };
-
   const stats: ParallelResearchStats = {
     searchDurationMs: 0,
     scrapeDurationMs: 0,
@@ -177,11 +166,7 @@ export async function* executeParallelResearch(
           query: sq.query,
           maxResults: 8,
         });
-        logSearchResult(
-          Date.now() - queryStart,
-          sq.query,
-          result.results?.length || 0,
-        );
+        logSearchResult(Date.now() - queryStart, sq.query, result.results?.length || 0);
         return { query: sq.query, result, error: null };
       } catch (error) {
         logWorkflowError("SEARCH_FAILED", sq.query, error);
@@ -207,10 +192,7 @@ export async function* executeParallelResearch(
       }
 
       // Harvest enrichment from first successful search with enrichment
-      if (
-        result.enrichment &&
-        Object.keys(harvested.serpEnrichment).length === 0
-      ) {
+      if (result.enrichment && Object.keys(harvested.serpEnrichment).length === 0) {
         const enrich = result.enrichment;
         if (enrich.knowledgeGraph) {
           harvested.serpEnrichment.knowledgeGraph = enrich.knowledgeGraph;
@@ -241,9 +223,7 @@ export async function* executeParallelResearch(
   // ============================================
 
   // Deduplicate URLs and select top candidates for scraping
-  const uniqueUrls = Array.from(
-    new Map(harvested.searchResults.map((r) => [r.url, r])).values(),
-  )
+  const uniqueUrls = Array.from(new Map(harvested.searchResults.map((r) => [r.url, r])).values())
     .filter((r) => r.url && r.url.startsWith("http"))
     .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
     .slice(0, maxScrapeUrls);
@@ -266,50 +246,30 @@ export async function* executeParallelResearch(
       const singleScrapeStart = Date.now();
 
       try {
-        const content = await ctx.runAction(
-          api.search.scraperAction.scrapeUrl,
-          { url },
-        );
+        const content = await ctx.runAction(api.search.scraperAction.scrapeUrl, { url });
 
         // Skip if we got an error response or minimal content
         if (content.content.length < CONTENT_LIMITS.MIN_CONTENT_LENGTH) {
-          logScrapeSkip(
-            Date.now() - singleScrapeStart,
-            url,
-            content.content.length,
-          );
+          logScrapeSkip(Date.now() - singleScrapeStart, url, content.content.length);
           return null;
         }
 
-        logScrapeResult(
-          Date.now() - singleScrapeStart,
-          url,
-          content.content.length,
-        );
+        logScrapeResult(Date.now() - singleScrapeStart, url, content.content.length);
 
         const scraped: ScrapedContent = {
           url,
           title: content.title,
           content: content.content,
           summary:
-            content.summary ||
-            content.content.substring(
-              0,
-              CONTENT_LIMITS.SUMMARY_TRUNCATE_LENGTH,
-            ),
+            content.summary || content.content.substring(0, CONTENT_LIMITS.SUMMARY_TRUNCATE_LENGTH),
           contentLength: content.content.length,
           scrapedAt: Date.now(),
           contextId,
-          relevanceScore:
-            urlInfo.relevanceScore || RELEVANCE_SCORES.SCRAPED_PAGE,
+          relevanceScore: urlInfo.relevanceScore || RELEVANCE_SCORES.SCRAPED_PAGE,
         };
         return scraped;
       } catch (error) {
-        logWorkflowError(
-          "SCRAPE_FAILED",
-          `${url} [${Date.now() - singleScrapeStart}ms]`,
-          error,
-        );
+        logWorkflowError("SCRAPE_FAILED", `${url} [${Date.now() - singleScrapeStart}ms]`, error);
         return null;
       }
     });
@@ -317,19 +277,13 @@ export async function* executeParallelResearch(
     const scrapeResults = await Promise.all(scrapePromises);
     stats.scrapeDurationMs = Date.now() - scrapeStart;
 
-    const successfulScrapes = scrapeResults.filter(
-      (r): r is ScrapedContent => r !== null,
-    );
+    const successfulScrapes = scrapeResults.filter((r): r is ScrapedContent => r !== null);
     harvested.scrapedContent.push(...successfulScrapes);
 
     stats.scrapeSuccessCount = successfulScrapes.length;
     stats.scrapeFailCount = uniqueUrls.length - successfulScrapes.length;
 
-    logParallelScrapeComplete(
-      stats.scrapeDurationMs,
-      stats.scrapeSuccessCount,
-      uniqueUrls.length,
-    );
+    logParallelScrapeComplete(stats.scrapeDurationMs, stats.scrapeSuccessCount, uniqueUrls.length);
 
     yield {
       type: "scrape_complete",

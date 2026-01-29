@@ -116,11 +116,7 @@ export type SynthesisEvent =
  * Wrap a promise with a timeout.
  * Extracted for reuse from orchestration.ts.
  */
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  stage: string,
-): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, stage: string): Promise<T> {
   let timerId: ReturnType<typeof setTimeout> | undefined;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -204,12 +200,10 @@ export async function* executeSynthesis(
 
   // Determine scraped content to use
   // If provided directly, use that; otherwise fall back to harvested
-  const effectiveScrapedContent =
-    scrapedContent ?? harvested?.scrapedContent ?? [];
+  const effectiveScrapedContent = scrapedContent ?? harvested?.scrapedContent ?? [];
 
   // Determine SERP enrichment to use
-  const effectiveSerpEnrichment =
-    serpEnrichment ?? harvested?.serpEnrichment ?? undefined;
+  const effectiveSerpEnrichment = serpEnrichment ?? harvested?.serpEnrichment ?? undefined;
 
   // Build synthesis instructions
   const synthesisInstructions = buildSynthesisInstructions({
@@ -222,8 +216,7 @@ export async function* executeSynthesis(
     scrapedContent: effectiveScrapedContent,
     serpEnrichment: effectiveSerpEnrichment,
     enhancedContext: synthesisEnhancements.enhancedContext || undefined,
-    enhancedSystemPrompt:
-      synthesisEnhancements.enhancedSystemPrompt || undefined,
+    enhancedSystemPrompt: synthesisEnhancements.enhancedSystemPrompt || undefined,
   });
 
   // Run the synthesis agent with streaming
@@ -244,11 +237,7 @@ export async function* executeSynthesis(
   }
 
   // Wait for stream completion
-  await withTimeout(
-    synthesisResult.completed,
-    AGENT_TIMEOUTS.AGENT_STAGE_MS,
-    "synthesis",
-  );
+  await withTimeout(synthesisResult.completed, AGENT_TIMEOUTS.AGENT_STAGE_MS, "synthesis");
 
   const durationMs = Date.now() - startTime;
 
@@ -268,7 +257,7 @@ export async function* executeSynthesis(
   const parsedAnswer = parseAnswerText(strippedOutput);
 
   // If no content was streamed, the final answer is the parsed one
-  const finalAnswer = parsedAnswer.answer || accumulatedAnswer;
+  const finalAnswer = parsedAnswer.answer || strippedOutput || accumulatedAnswer;
 
   // If nothing was streamed but we have a final answer, yield it now
   if (accumulatedAnswer.length === 0 && finalAnswer.length > 0) {

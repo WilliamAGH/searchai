@@ -67,12 +67,7 @@ export async function* streamConversationalWorkflow(
   const harvested = createEmptyHarvestedData();
 
   try {
-    const session = await initializeWorkflowSession(
-      ctx,
-      args,
-      workflowId,
-      nonce,
-    );
+    const session = await initializeWorkflowSession(ctx, args, workflowId, nonce);
     workflowTokenId = session.workflowTokenId;
     const { chat, conversationContext } = session;
 
@@ -111,10 +106,7 @@ export async function* streamConversationalWorkflow(
               return null;
             },
             onToolError: (toolName, errorCount) => {
-              logWorkflow(
-                "TOOL_OUTPUT_SKIP",
-                `Failed tool output: ${toolName}`,
-              );
+              logWorkflow("TOOL_OUTPUT_SKIP", `Failed tool output: ${toolName}`);
               assertToolErrorThreshold(errorCount, "Conversational workflow");
               return true;
             },
@@ -125,7 +117,15 @@ export async function* streamConversationalWorkflow(
         harvested,
       );
 
-      for await (const event of processor) {
+      while (true) {
+        const { value, done } = await processor.next();
+        if (done) {
+          if (value && typeof value === "object" && "toolCallCount" in value) {
+            toolCallCount = value.toolCallCount;
+          }
+          break;
+        }
+        const event = value;
         if (event.type === "reasoning") {
           yield writeEvent("reasoning", { content: event.content });
         } else if (event.type === "progress") {
@@ -144,15 +144,6 @@ export async function* streamConversationalWorkflow(
           accumulatedResponse += event.delta;
           yield writeEvent("content", { delta: event.delta });
         }
-      }
-
-      const statsResult = await processor.next();
-      if (
-        statsResult.value &&
-        typeof statsResult.value === "object" &&
-        "toolCallCount" in statsResult.value
-      ) {
-        toolCallCount = statsResult.value.toolCallCount;
       }
     } catch (streamError) {
       if (streamError instanceof MaxTurnsExceededError) {
@@ -224,9 +215,7 @@ export async function* streamConversationalWorkflow(
     const totalDuration = Date.now() - startTime;
 
     if (!finalOutput || finalOutput.trim().length === 0) {
-      throw new Error(
-        "Conversational agent produced empty output - no content to save",
-      );
+      throw new Error("Conversational agent produced empty output - no content to save");
     }
 
     logWorkflowComplete({
@@ -247,19 +236,12 @@ export async function* streamConversationalWorkflow(
       intent: args.userQuery,
     });
 
-    const uniqueContextRefs = buildContextReferencesFromHarvested(
-      harvested,
-      generateMessageId,
-    );
+    const uniqueContextRefs = buildContextReferencesFromHarvested(harvested, generateMessageId);
 
     const searchResults = buildSearchResultsFromContextRefs(uniqueContextRefs);
     const sources = extractSourceUrls(uniqueContextRefs);
 
-    logSourcesSummary(
-      uniqueContextRefs.length,
-      searchResults.length,
-      sources.length,
-    );
+    logSourcesSummary(uniqueContextRefs.length, searchResults.length, sources.length);
 
     const { payload: persistedPayload, signature } = await withErrorContext(
       "Failed to persist and complete workflow",
@@ -311,9 +293,7 @@ export async function* streamConversationalWorkflow(
     });
   } catch (error) {
     await handleError(
-      error instanceof Error
-        ? error
-        : new Error("Conversational workflow failed"),
+      error instanceof Error ? error : new Error("Conversational workflow failed"),
       "conversational",
     );
   }
