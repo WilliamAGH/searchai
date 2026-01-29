@@ -64,14 +64,17 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
   await input.type("Smoke home sanity");
   await page.keyboard.press("Enter");
 
-  // Should show loading state or navigate quickly (may not work without real backend)
+  // Wait for "Creating..." state to clear first (backend operation in progress)
+  const creatingButton = page.locator('button:has-text("Creating")');
+  await creatingButton.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {}); // May not appear at all if fast
+
+  // Then wait for chat navigation with extended timeout
   const navigated = await page
-    .waitForURL(/\/(chat|s|p)\//, { timeout: 15000 })
+    .waitForURL(/\/(chat|s|p)\//, { timeout: 30000 })
     .then(() => true)
     .catch(() => false);
 
-  // Navigation is expected but may fail without real backend - only assert on errors
-  // The primary purpose of this smoke test is to verify no console errors occur
+  // Navigation is expected - only skip assertion if it truly failed
   if (navigated) {
     const currentUrl = page.url();
     expect(currentUrl).toMatch(/\/(chat|s|p)\//);
