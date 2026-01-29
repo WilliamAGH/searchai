@@ -21,12 +21,7 @@ export function formatConversationMarkdown(params: {
   const lines: string[] = [];
   if (params.title) lines.push(`# ${params.title}`, "");
   for (const m of params.messages) {
-    const role =
-      m.role === "user"
-        ? "User"
-        : m.role === "assistant"
-          ? "Assistant"
-          : "System";
+    const role = m.role === "user" ? "User" : m.role === "assistant" ? "Assistant" : "System";
     lines.push(`${role}: ${m.content ?? ""}`);
     if (m.role === "assistant") {
       const src: string[] = [];
@@ -116,10 +111,7 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
  * @param threshold - Distance from bottom in pixels
  * @returns True if near bottom
  */
-export function isNearBottom(
-  element: HTMLElement | null,
-  threshold: number,
-): boolean {
+export function isNearBottom(element: HTMLElement | null, threshold: number): boolean {
   if (!element) return false;
   const { scrollTop, scrollHeight, clientHeight } = element;
   return scrollHeight - scrollTop - clientHeight < threshold;
@@ -150,10 +142,7 @@ export function isScrolledPastPercent(
  * @param tolerance - Tolerance in pixels (default: 1)
  * @returns True if at bottom
  */
-export function isAtBottom(
-  element: HTMLElement | null,
-  tolerance = 1,
-): boolean {
+export function isAtBottom(element: HTMLElement | null, tolerance = 1): boolean {
   if (!element) return false;
   const { scrollTop, scrollHeight, clientHeight } = element;
   return Math.abs(scrollHeight - scrollTop - clientHeight) <= tolerance;
@@ -162,15 +151,7 @@ export function isAtBottom(
 /**
  * Input types that accept text entry (excludes buttons, checkboxes, etc.)
  */
-const TEXT_INPUT_TYPES = new Set([
-  "text",
-  "search",
-  "email",
-  "url",
-  "tel",
-  "password",
-  "number",
-]);
+const TEXT_INPUT_TYPES = new Set(["text", "search", "email", "url", "tel", "password", "number"]);
 
 /**
  * Check if a text input or textarea is currently focused.

@@ -43,10 +43,7 @@ export function useCitationProcessor(
         }
       } else {
         // Check if cited text is a full URL
-        if (
-          citedText.startsWith("http://") ||
-          citedText.startsWith("https://")
-        ) {
+        if (citedText.startsWith("http://") || citedText.startsWith("https://")) {
           // Extract domain from the full URL citation
           try {
             domain = new URL(citedText).hostname.replace("www.", "");
@@ -74,9 +71,7 @@ export function useCitationProcessor(
           // If not found, try to find a URL that contains this path
           if (!url) {
             const matchingResult = searchResults?.find(
-              (r) =>
-                r.url.includes(citedText) ||
-                (r.url.includes(domain) && r.url.includes("/")),
+              (r) => r.url.includes(citedText) || (r.url.includes(domain) && r.url.includes("/")),
             );
             if (matchingResult) {
               url = matchingResult.url;

@@ -18,8 +18,7 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
       consoleErrors.push(t);
     });
     page.on("pageerror", (err) => consoleErrors.push(err.message));
-    const isHttp = (u: string) =>
-      u.startsWith("http://") || u.startsWith("https://");
+    const isHttp = (u: string) => u.startsWith("http://") || u.startsWith("https://");
     page.on("requestfailed", (req) => {
       const url = req.url();
       if (!isHttp(url)) return;
@@ -33,8 +32,7 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
       const url = res.url();
       if (!isHttp(url)) return;
       const status = res.status();
-      if (status >= 400)
-        responseFailures.push(`${res.request().method()} ${url} -> ${status}`);
+      if (status >= 400) responseFailures.push(`${res.request().method()} ${url} -> ${status}`);
     });
 
     // Step 1: create a local chat by sending a message
@@ -48,9 +46,7 @@ test.describe("smoke: existing shared/public chat open has no console errors", (
     await input.type("Smoke publish shared");
     await page.keyboard.press("Enter");
     // Wait for share controls to become available
-    const shareButton = page
-      .locator('button[title="Share this conversation"]')
-      .first();
+    const shareButton = page.locator('button[title="Share this conversation"]').first();
     await expect(shareButton).toBeVisible({ timeout: 30000 });
 
     // Step 2: open share modal and pick Shared

@@ -17,8 +17,7 @@ const stripJunk = ($: CheerioAPI) => {
 };
 
 export const extractPageMetadata = ($: CheerioAPI) => {
-  const fallbackTitle =
-    $("h1").first().text().trim() || $("h2").first().text().trim();
+  const fallbackTitle = $("h1").first().text().trim() || $("h2").first().text().trim();
   return {
     title: $("title").text().trim() || fallbackTitle,
     description: $('meta[name="description"]').attr("content"),
@@ -68,10 +67,7 @@ export const extractMainContent = ($: CheerioAPI): string => {
  * Detect if a page likely needs JavaScript rendering for full content.
  * Must be called BEFORE stripJunk() since it checks for noscript elements.
  */
-export const needsJsRendering = (
-  $: CheerioAPI,
-  textLength: number,
-): boolean => {
+export const needsJsRendering = ($: CheerioAPI, textLength: number): boolean => {
   const hasReactRoot = $("#root, #__next, #app").length > 0;
   const hasNoscript = $("noscript").text().toLowerCase().includes("javascript");
   const minimalContent = textLength < 500;

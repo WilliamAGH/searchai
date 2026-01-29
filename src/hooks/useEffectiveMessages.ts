@@ -41,9 +41,7 @@ export function useEffectiveMessages({
       (m) => m.isStreaming === true || m.persisted === false,
     );
 
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find((m) => m.role === "assistant");
+    const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant");
 
     // Extract stable ID from the last assistant message
     const lastAssistantKey = lastAssistantMessage?._id ?? null;

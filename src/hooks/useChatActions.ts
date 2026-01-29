@@ -232,9 +232,7 @@ export function createChatActions(
     updateMessage(id: string, updates: Partial<Message>) {
       setState((prev) => ({
         ...prev,
-        messages: prev.messages.map((m) =>
-          String(m._id) === id ? { ...m, ...updates } : m,
-        ),
+        messages: prev.messages.map((m) => (String(m._id) === id ? { ...m, ...updates } : m)),
       }));
     },
 

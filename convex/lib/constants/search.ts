@@ -7,12 +7,7 @@
  * Available search provider methods.
  * Used by vSearchMethod validator (validators.ts) and Zod schemas (schemas/search.ts).
  */
-export const SEARCH_METHODS = [
-  "serp",
-  "openrouter",
-  "duckduckgo",
-  "fallback",
-] as const;
+export const SEARCH_METHODS = ["serp", "openrouter", "duckduckgo", "fallback"] as const;
 
 export type SearchMethod = (typeof SEARCH_METHODS)[number];
 

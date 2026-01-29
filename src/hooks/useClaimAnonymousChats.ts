@@ -30,9 +30,7 @@ export function useClaimAnonymousChats() {
             // Reason: HTTP actions lack Convex auth context and validate via sessionId
             // The sessionId may be rotated during claim to prevent cross-user access.
             const nextSessionId =
-              typeof result.newSessionId === "string"
-                ? result.newSessionId
-                : sessionId;
+              typeof result.newSessionId === "string" ? result.newSessionId : sessionId;
             if (nextSessionId && nextSessionId !== sessionId) {
               localStorage.setItem(SESSION_KEY, nextSessionId);
               window.dispatchEvent(new Event("searchai:session-id-updated"));
@@ -46,7 +44,7 @@ export function useClaimAnonymousChats() {
       }
     }
 
-    claim();
+    void claim();
   }, [isAuthenticated, claimChats]);
 
   useEffect(() => {

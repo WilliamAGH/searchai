@@ -70,9 +70,7 @@ describe("Agent Grounding Specifications", () => {
             relevance: expect.stringMatching(/^(high|medium|low)$/),
           }),
         ]),
-        researchQuality: expect.stringMatching(
-          /^(comprehensive|adequate|limited)$/,
-        ),
+        researchQuality: expect.stringMatching(/^(comprehensive|adequate|limited)$/),
       },
 
       // Stage 3: Answer Synthesis
@@ -80,9 +78,7 @@ describe("Agent Grounding Specifications", () => {
         answer: expect.any(String),
         hasLimitations: expect.any(Boolean),
         sourcesUsed: expect.any(Array), // Array of domains cited
-        answerCompleteness: expect.stringMatching(
-          /^(complete|partial|insufficient)$/,
-        ),
+        answerCompleteness: expect.stringMatching(/^(complete|partial|insufficient)$/),
         confidence: expect.any(Number),
       },
 
@@ -98,9 +94,7 @@ describe("Agent Grounding Specifications", () => {
 
     // Verify structure is well-formed
     expect(expectedResponseStructure).toBeDefined();
-    console.info(
-      "[OK] Expected response structure validated for grounding workflow",
-    );
+    console.info("[OK] Expected response structure validated for grounding workflow");
   });
 
   it("should validate contextId format requirements", () => {
@@ -118,8 +112,7 @@ describe("Agent Grounding Specifications", () => {
       "", // Empty
     ];
 
-    const uuidV7Regex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const uuidV7Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
     for (const validId of validContextIds) {
       expect(validId).toMatch(uuidV7Regex);
@@ -187,9 +180,7 @@ describe("Agent Grounding Specifications", () => {
       "persisted",
     ];
 
-    expect(expectedSequence.indexOf("metadata")).toBeLessThan(
-      expectedSequence.indexOf("complete"),
-    );
+    expect(expectedSequence.indexOf("metadata")).toBeLessThan(expectedSequence.indexOf("complete"));
     expect(expectedSequence.indexOf("complete")).toBeLessThan(
       expectedSequence.indexOf("persisted"),
     );
@@ -221,9 +212,7 @@ describe("Agent Grounding Specifications", () => {
     };
 
     expect(examplePersistedChunk).toEqual(persistedChunkShape);
-    console.info(
-      "[OK] Streaming event ordering and security metadata documented",
-    );
+    console.info("[OK] Streaming event ordering and security metadata documented");
   });
 
   it("should validate sourcesUsed cross-referencing with keyFindings", () => {

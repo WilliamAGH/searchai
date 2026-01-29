@@ -38,9 +38,7 @@ export const ResearchContextReferenceSchema = z.object({
   metadata: z.unknown().optional(),
 });
 
-export type ResearchContextReference = z.infer<
-  typeof ResearchContextReferenceSchema
->;
+export type ResearchContextReference = z.infer<typeof ResearchContextReferenceSchema>;
 
 // ============================================
 // Streaming Persist Payload
@@ -54,9 +52,7 @@ export const StreamingPersistPayloadSchema = z.object({
   contextReferences: z.array(ResearchContextReferenceSchema),
 });
 
-export type StreamingPersistPayload = z.infer<
-  typeof StreamingPersistPayloadSchema
-> & {
+export type StreamingPersistPayload = z.infer<typeof StreamingPersistPayloadSchema> & {
   assistantMessageId: Id<"messages">;
 };
 
@@ -148,9 +144,7 @@ export const PlanResearchToolOutputSchema = z.object({
   timestamp: z.number(),
 });
 
-export type PlanResearchToolOutput = z.infer<
-  typeof PlanResearchToolOutputSchema
->;
+export type PlanResearchToolOutput = z.infer<typeof PlanResearchToolOutputSchema>;
 
 // ============================================
 // Safe Parse Helpers
@@ -164,9 +158,7 @@ export const safeParseSearchToolOutput = (
   value: unknown,
   recordId?: string,
 ): SearchToolOutput | null => {
-  const context = recordId
-    ? `SearchToolOutput [${recordId}]`
-    : "SearchToolOutput";
+  const context = recordId ? `SearchToolOutput [${recordId}]` : "SearchToolOutput";
   return safeParseOrNull(SearchToolOutputSchema, value, context);
 };
 
@@ -178,9 +170,7 @@ export const safeParseScrapeToolOutput = (
   value: unknown,
   recordId?: string,
 ): ScrapeToolOutput | null => {
-  const context = recordId
-    ? `ScrapeToolOutput [${recordId}]`
-    : "ScrapeToolOutput";
+  const context = recordId ? `ScrapeToolOutput [${recordId}]` : "ScrapeToolOutput";
   return safeParseOrNull(ScrapeToolOutputSchema, value, context);
 };
 
@@ -192,9 +182,7 @@ export const safeParsePlanResearchToolOutput = (
   value: unknown,
   recordId?: string,
 ): PlanResearchToolOutput | null => {
-  const context = recordId
-    ? `PlanResearchToolOutput [${recordId}]`
-    : "PlanResearchToolOutput";
+  const context = recordId ? `PlanResearchToolOutput [${recordId}]` : "PlanResearchToolOutput";
   return safeParseOrNull(PlanResearchToolOutputSchema, value, context);
 };
 

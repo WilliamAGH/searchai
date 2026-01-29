@@ -39,12 +39,19 @@ describe("New Chat functionality", () => {
   });
 
   it("handles creation failure gracefully", () => {
+    // Test that errors are properly caught and handled
+    const throwingFn = () => {
+      throw new Error("Network error");
+    };
+
+    expect(throwingFn).toThrow("Network error");
+
+    // Verify error handler would be invoked
     let errorHandled = false;
     try {
-      throw new Error("Network error");
-    } catch (error: any) {
+      throwingFn();
+    } catch {
       errorHandled = true;
-      expect(error.message).toBe("Network error");
     }
     expect(errorHandled).toBe(true);
   });
@@ -103,17 +110,25 @@ describe("New Chat functionality", () => {
   });
 
   it("generates correct URLs for privacy levels", () => {
-    const tests = [
+    // Define test cases with proper types
+    interface TestCase {
+      privacy: string;
+      id?: string;
+      shareId?: string;
+      publicId?: string;
+      expected: string;
+    }
+    const tests: TestCase[] = [
       { privacy: "private", id: "chat-123", expected: "/chat/chat-123" },
       { privacy: "shared", shareId: "share-456", expected: "/s/share-456" },
       { privacy: "public", publicId: "pub-789", expected: "/p/pub-789" },
     ];
     for (const t of tests) {
-      let url = "/chat/" + (t as any).id;
-      if (t.privacy === "shared" && (t as any).shareId) {
-        url = "/s/" + (t as any).shareId;
-      } else if (t.privacy === "public" && (t as any).publicId) {
-        url = "/p/" + (t as any).publicId;
+      let url = "/chat/" + (t.id ?? "");
+      if (t.privacy === "shared" && t.shareId) {
+        url = "/s/" + t.shareId;
+      } else if (t.privacy === "public" && t.publicId) {
+        url = "/p/" + t.publicId;
       }
       expect(url).toBe(t.expected);
     }

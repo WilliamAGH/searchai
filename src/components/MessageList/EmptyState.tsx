@@ -38,8 +38,8 @@ export function EmptyState({ onToggleSidebar }: EmptyStateProps) {
           Search the web with AI
         </h2>
         <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-          Ask me anything and I'll search the web in real-time to give you
-          accurate, up-to-date information with sources.
+          Ask me anything and I'll search the web in real-time to give you accurate, up-to-date
+          information with sources.
         </p>
       </div>
     </div>

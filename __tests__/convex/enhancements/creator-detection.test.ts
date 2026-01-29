@@ -115,18 +115,14 @@ describe("creator detection", () => {
         injectSearchResults: true,
       });
 
-      expect(result.matchedRules.some((r) => r.id === "creator-author")).toBe(
-        true,
-      );
+      expect(result.matchedRules.some((r) => r.id === "creator-author")).toBe(true);
       expect(result.enhancedQuery).toContain("williamcallahan.com");
       expect(result.enhancedQuery).toContain("aventure.vc");
       expect(result.enhancedContext).toContain("William Callahan");
       expect(result.enhancedContext).toContain("SearchAI");
       expect(result.enhancedContext).toContain("aVenture");
       expect(result.injectedResults.length).toBeGreaterThan(0);
-      expect(
-        result.injectedResults.some((r) => r.url.includes("search-ai.io")),
-      ).toBe(true);
+      expect(result.injectedResults.some((r) => r.url.includes("search-ai.io"))).toBe(true);
     }
   });
 });

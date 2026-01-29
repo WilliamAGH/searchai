@@ -10,9 +10,7 @@ import { Page, Locator } from "@playwright/test";
  */
 export async function waitForSidebarAnimation(page: Page) {
   // Wait for the sidebar dialog to be stable (animation complete)
-  const sidebar = page
-    .locator('[role="dialog"], [data-sidebar], .sidebar-dialog')
-    .first();
+  const sidebar = page.locator('[role="dialog"], [data-sidebar], .sidebar-dialog').first();
 
   try {
     // First wait for it to be visible
@@ -21,9 +19,7 @@ export async function waitForSidebarAnimation(page: Page) {
     // Then wait for animation to complete using a more reliable method
     await page.waitForFunction(
       () => {
-        const sidebar = document.querySelector(
-          '[role="dialog"], [data-sidebar], .sidebar-dialog',
-        );
+        const sidebar = document.querySelector('[role="dialog"], [data-sidebar], .sidebar-dialog');
         if (!sidebar) return true;
 
         // Check if any transitions are still running
@@ -32,11 +28,7 @@ export async function waitForSidebarAnimation(page: Page) {
         const opacity = computedStyle.opacity;
 
         // Most sidebars animate via transform or opacity
-        return (
-          transform === "none" ||
-          transform === "matrix(1, 0, 0, 1, 0, 0)" ||
-          opacity === "1"
-        );
+        return transform === "none" || transform === "matrix(1, 0, 0, 1, 0, 0)" || opacity === "1";
       },
       { timeout: 1000 },
     );

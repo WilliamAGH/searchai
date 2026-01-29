@@ -28,7 +28,6 @@ export async function* executeParallelPath({
   startTime,
   planningOutput,
 }: WorkflowPathArgs): AsyncGenerator<WorkflowStreamEvent> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   // Dynamic require to avoid circular import with definitions.ts
   const { agents } = require("./definitions");
   const writeEvent = (type: string, data: Record<string, unknown>) =>

@@ -14,7 +14,7 @@ import { runSearchWeb } from "./search/search_web_handler";
 import { invalidatePlanCacheForChat as invalidateCacheForChat } from "./search/cache";
 
 // Re-export test utilities for backward compatibility
-export { __extractKeywordsForTest, __augmentQueryForTest } from "./search/utils";
+export { extractKeywordsForTest, augmentQueryForTest } from "./search/utils";
 
 /**
  * Perform web search using available providers

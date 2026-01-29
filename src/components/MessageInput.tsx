@@ -9,6 +9,7 @@
 import React, { useState, useRef } from "react";
 import { useAutoResizeTextarea } from "@/hooks/useAutoResizeTextarea";
 import { useMessageInputFocus } from "@/hooks/useMessageInputFocus";
+import { useInputHistory } from "@/hooks/useInputHistory";
 
 interface MessageInputProps {
   /** Callback when message is sent */
@@ -42,13 +43,14 @@ export function MessageInput({
   const MAX_TEXTAREA_HEIGHT = 200;
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // (padding centering cache removed; no longer needed)
-  // Track navigation through history (index into `history`), null when not navigating
-  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
-  // Preserve current draft when entering history navigation so it can be restored
-  const [draftBeforeHistory, setDraftBeforeHistory] = useState<string | null>(
-    null,
-  );
+
+  const { historyIndex, handleHistoryNavigation, resetHistory } = useInputHistory({
+    history,
+    currentMessage: message,
+    setMessage,
+    onDraftChange,
+    textareaRef,
+  });
 
   /**
    * Handle form submission
@@ -58,13 +60,12 @@ export function MessageInput({
   const sendCurrentMessage = React.useCallback(() => {
     const trimmed = message.trim();
     if (trimmed && !disabled) {
-      onSendMessage(trimmed);
+      void onSendMessage(trimmed);
       setMessage("");
       onDraftChange?.("");
-      setHistoryIndex(null);
-      setDraftBeforeHistory(null);
+      resetHistory();
     }
-  }, [message, disabled, onSendMessage, onDraftChange]);
+  }, [message, disabled, onSendMessage, onDraftChange, resetHistory]);
 
   const handleSubmit = React.useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -78,6 +79,7 @@ export function MessageInput({
    * Handle keyboard shortcuts
    * - Enter: send message
    * - Shift+Enter: newline
+   * - ArrowUp/Down: history navigation (handled by useInputHistory hook)
    */
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -89,88 +91,20 @@ export function MessageInput({
         return;
       }
 
-      // Ignore modifier combos
+      // Ignore modifier combos for history navigation
       if (e.altKey || e.ctrlKey || e.metaKey) return;
 
+      // Delegate history navigation to the hook
       const ta = textareaRef.current;
       if (!ta) return;
       const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
-      const atEnd =
-        ta.selectionStart === message.length &&
-        ta.selectionEnd === message.length;
+      const atEnd = ta.selectionStart === message.length && ta.selectionEnd === message.length;
 
-      // Navigate up: only when caret at start
-      if (e.key === "ArrowUp" && atStart && history.length > 0) {
+      if (handleHistoryNavigation(e.key, atStart, atEnd)) {
         e.preventDefault();
-        // On first entry into history mode, save current draft
-        if (historyIndex === null) {
-          setDraftBeforeHistory(message);
-          const idx = history.length - 1;
-          setHistoryIndex(idx);
-          const next = history[idx] || "";
-          setMessage(next);
-          onDraftChange?.(next);
-        } else {
-          const idx = Math.max(0, historyIndex - 1);
-          setHistoryIndex(idx);
-          const next = history[idx] || "";
-          setMessage(next);
-          onDraftChange?.(next);
-        }
-        // Move caret to end after setting message
-        requestAnimationFrame(() => {
-          const el = textareaRef.current;
-          if (el) {
-            const len = el.value.length;
-            el.setSelectionRange(len, len);
-          }
-        });
-        return;
-      }
-
-      // Navigate down: only when caret at end
-      if (e.key === "ArrowDown" && atEnd && history.length > 0) {
-        if (historyIndex === null) return; // Not in history mode
-        e.preventDefault();
-        if (historyIndex < history.length - 1) {
-          const idx = historyIndex + 1;
-          setHistoryIndex(idx);
-          const next = history[idx] || "";
-          setMessage(next);
-          onDraftChange?.(next);
-          requestAnimationFrame(() => {
-            const el = textareaRef.current;
-            if (el) {
-              const len = el.value.length;
-              el.setSelectionRange(len, len);
-            }
-          });
-        } else {
-          // Exiting history mode -> restore draft
-          const restore = draftBeforeHistory ?? "";
-          setHistoryIndex(null);
-          setDraftBeforeHistory(null);
-          setMessage(restore);
-          onDraftChange?.(restore);
-          requestAnimationFrame(() => {
-            const el = textareaRef.current;
-            if (el) {
-              const len = el.value.length;
-              el.setSelectionRange(len, len);
-            }
-          });
-        }
-        return;
       }
     },
-    [
-      sendCurrentMessage,
-      history,
-      historyIndex,
-      message,
-      onDraftChange,
-      draftBeforeHistory,
-    ],
+    [sendCurrentMessage, message, handleHistoryNavigation],
   );
 
   useAutoResizeTextarea({
@@ -185,12 +119,11 @@ export function MessageInput({
       const val = e.target.value;
       setMessage(val);
       if (historyIndex !== null) {
-        setHistoryIndex(null);
-        setDraftBeforeHistory(null);
+        resetHistory();
       }
       onDraftChange?.(val);
     },
-    [historyIndex, onDraftChange],
+    [historyIndex, onDraftChange, resetHistory],
   );
 
   return (

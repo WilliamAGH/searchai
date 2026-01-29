@@ -64,11 +64,7 @@ export const loadMoreMessages = action({
         _id: v.id("messages"),
         _creationTime: v.number(),
         chatId: v.id("chats"),
-        role: v.union(
-          v.literal("user"),
-          v.literal("assistant"),
-          v.literal("system"),
-        ),
+        role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
         content: v.optional(v.string()),
         timestamp: v.optional(v.number()),
         isStreaming: v.optional(v.boolean()),
@@ -98,15 +94,12 @@ export const loadMoreMessages = action({
   handler: async (ctx, args): Promise<PaginatedMessagesResult> => {
     try {
       // @ts-ignore - Known Convex TS2589 issue with complex type inference
-      return await ctx.runQuery(
-        api.chats.messagesPaginated.getChatMessagesPaginated,
-        {
-          chatId: args.chatId,
-          cursor: args.cursor,
-          limit: args.limit,
-          sessionId: args.sessionId,
-        },
-      );
+      return await ctx.runQuery(api.chats.messagesPaginated.getChatMessagesPaginated, {
+        chatId: args.chatId,
+        cursor: args.cursor,
+        limit: args.limit,
+        sessionId: args.sessionId,
+      });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       console.error("Failed to load more messages:", {

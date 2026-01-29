@@ -61,11 +61,7 @@ export const agentTools: {
  *
  * @see Module JSDoc for type annotation policy
  */
-export const conversationalToolsList: Tool[] = [
-  planResearchTool,
-  searchWebTool,
-  scrapeWebpageTool,
-];
+export const conversationalToolsList: Tool[] = [planResearchTool, searchWebTool, scrapeWebpageTool];
 
 /**
  * Tool list for research-only agents (no planning needed).

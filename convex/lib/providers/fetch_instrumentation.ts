@@ -14,22 +14,15 @@ type InstrumentedRequestPayload = Record<string, unknown> & {
   input: unknown[];
 };
 
-const isFunctionCallOutputItem = (
-  value: unknown,
-): value is FunctionCallOutputItem => {
+const isFunctionCallOutputItem = (value: unknown): value is FunctionCallOutputItem => {
   if (typeof value !== "object" || value === null) {
     return false;
   }
   const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.type === "string" &&
-    candidate.type === "function_call_output"
-  );
+  return typeof candidate.type === "string" && candidate.type === "function_call_output";
 };
 
-const isInstrumentedRequestPayload = (
-  value: unknown,
-): value is InstrumentedRequestPayload => {
+const isInstrumentedRequestPayload = (value: unknown): value is InstrumentedRequestPayload => {
   if (typeof value !== "object" || value === null) {
     return false;
   }
@@ -41,8 +34,7 @@ const isInstrumentedRequestPayload = (
  * Wrap the native fetch to inject IDs for function_call_output items
  * and optionally dump payloads when debugging
  */
-const SENSITIVE_HEADER_PATTERN =
-  /^(authorization|x[-_]api[-_]key|api[-_]key)$/i;
+const SENSITIVE_HEADER_PATTERN = /^(authorization|x[-_]api[-_]key|api[-_]key)$/i;
 
 export const redactSensitiveHeaders = (
   headers: HeadersInit | undefined | null,
@@ -71,12 +63,8 @@ export const redactSensitiveHeaders = (
   return redacted;
 };
 
-export const createInstrumentedFetch = (
-  debugLogging: boolean,
-): typeof fetch => {
-  const instrumented = async (
-    ...args: Parameters<typeof fetch>
-  ): Promise<Response> => {
+export const createInstrumentedFetch = (debugLogging: boolean): typeof fetch => {
+  const instrumented = async (...args: Parameters<typeof fetch>): Promise<Response> => {
     const [input, init] = args;
     const clonedInit: RequestInit = init ? { ...init } : {};
     let bodyText: string | undefined;
@@ -126,11 +114,7 @@ export const createInstrumentedFetch = (
         console.error("[llm-debug] URL:", input);
         console.error(
           "[llm-debug] Headers:",
-          JSON.stringify(
-            redactSensitiveHeaders(clonedInit.headers) ?? {},
-            null,
-            2,
-          ),
+          JSON.stringify(redactSensitiveHeaders(clonedInit.headers) ?? {}, null, 2),
         );
         console.error(
           "[llm-debug] Body:",
@@ -149,17 +133,11 @@ export const createInstrumentedFetch = (
         const responseClone = response.clone();
         const responseText = await responseClone.text();
         console.error("[llm-debug] ========== INCOMING RESPONSE ==========");
-        console.error(
-          "[llm-debug] Status:",
-          response.status,
-          response.statusText,
-        );
+        console.error("[llm-debug] Status:", response.status, response.statusText);
         console.error(
           "[llm-debug] Headers:",
           JSON.stringify(
-            redactSensitiveHeaders(
-              Object.fromEntries(response.headers.entries()),
-            ) ?? {},
+            redactSensitiveHeaders(Object.fromEntries(response.headers.entries())) ?? {},
             null,
             2,
           ),

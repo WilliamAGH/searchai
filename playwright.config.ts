@@ -44,15 +44,11 @@ export default defineConfig({
         }
       : {
           VITE_CONVEX_URL:
-            process.env.VITE_CONVEX_URL ||
-            "https://diligent-greyhound-240.convex.cloud",
+            process.env.VITE_CONVEX_URL || "https://diligent-greyhound-240.convex.cloud",
           CONVEX_SITE_URL:
             process.env.CONVEX_SITE_URL ||
             (process.env.VITE_CONVEX_URL
-              ? process.env.VITE_CONVEX_URL.replace(
-                  ".convex.cloud",
-                  ".convex.site",
-                )
+              ? process.env.VITE_CONVEX_URL.replace(".convex.cloud", ".convex.site")
               : "https://diligent-greyhound-240.convex.site"),
         },
   },

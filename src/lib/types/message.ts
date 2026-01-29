@@ -13,10 +13,7 @@ import type { SearchResult } from "../../../convex/schemas/search";
 
 // Re-export types from canonical sources
 export type { SearchResult } from "../../../convex/schemas/search";
-export type {
-  ContextReference,
-  MessageMetadata,
-} from "@/lib/schemas/messageStream";
+export type { ContextReference, MessageMetadata } from "@/lib/schemas/messageStream";
 
 /**
  * Workflow progress stages for search/response process.
@@ -72,10 +69,7 @@ export type Message = Omit<
  * Message stream chunk for real-time updates
  * Extended to support agent workflow streaming events
  */
-export type PersistedPayload = Omit<
-  StreamingPersistPayload,
-  "contextReferences"
-> & {
+export type PersistedPayload = Omit<StreamingPersistPayload, "contextReferences"> & {
   contextReferences: ContextReference[];
 };
 

@@ -11,19 +11,11 @@ interface LoadMoreButtonProps {
   hasMore: boolean;
 }
 
-export function LoadMoreButton({
-  onClick,
-  isLoading,
-  hasMore,
-}: LoadMoreButtonProps) {
+export function LoadMoreButton({ onClick, isLoading, hasMore }: LoadMoreButtonProps) {
   if (!hasMore) return null;
 
   return (
-    <div
-      className="flex justify-center py-4"
-      role="region"
-      aria-label="Message pagination"
-    >
+    <div className="flex justify-center py-4" role="region" aria-label="Message pagination">
       <button
         onClick={onClick}
         disabled={isLoading}
@@ -32,9 +24,7 @@ export function LoadMoreButton({
                    rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 
                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
                    disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        aria-label={
-          isLoading ? "Loading earlier messages" : "Load earlier messages"
-        }
+        aria-label={isLoading ? "Loading earlier messages" : "Load earlier messages"}
         aria-busy={isLoading}
         aria-live="polite"
       >

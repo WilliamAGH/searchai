@@ -34,9 +34,8 @@ export function useUrlStateSync({
   const location = useLocation();
   const lastResolvedChatIdRef = useRef<string | null>(null);
 
-  const resolveChatId = (
-    chat: Doc<"chats"> | null | undefined,
-  ): string | null => (chat?._id ? String(chat._id) : null);
+  const resolveChatId = (chat: Doc<"chats"> | null | undefined): string | null =>
+    chat?._id ? String(chat._id) : null;
 
   useEffect(() => {
     const isShareRoute = location.pathname.startsWith("/s/");
@@ -46,12 +45,9 @@ export function useUrlStateSync({
       location.pathname === "/chat" ||
       location.pathname.startsWith("/chat/");
 
-    const shareChatId =
-      propShareId && isShareRoute ? resolveChatId(chatByShareId) : null;
-    const publicChatId =
-      propPublicId && isPublicRoute ? resolveChatId(chatByPublicId) : null;
-    const opaqueChatId =
-      propChatId && isChatRoute ? resolveChatId(chatByOpaqueId) : null;
+    const shareChatId = propShareId && isShareRoute ? resolveChatId(chatByShareId) : null;
+    const publicChatId = propPublicId && isPublicRoute ? resolveChatId(chatByPublicId) : null;
+    const opaqueChatId = propChatId && isChatRoute ? resolveChatId(chatByOpaqueId) : null;
 
     const targetChatId =
       shareChatId ??
@@ -72,14 +68,14 @@ export function useUrlStateSync({
     if (currentChatId && isChatRoute) {
       const expectedPath = `/chat/${currentChatId}`;
       if (location.pathname !== expectedPath) {
-        navigate(expectedPath, { replace: true });
+        void navigate(expectedPath, { replace: true });
       }
       return;
     }
 
     // If no chat ID but we're on a chat route, go home
     if (!currentChatId && isChatRoute && location.pathname !== "/") {
-      navigate("/", { replace: true });
+      void navigate("/", { replace: true });
     }
   }, [
     currentChatId,

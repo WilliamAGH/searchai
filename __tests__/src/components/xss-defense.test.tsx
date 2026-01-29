@@ -66,9 +66,7 @@ describe("XSS Defense - Component Sanitization", () => {
       // The publish route only allows 'user' or 'assistant' roles
       const invalidRole = "system";
       const validated =
-        invalidRole === "user" || invalidRole === "assistant"
-          ? invalidRole
-          : "assistant";
+        invalidRole === "user" || invalidRole === "assistant" ? invalidRole : "assistant";
       expect(validated).toBe("assistant");
     });
   });
@@ -143,21 +141,18 @@ describe("XSS Defense - Component Sanitization", () => {
       // Test that non-http protocols would be rejected
       const validProtocols = ["http:", "https:"];
       const testUrls = [
-        "ftp://example.com",
-        "file:///etc/passwd",
-        'javascript:alert("XSS")',
-        'data:text/html,<script>alert("XSS")</script>',
+        { url: "ftp://example.com", valid: true },
+        { url: "file:///etc/passwd", valid: true },
+        { url: 'javascript:alert("XSS")', valid: true },
+        { url: 'data:text/html,<script>alert("XSS")</script>', valid: true },
       ];
 
-      testUrls.forEach((testUrl) => {
-        try {
-          const url = new URL(testUrl);
-          expect(validProtocols.includes(url.protocol)).toBe(false);
-        } catch {
-          // Invalid URLs should also be rejected
-          expect(true).toBe(true);
-        }
-      });
+      for (const testCase of testUrls) {
+        const parsed = URL.canParse(testCase.url) ? new URL(testCase.url) : null;
+        // Either URL parsing fails OR protocol is not http/https - both are safe rejections
+        const isRejected = parsed === null || !validProtocols.includes(parsed.protocol);
+        expect(isRejected).toBe(true);
+      }
     });
   });
 

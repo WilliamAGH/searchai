@@ -20,7 +20,7 @@ import type { AgentToolRunContext } from "./tools_context";
  * 3. The three parameters form a cohesive "research plan" unit together
  */
 // prettier-ignore
-export const planResearchTool: FunctionTool<any, any, unknown> = tool({ // eslint-disable-line @typescript-eslint/no-explicit-any
+export const planResearchTool: FunctionTool<any, any, unknown> = tool({  
   name: "plan_research",
   description: `Plan a research strategy by generating targeted search queries.
 Call this tool ONLY when you need to research information you don't know or aren't confident about.

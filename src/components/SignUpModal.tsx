@@ -47,11 +47,7 @@ function UserAddIcon() {
  * @param onClose - Callback to close modal
  * @param onSwitchToSignIn - Callback to switch to sign-in modal
  */
-export function SignUpModal({
-  isOpen,
-  onClose,
-  onSwitchToSignIn,
-}: SignUpModalProps) {
+export function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignUpModalProps) {
   const { signIn } = useAuthActions();
   const [submitting, setSubmitting] = useState(false);
 
@@ -67,10 +63,7 @@ export function SignUpModal({
       } catch (error: unknown) {
         const maybeMessage = extractAuthErrorMessage(error);
         toast.error(
-          getAuthToastMessage(
-            maybeMessage,
-            "Could not sign up. Please check your details.",
-          ),
+          getAuthToastMessage(maybeMessage, "Could not sign up. Please check your details."),
         );
       } finally {
         setSubmitting(false);

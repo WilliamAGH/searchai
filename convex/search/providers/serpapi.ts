@@ -69,8 +69,10 @@ export async function searchWithSerpApiDuckDuckGo(
       `SerpAPI [query=${query.substring(0, 50)}]`,
     );
     if (!parseResult.success) {
-      // Error already logged with context by safeParseWithLog
-      return { results: [] };
+      // Per [EH1b]: Surface failures, don't swallow - throw with context
+      throw new Error(
+        `SerpAPI response validation failed for query "${query.substring(0, 50)}": ${parseResult.error.message}`,
+      );
     }
     const data = parseResult.data;
     console.info("[OK] SERP API Success:", {

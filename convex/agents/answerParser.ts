@@ -9,16 +9,13 @@
  */
 
 /** Matches `## Sources` or `### References` heading followed by any content */
-const MARKDOWN_HEADING_SOURCES =
-  /\n#{1,3}\s*(?:Sources?|References?):?\s*\n[\s\S]*$/i;
+const MARKDOWN_HEADING_SOURCES = /\n#{1,3}\s*(?:Sources?|References?):?\s*\n[\s\S]*$/i;
 
 /** Matches `**Sources:**` or `**References:**` bold header followed by any content */
-const BOLD_HEADER_SOURCES =
-  /\n\*\*(?:Sources?|References?)\*\*:?\s*\n[\s\S]*$/i;
+const BOLD_HEADER_SOURCES = /\n\*\*(?:Sources?|References?)\*\*:?\s*\n[\s\S]*$/i;
 
 /** Matches plain `Sources:` or `References:` followed by bullet/numbered list items */
-const PLAIN_HEADER_SOURCES =
-  /\n(?:Sources?|References?):?\s*\n(?:\s*[-•*\d]+\.?\s+.+(?:\n|$))+$/i;
+const PLAIN_HEADER_SOURCES = /\n(?:Sources?|References?):?\s*\n(?:\s*[-•*\d]+\.?\s+.+(?:\n|$))+$/i;
 
 const TRAILING_SOURCES_PATTERNS = [
   MARKDOWN_HEADING_SOURCES,
@@ -120,18 +117,14 @@ export function extractLimitations(text: string): string | undefined {
 /**
  * Assess answer completeness based on content
  */
-export function assessCompleteness(
-  text: string,
-): "complete" | "partial" | "insufficient" {
+export function assessCompleteness(text: string): "complete" | "partial" | "insufficient" {
   const hasLimitations = hasLimitationsSection(text);
   const wordCount = text.split(/\s+/).length;
 
   // Insufficient: very short or explicitly states insufficient info
   if (
     wordCount < 50 ||
-    /I (could not|couldn't) find|insufficient information|no information available/i.test(
-      text,
-    )
+    /I (could not|couldn't) find|insufficient information|no information available/i.test(text)
   ) {
     return "insufficient";
   }

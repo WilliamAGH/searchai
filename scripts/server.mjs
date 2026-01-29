@@ -28,9 +28,7 @@ const CONVEX_SITE_URL = (
 ).replace(/\/+$/, "");
 
 if (!CONVEX_SITE_URL) {
-  console.error(
-    "ERROR: Set CONVEX_SITE_URL env (e.g., https://<deployment>.convex.site)",
-  );
+  console.error("ERROR: Set CONVEX_SITE_URL env (e.g., https://<deployment>.convex.site)");
   process.exit(1);
 }
 
@@ -53,9 +51,7 @@ const mime = new Map([
 
 // Minimal IP-based rate limiter for publish endpoint
 const PUBLISH_MAX = Number(process.env.RATELIMIT_PUBLISH_MAX || 10); // requests
-const PUBLISH_WINDOW_MS = Number(
-  process.env.RATELIMIT_PUBLISH_WINDOW_MS || 5 * 60 * 1000,
-); // 5 minutes
+const PUBLISH_WINDOW_MS = Number(process.env.RATELIMIT_PUBLISH_WINDOW_MS || 5 * 60 * 1000); // 5 minutes
 const publishHits = new Map(); // key -> array of timestamps
 
 function rateLimited(remote, now = Date.now()) {
@@ -102,8 +98,7 @@ async function forwardTo(target, req, res) {
   try {
     const headers = new Headers();
     for (const [k, v] of Object.entries(req.headers)) {
-      if (v !== undefined)
-        headers.set(k, Array.isArray(v) ? v.join(", ") : String(v));
+      if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(", ") : String(v));
     }
     headers.set("host", new URL(CONVEX_SITE_URL).host);
 
@@ -151,8 +146,7 @@ const server = http.createServer(async (req, res) => {
   if (req.url.startsWith("/api/")) {
     // Rate-limit POST /api/publishChat
     if (req.method === "POST" && req.url.startsWith("/api/publishChat")) {
-      const remote =
-        req.socket?.remoteAddress || req.headers["x-forwarded-for"];
+      const remote = req.socket?.remoteAddress || req.headers["x-forwarded-for"];
       const rl = rateLimited(String(remote || ""));
       if (rl.limited) {
         res.writeHead(429, {

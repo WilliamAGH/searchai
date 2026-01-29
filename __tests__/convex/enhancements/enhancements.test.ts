@@ -184,10 +184,11 @@ describe("message enhancement system", () => {
     });
     const matched = result.matchedRules.map((r) => r.id);
     const creatorIdx = matched.indexOf("creator-author");
-    if (creatorIdx !== -1 && matched.length > 1) {
-      const otherIdx = matched.findIndex((id, i) => id !== "creator-author" && i > -1);
-      expect(creatorIdx).toBeLessThan(otherIdx);
-    }
+    // This query should always match creator-author and at least one other rule
+    expect(creatorIdx).not.toBe(-1);
+    expect(matched.length).toBeGreaterThan(1);
+    // creator-author should be first (index 0) when present with other rules
+    expect(creatorIdx).toBe(0);
   });
 
   it("prioritizes expected URLs for creator queries", () => {

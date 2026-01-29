@@ -63,23 +63,17 @@ test.describe("Debug Mobile Sidebar", () => {
     console.log("Mobile sidebar dialogs:", mobileSidebar);
 
     // Check if Transition component is rendering
-    const transitionElements = await page
-      .locator("[data-headlessui-state]")
-      .count();
+    const transitionElements = await page.locator("[data-headlessui-state]").count();
     console.log("Headless UI transition elements:", transitionElements);
 
     // Check the actual sidebar open state (captured for debugging, console.log is commented out)
     const _sidebarState = await page.evaluate(() => {
       // Try to find React fiber to check state
-      const button = document.querySelector(
-        'button[aria-label="Toggle sidebar"]',
-      );
+      const button = document.querySelector('button[aria-label="Toggle sidebar"]');
       if (!button) return { found: false };
 
       const reactKey = Object.keys(button).find(
-        (key) =>
-          key.startsWith("__reactFiber") ||
-          key.startsWith("__reactInternalInstance"),
+        (key) => key.startsWith("__reactFiber") || key.startsWith("__reactInternalInstance"),
       );
 
       if (!reactKey) return { found: false, hasReact: false };
@@ -108,9 +102,7 @@ test.describe("Debug Mobile Sidebar", () => {
     }
 
     // Check if error boundary is showing
-    const errorBoundary = await page
-      .locator("text=/Something went wrong/i")
-      .count();
+    const errorBoundary = await page.locator("text=/Something went wrong/i").count();
     if (errorBoundary > 0) {
       console.log("Error boundary is showing!");
 

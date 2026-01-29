@@ -7,11 +7,7 @@
  * - Ensuring consistent field shapes for components
  */
 
-import type {
-  ContextReference,
-  Message,
-  SearchResult,
-} from "@/lib/types/message";
+import type { ContextReference, Message, SearchResult } from "@/lib/types/message";
 import { logger } from "@/lib/logger";
 
 const MAX_CONTEXT_REFERENCES = 10;
@@ -43,8 +39,7 @@ function synthesizeSearchResults(msg: Message): SearchResult[] | undefined {
           title,
           url: r.url || "",
           snippet: "",
-          relevanceScore:
-            typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5,
+          relevanceScore: typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5,
           kind,
         };
         return result;
@@ -63,8 +58,7 @@ export function mapMessagesToLocal(messages: Message[]): Message[] {
     // Synthesize searchResults from contextReferences when not present (Agents workflow)
     const searchResults = synthesizeSearchResults(msg);
 
-    const resolvedReasoning =
-      typeof msg.reasoning === "string" ? msg.reasoning : undefined;
+    const resolvedReasoning = typeof msg.reasoning === "string" ? msg.reasoning : undefined;
 
     return {
       ...msg,

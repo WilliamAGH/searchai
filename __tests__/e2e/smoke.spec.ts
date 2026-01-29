@@ -14,16 +14,12 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
         text.includes("Failed to send message") ||
         text.includes("403 (Forbidden)") ||
         text.includes("Failed to load resource") ||
-        text.includes(
-          'Viewport argument key "interactive-widget" not recognized',
-        )
+        text.includes('Viewport argument key "interactive-widget" not recognized')
       ) {
         return;
       }
       const loc = msg.location();
-      const where = loc.url
-        ? `${loc.url}:${loc.lineNumber ?? 0}:${loc.columnNumber ?? 0}`
-        : "";
+      const where = loc.url ? `${loc.url}:${loc.lineNumber ?? 0}:${loc.columnNumber ?? 0}` : "";
       consoleErrors.push(`${msg.text()}${where ? `\n  at ${where}` : ""}`);
     }
   });
@@ -32,17 +28,14 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
     consoleErrors.push(err.stack || err.message);
   });
 
-  const isHttp = (u: string) =>
-    u.startsWith("http://") || u.startsWith("https://");
+  const isHttp = (u: string) => u.startsWith("http://") || u.startsWith("https://");
 
   page.on("requestfailed", (req) => {
     const url = req.url();
     if (!isHttp(url)) return;
     // Ignore common favicon variants to reduce flakiness
     if (url.endsWith("favicon.ico") || url.endsWith("favicon.svg")) return;
-    requestFailures.push(
-      `${req.method()} ${url} -> ${req.failure()?.errorText}`,
-    );
+    requestFailures.push(`${req.method()} ${url} -> ${req.failure()?.errorText}`);
   });
 
   page.on("response", (res) => {
@@ -80,18 +73,10 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
 
   // Fail if any console errors or request failures occurred
   expect
-    .soft(
-      requestFailures,
-      `No failed network requests.\n${requestFailures.join("\n")}`,
-    )
+    .soft(requestFailures, `No failed network requests.\n${requestFailures.join("\n")}`)
     .toEqual([]);
   expect
-    .soft(
-      responseFailures,
-      `No HTTP responses with status >= 400.\n${responseFailures.join("\n")}`,
-    )
+    .soft(responseFailures, `No HTTP responses with status >= 400.\n${responseFailures.join("\n")}`)
     .toEqual([]);
-  expect
-    .soft(consoleErrors, `No console errors.\n${consoleErrors.join("\n")}`)
-    .toEqual([]);
+  expect.soft(consoleErrors, `No console errors.\n${consoleErrors.join("\n")}`).toEqual([]);
 });

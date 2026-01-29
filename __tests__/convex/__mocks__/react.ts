@@ -8,14 +8,10 @@ type QueryArgs = Record<string, unknown> | "skip";
  */
 export function setupConvexReactMock(options?: {
   queryImpl?: (name: string, args: QueryArgs) => unknown;
-  actionImpl?: (
-    name: string,
-    args: Record<string, unknown>,
-  ) => Promise<unknown>;
+  actionImpl?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
 }) {
   const queryImplFn =
-    options?.queryImpl ||
-    ((name: string, _args: QueryArgs) => ({ mocked: name }));
+    options?.queryImpl || ((name: string, _args: QueryArgs) => ({ mocked: name }));
   const actionImplFn =
     options?.actionImpl ||
     (async (name: string, _args: Record<string, unknown>) => ({

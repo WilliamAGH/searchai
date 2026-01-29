@@ -89,18 +89,13 @@ function validateOrigin(requestOrigin: string | null): string | null {
     // Support wildcard subdomains: *.example.com
     if (allowed.startsWith("*.")) {
       const domain = allowed.slice(2);
-      if (
-        requestOrigin.endsWith(`.${domain}`) ||
-        requestOrigin === `https://${domain}`
-      ) {
+      if (requestOrigin.endsWith(`.${domain}`) || requestOrigin === `https://${domain}`) {
         return requestOrigin;
       }
     }
   }
 
-  console.warn(
-    `[BLOCKED] Rejected request from unauthorized origin: ${requestOrigin}`,
-  );
+  console.warn(`[BLOCKED] Rejected request from unauthorized origin: ${requestOrigin}`);
   return null;
 }
 
@@ -111,11 +106,7 @@ function validateOrigin(requestOrigin: string | null): string | null {
  * @param requestOrigin - Origin header from request
  * @returns Response with CORS headers or 403 if origin not allowed
  */
-export function corsResponse(
-  body: string,
-  status = 200,
-  requestOrigin?: string | null,
-) {
+export function corsResponse(body: string, status = 200, requestOrigin?: string | null) {
   // If no origin provided, reject (backward compatibility issue - caller must pass origin)
   if (requestOrigin === undefined) {
     console.error(

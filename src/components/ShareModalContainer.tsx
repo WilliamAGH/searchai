@@ -91,11 +91,7 @@ export function ShareModalContainer(props: ShareModalContainerProps) {
       onClose={props.onClose}
       onShare={onShare}
       privacy={privacy}
-      llmTxtUrl={
-        shareId
-          ? `${exportBase}?shareId=${encodeURIComponent(shareId)}`
-          : undefined
-      }
+      llmTxtUrl={shareId ? `${exportBase}?shareId=${encodeURIComponent(shareId)}` : undefined}
       shareId={shareId}
       publicId={publicId}
       exportBase={exportBase}

@@ -109,22 +109,20 @@ describe("Message Sending Critical Path", () => {
         },
       ];
 
-      mockRepository.sendMessage = vi
-        .fn()
-        .mockImplementation(async (chatId, message) => {
-          const newMessage: UnifiedMessage = {
-            id: `msg-${Date.now()}`,
-            chatId,
-            role: message.role,
-            content: message.content,
-            searchResults: message.searchResults,
-            timestamp: Date.now(),
-            synced: true,
-            source: "convex",
-          };
-          mockMessages.push(newMessage);
-          return newMessage;
-        });
+      mockRepository.sendMessage = vi.fn().mockImplementation(async (chatId, message) => {
+        const newMessage: UnifiedMessage = {
+          id: `msg-${Date.now()}`,
+          chatId,
+          role: message.role,
+          content: message.content,
+          searchResults: message.searchResults,
+          timestamp: Date.now(),
+          synced: true,
+          source: "convex",
+        };
+        mockMessages.push(newMessage);
+        return newMessage;
+      });
 
       const result = await mockRepository.sendMessage(chatId, {
         role: "assistant",
@@ -138,23 +136,21 @@ describe("Message Sending Critical Path", () => {
     it("should handle streaming messages", async () => {
       const chatId = "test-chat-id";
 
-      mockRepository.sendMessage = vi
-        .fn()
-        .mockImplementation(async (chatId, message) => {
-          const newMessage: UnifiedMessage = {
-            id: `msg-${Date.now()}`,
-            chatId,
-            role: message.role,
-            content: message.content || "",
-            isStreaming: message.isStreaming,
-            streamedContent: message.streamedContent,
-            timestamp: Date.now(),
-            synced: true,
-            source: "convex",
-          };
-          mockMessages.push(newMessage);
-          return newMessage;
-        });
+      mockRepository.sendMessage = vi.fn().mockImplementation(async (chatId, message) => {
+        const newMessage: UnifiedMessage = {
+          id: `msg-${Date.now()}`,
+          chatId,
+          role: message.role,
+          content: message.content || "",
+          isStreaming: message.isStreaming,
+          streamedContent: message.streamedContent,
+          timestamp: Date.now(),
+          synced: true,
+          source: "convex",
+        };
+        mockMessages.push(newMessage);
+        return newMessage;
+      });
 
       const result = await mockRepository.sendMessage(chatId, {
         role: "assistant",
@@ -193,8 +189,7 @@ describe("Message Sending Critical Path", () => {
 
     it("should handle special characters in messages", async () => {
       const chatId = "test-chat-id";
-      const specialContent =
-        "Hello <script>alert('xss')</script> & \"quotes\" 'apostrophes'";
+      const specialContent = "Hello <script>alert('xss')</script> & \"quotes\" 'apostrophes'";
 
       const result = await mockRepository.sendMessage(chatId, {
         role: "user",
@@ -271,13 +266,11 @@ describe("Message Sending Critical Path", () => {
     });
 
     it("should handle deletion of non-existent message", async () => {
-      mockRepository.deleteMessage = vi
-        .fn()
-        .mockRejectedValue(new Error("Message not found"));
+      mockRepository.deleteMessage = vi.fn().mockRejectedValue(new Error("Message not found"));
 
-      await expect(
-        mockRepository.deleteMessage("non-existent"),
-      ).rejects.toThrow("Message not found");
+      await expect(mockRepository.deleteMessage("non-existent")).rejects.toThrow(
+        "Message not found",
+      );
     });
   });
 });

@@ -56,11 +56,7 @@ export function validateSearchResponse(data: unknown): {
   enrichment?: SerpEnrichment;
 } {
   if (!data || typeof data !== "object") {
-    logZodFailure(
-      "validateSearchResponse",
-      new Error("Invalid data type"),
-      data,
-    );
+    logZodFailure("validateSearchResponse", new Error("Invalid data type"), data);
     return DEFAULT_SEARCH_RESPONSE_TYPED;
   }
 
@@ -87,11 +83,7 @@ export function validateSearchResponse(data: unknown): {
   // Validate search method
   const methodResult = SearchMethodSchema.safeParse(response.searchMethod);
   if (!methodResult.success) {
-    logZodFailure(
-      "validateSearchResponse.searchMethod",
-      methodResult.error,
-      response.searchMethod,
-    );
+    logZodFailure("validateSearchResponse.searchMethod", methodResult.error, response.searchMethod);
   }
   const searchMethod = methodResult.success ? methodResult.data : "fallback";
 
@@ -101,11 +93,7 @@ export function validateSearchResponse(data: unknown): {
   // Validate enrichment
   const enrichmentResult = SerpEnrichmentSchema.safeParse(response.enrichment);
   if (!enrichmentResult.success && response.enrichment !== undefined) {
-    logZodFailure(
-      "validateSearchResponse.enrichment",
-      enrichmentResult.error,
-      response.enrichment,
-    );
+    logZodFailure("validateSearchResponse.enrichment", enrichmentResult.error, response.enrichment);
   }
 
   return {
@@ -137,8 +125,7 @@ export function validateAIResponse(data: unknown): {
     if (typeof data.response === "string") {
       return {
         response: data.response,
-        reasoning:
-          typeof data.reasoning === "string" ? data.reasoning : undefined,
+        reasoning: typeof data.reasoning === "string" ? data.reasoning : undefined,
       };
     }
   }

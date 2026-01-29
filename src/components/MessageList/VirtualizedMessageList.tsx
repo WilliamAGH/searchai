@@ -71,16 +71,9 @@ export function VirtualizedMessageList({
           {group.map((message, index) => {
             const actualIndex = groupIndex * 10 + index;
             // Generate stable key that never evaluates to undefined
-            const messageKey = resolveMessageKey(
-              message,
-              `virtual-group-${groupIndex}-${index}`,
-            );
+            const messageKey = resolveMessageKey(message, `virtual-group-${groupIndex}-${index}`);
             return (
-              <div
-                key={messageKey}
-                className="message-item"
-                data-message-index={actualIndex}
-              >
+              <div key={messageKey} className="message-item" data-message-index={actualIndex}>
                 {renderItem(message, actualIndex)}
               </div>
             );
@@ -104,18 +97,13 @@ export function useSupportsContentVisibility(): boolean {
 /**
  * Performance monitoring for virtualization
  */
-export function useVirtualizationMetrics(
-  containerRef: React.RefObject<HTMLElement>,
-) {
+export function useVirtualizationMetrics(containerRef: React.RefObject<HTMLElement>) {
   useEffect(() => {
     if (!containerRef.current) return;
 
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        if (
-          entry.entryType === "measure" &&
-          entry.name.startsWith("virtualization")
-        ) {
+        if (entry.entryType === "measure" && entry.name.startsWith("virtualization")) {
           // Performance metrics logging disabled in production
           // console.debug(`[Virtualization] ${entry.name}: ${entry.duration.toFixed(2)}ms`);
         }

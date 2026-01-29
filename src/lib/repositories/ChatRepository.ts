@@ -18,10 +18,7 @@
 import type { MessageStreamChunk } from "@/lib/types/message";
 import type { CreateChatResult } from "@/lib/types/chat";
 import type { Doc } from "../../../convex/_generated/dataModel";
-import type {
-  SearchResult,
-  SerpEnrichment,
-} from "../../../convex/schemas/search";
+import type { SearchResult, SerpEnrichment } from "../../../convex/schemas/search";
 
 /**
  * Search web response type - mirrors Convex action return type without importing convex/server.
@@ -46,26 +43,17 @@ export interface IChatRepository {
   getChatById(id: string): Promise<Doc<"chats"> | null>;
   createChat(title?: string): Promise<CreateChatResult>;
   updateChatTitle(id: string, title: string): Promise<void>;
-  updateChatPrivacy(
-    id: string,
-    privacy: "private" | "shared" | "public",
-  ): Promise<void>;
+  updateChatPrivacy(id: string, privacy: "private" | "shared" | "public"): Promise<void>;
   deleteChat(id: string): Promise<void>;
 
   // Message operations
   getMessages(chatId: string): Promise<Doc<"messages">[]>;
-  addMessage(
-    chatId: string,
-    message: Partial<Doc<"messages">>,
-  ): Promise<Doc<"messages">>;
+  addMessage(chatId: string, message: Partial<Doc<"messages">>): Promise<Doc<"messages">>;
   updateMessage(id: string, updates: Partial<Doc<"messages">>): Promise<void>;
   deleteMessage(id: string): Promise<void>;
 
   // Search and AI operations
-  generateResponse(
-    chatId: string,
-    message: string,
-  ): AsyncGenerator<MessageStreamChunk>;
+  generateResponse(chatId: string, message: string): AsyncGenerator<MessageStreamChunk>;
   searchWeb(query: string): Promise<SearchWebResponse>;
 
   // Sharing operations
@@ -107,27 +95,15 @@ export abstract class BaseRepository implements IChatRepository {
   abstract getChats(): Promise<Doc<"chats">[]>;
   abstract getChatById(id: string): Promise<Doc<"chats"> | null>;
   abstract createChat(title?: string): Promise<CreateChatResult>;
-  abstract updateChatPrivacy(
-    id: string,
-    privacy: "private" | "shared" | "public",
-  ): Promise<void>;
+  abstract updateChatPrivacy(id: string, privacy: "private" | "shared" | "public"): Promise<void>;
   abstract deleteChat(id: string): Promise<void>;
 
   abstract getMessages(chatId: string): Promise<Doc<"messages">[]>;
-  abstract addMessage(
-    chatId: string,
-    message: Partial<Doc<"messages">>,
-  ): Promise<Doc<"messages">>;
-  abstract updateMessage(
-    id: string,
-    updates: Partial<Doc<"messages">>,
-  ): Promise<void>;
+  abstract addMessage(chatId: string, message: Partial<Doc<"messages">>): Promise<Doc<"messages">>;
+  abstract updateMessage(id: string, updates: Partial<Doc<"messages">>): Promise<void>;
   abstract deleteMessage(id: string): Promise<void>;
 
-  abstract generateResponse(
-    chatId: string,
-    message: string,
-  ): AsyncGenerator<MessageStreamChunk>;
+  abstract generateResponse(chatId: string, message: string): AsyncGenerator<MessageStreamChunk>;
   abstract searchWeb(query: string): Promise<SearchWebResponse>;
 
   abstract shareChat(

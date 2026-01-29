@@ -22,16 +22,8 @@ export default defineConfig({
     environment: "node",
     silent: false, // Set to true to suppress console output during tests
     // Top-level __tests__/ with mirrored structure: __tests__/src/* and __tests__/convex/*
-    include: [
-      "__tests__/src/**/*.test.{ts,tsx}",
-      "__tests__/convex/**/*.test.{ts,tsx}",
-    ],
-    exclude: [
-      "node_modules",
-      "dist",
-      "__tests__/e2e/**",
-      "__tests__/integration/**",
-    ],
+    include: ["__tests__/src/**/*.test.{ts,tsx}", "__tests__/convex/**/*.test.{ts,tsx}"],
+    exclude: ["node_modules", "dist", "__tests__/e2e/**", "__tests__/integration/**"],
     reporters: process.env.CI ? ["default", "json", "html"] : ["default"],
     ...(process.env.CI && {
       pool: "vmForks" as const,
@@ -57,10 +49,7 @@ export default defineConfig({
           name: "node",
           environment: "node",
           // Backend and pure logic tests use node
-          include: [
-            "__tests__/src/**/*.test.ts",
-            "__tests__/convex/**/*.test.ts",
-          ],
+          include: ["__tests__/src/**/*.test.ts", "__tests__/convex/**/*.test.ts"],
           exclude: [
             "node_modules/**",
             "dist/**",

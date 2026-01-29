@@ -9,9 +9,7 @@ export default defineConfig(({ mode }) => {
 
   // Derive Convex proxy target if provided; otherwise disable proxy to avoid crashes
   const rawConvex = env.CONVEX_SITE_URL || env.VITE_CONVEX_URL || "";
-  const convexProxyTarget = rawConvex
-    ? rawConvex.replace(".convex.cloud", ".convex.site")
-    : "";
+  const convexProxyTarget = rawConvex ? rawConvex.replace(".convex.cloud", ".convex.site") : "";
 
   return {
     plugins: [
@@ -58,8 +56,7 @@ window.addEventListener('message', async (message) => {
           manualChunks: (id) => {
             if (!id.includes("node_modules")) return;
             if (id.includes("convex")) return "convex";
-            if (id.includes("tailwind") || id.includes("@headlessui"))
-              return "ui";
+            if (id.includes("tailwind") || id.includes("@headlessui")) return "ui";
             // Do not force vendor/react chunks to avoid TDZ/cycle issues.
             return undefined;
           },

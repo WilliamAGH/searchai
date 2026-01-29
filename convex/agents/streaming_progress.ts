@@ -1,12 +1,7 @@
 "use node";
 
 /** Map tool names to workflow progress stages */
-export type ProgressStage =
-  | "thinking"
-  | "planning"
-  | "searching"
-  | "scraping"
-  | "generating";
+export type ProgressStage = "thinking" | "planning" | "searching" | "scraping" | "generating";
 
 const TOOL_TO_STAGE: Record<string, ProgressStage> = {
   plan_research: "planning",

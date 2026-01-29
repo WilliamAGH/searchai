@@ -5,10 +5,7 @@ type JsonPayloadResult =
   | { ok: true; payload: Record<string, unknown> }
   | { ok: false; response: Response };
 
-export function rateLimitExceededResponse(
-  resetAt: number,
-  origin: string | null,
-): Response {
+export function rateLimitExceededResponse(resetAt: number, origin: string | null): Response {
   return corsResponse(
     JSON.stringify({
       error: "Rate limit exceeded",
@@ -50,44 +47,30 @@ export async function parseJsonPayload(
   if (!isRecord(rawPayload)) {
     return {
       ok: false,
-      response: corsResponse(
-        JSON.stringify({ error: "Invalid request payload" }),
-        400,
-        origin,
-      ),
+      response: corsResponse(JSON.stringify({ error: "Invalid request payload" }), 400, origin),
     };
   }
 
   return { ok: true, payload: rawPayload };
 }
 
-export function sanitizeTextInput(
-  value: unknown,
-  maxLength: number,
-): string | undefined {
+export function sanitizeTextInput(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== "string") return undefined;
-  return value
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-    .slice(0, maxLength);
+  return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").slice(0, maxLength);
 }
 
-export function sanitizeContextReferences(
-  input: unknown,
-): ResearchContextReference[] | undefined {
+export function sanitizeContextReferences(input: unknown): ResearchContextReference[] | undefined {
   if (!Array.isArray(input)) return undefined;
 
   return input
     .slice(0, 12)
     .map((refRaw) => {
       if (!isRecord(refRaw)) return null;
-      const contextId =
-        typeof refRaw.contextId === "string" ? refRaw.contextId : "";
+      const contextId = typeof refRaw.contextId === "string" ? refRaw.contextId : "";
       const type = refRaw.type;
       if (
         !contextId ||
-        (type !== "search_result" &&
-          type !== "scraped_page" &&
-          type !== "research_summary")
+        (type !== "search_result" && type !== "scraped_page" && type !== "research_summary")
       ) {
         return null;
       }
@@ -95,8 +78,7 @@ export function sanitizeContextReferences(
       const sanitized: ResearchContextReference = {
         contextId,
         type,
-        timestamp:
-          typeof refRaw.timestamp === "number" ? refRaw.timestamp : Date.now(),
+        timestamp: typeof refRaw.timestamp === "number" ? refRaw.timestamp : Date.now(),
       };
 
       if (typeof refRaw.url === "string") {
@@ -111,10 +93,7 @@ export function sanitizeContextReferences(
       if (
         refRaw.metadata !== null &&
         refRaw.metadata !== undefined &&
-        !(
-          typeof refRaw.metadata === "object" &&
-          Object.keys(refRaw.metadata).length === 0
-        )
+        !(typeof refRaw.metadata === "object" && Object.keys(refRaw.metadata).length === 0)
       ) {
         sanitized.metadata = refRaw.metadata;
       }

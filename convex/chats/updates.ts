@@ -90,11 +90,7 @@ export const updateRollingSummary = internalMutation({
 export const updateChatPrivacy = mutation({
   args: {
     chatId: v.id("chats"),
-    privacy: v.union(
-      v.literal("private"),
-      v.literal("shared"),
-      v.literal("public"),
-    ),
+    privacy: v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
   },
   returns: v.object({
     shareId: v.union(v.string(), v.null()),

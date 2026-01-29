@@ -10,11 +10,7 @@ import { EmptyState } from "./EmptyState";
 import { ScrollToBottomFab } from "./ScrollToBottomFab";
 import { MessageItem } from "./MessageItem";
 import { LoadMoreButton } from "../LoadMoreButton";
-import {
-  MessageSkeleton,
-  LoadingMoreIndicator,
-  LoadErrorState,
-} from "./MessageSkeleton";
+import { MessageSkeleton, LoadingMoreIndicator, LoadErrorState } from "./MessageSkeleton";
 import { VirtualizedMessageList } from "./VirtualizedMessageList";
 import type { Message, SearchProgress } from "@/lib/types/message";
 import { useMessageListScroll } from "@/hooks/useMessageListScroll";
@@ -78,9 +74,7 @@ export function MessageList({
     searchProgress,
   });
 
-  const [collapsedById, setCollapsedById] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [collapsedById, setCollapsedById] = useState<Record<string, boolean>>({});
   const [hoveredSourceUrl, setHoveredSourceUrl] = useState<string | null>(null);
   // Citation hover callback - wired to CitationRenderer for hover highlighting
   // Currently no-op at this level; could sync with hoveredSourceUrl for cross-component highlighting
@@ -93,8 +87,7 @@ export function MessageList({
       if (!messageId) return;
 
       try {
-        if (!window.confirm("Delete this message? This cannot be undone."))
-          return;
+        if (!window.confirm("Delete this message? This cannot be undone.")) return;
         onRequestDeleteMessage(String(messageId));
       } catch (err) {
         logger.error("Failed to delete message", err);
@@ -186,11 +179,7 @@ export function MessageList({
         <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8 min-w-0">
           {/* Error state for pagination */}
           {loadError && onClearError && (
-            <LoadErrorState
-              error={loadError}
-              onRetry={onClearError}
-              retryCount={retryCount}
-            />
+            <LoadErrorState error={loadError} onRetry={onClearError} retryCount={retryCount} />
           )}
 
           {/* Test hook: hidden count for E2E smoke assertions */}
@@ -200,11 +189,7 @@ export function MessageList({
 
           {/* Load More Button at the top for loading older messages */}
           {hasMore && onLoadMore && !loadError && (
-            <LoadMoreButton
-              onClick={handleLoadMore}
-              isLoading={isLoadingMore}
-              hasMore={hasMore}
-            />
+            <LoadMoreButton onClick={handleLoadMore} isLoading={isLoadingMore} hasMore={hasMore} />
           )}
 
           {/* Loading indicator when fetching more messages */}
@@ -217,10 +202,7 @@ export function MessageList({
               className="space-y-6 sm:space-y-8"
               estimatedItemHeight={150}
               renderItem={(message, index) => {
-                const messageKey = resolveMessageKey(
-                  message,
-                  `virtual-${index}`,
-                );
+                const messageKey = resolveMessageKey(message, `virtual-${index}`);
                 return (
                   <MessageItem
                     key={messageKey}
@@ -233,9 +215,7 @@ export function MessageList({
                     onSourceHover={setHoveredSourceUrl}
                     onCitationHover={handleCitationHover}
                     searchProgress={
-                      index === messages.length - 1 && isGenerating
-                        ? searchProgress
-                        : undefined
+                      index === messages.length - 1 && isGenerating ? searchProgress : undefined
                     }
                   />
                 );
@@ -267,9 +247,7 @@ export function MessageList({
                   onSourceHover={setHoveredSourceUrl}
                   onCitationHover={handleCitationHover}
                   searchProgress={
-                    index === messages.length - 1 && isGenerating
-                      ? searchProgress
-                      : undefined
+                    index === messages.length - 1 && isGenerating ? searchProgress : undefined
                   }
                 />
               );
@@ -283,9 +261,7 @@ export function MessageList({
               const lastMessage = messages[messages.length - 1];
               return (
                 lastMessage?.role === "assistant" &&
-                lastMessage?.reasoning && (
-                  <ReasoningDisplay reasoning={lastMessage.reasoning} />
-                )
+                lastMessage?.reasoning && <ReasoningDisplay reasoning={lastMessage.reasoning} />
               );
             })()}
 
@@ -301,17 +277,12 @@ export function MessageList({
   // Use grow shrink-0 (not flex-1): grow to fill space when content is small,
   // don't shrink when content is large (allows scroll overflow)
   if (useExternalScroll) {
-    return (
-      <div className="grow shrink-0 flex flex-col relative">{content}</div>
-    );
+    return <div className="grow shrink-0 flex flex-col relative">{content}</div>;
   }
 
   // Internal scroll container (fallback for backwards compatibility)
   return (
-    <div
-      ref={internalScrollRef}
-      className="flex-1 overflow-y-auto relative overscroll-contain"
-    >
+    <div ref={internalScrollRef} className="flex-1 overflow-y-auto relative overscroll-contain">
       {content}
     </div>
   );

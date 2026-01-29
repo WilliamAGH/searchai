@@ -25,9 +25,7 @@ export const vSearchResult = v.object({
   content: v.optional(v.string()),
   fullTitle: v.optional(v.string()),
   summary: v.optional(v.string()),
-  kind: v.optional(
-    v.union(v.literal("search_result"), v.literal("scraped_page")),
-  ),
+  kind: v.optional(v.union(v.literal("search_result"), v.literal("scraped_page"))),
 });
 
 export const vScrapedContent = v.object({
@@ -39,9 +37,7 @@ export const vScrapedContent = v.object({
   scrapedAt: v.number(),
   contextId: v.string(),
   relevanceScore: v.optional(v.number()),
-  sourceType: v.optional(
-    v.union(v.literal("search_result"), v.literal("scraped_page")),
-  ),
+  sourceType: v.optional(v.union(v.literal("search_result"), v.literal("scraped_page"))),
 });
 
 export const vSerpEnrichment = v.object({
@@ -137,9 +133,7 @@ export function isValidConvexIdFormat(str: string): boolean {
   return extractRawIdentifier(str) !== null;
 }
 
-export function isConvexId<TableName extends TableNames>(
-  str: string,
-): str is Id<TableName> {
+export function isConvexId<TableName extends TableNames>(str: string): str is Id<TableName> {
   return isValidConvexIdFormat(str);
 }
 

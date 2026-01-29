@@ -85,10 +85,7 @@ export const sendEmail = action({
     html: v.string(),
     from: v.optional(v.string()),
   },
-  handler: async (
-    _ctx,
-    args,
-  ): Promise<{ success: boolean; messageId?: string }> => {
+  handler: async (_ctx, args): Promise<{ success: boolean; messageId?: string }> => {
     return await sendEmailToMailPit(args);
   },
 });

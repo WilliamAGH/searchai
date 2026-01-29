@@ -44,16 +44,12 @@ export const queryPlannerAgent = Agent.create({
 
   outputType: z.object({
     userIntent: z.string().describe("What the user wants to know or do"),
-    informationNeeded: z
-      .array(z.string())
-      .describe("List of specific information types needed"),
+    informationNeeded: z.array(z.string()).describe("List of specific information types needed"),
     searchQueries: z
       .array(
         z.object({
           query: z.string().describe("The search query"),
-          reasoning: z
-            .string()
-            .describe("Why this search will help answer the question"),
+          reasoning: z.string().describe("Why this search will help answer the question"),
           priority: z
             .number()
             .min(1)
@@ -64,9 +60,7 @@ export const queryPlannerAgent = Agent.create({
       .describe("Ordered list of search queries with reasoning"),
     needsWebScraping: z
       .boolean()
-      .describe(
-        "Whether we'll likely need to scrape specific URLs for detailed info",
-      ),
+      .describe("Whether we'll likely need to scrape specific URLs for detailed info"),
     anticipatedChallenges: z
       .array(z.string())
       .nullable()
@@ -76,9 +70,7 @@ export const queryPlannerAgent = Agent.create({
       .number()
       .min(0)
       .max(1)
-      .describe(
-        "Confidence that the planned research will answer the question",
-      ),
+      .describe("Confidence that the planned research will answer the question"),
   }),
 
   modelSettings: {
@@ -101,16 +93,12 @@ export const researchAgent: ReturnType<typeof Agent.create> = Agent.create({
   outputType: z.object({
     researchSummary: z
       .string()
-      .describe(
-        "Comprehensive summary of all information gathered, organized by topic",
-      ),
+      .describe("Comprehensive summary of all information gathered, organized by topic"),
     keyFindings: z
       .array(
         z.object({
           finding: z.string().describe("The key piece of information"),
-          sources: z
-            .array(z.string())
-            .describe("URLs that support this finding"),
+          sources: z.array(z.string()).describe("URLs that support this finding"),
           confidence: z
             .enum(["high", "medium", "low"])
             .describe("Confidence in this finding based on source quality"),
@@ -124,9 +112,7 @@ export const researchAgent: ReturnType<typeof Agent.create> = Agent.create({
           title: z.string(),
           contextId: z.string().describe("UUIDv7 context ID"),
           type: z.enum(["search_result", "scraped_page"]),
-          relevance: z
-            .enum(["high", "medium", "low"])
-            .describe("How relevant this source was"),
+          relevance: z.enum(["high", "medium", "low"]).describe("How relevant this source was"),
         }),
       )
       .describe("All sources accessed during research"),
@@ -142,9 +128,7 @@ export const researchAgent: ReturnType<typeof Agent.create> = Agent.create({
           title: z.string(),
           content: z
             .string()
-            .describe(
-              "Full scraped text content (truncate to budget before returning if needed)",
-            ),
+            .describe("Full scraped text content (truncate to budget before returning if needed)"),
           summary: z.string().describe("Summary or first 500 characters"),
           contentLength: z.number().describe("Length of the scraped content"),
           scrapedAt: z.number().describe("Timestamp when the page was scraped"),
@@ -195,9 +179,7 @@ export const researchAgent: ReturnType<typeof Agent.create> = Agent.create({
         relatedSearches: z.array(z.string()).nullable(),
       })
       .nullable()
-      .describe(
-        "Enriched SERP data - MUST be populated when search_web returns enrichment data",
-      ),
+      .describe("Enriched SERP data - MUST be populated when search_web returns enrichment data"),
     researchQuality: z
       .enum(["comprehensive", "adequate", "limited"])
       .describe("Overall quality of research results"),

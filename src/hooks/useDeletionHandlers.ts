@@ -13,14 +13,8 @@ interface UseDeletionHandlersProps {
     removeMessage: (id: string) => void;
     addMessage: (message: Message) => void;
   };
-  deleteChat: (args: {
-    chatId: Id<"chats">;
-    sessionId?: string;
-  }) => Promise<null>;
-  deleteMessage: (args: {
-    messageId: Id<"messages">;
-    sessionId?: string;
-  }) => Promise<null>;
+  deleteChat: (args: { chatId: Id<"chats">; sessionId?: string }) => Promise<null>;
+  deleteMessage: (args: { messageId: Id<"messages">; sessionId?: string }) => Promise<null>;
   sessionId?: string;
 }
 
@@ -58,8 +52,7 @@ export function useDeletionHandlers({
   const handleRequestDeleteChat = useCallback(
     async (chatId: Id<"chats"> | string) => {
       try {
-        const resolvedChatId =
-          typeof chatId === "string" ? toConvexId<"chats">(chatId) : chatId;
+        const resolvedChatId = typeof chatId === "string" ? toConvexId<"chats">(chatId) : chatId;
         if (!resolvedChatId) {
           throw new Error(`Invalid chat ID for deletion: ${chatId}`);
         }
@@ -93,9 +86,7 @@ export function useDeletionHandlers({
   const handleDeleteLocalMessage = useCallback(
     async (messageId: string) => {
       if (!chatState || !chatActions) return;
-      const messageToDelete = chatState.messages.find(
-        (m) => String(m._id) === messageId,
-      );
+      const messageToDelete = chatState.messages.find((m) => String(m._id) === messageId);
 
       if (!messageToDelete) return;
 
@@ -111,9 +102,7 @@ export function useDeletionHandlers({
 
       clearAllTimeouts();
       const timeoutId = window.setTimeout(() => {
-        setUndoBanner((prev) =>
-          prev?.message === "Message deleted" ? null : prev,
-        );
+        setUndoBanner((prev) => (prev?.message === "Message deleted" ? null : prev));
       }, 2000);
       timeoutsRef.current.push(timeoutId);
     },
@@ -124,9 +113,7 @@ export function useDeletionHandlers({
     async (messageId: Id<"messages"> | string) => {
       try {
         const resolvedMessageId =
-          typeof messageId === "string"
-            ? toConvexId<"messages">(messageId)
-            : messageId;
+          typeof messageId === "string" ? toConvexId<"messages">(messageId) : messageId;
         if (!resolvedMessageId) {
           await handleDeleteLocalMessage(String(messageId));
           return;

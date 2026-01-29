@@ -77,7 +77,6 @@ export const orchestrateResearchWorkflow = action({
   returns: orchestrateResearchWorkflowReturns,
   // @ts-ignore TS2589 - Convex type instantiation is excessively deep with complex return validators
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     // Dynamic require to avoid circular import with definitions.ts
     const { agents } = require("./definitions");
     const workflowId = generateMessageId();

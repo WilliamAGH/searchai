@@ -54,16 +54,11 @@ export interface WorkflowSessionResult {
  * Wrap a Convex call with explicit error context.
  * Adds operation context to errors for better debugging.
  */
-export async function withErrorContext<T>(
-  operation: string,
-  fn: () => Promise<T>,
-): Promise<T> {
+export async function withErrorContext<T>(operation: string, fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (error) {
-    throw new Error(
-      `${operation}: ${getErrorMessage(error, "Unknown error occurred")}`,
-    );
+    throw new Error(`${operation}: ${getErrorMessage(error, "Unknown error occurred")}`);
   }
 }
 
@@ -114,14 +109,12 @@ export async function initializeWorkflowSession(
     workflowTokenPayload.sessionId = args.sessionId;
   }
 
-  const workflowTokenId = await withErrorContext(
-    "Failed to create workflow token",
-    () =>
-      ctx.runMutation(
-        // @ts-ignore - Convex api type instantiation is too deep here
-        internal.workflowTokens.createToken,
-        workflowTokenPayload,
-      ),
+  const workflowTokenId = await withErrorContext("Failed to create workflow token", () =>
+    ctx.runMutation(
+      // @ts-ignore - Convex api type instantiation is too deep here
+      internal.workflowTokens.createToken,
+      workflowTokenPayload,
+    ),
   );
 
   // 2. Get chat and verify access
@@ -163,14 +156,12 @@ export async function initializeWorkflowSession(
 
   let recentMessagesResult: MessageQueryResult[] | null;
   if (useAuthVariant) {
-    recentMessagesResult = await withErrorContext(
-      "Failed to retrieve chat messages",
-      () => ctx.runQuery(api.chats.getChatMessages, getMessagesArgs),
+    recentMessagesResult = await withErrorContext("Failed to retrieve chat messages", () =>
+      ctx.runQuery(api.chats.getChatMessages, getMessagesArgs),
     );
   } else {
-    recentMessagesResult = await withErrorContext(
-      "Failed to retrieve chat messages",
-      () => ctx.runQuery(api.chats.getChatMessagesHttp, getMessagesArgs),
+    recentMessagesResult = await withErrorContext("Failed to retrieve chat messages", () =>
+      ctx.runQuery(api.chats.getChatMessagesHttp, getMessagesArgs),
     );
   }
 
@@ -200,9 +191,7 @@ export async function initializeWorkflowSession(
   // 5. Build context
   let conversationContext = buildConversationContext(recentMessages || []);
   if (!conversationContext && args.conversationContext) {
-    console.warn(
-      "buildConversationContext returned empty; using args.conversationContext",
-    );
+    console.warn("buildConversationContext returned empty; using args.conversationContext");
     conversationContext = args.conversationContext;
   }
   if (!conversationContext) {

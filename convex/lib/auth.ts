@@ -30,10 +30,7 @@ interface ChatOwnership {
  *   // User owns this chat
  * }
  */
-export function hasUserAccess(
-  chat: ChatOwnership,
-  userId: Id<"users"> | null,
-): boolean {
+export function hasUserAccess(chat: ChatOwnership, userId: Id<"users"> | null): boolean {
   return !!(chat.userId && userId && chat.userId === userId);
 }
 
@@ -49,10 +46,7 @@ export function hasUserAccess(
  *   // Session owns this chat
  * }
  */
-export function hasSessionAccess(
-  chat: ChatOwnership,
-  sessionId: string | undefined,
-): boolean {
+export function hasSessionAccess(chat: ChatOwnership, sessionId: string | undefined): boolean {
   return !!(chat.sessionId && sessionId && chat.sessionId === sessionId);
 }
 

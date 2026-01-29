@@ -8,17 +8,10 @@
 import { describe, it, expect } from "vitest";
 
 // Frontend utilities
-import {
-  isValidConvexId,
-  toConvexId,
-  isLocalId,
-} from "../../../../src/lib/utils/idValidation";
+import { isValidConvexId, toConvexId, isLocalId } from "../../../../src/lib/utils/idValidation";
 
 // Backend utilities
-import {
-  isValidConvexIdFormat,
-  safeConvexId,
-} from "../../../../convex/lib/validators";
+import { isValidConvexIdFormat, safeConvexId } from "../../../../convex/lib/validators";
 
 describe("Frontend ID Validation", () => {
   describe("isValidConvexId", () => {
@@ -73,9 +66,7 @@ describe("Backend ID Validation", () => {
   describe("isValidConvexIdFormat", () => {
     it("should accept identifiers that are not local", () => {
       expect(isValidConvexIdFormat("kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(true);
-      expect(isValidConvexIdFormat("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(
-        true,
-      );
+      expect(isValidConvexIdFormat("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(true);
     });
 
     it("should reject local identifiers", () => {
@@ -144,16 +135,15 @@ describe("Type Safety", () => {
   });
 
   it("should handle null safely in conditional flows", () => {
-    const maybeId = "invalid-id";
-    const id = toConvexId<"chats">(maybeId);
+    // For invalid IDs, toConvexId should return null
+    const invalidId = "invalid-id";
+    const nullResult = toConvexId<"chats">(invalidId);
+    expect(nullResult).toBeNull();
 
-    // Safe pattern for conditional database operations
-    if (id) {
-      // Would safely call database here
-      expect(id).toBeTruthy();
-    } else {
-      // Gracefully handle invalid ID
-      expect(id).toBeNull();
-    }
+    // For valid IDs, it should return the ID (truthy)
+    const validId = "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z";
+    const validResult = toConvexId<"chats">(validId);
+    expect(validResult).toBeTruthy();
+    expect(validResult).toBe(validId);
   });
 });

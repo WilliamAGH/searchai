@@ -1,25 +1,25 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import {
-  __extractKeywordsForTest as extractKW,
-  __augmentQueryForTest as augmentQ,
+  extractKeywordsForTest as extractKW,
+  augmentQueryForTest as augmentQ,
 } from "../../../convex/search.ts";
 import { searchWithDuckDuckGo } from "../../../convex/search/providers/duckduckgo.ts";
 
 // Prevent live network calls in restricted environments by stubbing fetch
 beforeAll(() => {
   if (typeof globalThis.fetch !== "function") {
-    // @ts-expect-error - adding fetch to global for tests
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = vi.fn(async () => ({
       ok: true,
       json: async () => ({}),
-    })) as any;
+    })) as unknown as typeof fetch;
   }
   vi.stubGlobal(
     "fetch",
     // Minimal Response-like stub used by providers
-    vi.fn(
-      async () => ({ ok: true, json: async () => ({ results: [] }) }) as any,
-    ),
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ results: [] }),
+    })) as unknown as typeof fetch,
   );
 });
 

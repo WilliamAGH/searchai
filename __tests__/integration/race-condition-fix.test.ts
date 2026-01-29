@@ -33,14 +33,11 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
     expect(chatIdFromUser).toBeTruthy();
 
     // Wait for assistant response
-    const assistantMessage = page
-      .locator('[data-testid="message-assistant"]')
-      .first();
+    const assistantMessage = page.locator('[data-testid="message-assistant"]').first();
     await expect(assistantMessage).toBeVisible({ timeout: 45000 });
 
     // Verify assistant message has same chat ID
-    const chatIdFromAssistant =
-      await assistantMessage.getAttribute("data-chat-id");
+    const chatIdFromAssistant = await assistantMessage.getAttribute("data-chat-id");
     expect(chatIdFromAssistant).toBe(chatIdFromUser);
 
     // Verify URL contains chat ID
@@ -53,9 +50,7 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
     await messageInput.press("Enter");
 
     // Wait for second user message
-    const secondUserMessage = page
-      .locator('[data-testid="message-user"]')
-      .nth(1);
+    const secondUserMessage = page.locator('[data-testid="message-user"]').nth(1);
     await expect(secondUserMessage).toBeVisible({ timeout: 10000 });
 
     // Verify all messages are in the same chat
@@ -63,15 +58,9 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
     expect(secondChatId).toBe(chatIdFromUser);
   });
 
-  test("should handle multiple messages without creating new chats", async ({
-    page,
-  }) => {
+  test("should handle multiple messages without creating new chats", async ({ page }) => {
     const messageInput = page.locator('[data-testid="message-input"]');
-    const messages = [
-      "First message",
-      "Second message quickly",
-      "Third message very fast",
-    ];
+    const messages = ["First message", "Second message quickly", "Third message very fast"];
 
     // Send messages with proper waits between each
     for (const msg of messages) {
@@ -90,9 +79,7 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
 
     // Collect all chat IDs
     const allMessages = await page.locator('[data-testid^="message-"]').all();
-    const chatIds = await Promise.all(
-      allMessages.map((msg) => msg.getAttribute("data-chat-id")),
-    );
+    const chatIds = await Promise.all(allMessages.map((msg) => msg.getAttribute("data-chat-id")));
 
     // Verify all messages have the same chat ID
     const uniqueChatIds = [...new Set(chatIds.filter((id) => id))];
@@ -101,9 +88,7 @@ test.describe("Race Condition Fix - Assistant First Message", () => {
 });
 
 test.describe("Chat State Management", () => {
-  test("should correctly initialize chat from URL parameters", async ({
-    page,
-  }) => {
+  test("should correctly initialize chat from URL parameters", async ({ page }) => {
     // Create a specific chat ID
     const testChatId = "test_chat_" + Date.now();
 
@@ -158,9 +143,7 @@ test.describe("Message Validation", () => {
     }).toPass({ timeout: 30000 });
   });
 
-  test("should handle edge case of empty or whitespace messages", async ({
-    page,
-  }) => {
+  test("should handle edge case of empty or whitespace messages", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
@@ -185,9 +168,9 @@ test.describe("Message Validation", () => {
     await messageInput.press("Enter");
 
     // Should create message
-    await expect(
-      page.locator('[data-testid="message-user"]').first(),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="message-user"]').first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 });
 
@@ -210,16 +193,13 @@ test.describe("Performance Testing", () => {
     }
 
     // Wait for all messages
-    await expect(page.locator('[data-testid="message-user"]')).toHaveCount(
-      messageCount,
-      { timeout: 30000 },
-    );
+    await expect(page.locator('[data-testid="message-user"]')).toHaveCount(messageCount, {
+      timeout: 30000,
+    });
 
     // Verify all have same chat ID
     const messages = await page.locator('[data-testid^="message-"]').all();
-    const chatIds = await Promise.all(
-      messages.map((msg) => msg.getAttribute("data-chat-id")),
-    );
+    const chatIds = await Promise.all(messages.map((msg) => msg.getAttribute("data-chat-id")));
     const uniqueIds = [...new Set(chatIds.filter(Boolean))];
     expect(uniqueIds).toHaveLength(1);
   });

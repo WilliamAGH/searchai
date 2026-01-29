@@ -59,15 +59,11 @@ export async function searchWithDuckDuckGo(
   // Extract results from DuckDuckGo response
   if (data.RelatedTopics && data.RelatedTopics.length > 0) {
     results = data.RelatedTopics.filter(
-      (topic) =>
-        topic.FirstURL && topic.Text && topic.FirstURL.startsWith("http"),
+      (topic) => topic.FirstURL && topic.Text && topic.FirstURL.startsWith("http"),
     )
       .slice(0, maxResults)
       .map((topic) => ({
-        title:
-          topic.Text?.split(" - ")[0] ||
-          topic.Text?.substring(0, 100) ||
-          "Untitled",
+        title: topic.Text?.split(" - ")[0] || topic.Text?.substring(0, 100) || "Untitled",
         url: topic.FirstURL || "",
         snippet: topic.Text || "",
         relevanceScore: DUCKDUCKGO_SCORES.RELATED_TOPIC,

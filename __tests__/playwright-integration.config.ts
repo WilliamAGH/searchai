@@ -22,10 +22,7 @@ export default defineConfig({
   workers: 1, // Single worker for integration tests
   reporter: [
     ["list"],
-    [
-      "html",
-      { outputFolder: "../playwright-report/integration", open: "never" },
-    ],
+    ["html", { outputFolder: "../playwright-report/integration", open: "never" }],
     ["json", { outputFile: "../test-results/integration-results.json" }],
   ],
   use: {
@@ -65,15 +62,11 @@ export default defineConfig({
         PORT: "5173",
         // Use provided env or fall back to dev Convex cloud URL for tests
         VITE_CONVEX_URL:
-          process.env.VITE_CONVEX_URL ||
-          "https://diligent-greyhound-240.convex.cloud",
+          process.env.VITE_CONVEX_URL || "https://diligent-greyhound-240.convex.cloud",
         CONVEX_SITE_URL:
           process.env.CONVEX_SITE_URL ||
           (process.env.VITE_CONVEX_URL
-            ? process.env.VITE_CONVEX_URL.replace(
-                ".convex.cloud",
-                ".convex.site",
-              )
+            ? process.env.VITE_CONVEX_URL.replace(".convex.cloud", ".convex.site")
             : "https://diligent-greyhound-240.convex.site"),
       },
     },

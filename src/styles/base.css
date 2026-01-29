@@ -66,8 +66,8 @@
   /* Dark mode - Sleek mono, tuned for compact mobile readability */
   html.dark body {
     font-family:
-      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
-      "Source Code Pro", monospace;
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Source Code Pro",
+      monospace;
     font-weight: 400;
     font-size: 15px; /* smaller on mobile to avoid oversized feel */
     line-height: 1.6;
@@ -128,8 +128,7 @@
   html:not(.dark) input[type="text"],
   html:not(.dark) input[type="email"],
   html:not(.dark) input[type="password"] {
-    font-family:
-      "Playfair Display", "Georgia", "Times New Roman", serif !important;
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif !important;
   }
 
   /* Dark mode inputs use mono */
@@ -138,8 +137,8 @@
   html.dark input[type="email"],
   html.dark input[type="password"] {
     font-family:
-      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
-      "Source Code Pro", monospace !important;
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Source Code Pro",
+      monospace !important;
   }
 
   /* Buttons and selects: match light mode body (serif) for consistency */
@@ -152,8 +151,8 @@
   html.dark button,
   html.dark select {
     font-family:
-      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
-      "Source Code Pro", monospace !important;
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Source Code Pro",
+      monospace !important;
     font-size: 16px;
   }
 

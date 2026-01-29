@@ -32,12 +32,7 @@ export function CloseIcon() {
       aria-hidden="true"
     >
       <title>Close</title>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M6 18L18 6M6 6l12 12"
-      />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
 }
@@ -62,10 +57,7 @@ export function extractAuthErrorMessage(error: unknown): string {
 /**
  * Determine toast message based on error content
  */
-export function getAuthToastMessage(
-  errorMessage: string,
-  defaultMessage: string,
-): string {
+export function getAuthToastMessage(errorMessage: string, defaultMessage: string): string {
   return errorMessage.includes("Invalid password")
     ? "Invalid password. Please try again."
     : defaultMessage;
@@ -100,8 +92,7 @@ export function AuthModalBase({
     if (!isOpen) return;
 
     const activeElement = document.activeElement;
-    previouslyFocusedRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
+    previouslyFocusedRef.current = activeElement instanceof HTMLElement ? activeElement : null;
     dialogRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -121,8 +112,7 @@ export function AuthModalBase({
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         const activeElement = document.activeElement;
-        const active =
-          activeElement instanceof HTMLElement ? activeElement : null;
+        const active = activeElement instanceof HTMLElement ? activeElement : null;
 
         if (e.shiftKey) {
           if (active === first || !container.contains(active)) {

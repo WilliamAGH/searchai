@@ -21,23 +21,7 @@
 }
 
 /* Ensure nested text elements inherit numeric features */
-.prose
-  :where(
-    p,
-    li,
-    span,
-    a,
-    strong,
-    em,
-    small,
-    blockquote,
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6
-  ) {
+.prose :where(p, li, span, a, strong, em, small, blockquote, h1, h2, h3, h4, h5, h6) {
   font-family: inherit;
   font-variant-numeric: inherit;
 }

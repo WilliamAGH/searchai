@@ -2,16 +2,12 @@ import { expect, test } from "vitest";
 import { normalizeUrlForKey, normalizeUrl } from "../../../convex/lib/url";
 
 test("normalizeUrl strips hash", () => {
-  expect(normalizeUrl("https://example.com/page#section")).toBe(
-    "https://example.com/page",
-  );
+  expect(normalizeUrl("https://example.com/page#section")).toBe("https://example.com/page");
 });
 
 test("normalizeUrlForKey handles invalid URLs consistently with fallback", () => {
   // Case 1: Valid URL - hash stripped by normalizeUrl
-  expect(normalizeUrlForKey("https://example.com/page#section")).toBe(
-    "https://example.com/page",
-  );
+  expect(normalizeUrlForKey("https://example.com/page#section")).toBe("https://example.com/page");
 
   // Case 2: Invalid URL - hash is manually stripped in fallback
   expect(normalizeUrlForKey("not-a-url#hash")).toBe("not-a-url");

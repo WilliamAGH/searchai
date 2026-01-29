@@ -39,7 +39,6 @@ type CacheEntry = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var __scrapeCache: Map<string, CacheEntry> | undefined;
 }
 
@@ -96,10 +95,8 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
   try {
     const response = await fetch(validatedUrl, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; SearchChat/1.0; Web Content Reader)",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (compatible; SearchChat/1.0; Web Content Reader)",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
         "Accept-Encoding": "gzip, deflate",
         Connection: "keep-alive",
@@ -161,10 +158,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
         : extractedContent;
 
     const title =
-      metadata.title ||
-      metadata.ogTitle ||
-      metadata.description ||
-      new URL(validatedUrl).hostname;
+      metadata.title || metadata.ogTitle || metadata.description || new URL(validatedUrl).hostname;
 
     // Remove common junk patterns before quality check
     const junkPatterns = [
@@ -205,13 +199,8 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
         contentLengthAfter: cleanedContent.length,
         timestamp: new Date().toISOString(),
       };
-      console.error(
-        "[ERROR] Content too short after junk removal:",
-        errorDetails,
-      );
-      throw new Error(
-        `Content too short after cleaning (${cleanedContent.length} characters)`,
-      );
+      console.error("[ERROR] Content too short after junk removal:", errorDetails);
+      throw new Error(`Content too short after cleaning (${cleanedContent.length} characters)`);
     }
 
     const summaryLength = Math.min(500, cleanedContent.length);
@@ -245,8 +234,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     if (errorMessage.includes("HTTP 4")) errorCode = "HTTP_CLIENT_ERROR";
     else if (errorMessage.includes("HTTP 5")) errorCode = "HTTP_SERVER_ERROR";
     else if (errorMessage.includes("timeout")) errorCode = "TIMEOUT";
-    else if (errorMessage.includes("Content too short"))
-      errorCode = "CONTENT_TOO_SHORT";
+    else if (errorMessage.includes("Content too short")) errorCode = "CONTENT_TOO_SHORT";
     else if (errorMessage.includes("Not an HTML")) errorCode = "NOT_HTML";
 
     console.error("[ERROR] Scraping failed with exception:", {

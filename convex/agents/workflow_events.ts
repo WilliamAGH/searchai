@@ -45,12 +45,7 @@ export function createWorkflowEvent(
   const cleaned: Record<string, unknown> = { type };
   for (const [k, v] of Object.entries(data)) {
     if (v === undefined || v === null) continue;
-    if (
-      typeof v === "object" &&
-      !Array.isArray(v) &&
-      Object.keys(v).length === 0
-    )
-      continue;
+    if (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0) continue;
     cleaned[k] = v;
   }
   return cleaned;
@@ -66,9 +61,7 @@ export function createWorkflowEvent(
  * This centralizes the construction of the "complete" SSE event,
  * which was previously duplicated in 4 locations in orchestration.ts.
  */
-export function buildCompleteEvent(
-  params: BuildCompleteEventParams,
-): WorkflowCompletePayload {
+export function buildCompleteEvent(params: BuildCompleteEventParams): WorkflowCompletePayload {
   const {
     workflowId,
     userQuery,
@@ -101,9 +94,7 @@ export function buildCompleteEvent(
   const derivedSourcesUsed =
     research?.sourcesUsed ??
     contextReferences
-      .filter(
-        (ref) => ref.type === "search_result" || ref.type === "scraped_page",
-      )
+      .filter((ref) => ref.type === "search_result" || ref.type === "scraped_page")
       .map((ref) => ({
         url: ref.url ?? "",
         title: ref.title ?? "",
@@ -158,9 +149,7 @@ export function buildCompleteEvent(
 /**
  * Build a metadata event payload.
  */
-export function buildMetadataEvent(
-  params: BuildMetadataEventParams,
-): WorkflowMetadataPayload {
+export function buildMetadataEvent(params: BuildMetadataEventParams): WorkflowMetadataPayload {
   return {
     metadata: {
       workflowId: params.workflowId,
@@ -176,9 +165,7 @@ export function buildMetadataEvent(
 /**
  * Build a persisted event payload.
  */
-export function buildPersistedEvent(
-  params: BuildPersistedEventParams,
-): WorkflowPersistedPayload {
+export function buildPersistedEvent(params: BuildPersistedEventParams): WorkflowPersistedPayload {
   return {
     payload: params.payload,
     nonce: params.nonce,

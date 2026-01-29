@@ -30,7 +30,7 @@ function getCurrentDateString(): string {
  * Uses FunctionTool<any, any, unknown> per [SDK1] policy — required for SDK compatibility.
  */
 // prettier-ignore
-export const searchWebTool: FunctionTool<any, any, unknown> = tool({ // eslint-disable-line @typescript-eslint/no-explicit-any
+export const searchWebTool: FunctionTool<any, any, unknown> = tool({  
   name: "search_web",
   description: `Search the web for current information. 
 

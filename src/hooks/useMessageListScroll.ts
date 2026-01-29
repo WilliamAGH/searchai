@@ -192,8 +192,7 @@ export function useMessageListScroll({
     const shouldAutoScroll =
       autoScrollEnabledRef.current &&
       !isVirtualKeyboardOpen &&
-      (isNearBottom(container, NEAR_BOTTOM_THRESHOLD) ||
-        (isGenerating && !userHasScrolled));
+      (isNearBottom(container, NEAR_BOTTOM_THRESHOLD) || (isGenerating && !userHasScrolled));
 
     if (shouldAutoScroll) {
       scrollToBottom("smooth");
@@ -252,10 +251,7 @@ export function useMessageListScroll({
 
       // Use both pixel threshold AND percentage-based check for reliability
       const nearBottomPixels = isNearBottom(container, STUCK_THRESHOLD);
-      const nearBottomPercent = isScrolledPastPercent(
-        container,
-        SCROLL_PERCENT_THRESHOLD,
-      );
+      const nearBottomPercent = isScrolledPastPercent(container, SCROLL_PERCENT_THRESHOLD);
       const nearBottom = nearBottomPixels || nearBottomPercent;
       const wasScrolledUp = userHasScrolled;
 
@@ -289,13 +285,7 @@ export function useMessageListScroll({
       container.removeEventListener("touchstart", handleTouchStart);
       container.removeEventListener("wheel", handleWheel);
     };
-  }, [
-    userHasScrolled,
-    messageCount,
-    STUCK_THRESHOLD,
-    cancelSmoothScroll,
-    scrollContainerRef,
-  ]);
+  }, [userHasScrolled, messageCount, STUCK_THRESHOLD, cancelSmoothScroll, scrollContainerRef]);
 
   // Track when messages change to preserve scroll on load more
   useEffect(() => {

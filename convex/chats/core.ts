@@ -202,8 +202,7 @@ export const getChatByIdDirect = query({
 
     const userId = await getAuthUserId(ctx);
 
-    const isSharedOrPublic =
-      chat.privacy === "shared" || chat.privacy === "public";
+    const isSharedOrPublic = chat.privacy === "shared" || chat.privacy === "public";
     const isUserOwner = hasUserAccess(chat, userId);
     const isSessionOwner = hasSessionAccess(chat, args.sessionId);
 

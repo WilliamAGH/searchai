@@ -4,9 +4,7 @@ import { waitForNetworkIdle } from "../helpers/wait-conditions";
 
 test.describe("share modal link variants", () => {
   // Skip this test - requires functional backend with API keys
-  test.skip("smoke: shared/public/llm show correct URL shapes", async ({
-    page,
-  }) => {
+  test.skip("smoke: shared/public/llm show correct URL shapes", async ({ page }) => {
     // Go home
     await page.goto("/");
 
@@ -24,9 +22,9 @@ test.describe("share modal link variants", () => {
     ).toBeVisible({ timeout: 30000 });
 
     // Wait for generation to complete (no "AI is thinking" indicator)
-    await expect(
-      page.locator('text="AI is thinking and generating response..."'),
-    ).not.toBeVisible({ timeout: 30000 });
+    await expect(page.locator('text="AI is thinking and generating response..."')).not.toBeVisible({
+      timeout: 30000,
+    });
 
     // Wait for share controls to be available
     const shareButton = page.locator('button[title="Share this conversation"]');
@@ -70,9 +68,7 @@ test.describe("share modal link variants", () => {
 
         // Find React fiber key
         const fiberKey = Object.keys(radio).find(
-          (key) =>
-            key.startsWith("__reactFiber") ||
-            key.startsWith("__reactInternalInstance"),
+          (key) => key.startsWith("__reactFiber") || key.startsWith("__reactInternalInstance"),
         );
 
         if (!fiberKey) return false;
@@ -109,10 +105,7 @@ test.describe("share modal link variants", () => {
     const sharedSuccess = await triggerRadioChange("shared");
     if (!sharedSuccess) {
       // Fallback: try clicking the label with React fiber
-      const labelSuccess = await clickReactElement(
-        page,
-        'label[aria-label="Shared"]',
-      );
+      const labelSuccess = await clickReactElement(page, 'label[aria-label="Shared"]');
       if (!labelSuccess) {
         // Final fallback: force click the radio button
         await sharedRadio.click({ force: true });
@@ -122,9 +115,7 @@ test.describe("share modal link variants", () => {
     // Wait for React to process the state change and URL to appear
     await page.waitForFunction(
       () => {
-        const input = document.querySelector(
-          'input[type="text"]',
-        ) as HTMLInputElement;
+        const input = document.querySelector('input[type="text"]') as HTMLInputElement;
         return input && input.value.includes("/");
       },
       { timeout: 2000 },
@@ -163,9 +154,7 @@ test.describe("share modal link variants", () => {
     // Wait for URL generation to complete
     await page.waitForFunction(
       () => {
-        const input = document.querySelector(
-          'input[type="text"]',
-        ) as HTMLInputElement;
+        const input = document.querySelector('input[type="text"]') as HTMLInputElement;
         return input && input.value.includes("/");
       },
       { timeout: 2000 },
@@ -199,10 +188,7 @@ test.describe("share modal link variants", () => {
     await expect(urlInput).toHaveValue(/\/s\//);
 
     // Select Public using React fiber workaround on label
-    const publicLabelClickSuccess = await clickReactElement(
-      page,
-      'label[aria-label="Public"]',
-    );
+    const publicLabelClickSuccess = await clickReactElement(page, 'label[aria-label="Public"]');
     if (!publicLabelClickSuccess) {
       // Fallback to clicking the label normally
       const publicLabel = modal.locator('label[aria-label="Public"]');
@@ -215,10 +201,7 @@ test.describe("share modal link variants", () => {
     await expect(urlInput).toHaveValue(/\/(p|s)\//, { timeout: 15000 });
 
     // Select LLM using React fiber workaround on label
-    const llmLabelClickSuccess = await clickReactElement(
-      page,
-      'label[aria-label="LLM Link"]',
-    );
+    const llmLabelClickSuccess = await clickReactElement(page, 'label[aria-label="LLM Link"]');
     if (!llmLabelClickSuccess) {
       // Fallback to clicking the label normally
       const llmLabel = modal.locator('label[aria-label="LLM Link"]');
@@ -227,12 +210,9 @@ test.describe("share modal link variants", () => {
     await expect(llmRadio).toBeChecked({ timeout: 5000 });
     const genBtn3 = modal.getByRole("button", { name: /generate url|copy/i });
     await genBtn3.click();
-    await expect(urlInput).toHaveValue(
-      /(\/api\/chatTextMarkdown\?shareId=|\/s\/)/,
-      {
-        timeout: 15000,
-      },
-    );
+    await expect(urlInput).toHaveValue(/(\/api\/chatTextMarkdown\?shareId=|\/s\/)/, {
+      timeout: 15000,
+    });
 
     // Close modal; generation already persisted as needed
     await modal.getByLabel("Close").click();

@@ -16,7 +16,7 @@ import { getActionCtx, type AgentToolRunContext } from "./tools_context";
  * Uses FunctionTool<any, any, unknown> per [SDK1] policy — required for SDK compatibility.
  */
 // prettier-ignore
-export const scrapeWebpageTool: FunctionTool<any, any, unknown> = tool({ // eslint-disable-line @typescript-eslint/no-explicit-any
+export const scrapeWebpageTool: FunctionTool<any, any, unknown> = tool({  
   name: "scrape_webpage",
   description: `Fetch and parse the full content of a specific webpage. Use this when you need:
 - Detailed information from a specific URL

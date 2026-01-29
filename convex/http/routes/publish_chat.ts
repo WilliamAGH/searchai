@@ -25,8 +25,9 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
   const rawTitle = typeof payload.title === "string" ? payload.title : "Shared Chat";
   const title = rawTitle.trim().slice(0, 200);
   const privacy = payload.privacy === "public" ? "public" : "shared";
-  const shareId = payload.shareId ? String(payload.shareId).slice(0, 100) : undefined;
-  const publicId = payload.publicId ? String(payload.publicId).slice(0, 100) : undefined;
+  const shareId = typeof payload.shareId === "string" ? payload.shareId.slice(0, 100) : undefined;
+  const publicId =
+    typeof payload.publicId === "string" ? payload.publicId.slice(0, 100) : undefined;
 
   const messages = Array.isArray(payload.messages)
     ? payload.messages.slice(0, 100).map((m: unknown) => {
@@ -34,14 +35,14 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
         const role: "user" | "assistant" = msg.role === "user" ? "user" : "assistant";
         return {
           role,
-          content: msg.content ? String(msg.content).slice(0, 50000) : undefined,
+          content: typeof msg.content === "string" ? msg.content.slice(0, 50000) : undefined,
           searchResults: Array.isArray(msg.searchResults)
             ? msg.searchResults.slice(0, 20).map((r: unknown) => {
                 const result = isRecord(r) ? r : {};
                 return {
-                  title: String(result.title || "").slice(0, 200),
-                  url: String(result.url || "").slice(0, 2048),
-                  snippet: String(result.snippet || "").slice(0, 500),
+                  title: (typeof result.title === "string" ? result.title : "").slice(0, 200),
+                  url: (typeof result.url === "string" ? result.url : "").slice(0, 2048),
+                  snippet: (typeof result.snippet === "string" ? result.snippet : "").slice(0, 500),
                   relevanceScore:
                     typeof result.relevanceScore === "number"
                       ? Math.max(0, Math.min(1, result.relevanceScore))
@@ -53,7 +54,7 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
             ? msg.sources
                 .slice(0, 20)
                 .filter((s: unknown) => typeof s === "string")
-                .map((s: unknown) => String(s).slice(0, 2048))
+                .map((s: unknown) => (s as string).slice(0, 2048))
             : undefined,
           timestamp:
             typeof msg.timestamp === "number" && isFinite(msg.timestamp)

@@ -16,6 +16,77 @@ interface UseEnhancedFollowUpPromptProps {
   } | null;
 }
 
+interface FollowUpCheckResult {
+  shouldShow: boolean;
+  suggestions: string[];
+  pendingMessage: string | null;
+}
+
+/** Check if follow-up prompt should be shown based on message history */
+function checkFollowUpConditions(
+  messages: Array<{ role?: string; content?: string }>,
+  isGenerating: boolean | undefined,
+): FollowUpCheckResult {
+  const userMessages = messages.filter((m) => m?.role === "user");
+  const assistantMessages = messages.filter((m) => m?.role === "assistant");
+
+  // Require at least 4 user messages before ever showing the prompt
+  if (userMessages.length < 4 || assistantMessages.length === 0) {
+    return { shouldShow: false, suggestions: [], pendingMessage: null };
+  }
+
+  const lastMessage = messages[messages.length - 1];
+  const hasUserHistory = messages.some((m) => m?.role === "user");
+  const lastUserMessage = userMessages[userMessages.length - 1];
+  const previousUserMessage = userMessages[userMessages.length - 2];
+
+  if (
+    !hasUserHistory ||
+    lastMessage?.role !== "assistant" ||
+    !lastMessage.content ||
+    !lastUserMessage?.content ||
+    !previousUserMessage?.content
+  ) {
+    return { shouldShow: false, suggestions: [], pendingMessage: null };
+  }
+
+  // Only show if there's a topic change
+  const hasTopicChanged = isTopicChange(lastUserMessage.content, previousUserMessage.content);
+
+  if (hasTopicChanged) {
+    const suggestions = generateFollowUpSuggestions(lastMessage.content);
+    return {
+      shouldShow: suggestions.length > 0 && !isGenerating,
+      suggestions,
+      pendingMessage: lastUserMessage.content,
+    };
+  }
+
+  return { shouldShow: false, suggestions: [], pendingMessage: null };
+}
+
+function generateFollowUpSuggestions(content: string): string[] {
+  const suggestions: string[] = [];
+  const contentLower = content.toLowerCase();
+
+  if (contentLower.includes("code")) {
+    suggestions.push("Can you explain this code in more detail?");
+    suggestions.push("How can I test this implementation?");
+  }
+
+  if (contentLower.includes("error")) {
+    suggestions.push("What causes this error?");
+    suggestions.push("How can I debug this issue?");
+  }
+
+  if (suggestions.length === 0) {
+    suggestions.push("Tell me more about this");
+    suggestions.push("What are the alternatives?");
+  }
+
+  return suggestions.slice(0, 3);
+}
+
 /**
  * Hook to manage enhanced follow-up prompts and chat continuations
  */
@@ -38,47 +109,14 @@ export function useEnhancedFollowUpPrompt({
   // Generate follow-up suggestions based on last assistant message
   useEffect(() => {
     const messages = chatState?.messages || [];
-    // Require at least 4 user messages before ever showing the prompt
-    const userMessages = messages.filter((m) => m?.role === "user");
-    const assistantMessages = messages.filter((m) => m?.role === "assistant");
-    if (userMessages.length < 4 || assistantMessages.length === 0) {
+    const result = checkFollowUpConditions(messages, chatState?.isGenerating);
+
+    if (result.shouldShow) {
+      setFollowUpSuggestions(result.suggestions);
+      setPendingMessage(result.pendingMessage);
+      setShowFollowUpPrompt(true);
+    } else {
       setShowFollowUpPrompt(false);
-      return;
-    }
-
-    const lastMessage = messages[messages.length - 1];
-    const hasUserHistory = messages.some((m) => m?.role === "user");
-
-    // Check for actual topic change before showing prompt
-    const lastUserMessage = userMessages[userMessages.length - 1];
-    const previousUserMessage = userMessages[userMessages.length - 2];
-
-    if (
-      hasUserHistory &&
-      lastMessage?.role === "assistant" &&
-      lastMessage.content &&
-      lastUserMessage?.content &&
-      previousUserMessage?.content
-    ) {
-      // Only show if there's a topic change
-      const hasTopicChanged = isTopicChange(
-        lastUserMessage.content,
-        previousUserMessage.content,
-      );
-
-      if (hasTopicChanged) {
-        // Simple follow-up generation - can be enhanced with AI
-        const suggestions = generateFollowUpSuggestions(lastMessage.content);
-        setFollowUpSuggestions(suggestions);
-        setPendingMessage(lastUserMessage.content);
-        // Show follow-up if there are suggestions and not currently generating
-        if (suggestions.length > 0 && !chatState?.isGenerating) {
-          setShowFollowUpPrompt(true);
-        }
-      } else {
-        // No topic change, don't show the prompt
-        setShowFollowUpPrompt(false);
-      }
     }
   }, [chatState?.messages, chatState?.isGenerating]);
 
@@ -91,33 +129,12 @@ export function useEnhancedFollowUpPrompt({
   }, []);
 
   const maybeShowFollowUpPrompt = useCallback(() => {
-    // Only consider showing after sufficient conversation history
     const messages = chatState?.messages || [];
-    if (chatState?.isGenerating) return;
+    const result = checkFollowUpConditions(messages, chatState?.isGenerating);
 
-    const userMessages = messages.filter((m) => m?.role === "user");
-    const assistantMessages = messages.filter((m) => m?.role === "assistant");
-
-    // Require at least 4 user messages to avoid premature prompts
-    if (userMessages.length < 4 || assistantMessages.length < 1) {
-      return;
-    }
-
-    // Get the last two user messages to check for topic change
-    const lastUserMessage = userMessages[userMessages.length - 1];
-    const previousUserMessage = userMessages[userMessages.length - 2];
-
-    if (lastUserMessage?.content && previousUserMessage?.content) {
-      // Only show follow-up prompt if there's an actual topic change
-      const hasTopicChanged = isTopicChange(
-        lastUserMessage.content,
-        previousUserMessage.content,
-      );
-
-      if (hasTopicChanged) {
-        setPendingMessage(lastUserMessage.content);
-        setShowFollowUpPrompt(true);
-      }
+    if (result.shouldShow) {
+      setPendingMessage(result.pendingMessage);
+      setShowFollowUpPrompt(true);
     }
   }, [chatState?.messages, chatState?.isGenerating]);
 
@@ -161,13 +178,7 @@ export function useEnhancedFollowUpPrompt({
     }
 
     await handleNewChat({ userInitiated: true });
-  }, [
-    currentChatId,
-    handleNewChat,
-    pendingMessage,
-    resetFollowUp,
-    summarizeRecentAction,
-  ]);
+  }, [currentChatId, handleNewChat, pendingMessage, resetFollowUp, summarizeRecentAction]);
 
   // Send pending message when chat is ready
   useEffect(() => {
@@ -176,7 +187,7 @@ export function useEnhancedFollowUpPrompt({
         await sendRef.current?.(pendingMessage);
         setPendingMessage(null);
       };
-      sendMessage();
+      void sendMessage();
     }
   }, [pendingMessage, currentChatId, sendRef]);
 
@@ -194,27 +205,4 @@ export function useEnhancedFollowUpPrompt({
     /** Error from last summarization attempt, if any. Callers can use this to show UI feedback. */
     summaryError,
   };
-}
-
-function generateFollowUpSuggestions(content: string): string[] {
-  const suggestions: string[] = [];
-
-  // Generate contextual suggestions based on content
-  if (content.toLowerCase().includes("code")) {
-    suggestions.push("Can you explain this code in more detail?");
-    suggestions.push("How can I test this implementation?");
-  }
-
-  if (content.toLowerCase().includes("error")) {
-    suggestions.push("What causes this error?");
-    suggestions.push("How can I debug this issue?");
-  }
-
-  // Default suggestions if no specific context
-  if (suggestions.length === 0) {
-    suggestions.push("Tell me more about this");
-    suggestions.push("What are the alternatives?");
-  }
-
-  return suggestions.slice(0, 3); // Limit to 3 suggestions
 }

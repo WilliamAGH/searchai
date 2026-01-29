@@ -19,10 +19,7 @@ function resolveFormat(request: Request): ExportFormat {
   }
 
   if (baseFormat === "json") {
-    if (
-      accept.includes("text/markdown") ||
-      accept.includes("application/markdown")
-    ) {
+    if (accept.includes("text/markdown") || accept.includes("application/markdown")) {
       return "markdown";
     }
     if (accept.includes("text/html")) {
@@ -33,10 +30,7 @@ function resolveFormat(request: Request): ExportFormat {
   return baseFormat;
 }
 
-export async function handleExportChat(
-  ctx: ActionCtx,
-  request: Request,
-): Promise<Response> {
+export async function handleExportChat(ctx: ActionCtx, request: Request): Promise<Response> {
   const exportResult = await loadExportData(ctx, request, "http");
   if (!exportResult.ok) {
     return exportResult.response;

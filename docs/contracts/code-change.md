@@ -201,11 +201,7 @@ Core rules in `AGENTS.md`: [TY1], [VL1], [ZV1]
 - [ZD5d] **Use canonical utilities**:
 
 ```typescript
-import {
-  logZodFailure,
-  safeParseWithLog,
-  safeParseOrNull,
-} from "convex/lib/validation/zodUtils";
+import { logZodFailure, safeParseWithLog, safeParseOrNull } from "convex/lib/validation/zodUtils";
 
 // Best: Discriminated union (new code)
 const result = safeParseWithLog(UserSchema, data, `parseUser [id=${id}]`);

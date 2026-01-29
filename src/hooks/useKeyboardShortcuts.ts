@@ -26,7 +26,7 @@ export function useKeyboardShortcuts({
       // Cmd/Ctrl + K - New chat
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        onNewChat();
+        void onNewChat();
         return;
       }
 

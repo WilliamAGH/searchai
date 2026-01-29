@@ -102,9 +102,7 @@ export async function* parseSSEStream(
  * Check if an SSE event is a parse error.
  * Type guard for narrowing SSEEvent | SSEParseError.
  */
-export function isSSEParseError(
-  event: SSEEvent | SSEParseError,
-): event is SSEParseError {
+export function isSSEParseError(event: SSEEvent | SSEParseError): event is SSEParseError {
   return event.type === "parse_error";
 }
 

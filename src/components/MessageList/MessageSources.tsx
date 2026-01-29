@@ -8,11 +8,7 @@
 
 import React from "react";
 import type { ContextReference, SearchResult } from "@/lib/types/message";
-import {
-  getDomainFromUrl,
-  getFaviconUrl,
-  getSafeHostname,
-} from "@/lib/utils/favicon";
+import { getDomainFromUrl, getFaviconUrl, getSafeHostname } from "@/lib/utils/favicon";
 import { logger } from "@/lib/logger";
 
 interface MessageSourcesProps {
@@ -41,12 +37,9 @@ export function MessageSources({
   const messageId = id || "unknown";
 
   // Prefer contextReferences from agent workflow, fallback to legacy results
-  const hasContextRefs =
-    Array.isArray(contextReferences) && contextReferences.length > 0;
+  const hasContextRefs = Array.isArray(contextReferences) && contextReferences.length > 0;
 
-  const hasUrl = (
-    ref: ContextReference,
-  ): ref is ContextReference & { url: string } =>
+  const hasUrl = (ref: ContextReference): ref is ContextReference & { url: string } =>
     typeof ref.url === "string" && ref.url.length > 0;
 
   // Convert contextReferences to display format
@@ -123,9 +116,7 @@ export function MessageSources({
               />
             </svg>
             <span className="font-medium">Sources</span>
-            <span className="text-gray-500 dark:text-gray-400">
-              ({displaySources.length})
-            </span>
+            <span className="text-gray-500 dark:text-gray-400">({displaySources.length})</span>
             {hasContextRefs && (
               <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400 truncate">
                 via agent research
@@ -144,19 +135,13 @@ export function MessageSources({
             stroke="currentColor"
             aria-hidden="true"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
         {collapsed && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             {previewSources.map((source, i) => {
-              const hostname =
-                getDomainFromUrl(source.url) || getSafeHostname(source.url);
+              const hostname = getDomainFromUrl(source.url) || getSafeHostname(source.url);
               return (
                 <a
                   key={`${messageId}-preview-${i}`}
@@ -190,21 +175,18 @@ export function MessageSources({
       {!collapsed && (
         <div className="mt-2 space-y-2 px-2 max-h-[300px] overflow-y-auto">
           {displaySources.map((source, i) => {
-            const hostname =
-              getDomainFromUrl(source.url) || getSafeHostname(source.url);
+            const hostname = getDomainFromUrl(source.url) || getSafeHostname(source.url);
             const isHovered = hoveredSourceUrl === source.url;
 
             // Determine relevance badge color
             const relevanceBadge =
-              source.relevanceScore !== undefined &&
-              source.relevanceScore >= 0.8
+              source.relevanceScore !== undefined && source.relevanceScore >= 0.8
                 ? {
                     label: "high",
                     color:
                       "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
                   }
-                : source.relevanceScore !== undefined &&
-                    source.relevanceScore >= 0.5
+                : source.relevanceScore !== undefined && source.relevanceScore >= 0.5
                   ? {
                       label: "medium",
                       color:
@@ -216,8 +198,7 @@ export function MessageSources({
               source.type === "scraped_page"
                 ? {
                     label: "scraped",
-                    color:
-                      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+                    color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
                   }
                 : source.type === "research_summary"
                   ? {

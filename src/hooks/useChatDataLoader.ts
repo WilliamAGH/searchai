@@ -34,8 +34,7 @@ export function useChatDataLoader(
 
       setState((prev) => {
         const currentChat = prev.currentChatId
-          ? (chats.find((chat) => chat._id === prev.currentChatId) ??
-            prev.currentChat)
+          ? (chats.find((chat) => chat._id === prev.currentChatId) ?? prev.currentChat)
           : prev.currentChat;
 
         return {
@@ -102,19 +101,13 @@ export function useChatDataLoader(
         if (cancelled) return;
 
         setState((current) => {
-          if (
-            current.currentChatId &&
-            current.currentChatId !== pendingChatId
-          ) {
-            return current.isLoading
-              ? { ...current, isLoading: false }
-              : current;
+          if (current.currentChatId && current.currentChatId !== pendingChatId) {
+            return current.isLoading ? { ...current, isLoading: false } : current;
           }
 
           const nextChat =
-            current.chats.find(
-              (chat) => String(chat._id ?? "") === String(pendingChatId),
-            ) ?? pendingChat;
+            current.chats.find((chat) => String(chat._id ?? "") === String(pendingChatId)) ??
+            pendingChat;
 
           if (!nextChat) {
             return {
@@ -140,10 +133,7 @@ export function useChatDataLoader(
         setState((current) => ({
           ...current,
           isLoading: false,
-          error: getErrorMessage(
-            error,
-            "Failed to load messages for first chat",
-          ),
+          error: getErrorMessage(error, "Failed to load messages for first chat"),
         }));
       });
 

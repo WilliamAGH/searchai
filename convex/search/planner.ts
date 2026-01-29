@@ -119,10 +119,7 @@ function sanitizeForQuery(query: string): string {
  * @param contextTerms Context terms
  * @returns Array of query variations
  */
-function generateVariations(
-  baseQuery: string,
-  contextTerms: string[],
-): string[] {
+function generateVariations(baseQuery: string, contextTerms: string[]): string[] {
   const variations: string[] = [];
 
   // Add individual context terms
@@ -145,11 +142,7 @@ function generateVariations(
  * @param maxQueries Maximum number of queries to return
  * @returns Diversified queries
  */
-function mmrDiversify(
-  queries: string[],
-  baseQuery: string,
-  maxQueries: number,
-): string[] {
+function mmrDiversify(queries: string[], baseQuery: string, maxQueries: number): string[] {
   if (queries.length <= maxQueries) {
     return queries;
   }

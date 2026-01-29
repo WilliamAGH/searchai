@@ -9,11 +9,7 @@ import ReactMarkdown from "react-markdown";
 import { useDomainToUrlMap } from "@/hooks/utils/useDomainToUrlMap";
 import { useCitationProcessor } from "@/hooks/utils/useCitationProcessor";
 import { createCitationAnchorRenderer } from "@/lib/utils/citationAnchorRenderer";
-import {
-  REMARK_PLUGINS,
-  REHYPE_PLUGINS,
-  CodeRenderer,
-} from "@/lib/utils/markdownConfig";
+import { REMARK_PLUGINS, REHYPE_PLUGINS, CodeRenderer } from "@/lib/utils/markdownConfig";
 
 interface ContentWithCitationsProps {
   content: string;
@@ -36,32 +32,20 @@ export function ContentWithCitations({
   const domainToUrlMap = useDomainToUrlMap(searchResults);
 
   // Convert [domain] or [URL] to markdown links where domain is known
-  const processedContent = useCitationProcessor(
-    content,
-    searchResults,
-    domainToUrlMap,
-  );
+  const processedContent = useCitationProcessor(content, searchResults, domainToUrlMap);
 
   // Pre-compute citation URL set for O(1) lookup
-  const citationUrls = React.useMemo(
-    () => new Set(domainToUrlMap.values()),
-    [domainToUrlMap],
-  );
+  const citationUrls = React.useMemo(() => new Set(domainToUrlMap.values()), [domainToUrlMap]);
 
   // Anchor renderer needs memoization because it depends on hover state
   const anchorRenderer = React.useMemo(
-    () =>
-      createCitationAnchorRenderer(
-        citationUrls,
-        hoveredSourceUrl,
-        onCitationHover,
-      ),
+    () => createCitationAnchorRenderer(citationUrls, hoveredSourceUrl, onCitationHover),
     [citationUrls, hoveredSourceUrl, onCitationHover],
   );
 
   return (
     <>
-      {/* 
+      {/*
         DO NOT REMOVE OR OVERRIDE: Overflow Protection Wrapper
         This wrapper is CRITICAL for preventing horizontal layout blowout from:
         1. Long continuous strings (URLs, base64, etc.)

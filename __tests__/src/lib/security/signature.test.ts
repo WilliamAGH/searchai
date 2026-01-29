@@ -29,6 +29,8 @@ async function signPayload(
     .join("");
 }
 
+const hasCryptoSubtle = Boolean(globalThis.crypto?.subtle);
+
 describe("verifyPersistedPayload", () => {
   const payload: PersistedPayloadWire = {
     assistantMessageId: "msg_1",
@@ -40,22 +42,12 @@ describe("verifyPersistedPayload", () => {
   const nonce = "019a122e-c507-7851-99f7-b8f5d7345b41";
   const signingKey = "test-signing-key";
 
-  it("accepts matching signatures", async () => {
-    if (!globalThis.crypto?.subtle) {
-      expect(true).toBe(true);
-      return;
-    }
+  it.skipIf(!hasCryptoSubtle)("accepts matching signatures", async () => {
     const signature = await signPayload(payload, nonce, signingKey);
-    await expect(
-      verifyPersistedPayload(payload, nonce, signature, signingKey),
-    ).resolves.toBe(true);
+    await expect(verifyPersistedPayload(payload, nonce, signature, signingKey)).resolves.toBe(true);
   });
 
-  it("rejects tampered payloads", async () => {
-    if (!globalThis.crypto?.subtle) {
-      expect(true).toBe(true);
-      return;
-    }
+  it.skipIf(!hasCryptoSubtle)("rejects tampered payloads", async () => {
     const signature = await signPayload(payload, nonce, signingKey);
     const tamperedPayload = { ...payload, answer: "Tampered" };
     await expect(

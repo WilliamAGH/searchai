@@ -12,18 +12,12 @@ async function ensureSidebarIsOpen(page: any) {
 
   if (isMobile) {
     // Mobile: Check if dialog is already open, if not click toggle
-    const newChatInDialog = page
-      .locator('[role="dialog"] button:has-text("New Chat")')
-      .first();
-    const isDialogOpen = await newChatInDialog
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
+    const newChatInDialog = page.locator('[role="dialog"] button:has-text("New Chat")').first();
+    const isDialogOpen = await newChatInDialog.isVisible({ timeout: 500 }).catch(() => false);
 
     if (!isDialogOpen) {
       const btn = page.locator('button[aria-label="Toggle sidebar"]').first();
-      const isVisible = await btn
-        .isVisible({ timeout: 2000 })
-        .catch(() => false);
+      const isVisible = await btn.isVisible({ timeout: 2000 }).catch(() => false);
       if (isVisible) {
         await btn.click();
         // Wait for New Chat button inside dialog to be visible
@@ -33,16 +27,12 @@ async function ensureSidebarIsOpen(page: any) {
   } else {
     // Desktop: Check if New Chat button is already visible (sidebar open)
     const newChatBtn = page.locator('button:has-text("New Chat")').first();
-    const isSidebarOpen = await newChatBtn
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
+    const isSidebarOpen = await newChatBtn.isVisible({ timeout: 500 }).catch(() => false);
 
     if (!isSidebarOpen) {
       // Click toggle to open sidebar
       const btn = page.locator('button[aria-label="Toggle sidebar"]').first();
-      const isVisible = await btn
-        .isVisible({ timeout: 2000 })
-        .catch(() => false);
+      const isVisible = await btn.isVisible({ timeout: 2000 }).catch(() => false);
       if (isVisible) {
         await btn.click();
         await page.waitForTimeout(300); // Wait for sidebar animation
@@ -91,9 +81,7 @@ test.describe("chat navigation", () => {
     await ensureSidebarIsOpen(page);
 
     // Click New Chat - on mobile it's in dialog
-    const newChat = page
-      .locator('[role="dialog"] button:has-text("New Chat")')
-      .first();
+    const newChat = page.locator('[role="dialog"] button:has-text("New Chat")').first();
     await expect(newChat).toBeVisible({ timeout: 5000 });
     await newChat.click();
 
@@ -137,20 +125,17 @@ test.describe("chat navigation", () => {
     await expect(page).toHaveURL(/\/$/, { timeout: 5000 });
   });
 
-  test.fixme(
-    "migration from local to server preserves current selection",
-    async ({ page, baseURL }) => {
-      // This test requires auth setup + server mapping; mark fixme until test env supports it
-      await page.goto((baseURL ?? "http://localhost:4173") + HOME);
-    },
-  );
+  test.fixme("migration from local to server preserves current selection", async ({
+    page,
+    baseURL,
+  }) => {
+    // This test requires auth setup + server mapping; mark fixme until test env supports it
+    await page.goto((baseURL ?? "http://localhost:4173") + HOME);
+  });
 
-  test.fixme(
-    "mobile swipe open/close is idempotent",
-    async ({ page, baseURL }) => {
-      await page.setViewportSize(viewports.iPhone12);
-      await page.goto((baseURL ?? "http://localhost:4173") + HOME);
-      // Implement swipe gestures with Playwright touch simulation when CI supports it
-    },
-  );
+  test.fixme("mobile swipe open/close is idempotent", async ({ page, baseURL }) => {
+    await page.setViewportSize(viewports.iPhone12);
+    await page.goto((baseURL ?? "http://localhost:4173") + HOME);
+    // Implement swipe gestures with Playwright touch simulation when CI supports it
+  });
 });

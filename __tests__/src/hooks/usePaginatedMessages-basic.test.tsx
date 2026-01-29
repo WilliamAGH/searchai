@@ -31,9 +31,7 @@ describe.skip("usePaginatedMessages basic functionality", () => {
       }),
     }));
 
-    const { usePaginatedMessages } = await import(
-      "../../../src/hooks/usePaginatedMessages"
-    );
+    const { usePaginatedMessages } = await import("../../../src/hooks/usePaginatedMessages");
 
     // Create a test harness component that uses the hook
     let hookResult: any = null;
@@ -75,9 +73,7 @@ describe.skip("usePaginatedMessages basic functionality", () => {
       }),
     }));
 
-    const { usePaginatedMessages } = await import(
-      "../../../src/hooks/usePaginatedMessages"
-    );
+    const { usePaginatedMessages } = await import("../../../src/hooks/usePaginatedMessages");
 
     let hookResult: any = null;
     function TestHarness() {
@@ -113,9 +109,7 @@ describe.skip("usePaginatedMessages basic functionality", () => {
       }),
     }));
 
-    const { usePaginatedMessages } = await import(
-      "../../../src/hooks/usePaginatedMessages"
-    );
+    const { usePaginatedMessages } = await import("../../../src/hooks/usePaginatedMessages");
 
     let hookResult: any = null;
     function TestHarness() {

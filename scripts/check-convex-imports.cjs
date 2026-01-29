@@ -10,12 +10,7 @@ const path = require("path");
 function listFiles(dir, acc = []) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const e of entries) {
-    if (
-      e.name === "node_modules" ||
-      e.name === "dist" ||
-      e.name.startsWith(".")
-    )
-      continue;
+    if (e.name === "node_modules" || e.name === "dist" || e.name.startsWith(".")) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) listFiles(p, acc);
     else if (/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(e.name)) acc.push(p);
@@ -29,9 +24,7 @@ function main() {
   const convexHttpDir = path.resolve(process.cwd(), "convex/http");
   const files = fs.existsSync(srcDir) ? listFiles(srcDir) : [];
   const convexFiles = fs.existsSync(convexDir) ? listFiles(convexDir) : [];
-  const httpFiles = fs.existsSync(convexHttpDir)
-    ? listFiles(convexHttpDir)
-    : [];
+  const httpFiles = fs.existsSync(convexHttpDir) ? listFiles(convexHttpDir) : [];
   const bad = [];
   const duplication = [];
   const reexports = [];
@@ -48,11 +41,7 @@ function main() {
   for (const file of httpFiles) {
     const content = fs.readFileSync(file, "utf8");
     // Disallow re-export wrappers of generated types
-    if (
-      /export\s+\{[^}]*\}\s+from\s+["'](?:\.\.\/)+_generated\/dataModel["']/.test(
-        content,
-      )
-    ) {
+    if (/export\s+\{[^}]*\}\s+from\s+["'](?:\.\.\/)+_generated\/dataModel["']/.test(content)) {
       reexports.push({ file, reason: "Re-export of generated types" });
     }
     // Heuristic: interfaces that look like DB docs (both _id and _creationTime)
@@ -73,9 +62,7 @@ function main() {
     if (file.includes("/convex/_generated/")) continue;
     const content = fs.readFileSync(file, "utf8");
     // Re-export wrappers of generated types anywhere in convex
-    if (
-      /export\s+\{[^}]*\}\s+from\s+["'](?:\.\.\/)+_generated\//.test(content)
-    ) {
+    if (/export\s+\{[^}]*\}\s+from\s+["'](?:\.\.\/)+_generated\//.test(content)) {
       reexports.push({ file, reason: "Re-export of generated types" });
     }
     // Heuristic: manual DB-like interfaces with both _id and _creationTime
@@ -86,8 +73,7 @@ function main() {
     ) {
       duplication.push({
         file,
-        reason:
-          "Manual interface with _id and _creationTime fields in convex/*",
+        reason: "Manual interface with _id and _creationTime fields in convex/*",
       });
     }
     // [IM1d] Check for @/ path aliases in convex files - these will fail at bundle time
@@ -106,9 +92,7 @@ function main() {
   }
 
   if (reexports.length || duplication.length) {
-    console.error(
-      "✖ Potential Convex type wrapper/duplication issues detected:",
-    );
+    console.error("✖ Potential Convex type wrapper/duplication issues detected:");
     for (const r of reexports)
       console.error(" -", path.relative(process.cwd(), r.file), "=>", r.reason);
     for (const d of duplication)
@@ -117,12 +101,8 @@ function main() {
 
   // [IM1d] Report @/ path alias violations in convex files
   if (pathAliasViolations.length) {
-    console.error(
-      "✖ [IM1d] @/ path alias imports in convex/ files (WILL FAIL AT BUNDLE TIME):",
-    );
-    console.error(
-      "  Convex's esbuild bundler does NOT resolve tsconfig paths.",
-    );
+    console.error("✖ [IM1d] @/ path alias imports in convex/ files (WILL FAIL AT BUNDLE TIME):");
+    console.error("  Convex's esbuild bundler does NOT resolve tsconfig paths.");
     console.error("  Use relative imports (../lib/foo) within convex/.");
     console.error("  See AGENTS.md [IM1d] for details.");
     for (const v of pathAliasViolations)
@@ -130,10 +110,7 @@ function main() {
   }
 
   const allPassed =
-    !bad.length &&
-    !reexports.length &&
-    !duplication.length &&
-    !pathAliasViolations.length;
+    !bad.length && !reexports.length && !duplication.length && !pathAliasViolations.length;
 
   if (allPassed) {
     console.log("[OK] Convex import/type/path-alias checks passed");

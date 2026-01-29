@@ -11,6 +11,24 @@ import type { Message } from "@/lib/types/message";
 import { logger } from "@/lib/logger";
 import { toConvexId } from "@/lib/utils/idValidation";
 
+/** Map a Convex message to the local Message type */
+function mapConvexMessage(msg: Message, fallbackChatId: string | null): Message {
+  return {
+    ...msg,
+    _id: String(msg._id),
+    chatId: String(msg.chatId ?? fallbackChatId ?? ""),
+    _creationTime: msg._creationTime ?? msg.timestamp ?? Date.now(),
+    timestamp: msg.timestamp ?? msg._creationTime ?? Date.now(),
+    content: msg.content ?? "",
+  };
+}
+
+/** Compute exponential backoff delay (ms) capped at 5s */
+function computeBackoffDelay(attempt: number): number {
+  const base = Math.pow(2, Math.max(0, attempt - 1));
+  return Math.min(1000 * base, 5000);
+}
+
 interface UsePaginatedMessagesOptions {
   chatId: string | null;
   initialLimit?: number;
@@ -58,9 +76,7 @@ export function usePaginatedMessages({
   );
 
   // Query for initial messages
-  const initialMessages = useQuery<
-    typeof api.chats.messagesPaginated.getChatMessagesPaginated
-  >(
+  const initialMessages = useQuery<typeof api.chats.messagesPaginated.getChatMessagesPaginated>(
     api.chats.messagesPaginated.getChatMessagesPaginated,
     enabled && resolvedChatId
       ? {
@@ -84,14 +100,7 @@ export function usePaginatedMessages({
   const initialUIMessages = useMemo<Message[]>(() => {
     if (!initialMessages) return [];
     const convexMessages = initialMessages.messages || [];
-    return convexMessages.map((msg) => ({
-      ...msg,
-      _id: String(msg._id),
-      chatId: String(msg.chatId ?? chatId ?? ""),
-      _creationTime: msg._creationTime ?? msg.timestamp ?? Date.now(),
-      timestamp: msg.timestamp ?? msg._creationTime ?? Date.now(),
-      content: msg.content ?? "",
-    }));
+    return convexMessages.map((msg) => mapConvexMessage(msg, chatId));
   }, [initialMessages, chatId]);
 
   // Load initial messages when they arrive (stateful for subsequent appends)
@@ -120,14 +129,11 @@ export function usePaginatedMessages({
         );
 
         if (hasOptimisticMessages) {
-          logger.debug(
-            "Skipping initial messages load - preserving optimistic state",
-            {
-              chatId,
-              optimisticCount: prev.length,
-              dbCount: unifiedMessages.length,
-            },
-          );
+          logger.debug("Skipping initial messages load - preserving optimistic state", {
+            chatId,
+            optimisticCount: prev.length,
+            dbCount: unifiedMessages.length,
+          });
           return prev; // Keep optimistic state
         }
 
@@ -175,20 +181,13 @@ export function usePaginatedMessages({
         });
 
         if (moreMessages) {
-          const mappedMessages = moreMessages.messages.map((msg: Message) => ({
-            ...msg,
-            _id: String(msg._id),
-            chatId: String(msg.chatId ?? chatId ?? ""),
-            _creationTime: msg._creationTime ?? msg.timestamp ?? Date.now(),
-            timestamp: msg.timestamp ?? msg._creationTime ?? Date.now(),
-            content: msg.content ?? "",
-          }));
+          const mappedMessages = moreMessages.messages.map((msg: Message) =>
+            mapConvexMessage(msg, chatId),
+          );
 
           // Stale-guard: if session changed during async call, ignore results
           if (sessionRef.current !== currentSession) {
-            logger.info(
-              "Discarding stale loadMore results due to session change",
-            );
+            logger.info("Discarding stale loadMore results due to session change");
             return;
           }
           setMessages((prev) => [...prev, ...mappedMessages]);
@@ -197,10 +196,9 @@ export function usePaginatedMessages({
           setRetryCount(0); // Reset retry count on success
         }
       } catch (err) {
-        const error =
-          err instanceof Error
-            ? err
-            : new Error(String(err ?? "Unknown error"));
+        const errorMessage =
+          err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
+        const error = err instanceof Error ? err : new Error(errorMessage);
         const failTime = performance.now() - attemptStartTime;
 
         logger.error(`Failed to load more messages (attempt ${attempt})`, {
@@ -230,7 +228,7 @@ export function usePaginatedMessages({
           retryTimeoutRef.current = setTimeout(() => {
             // If session changed while waiting, do not retry
             if (sessionRef.current !== currentSession) return;
-            attemptLoad(attempt + 1);
+            void attemptLoad(attempt + 1);
           }, delay);
         } else {
           // Max retries reached
@@ -263,16 +261,7 @@ export function usePaginatedMessages({
       setIsLoadingMore(false);
       loadingRef.current = false;
     }
-  }, [
-    chatId,
-    cursor,
-    hasMore,
-    initialLimit,
-    loadMoreAction,
-    error,
-    sessionId,
-    resolvedChatId,
-  ]);
+  }, [chatId, cursor, hasMore, initialLimit, loadMoreAction, error, sessionId, resolvedChatId]);
 
   // Refresh messages (reload from beginning)
   const refresh = useCallback(async () => {
@@ -328,13 +317,4 @@ export function usePaginatedMessages({
     refresh,
     clearError,
   };
-}
-
-/**
- * Compute exponential backoff delay (ms) capped at 5s.
- * attempt=1 => 1000ms, 2 => 2000ms, 3 => 4000ms, >=4 => 5000ms
- */
-function computeBackoffDelay(attempt: number): number {
-  const base = Math.pow(2, Math.max(0, attempt - 1));
-  return Math.min(1000 * base, 5000);
 }

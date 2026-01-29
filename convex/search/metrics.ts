@@ -31,9 +31,7 @@ export const recordMetric = internalMutation({
       const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const existing = await ctx.db
         .query("metrics")
-        .withIndex("by_name_and_date", (q) =>
-          q.eq("name", args.name).eq("date", date),
-        )
+        .withIndex("by_name_and_date", (q) => q.eq("name", args.name).eq("date", date))
         .first();
       if (existing) {
         await ctx.db.patch(existing._id, { count: (existing.count || 0) + 1 });
@@ -59,10 +57,7 @@ export const recordMetric = internalMutation({
  */
 export const recordClientMetric = action({
   args: {
-    name: v.union(
-      v.literal("user_overrode_prompt"),
-      v.literal("new_chat_confirmed"),
-    ),
+    name: v.union(v.literal("user_overrode_prompt"), v.literal("new_chat_confirmed")),
     chatId: v.optional(v.id("chats")),
   },
   returns: v.null(),

@@ -2,28 +2,19 @@
 
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
 import { normalizeUrl as normalizeUrlUtil } from "../lib/url";
+import { isValidUuidV7 } from "../lib/uuid_validation";
 
 // ============================================
 // Constants and Utilities
 // ============================================
 
-/**
- * UUID v7 validation pattern - duplicated from lib/uuid.ts for bundle optimization.
- * @see {@link ../lib/uuid.ts:isValidUuidV7} - canonical implementation
- */
-const UUID_V7_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export const isUuidV7 = (value: string | undefined): boolean =>
-  !!value && UUID_V7_REGEX.test(value);
+export const isUuidV7 = (value: string | undefined): boolean => !!value && isValidUuidV7(value);
 
 /**
  * Convert numeric relevance score to human-readable label.
  * Uses centralized thresholds from RELEVANCE_SCORES constants.
  */
-export function relevanceScoreToLabel(
-  score: number | undefined,
-): "high" | "medium" | "low" {
+export function relevanceScoreToLabel(score: number | undefined): "high" | "medium" | "low" {
   const s = score ?? 0;
   if (s >= RELEVANCE_SCORES.HIGH_THRESHOLD) return "high";
   if (s >= RELEVANCE_SCORES.MEDIUM_THRESHOLD) return "medium";
@@ -55,13 +46,11 @@ const INSTANT_RESPONSE_MAP: ReadonlyArray<{
   },
   {
     pattern: /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/i,
-    response:
-      "Test confirmed! This chat is working. What would you like to research?",
+    response: "Test confirmed! This chat is working. What would you like to research?",
   },
   {
     pattern: /^this is a new chat[\s!.,?]*$/i,
-    response:
-      "Test confirmed! This chat is working. What would you like to research?",
+    response: "Test confirmed! This chat is working. What would you like to research?",
   },
   {
     pattern: /^(thanks|thank you|thx|ty)[\s!.,?]*$/i,
@@ -84,9 +73,7 @@ const INSTANT_RESPONSE_MAP: ReadonlyArray<{
 
 export function detectInstantResponse(query: string): string | null {
   const trimmed = query.trim().toLowerCase();
-  const match = INSTANT_RESPONSE_MAP.find(({ pattern }) =>
-    pattern.test(trimmed),
-  );
+  const match = INSTANT_RESPONSE_MAP.find(({ pattern }) => pattern.test(trimmed));
   return match?.response ?? null;
 }
 
@@ -94,25 +81,19 @@ export function detectInstantResponse(query: string): string | null {
 // Error Stage Detection
 // ============================================
 
-const ERROR_STAGE_PATTERNS: ReadonlyArray<{ pattern: string; stage: string }> =
-  [
-    { pattern: "Planning failed", stage: "planning" },
-    { pattern: "Research failed", stage: "research" },
-    { pattern: "Synthesis failed", stage: "synthesis" },
-  ];
+const ERROR_STAGE_PATTERNS: ReadonlyArray<{ pattern: string; stage: string }> = [
+  { pattern: "Planning failed", stage: "planning" },
+  { pattern: "Research failed", stage: "research" },
+  { pattern: "Synthesis failed", stage: "synthesis" },
+];
 
-export function detectErrorStage(
-  error: unknown,
-  isInstantPath: string | null,
-): string {
+export function detectErrorStage(error: unknown, isInstantPath: string | null): string {
   if (isInstantPath) {
     return "instant";
   }
 
   if (error instanceof Error) {
-    const match = ERROR_STAGE_PATTERNS.find(({ pattern }) =>
-      error.message.includes(pattern),
-    );
+    const match = ERROR_STAGE_PATTERNS.find(({ pattern }) => error.message.includes(pattern));
     if (match) {
       return match.stage;
     }

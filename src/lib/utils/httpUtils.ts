@@ -43,19 +43,13 @@ export async function readResponseBody(response: Response): Promise<string> {
   }
 }
 
-export function buildHttpError(
-  response: Response,
-  body: string,
-  context?: string,
-): Error {
+export function buildHttpError(response: Response, body: string, context?: string): Error {
   const headers: Record<string, string> = {};
   response.headers.forEach((value, key) => {
     headers[key] = value;
   });
   const prefix = context ? `${context}: ` : "";
-  const error = new Error(
-    `${prefix}HTTP ${response.status} ${response.statusText} ${body}`.trim(),
-  );
+  const error = new Error(`${prefix}HTTP ${response.status} ${response.statusText} ${body}`.trim());
   Object.assign(error, {
     status: response.status,
     statusText: response.statusText,
@@ -92,13 +86,9 @@ export async function fetchJsonWithRetry(
       }
     } catch (error) {
       lastError =
-        error instanceof Error
-          ? error
-          : new Error(getErrorMessage(error, "Unknown HTTP error"));
+        error instanceof Error ? error : new Error(getErrorMessage(error, "Unknown HTTP error"));
       if (i < maxRetries - 1) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, 1000 * Math.pow(2, i)),
-        );
+        await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, i)));
       }
     }
   }

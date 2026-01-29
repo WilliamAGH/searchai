@@ -14,10 +14,7 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { generateChatTitle } from "../chats/utils";
-import type {
-  ResearchContextReference,
-  StreamingPersistPayload,
-} from "../schemas/agents";
+import type { ResearchContextReference, StreamingPersistPayload } from "../schemas/agents";
 
 // ============================================
 // Types
@@ -40,10 +37,7 @@ import type {
  * Uses Pick<ActionCtx, ...> pattern matching StreamingWorkflowCtx in orchestration.ts
  * for proper type inference on Convex mutation/query/action calls.
  */
-export type WorkflowActionCtx = Pick<
-  ActionCtx,
-  "runMutation" | "runQuery" | "runAction"
->;
+export type WorkflowActionCtx = Pick<ActionCtx, "runMutation" | "runQuery" | "runAction">;
 
 /** Parameters for chat title update */
 export interface UpdateChatTitleParams {
@@ -99,9 +93,7 @@ export interface CompleteWorkflowParams {
  *
  * @see {@link ../chats/utils.ts} - generateChatTitle source
  */
-export async function updateChatTitleIfNeeded(
-  params: UpdateChatTitleParams,
-): Promise<void> {
+export async function updateChatTitleIfNeeded(params: UpdateChatTitleParams): Promise<void> {
   const { ctx, chatId, currentTitle, intent } = params;
 
   if (currentTitle === "New Chat" || !currentTitle) {
@@ -161,10 +153,10 @@ export async function completeWorkflowWithSignature(
 ): Promise<string> {
   const { ctx, workflowTokenId, payload, nonce } = params;
 
-  const signature = await ctx.runAction(
-    internal.workflowTokensActions.signPersistedPayload,
-    { payload, nonce },
-  );
+  const signature = await ctx.runAction(internal.workflowTokensActions.signPersistedPayload, {
+    payload,
+    nonce,
+  });
 
   if (workflowTokenId) {
     await ctx.runMutation(internal.workflowTokens.completeToken, {

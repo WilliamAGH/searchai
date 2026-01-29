@@ -16,9 +16,7 @@ export async function ensureSidebarOpen(page: Page): Promise<void> {
 
   if (isMobile) {
     // Mobile: Look for sidebar toggle button (same as desktop but opens modal)
-    const menuButton = page
-      .locator('button[aria-label="Toggle sidebar"]')
-      .first();
+    const menuButton = page.locator('button[aria-label="Toggle sidebar"]').first();
     const isMenuVisible = await menuButton.isVisible().catch(() => false);
 
     if (isMenuVisible) {
@@ -58,26 +56,18 @@ export async function ensureSidebarOpen(page: Page): Promise<void> {
       );
 
       // Verify New Chat button is visible (this confirms the dialog is open)
-      const newChatButton = page
-        .locator('[role="dialog"] button:has-text("New Chat")')
-        .first();
+      const newChatButton = page.locator('[role="dialog"] button:has-text("New Chat")').first();
       await expect(newChatButton).toBeVisible({ timeout: 3000 });
     }
   } else {
     // Desktop: Check if sidebar is already visible
     const newChatButton = page.locator('button:has-text("New Chat")').first();
-    const isNewChatVisible = await newChatButton
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
+    const isNewChatVisible = await newChatButton.isVisible({ timeout: 500 }).catch(() => false);
 
     if (!isNewChatVisible) {
       // Try to find and click the sidebar toggle
-      const sidebarToggle = page
-        .locator('button[aria-label="Toggle sidebar"]')
-        .first();
-      const isToggleVisible = await sidebarToggle
-        .isVisible()
-        .catch(() => false);
+      const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
+      const isToggleVisible = await sidebarToggle.isVisible().catch(() => false);
 
       if (isToggleVisible) {
         await sidebarToggle.click();
@@ -105,12 +95,8 @@ export async function closeSidebar(page: Page): Promise<void> {
 
     if (isDialogVisible) {
       // Click overlay or close button
-      const overlay = page
-        .locator('[role="dialog"] ~ div[class*="overlay"]')
-        .first();
-      const closeButton = page
-        .locator('[role="dialog"] button[aria-label="Close"]')
-        .first();
+      const overlay = page.locator('[role="dialog"] ~ div[class*="overlay"]').first();
+      const closeButton = page.locator('[role="dialog"] button[aria-label="Close"]').first();
 
       if (await closeButton.isVisible().catch(() => false)) {
         await closeButton.click();
@@ -124,14 +110,10 @@ export async function closeSidebar(page: Page): Promise<void> {
   } else {
     // Desktop: Check if sidebar is visible
     const newChatButton = page.locator('button:has-text("New Chat")').first();
-    const isNewChatVisible = await newChatButton
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
+    const isNewChatVisible = await newChatButton.isVisible({ timeout: 500 }).catch(() => false);
 
     if (isNewChatVisible) {
-      const sidebarToggle = page
-        .locator('button[aria-label="Toggle sidebar"]')
-        .first();
+      const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
       if (await sidebarToggle.isVisible().catch(() => false)) {
         await sidebarToggle.click();
         await page.waitForTimeout(300);
@@ -183,9 +165,9 @@ export async function createNewChat(page: Page): Promise<string> {
     .catch(() => false);
 
   if (loadingVisible) {
-    await expect(
-      page.locator('button:has-text("Creating...")').first(),
-    ).not.toBeVisible({ timeout: 10000 });
+    await expect(page.locator('button:has-text("Creating...")').first()).not.toBeVisible({
+      timeout: 10000,
+    });
   }
 
   // Wait for URL to change to a different chat

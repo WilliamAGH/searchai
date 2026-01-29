@@ -64,10 +64,7 @@ export function useAnonymousSession(): string | null {
 
     window.addEventListener("searchai:session-id-updated", handleSessionUpdate);
     return () => {
-      window.removeEventListener(
-        "searchai:session-id-updated",
-        handleSessionUpdate,
-      );
+      window.removeEventListener("searchai:session-id-updated", handleSessionUpdate);
     };
   }, []);
 

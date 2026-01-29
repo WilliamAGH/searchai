@@ -133,8 +133,8 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
 
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              An unexpected error occurred. This might be a temporary issue with
-              navigation or chat creation.
+              An unexpected error occurred. This might be a temporary issue with navigation or chat
+              creation.
             </p>
 
             {this.state.error && (

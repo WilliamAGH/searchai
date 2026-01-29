@@ -25,9 +25,7 @@ export const getUserPreferences = query({
 
 export const updateUserPreferences = mutation({
   args: {
-    theme: v.optional(
-      v.union(v.literal("light"), v.literal("dark"), v.literal("system")),
-    ),
+    theme: v.optional(v.union(v.literal("light"), v.literal("dark"), v.literal("system"))),
     searchEnabled: v.optional(v.boolean()),
     maxSearchResults: v.optional(v.number()),
   },
@@ -54,8 +52,7 @@ export const updateUserPreferences = mutation({
       await ctx.db.insert("preferences", {
         userId,
         theme: args.theme || "system",
-        searchEnabled:
-          args.searchEnabled !== undefined ? args.searchEnabled : true,
+        searchEnabled: args.searchEnabled !== undefined ? args.searchEnabled : true,
         maxSearchResults: args.maxSearchResults || 5,
       });
     }

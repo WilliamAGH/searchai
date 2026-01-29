@@ -6,16 +6,12 @@ import { truncate } from "./helpers_utils";
 
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 
-export function formatScrapedContentForPrompt(
-  scrapedContent: ScrapedContent[],
-): string {
+export function formatScrapedContentForPrompt(scrapedContent: ScrapedContent[]): string {
   if (!scrapedContent?.length) return "";
 
   const tokensPerPage = Math.min(
     TOKEN_BUDGETS.MAX_TOKENS_PER_PAGE,
-    Math.floor(
-      TOKEN_BUDGETS.TOTAL_CONTENT_TOKENS / Math.max(scrapedContent.length, 1),
-    ),
+    Math.floor(TOKEN_BUDGETS.TOTAL_CONTENT_TOKENS / Math.max(scrapedContent.length, 1)),
   );
   const charsPerPage = tokensPerPage * CHARS_PER_TOKEN_ESTIMATE;
 
@@ -24,8 +20,7 @@ export function formatScrapedContentForPrompt(
     .sort(
       (a, b) =>
         (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0) ||
-        (b.contentLength ?? b.content.length) -
-          (a.contentLength ?? a.content.length),
+        (b.contentLength ?? b.content.length) - (a.contentLength ?? a.content.length),
     )
     .map((page, idx) => {
       const safeContent = page.content || "";
@@ -42,17 +37,13 @@ Summary: ${summary}`;
     .join("\n\n---\n\n");
 }
 
-export function formatSerpEnrichmentForPrompt(
-  enrichment: SerpEnrichment | undefined,
-): string {
+export function formatSerpEnrichmentForPrompt(enrichment: SerpEnrichment | undefined): string {
   if (!enrichment) return "";
   const lines: string[] = [];
 
   if (enrichment.knowledgeGraph) {
     const kg = enrichment.knowledgeGraph;
-    lines.push(
-      `Knowledge Graph: ${kg.title || "N/A"} (${kg.type || "unknown"})`,
-    );
+    lines.push(`Knowledge Graph: ${kg.title || "N/A"} (${kg.type || "unknown"})`);
     if (kg.description) {
       lines.push(`Description: ${kg.description}`);
     }
@@ -69,9 +60,7 @@ export function formatSerpEnrichmentForPrompt(
 
   if (enrichment.answerBox) {
     const ab = enrichment.answerBox;
-    lines.push(
-      `Answer Box (${ab.type || "general"}): ${ab.answer || ab.snippet || "N/A"}`,
-    );
+    lines.push(`Answer Box (${ab.type || "general"}): ${ab.answer || ab.snippet || "N/A"}`);
     if (ab.source || ab.url) {
       lines.push(`Answer Source: ${ab.source || ab.url}`);
     }
@@ -131,9 +120,7 @@ export function formatContextReferencesForPrompt(
         typeof ref.relevanceScore === "number"
           ? ` (relevance ${ref.relevanceScore.toFixed(2)})`
           : "";
-      return `${idx + 1}. ${label}${
-        ref.url ? ` — ${ref.url}` : ""
-      }${relevance} [${ref.contextId}]`;
+      return `${idx + 1}. ${label}${ref.url ? ` — ${ref.url}` : ""}${relevance} [${ref.contextId}]`;
     })
     .join("\n");
   return `PREVIOUS CONTEXT REFERENCES:\n${recent}`;

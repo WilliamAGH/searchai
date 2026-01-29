@@ -5,28 +5,45 @@ const namingConventionRules = [
   "warn",
   { selector: "variable", modifiers: ["destructured"], format: null },
   { selector: "parameter", modifiers: ["destructured"], format: null },
+  // Allow test helper functions with double underscore prefix
+  {
+    selector: "function",
+    filter: { regex: "^__", match: true },
+    format: ["camelCase"],
+    leadingUnderscore: "allowDouble",
+  },
   {
     selector: "function",
     format: ["camelCase", "PascalCase"],
     leadingUnderscore: "forbid",
     trailingUnderscore: "forbid",
   },
+  // Allow leading underscore for private/internal variables (cache, internal state)
   {
     selector: "variable",
     modifiers: ["const"],
     format: ["camelCase", "PascalCase", "UPPER_CASE"],
-    leadingUnderscore: "forbid",
+    leadingUnderscore: "allowSingleOrDouble",
     trailingUnderscore: "forbid",
   },
   {
     selector: "variable",
     format: ["camelCase", "PascalCase"],
-    leadingUnderscore: "forbid",
+    leadingUnderscore: "allowSingleOrDouble",
     trailingUnderscore: "forbid",
   },
+  // Allow unused parameters with leading underscore (TypeScript convention)
+  // Must come before the general parameter rule to take precedence
   {
     selector: "parameter",
-    format: ["camelCase"],
+    filter: { regex: "^_", match: true },
+    format: null,
+    leadingUnderscore: "require",
+  },
+  // Allow PascalCase parameters for class/constructor references
+  {
+    selector: "parameter",
+    format: ["camelCase", "PascalCase"],
     leadingUnderscore: "forbid",
     trailingUnderscore: "forbid",
   },

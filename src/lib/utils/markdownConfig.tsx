@@ -63,9 +63,7 @@ export const REMARK_PLUGINS: PluggableList = [remarkGfm, remarkBreaks];
  * Rehype plugins for HTML sanitization.
  * Static - no need for memoization.
  */
-export const REHYPE_PLUGINS: PluggableList = [
-  [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA],
-];
+export const REHYPE_PLUGINS: PluggableList = [[rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]];
 
 /**
  * Code block renderer that ensures children are stringified.
@@ -75,8 +73,17 @@ export const CodeRenderer: NonNullable<Components["code"]> = ({
   className,
   children,
   ...props
-}: React.ComponentPropsWithoutRef<"code">) => (
-  <code className={className} {...props}>
-    {String(children)}
-  </code>
-);
+}: React.ComponentPropsWithoutRef<"code">) => {
+  // Safely convert children to string, handling various React node types
+  const textContent =
+    typeof children === "string" || typeof children === "number"
+      ? String(children)
+      : Array.isArray(children)
+        ? children.map((c) => (typeof c === "string" || typeof c === "number" ? c : "")).join("")
+        : "";
+  return (
+    <code className={className} {...props}>
+      {textContent}
+    </code>
+  );
+};

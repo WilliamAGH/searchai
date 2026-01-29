@@ -3,11 +3,7 @@ import { readFileSync } from "node:fs";
 
 const MAX_LINES = 350;
 
-const GENERATED_EXACT_PATHS = new Set([
-  "package-lock.json",
-  "pnpm-lock.yaml",
-  "yarn.lock",
-]);
+const GENERATED_EXACT_PATHS = new Set(["package-lock.json", "pnpm-lock.yaml", "yarn.lock"]);
 
 const GENERATED_PATH_PREFIXES = [
   "convex/_generated/",
@@ -64,9 +60,7 @@ for (const repoPath of trackedFiles) {
 if (violations.length > 0) {
   const sorted = [...violations].sort((a, b) => b.lineCount - a.lineCount);
   for (const v of sorted) {
-    process.stdout.write(
-      `${String(v.lineCount).padStart(5, " ")}  ${v.repoPath}\n`,
-    );
+    process.stdout.write(`${String(v.lineCount).padStart(5, " ")}  ${v.repoPath}\n`);
   }
 
   process.stdout.write(

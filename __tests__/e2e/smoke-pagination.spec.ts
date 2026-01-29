@@ -7,10 +7,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("smoke: pagination", () => {
-  test("basic pagination elements render without errors", async ({
-    page,
-    baseURL,
-  }) => {
+  test("basic pagination elements render without errors", async ({ page, baseURL }) => {
     const consoleErrors: string[] = [];
     const requestFailures: string[] = [];
     const responseFailures: string[] = [];
@@ -25,16 +22,12 @@ test.describe("smoke: pagination", () => {
           text.includes("Failed to send message") ||
           text.includes("403 (Forbidden)") ||
           text.includes("Failed to load resource") ||
-          text.includes(
-            'Viewport argument key "interactive-widget" not recognized',
-          )
+          text.includes('Viewport argument key "interactive-widget" not recognized')
         ) {
           return;
         }
         const loc = msg.location();
-        const where = loc.url
-          ? `${loc.url}:${loc.lineNumber ?? 0}:${loc.columnNumber ?? 0}`
-          : "";
+        const where = loc.url ? `${loc.url}:${loc.lineNumber ?? 0}:${loc.columnNumber ?? 0}` : "";
         consoleErrors.push(`${msg.text()}${where ? ` at ${where}` : ""}`);
       }
     });
@@ -49,9 +42,7 @@ test.describe("smoke: pagination", () => {
       if (url.startsWith("http://") || url.startsWith("https://")) {
         // Ignore favicon requests
         if (url.includes("favicon")) return;
-        requestFailures.push(
-          `${req.method()} ${url} -> ${req.failure()?.errorText}`,
-        );
+        requestFailures.push(`${req.method()} ${url} -> ${req.failure()?.errorText}`);
       }
     });
 
@@ -142,10 +133,7 @@ test.describe("smoke: pagination", () => {
 
     // Final assertions - ensure no errors occurred
     expect
-      .soft(
-        consoleErrors,
-        `No console errors during pagination test.\n${consoleErrors.join("\n")}`,
-      )
+      .soft(consoleErrors, `No console errors during pagination test.\n${consoleErrors.join("\n")}`)
       .toEqual([]);
 
     expect
@@ -195,9 +183,7 @@ test.describe("smoke: pagination", () => {
       expect(ariaLabel).toBeTruthy();
 
       // Check button has proper role or is semantic button
-      const tagName = await loadMoreButton.evaluate((el) =>
-        el.tagName.toLowerCase(),
-      );
+      const tagName = await loadMoreButton.evaluate((el) => el.tagName.toLowerCase());
       expect(tagName).toBe("button");
     }
 

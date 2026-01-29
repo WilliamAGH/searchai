@@ -17,9 +17,7 @@ export type { EnhancementRule } from "./enhancements/types";
 export { ENHANCEMENT_RULES };
 
 // Create search results from user-provided URLs
-export function createUserProvidedSearchResults(
-  urls: string[],
-): SearchResult[] {
+export function createUserProvidedSearchResults(urls: string[]): SearchResult[] {
   return urls.map((url) => {
     const parsedUrl = safeParseUrl(url);
     if (parsedUrl) {
@@ -60,9 +58,7 @@ export function applyEnhancements(
 
   const matchingRules = sortedRules.filter((rule) => rule.matcher(message));
 
-  const reportableRules = matchingRules.filter(
-    (r) => r.id !== "temporal-context",
-  );
+  const reportableRules = matchingRules.filter((r) => r.id !== "temporal-context");
 
   const result = {
     matchedRules: reportableRules.map((r) => ({ id: r.id, name: r.name })),
@@ -94,9 +90,7 @@ export function applyEnhancements(
     }
 
     if (options.enhanceSystemPrompt && rule.enhanceSystemPrompt) {
-      result.enhancedSystemPrompt = rule.enhanceSystemPrompt(
-        result.enhancedSystemPrompt,
-      );
+      result.enhancedSystemPrompt = rule.enhanceSystemPrompt(result.enhancedSystemPrompt);
     }
 
     if (rule.prioritizeUrls) {
@@ -117,10 +111,7 @@ export function applyEnhancements(
 /**
  * Check if a URL should be prioritized for scraping
  */
-export function shouldPrioritizeUrl(
-  url: string,
-  prioritizedUrls: string[],
-): boolean {
+export function shouldPrioritizeUrl(url: string, prioritizedUrls: string[]): boolean {
   const u = safeParseUrl(url);
   if (!u) return false;
 
@@ -138,9 +129,10 @@ export function shouldPrioritizeUrl(
 /**
  * Sort search results with prioritized URLs first
  */
-export function sortResultsWithPriority<
-  T extends { url: string; relevanceScore?: number },
->(results: T[], prioritizedUrls: string[]): T[] {
+export function sortResultsWithPriority<T extends { url: string; relevanceScore?: number }>(
+  results: T[],
+  prioritizedUrls: string[],
+): T[] {
   return [...results].sort((a, b) => {
     const aPriority = shouldPrioritizeUrl(a.url, prioritizedUrls);
     const bPriority = shouldPrioritizeUrl(b.url, prioritizedUrls);

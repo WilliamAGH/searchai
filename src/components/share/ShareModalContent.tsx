@@ -58,12 +58,7 @@ export function ShareModalContent({
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           aria-label="Close"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -97,10 +92,8 @@ export function ShareModalContent({
           </h2>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             {selectedPrivacy === "private" && "Only you can access this chat."}
-            {selectedPrivacy === "shared" &&
-              "Anyone with the link can view (not indexed)."}
-            {selectedPrivacy === "public" &&
-              "Publicly viewable and may appear in search results."}
+            {selectedPrivacy === "shared" && "Anyone with the link can view (not indexed)."}
+            {selectedPrivacy === "public" && "Publicly viewable and may appear in search results."}
             {selectedPrivacy === "llm" &&
               "LLM-friendly link; same visibility as Shared (not indexed)."}
           </p>
@@ -126,9 +119,7 @@ export function ShareModalContent({
                     className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 focus:ring-emerald-500"
                   />
                   <div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      Private
-                    </div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">Private</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                       Only you can see this chat.
                     </div>
@@ -147,9 +138,7 @@ export function ShareModalContent({
                     className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 focus:ring-emerald-500"
                   />
                   <div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      Shared
-                    </div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">Shared</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                       Anyone with the link can view. Not indexed.
                     </div>
@@ -168,9 +157,7 @@ export function ShareModalContent({
                     className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 focus:ring-emerald-500"
                   />
                   <div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      Public
-                    </div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">Public</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                       Anyone can view and it may appear in search results.
                     </div>
@@ -193,8 +180,7 @@ export function ShareModalContent({
                       LLM Link (Markdown .txt)
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Same visibility as Shared, formatted for LLMs; not
-                      indexed.
+                      Same visibility as Shared, formatted for LLMs; not indexed.
                     </div>
                   </div>
                 </label>
@@ -231,11 +217,7 @@ export function ShareModalContent({
                   onClick={onGenerateOrCopy}
                   className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-60"
                   aria-label={
-                    displayUrl
-                      ? "Copy URL to clipboard"
-                      : busy
-                        ? "Generating…"
-                        : "Generate URL"
+                    displayUrl ? "Copy URL to clipboard" : busy ? "Generating…" : "Generate URL"
                   }
                   disabled={busy}
                 >
@@ -253,18 +235,8 @@ export function ShareModalContent({
                         fill="none"
                         stroke="currentColor"
                       >
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          strokeWidth="4"
-                          className="opacity-25"
-                        />
-                        <path
-                          d="M4 12a8 8 0 018-8"
-                          strokeWidth="4"
-                          className="opacity-75"
-                        />
+                        <circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" />
+                        <path d="M4 12a8 8 0 018-8" strokeWidth="4" className="opacity-75" />
                       </svg>
                       Generating…
                     </span>

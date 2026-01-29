@@ -1,11 +1,7 @@
 import { useMemo } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat } from "@/lib/types/chat";
-import type {
-  Message,
-  SearchProgress,
-  PaginationState,
-} from "@/lib/types/message";
+import type { Message, SearchProgress, PaginationState } from "@/lib/types/message";
 
 interface UseComponentPropsArgs {
   allChats: Chat[];
@@ -106,8 +102,7 @@ export function useComponentProps({
       isGenerating,
       searchProgress,
       onToggleSidebar: handleToggleSidebar,
-      onRequestDeleteMessage: (messageId: string) =>
-        handleRequestDeleteMessage(messageId),
+      onRequestDeleteMessage: (messageId: string) => handleRequestDeleteMessage(messageId),
       // Pagination props (spread from grouped state)
       isLoadingMore: pagination?.isLoadingMore,
       hasMore: pagination?.hasMore,
@@ -130,22 +125,13 @@ export function useComponentProps({
   const messageInputProps = useMemo(
     () => ({
       disabled: false, // Never block input - allow sending messages while generating
-      placeholder: !currentChatId
-        ? "Start a new chat..."
-        : "Type your message...",
+      placeholder: !currentChatId ? "Start a new chat..." : "Type your message...",
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,
       onShare: isMobile ? () => setShowShareModal(true) : undefined,
     }),
-    [
-      currentChatId,
-      handleSendMessage,
-      handleDraftChange,
-      userHistory,
-      isMobile,
-      setShowShareModal,
-    ],
+    [currentChatId, handleSendMessage, handleDraftChange, userHistory, isMobile, setShowShareModal],
   );
 
   return {

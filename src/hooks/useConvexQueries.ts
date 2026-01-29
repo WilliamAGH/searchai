@@ -20,9 +20,7 @@ export function useConvexQueries({
   // Query for chat by opaque ID
   const chatByOpaqueId = useQuery(
     api.chats.getChatByOpaqueId,
-    propChatId
-      ? { opaqueId: propChatId, sessionId: sessionId || undefined }
-      : "skip",
+    propChatId ? { opaqueId: propChatId, sessionId: sessionId || undefined } : "skip",
   );
 
   // Query for chat by share ID

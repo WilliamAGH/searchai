@@ -25,7 +25,6 @@ export async function* streamResearchWorkflow(
   ctx: WorkflowActionCtx,
   args: StreamingWorkflowArgs,
 ): AsyncGenerator<WorkflowStreamEvent> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   // Dynamic require to avoid circular import with definitions.ts
   const { agents } = require("./definitions");
 
@@ -96,7 +95,11 @@ export async function* streamResearchWorkflow(
 
     if (planningResult.error) {
       logWorkflowError("PLANNING_ERROR", "Planning agent error", planningResult.error);
-      throw new Error(`Planning agent failed: ${planningResult.error}`);
+      const errorMsg =
+        planningResult.error instanceof Error
+          ? planningResult.error.message
+          : String(planningResult.error);
+      throw new Error(`Planning agent failed: ${errorMsg}`);
     }
 
     const planningOutput = safeParsePlanningOutput(planningResult.finalOutput, workflowId);

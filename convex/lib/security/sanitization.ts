@@ -32,13 +32,10 @@ export function robustSanitize(input: string): string {
 
   // 3. Convert fullwidth/special Unicode to ASCII
   // Fullwidth characters can be used to disguise malicious input
-  clean = clean.replace(/[\uFF01-\uFF5E]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0xfee0),
-  );
+  clean = clean.replace(/[\uFF01-\uFF5E]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
 
   // 4. Detect and neutralize base64 encoded injections
-  const base64Pattern =
-    /(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?/g;
+  const base64Pattern = /(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?/g;
   clean = clean.replace(base64Pattern, (match) => {
     // Skip short matches that are likely not base64
     if (match.length < 20) return match;
@@ -49,9 +46,7 @@ export function robustSanitize(input: string): string {
       const decoded = atob(match);
 
       // Check for common injection keywords in decoded content
-      if (
-        /system|ignore|instruction|assistant|forget|disregard/i.test(decoded)
-      ) {
+      if (/system|ignore|instruction|assistant|forget|disregard/i.test(decoded)) {
         return "[BASE64_BLOCKED]";
       }
     } catch (error) {
@@ -174,10 +169,7 @@ export function sanitizeHtmlContent(html: string): string {
   let clean = html;
 
   // Remove all script tags and content
-  clean = clean.replace(
-    /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-    "",
-  );
+  clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
 
   // Remove all style tags and content
   clean = clean.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");
@@ -211,15 +203,12 @@ export function sanitizeJson(jsonString: string): string | null {
       } else if (Array.isArray(obj)) {
         return obj.map(sanitizeObject);
       } else if (obj !== null && typeof obj === "object") {
+        const typedObj = obj as Record<string, unknown>;
         const result: Record<string, unknown> = {};
-        for (const key in obj as Record<string, unknown>) {
-          if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            // Sanitize the key as well
-            const sanitizedKey = robustSanitize(key);
-            result[sanitizedKey] = sanitizeObject(
-              (obj as Record<string, unknown>)[key],
-            );
-          }
+        for (const key of Object.keys(typedObj)) {
+          // Sanitize the key as well
+          const sanitizedKey = robustSanitize(key);
+          result[sanitizedKey] = sanitizeObject(typedObj[key]);
         }
         return result;
       }
@@ -259,7 +248,7 @@ export function normalizeSearchResult(result: unknown): {
     };
   }
 
-  // Type narrow to access properties safely
+  // Type guard: we know result is a non-null object
   const r = result as Record<string, unknown>;
 
   // Normalize relevanceScore - must be a number between 0 and 1
@@ -267,18 +256,23 @@ export function normalizeSearchResult(result: unknown): {
   if (typeof r.relevanceScore === "number") {
     // Clamp to valid range [0, 1]
     relevanceScore = Math.max(0, Math.min(1, r.relevanceScore));
-  } else if (r.relevanceScore !== undefined) {
-    // Try to parse if it's a string number
-    const parsed = parseFloat(String(r.relevanceScore));
+  } else if (typeof r.relevanceScore === "string") {
+    // Parse string numbers
+    const parsed = parseFloat(r.relevanceScore);
     if (!isNaN(parsed)) {
       relevanceScore = Math.max(0, Math.min(1, parsed));
     }
   }
 
+  // Extract string fields safely - only use string values, not objects
+  const titleValue = typeof r.title === "string" ? r.title : "Untitled";
+  const urlValue = typeof r.url === "string" ? r.url : "";
+  const snippetValue = typeof r.snippet === "string" ? r.snippet : "";
+
   return {
-    title: robustSanitize(String(r.title || "Untitled")),
-    url: String(r.url || ""), // Don't sanitize URLs - might break them
-    snippet: robustSanitize(String(r.snippet || "")),
+    title: robustSanitize(titleValue),
+    url: urlValue, // Don't sanitize URLs - might break them
+    snippet: robustSanitize(snippetValue),
     relevanceScore,
   };
 }

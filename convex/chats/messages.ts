@@ -28,11 +28,7 @@ export const getChatMessages = query({
       _id: v.id("messages"),
       _creationTime: v.number(),
       chatId: v.id("chats"),
-      role: v.union(
-        v.literal("user"),
-        v.literal("assistant"),
-        v.literal("system"),
-      ),
+      role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
       content: v.optional(v.string()),
       timestamp: v.optional(v.number()),
       isStreaming: v.optional(v.boolean()),
@@ -51,8 +47,7 @@ export const getChatMessages = query({
 
     if (!chat) return [];
 
-    const isSharedOrPublic =
-      chat.privacy === "shared" || chat.privacy === "public";
+    const isSharedOrPublic = chat.privacy === "shared" || chat.privacy === "public";
     const isUserOwner = hasUserAccess(chat, userId);
     const isSessionOwner = hasSessionAccess(chat, args.sessionId);
 
@@ -95,14 +90,10 @@ export const getChatMessages = query({
       isStreaming: m.isStreaming,
       streamedContent: m.streamedContent,
       thinking: m.thinking,
-      searchResults: Array.isArray(m.searchResults)
-        ? m.searchResults
-        : undefined,
+      searchResults: Array.isArray(m.searchResults) ? m.searchResults : undefined,
       sources: Array.isArray(m.sources) ? m.sources : undefined,
       reasoning: m.reasoning,
-      contextReferences: Array.isArray(m.contextReferences)
-        ? m.contextReferences
-        : undefined,
+      contextReferences: Array.isArray(m.contextReferences) ? m.contextReferences : undefined,
       workflowId: m.workflowId,
     }));
   },
@@ -124,11 +115,7 @@ export const getChatMessagesHttp = query({
       _id: v.id("messages"),
       _creationTime: v.number(),
       chatId: v.id("chats"),
-      role: v.union(
-        v.literal("user"),
-        v.literal("assistant"),
-        v.literal("system"),
-      ),
+      role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
       content: v.optional(v.string()),
       timestamp: v.optional(v.number()),
       isStreaming: v.optional(v.boolean()),
@@ -146,8 +133,7 @@ export const getChatMessagesHttp = query({
 
     if (!chat) return [];
 
-    const isSharedOrPublic =
-      chat.privacy === "shared" || chat.privacy === "public";
+    const isSharedOrPublic = chat.privacy === "shared" || chat.privacy === "public";
     const isSessionOwner = hasSessionAccess(chat, args.sessionId);
 
     if (!isSharedOrPublic && !isSessionOwner) {
@@ -184,14 +170,10 @@ export const getChatMessagesHttp = query({
       isStreaming: m.isStreaming,
       streamedContent: m.streamedContent,
       thinking: m.thinking,
-      searchResults: Array.isArray(m.searchResults)
-        ? m.searchResults
-        : undefined,
+      searchResults: Array.isArray(m.searchResults) ? m.searchResults : undefined,
       sources: Array.isArray(m.sources) ? m.sources : undefined,
       reasoning: m.reasoning,
-      contextReferences: Array.isArray(m.contextReferences)
-        ? m.contextReferences
-        : undefined,
+      contextReferences: Array.isArray(m.contextReferences) ? m.contextReferences : undefined,
       workflowId: m.workflowId,
     }));
   },

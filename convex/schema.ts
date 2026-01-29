@@ -26,9 +26,7 @@ const applicationTables = {
     shareId: v.optional(v.string()),
     publicId: v.optional(v.string()),
     threadId: v.optional(v.string()), // UUID v7 for conversation thread tracking
-    privacy: v.optional(
-      v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
-    ),
+    privacy: v.optional(v.union(v.literal("private"), v.literal("shared"), v.literal("public"))),
     createdAt: v.number(),
     updatedAt: v.number(),
     rollingSummary: v.optional(v.string()),
@@ -52,11 +50,7 @@ const applicationTables = {
     chatId: v.id("chats"),
     messageId: v.optional(v.string()), // UUID v7 for unique message tracking
     threadId: v.optional(v.string()), // UUID v7 for thread/conversation tracking
-    role: v.union(
-      v.literal("user"),
-      v.literal("assistant"),
-      v.literal("system"),
-    ),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
     content: v.optional(v.string()),
     searchResults: v.optional(
       v.array(
@@ -115,11 +109,7 @@ const applicationTables = {
     signature: v.string(),
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
-    status: v.union(
-      v.literal("active"),
-      v.literal("completed"),
-      v.literal("invalidated"),
-    ),
+    status: v.union(v.literal("active"), v.literal("completed"), v.literal("invalidated")),
     issuedAt: v.number(),
     expiresAt: v.number(),
   })

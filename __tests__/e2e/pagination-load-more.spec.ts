@@ -2,9 +2,7 @@ import { test, expect } from "@playwright/test";
 
 // smoke: pagination load more UI wiring
 test.describe("smoke: pagination load more", () => {
-  test("increases count after load more (if chat present)", async ({
-    page,
-  }) => {
+  test("increases count after load more (if chat present)", async ({ page }) => {
     await page.goto(process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173");
 
     // If no message list is rendered (no chat/seed), gracefully skip
@@ -13,8 +11,7 @@ test.describe("smoke: pagination load more", () => {
       .first()
       .isVisible()
       .catch(() => false);
-    if (!hasCount)
-      test.skip(true, "No chat/message list detected in environment");
+    if (!hasCount) test.skip(true, "No chat/message list detected in environment");
 
     const initial = await countLocator.first().innerText();
 

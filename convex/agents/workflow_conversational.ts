@@ -47,7 +47,6 @@ export async function* streamConversationalWorkflow(
   ctx: WorkflowActionCtx,
   args: StreamingWorkflowArgs,
 ): AsyncGenerator<WorkflowStreamEvent> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { agents } = require("./definitions");
 
   const workflowId = generateMessageId();

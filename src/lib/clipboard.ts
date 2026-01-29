@@ -102,9 +102,7 @@ export function formatConversationWithSources(
       if (message.sources && message.sources.length > 0) {
         // Only add if not already in searchResults
         message.sources.forEach((sourceUrl) => {
-          const alreadyIncluded = message.searchResults?.some(
-            (r) => r.url === sourceUrl,
-          );
+          const alreadyIncluded = message.searchResults?.some((r) => r.url === sourceUrl);
           if (!alreadyIncluded) {
             sources.push(`  • ${sourceUrl}`);
           }

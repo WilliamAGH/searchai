@@ -10,14 +10,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { logger } from "@/lib/logger";
 import { copyToClipboard } from "@/lib/clipboard";
 import { formatConversationMarkdown } from "@/lib/utils";
-import type {
-  PrivacyOption,
-  ShareModalMessage,
-} from "@/components/share/shareModalTypes";
-import {
-  buildShareUrl,
-  toPersistedPrivacy,
-} from "@/components/share/shareModalUtils";
+import type { PrivacyOption, ShareModalMessage } from "@/components/share/shareModalTypes";
+import { buildShareUrl, toPersistedPrivacy } from "@/components/share/shareModalUtils";
 import { ShareModalContent } from "@/components/share/ShareModalContent";
 
 interface ShareModalProps {
@@ -49,16 +43,16 @@ export function ShareModal({
   exportBase,
   messages,
 }: ShareModalProps) {
-  const [selectedPrivacy, setSelectedPrivacy] = useState<
-    "private" | "shared" | "public" | "llm"
-  >(privacy);
+  const [selectedPrivacy, setSelectedPrivacy] = useState<"private" | "shared" | "public" | "llm">(
+    privacy,
+  );
   const [urlCopied, setUrlCopied] = useState(false);
   const [markdownCopied, setMarkdownCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string>("");
-  const [generatedFor, setGeneratedFor] = useState<
-    "private" | "shared" | "public" | "llm" | null
-  >(null);
+  const [generatedFor, setGeneratedFor] = useState<"private" | "shared" | "public" | "llm" | null>(
+    null,
+  );
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -148,8 +142,7 @@ export function ShareModal({
         const ok = await copyToClipboard(displayUrl);
         if (ok) {
           setUrlCopied(true);
-          if (copyTimeoutRef.current !== null)
-            clearTimeout(copyTimeoutRef.current);
+          if (copyTimeoutRef.current !== null) clearTimeout(copyTimeoutRef.current);
           copyTimeoutRef.current = setTimeout(() => setUrlCopied(false), 2000);
         }
       } catch (error) {

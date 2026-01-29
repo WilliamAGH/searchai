@@ -1,12 +1,6 @@
 /** Main chat interface - orchestrates chats/messages for all users. */
 import { useAction, useMutation } from "convex/react";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useUnifiedChat } from "@/hooks/useUnifiedChat";
@@ -51,10 +45,7 @@ function ChatInterfaceComponent({
 }) {
   const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
   const apiBase = buildApiBase(convexUrl);
-  const resolveApi = useCallback(
-    (path: string) => resolveApiPath(apiBase, path),
-    [apiBase],
-  );
+  const resolveApi = useCallback((path: string) => resolveApiPath(apiBase, path), [apiBase]);
 
   const [localIsGenerating, setIsGenerating] = useState(false);
 
@@ -84,19 +75,16 @@ function ChatInterfaceComponent({
   const userSelectedChatAtRef = useRef<number | null>(null);
   // @ts-ignore - Convex api type instantiation is too deep here
   const deleteChat = useMutation(api.chats.deleteChat);
-  const deleteMessage = useMutation<typeof api.messages.deleteMessage>(
-    api.messages.deleteMessage,
-  );
+  const deleteMessage = useMutation<typeof api.messages.deleteMessage>(api.messages.deleteMessage);
 
   // Get all chats (Convex-backed only)
   const allChats = useMemo<Chat[]>(() => chats ?? [], [chats]);
 
-  const { navigateWithVerification, handleSelectChat: navHandleSelectChat } =
-    useChatNavigation({
-      currentChatId,
-      allChats,
-      onSelectChat: chatActions.selectChat,
-    });
+  const { navigateWithVerification, handleSelectChat: navHandleSelectChat } = useChatNavigation({
+    currentChatId,
+    allChats,
+    onSelectChat: chatActions.selectChat,
+  });
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
 
   const { chatByOpaqueId, chatByShareId, chatByPublicId } = useConvexQueries({
@@ -107,18 +95,14 @@ function ChatInterfaceComponent({
   });
 
   // Use deletion handlers hook for all deletion operations
-  const {
-    handleRequestDeleteChat,
-    handleRequestDeleteMessage,
-    undoBanner,
-    setUndoBanner,
-  } = useDeletionHandlers({
-    chatState,
-    chatActions,
-    deleteChat,
-    deleteMessage,
-    sessionId: sessionId || undefined,
-  });
+  const { handleRequestDeleteChat, handleRequestDeleteMessage, undoBanner, setUndoBanner } =
+    useDeletionHandlers({
+      chatState,
+      chatActions,
+      deleteChat,
+      deleteMessage,
+      sessionId: sessionId || undefined,
+    });
 
   const handleSelectChat = useCallback(
     (id: Id<"chats"> | string | null) => {
@@ -127,7 +111,7 @@ function ChatInterfaceComponent({
         void chatActions.selectChat(null);
         return;
       }
-      navHandleSelectChat(String(id));
+      void navHandleSelectChat(String(id));
     },
     [chatActions, navHandleSelectChat],
   );
@@ -160,14 +144,8 @@ function ChatInterfaceComponent({
     currentChatId,
   });
 
-  const currentMessages = useMemo(
-    () => mapMessagesToLocal(effectiveMessages),
-    [effectiveMessages],
-  );
-  const userHistory = useMemo(
-    () => buildUserHistory(currentMessages),
-    [currentMessages],
-  );
+  const currentMessages = useMemo(() => mapMessagesToLocal(effectiveMessages), [effectiveMessages]);
+  const userHistory = useMemo(() => buildUserHistory(currentMessages), [currentMessages]);
 
   useUrlStateSync({
     currentChatId,
@@ -265,59 +243,54 @@ function ChatInterfaceComponent({
   const isMobile = useIsMobile(1024);
 
   // Keyboard shortcuts and interaction handlers
-  const { swipeHandlers, handleToggleSidebar, handleNewChatButton } =
-    useKeyboardShortcuts({
-      isMobile,
-      sidebarOpen,
-      onToggleSidebar,
-      onNewChat: async () => {
-        // Reset state first
-        userSelectedChatAtRef.current = Date.now();
-        setMessageCount(0);
-        resetFollowUp();
-        setPendingMessage("");
+  const { swipeHandlers, handleToggleSidebar, handleNewChatButton } = useKeyboardShortcuts({
+    isMobile,
+    sidebarOpen,
+    onToggleSidebar,
+    onNewChat: async () => {
+      // Reset state first
+      userSelectedChatAtRef.current = Date.now();
+      setMessageCount(0);
+      resetFollowUp();
+      setPendingMessage("");
 
-        // Create chat and navigate to it
-        await handleNewChat({ userInitiated: true });
-      },
-      onShare: openShareModal,
-    });
+      // Create chat and navigate to it
+      await handleNewChat({ userInitiated: true });
+    },
+    onShare: openShareModal,
+  });
 
   // Prepare props for all child components
-  const {
-    chatSidebarProps,
-    mobileSidebarProps,
-    messageListProps,
-    messageInputProps,
-  } = useComponentProps({
-    allChats,
-    currentChatId,
-    currentMessages,
-    sidebarOpen,
-    isMobile,
-    isGenerating,
-    searchProgress,
-    isCreatingChat,
-    handleSelectChat,
-    handleToggleSidebar,
-    handleNewChatButton,
-    handleRequestDeleteChat,
-    handleRequestDeleteMessage,
-    handleMobileSidebarClose,
-    handleSendMessage,
-    handleDraftChange,
-    setShowShareModal,
-    userHistory,
-    pagination: {
-      isLoadingMore,
-      hasMore,
-      onLoadMore: handlePaginatedLoadMore,
-      isLoadingMessages,
-      loadError,
-      retryCount,
-      onClearError: clearError,
-    },
-  });
+  const { chatSidebarProps, mobileSidebarProps, messageListProps, messageInputProps } =
+    useComponentProps({
+      allChats,
+      currentChatId,
+      currentMessages,
+      sidebarOpen,
+      isMobile,
+      isGenerating,
+      searchProgress,
+      isCreatingChat,
+      handleSelectChat,
+      handleToggleSidebar,
+      handleNewChatButton,
+      handleRequestDeleteChat,
+      handleRequestDeleteMessage,
+      handleMobileSidebarClose,
+      handleSendMessage,
+      handleDraftChange,
+      setShowShareModal,
+      userHistory,
+      pagination: {
+        isLoadingMore,
+        hasMore,
+        onLoadMore: handlePaginatedLoadMore,
+        isLoadingMessages,
+        loadError,
+        retryCount,
+        onClearError: clearError,
+      },
+    });
 
   return (
     <ChatLayout
