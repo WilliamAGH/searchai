@@ -1,6 +1,6 @@
 # Architecture
 
-## High level
+## High-level
 
 - **Frontend**: React + Vite (`src/`)
 - **Backend**: Convex (`convex/`)

@@ -108,7 +108,7 @@ alwaysApply: true
 
 - [CC1a] **Mandatory Principles**: Clean Code principles (Robert C. Martin) and Domain-Driven Design (DDD) are **mandatory** and required in this repository.
 - [CC1b] **DRY (Don't Repeat Yourself)**: Avoid redundant code. Reuse code where appropriate and consistent with clean code principles.
-- [CC1c] **YAGNI (You Aren't Gonna Need It)**: Do not build features or abstractions "just in case". Implement only what is required for the current task.
+- [CC1c] **YAGNI (You Aren't Going to Need It)**: Do not build features or abstractions "just in case". Implement only what is required for the current task.
 - [CC1d] **Clean Architecture**: Dependencies point inward. Domain logic has zero framework imports.
 
 ## [IM1] Import Rules

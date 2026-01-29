@@ -28,10 +28,7 @@ This is **documented SDK behavior**, not a workaround. The SDK's own `Tool` type
 
 ```typescript
 // From @openai/agents-core/dist/tool.d.ts
-export type Tool<Context = unknown> =
-  | FunctionTool<Context, any, any>
-  | ComputerTool
-  | HostedTool;
+export type Tool<Context = unknown> = FunctionTool<Context, any, any> | ComputerTool | HostedTool;
 ```
 
 ### Correct Pattern
@@ -68,8 +65,8 @@ export const toolsList: Tool<MyContext>[] = [...]; // Won't satisfy Agent.create
 
 ### References
 
-- OpenAI Agents JS Tools Guide: https://openai.github.io/openai-agents-js/guides/tools
-- Tool Type Definition: https://openai.github.io/openai-agents-js/openai/agents-core/type-aliases/tool
+- [OpenAI Agents JS Tools Guide](https://openai.github.io/openai-agents-js/guides/tools)
+- [Tool Type Definition](https://openai.github.io/openai-agents-js/openai/agents-core/type-aliases/tool)
 - Canonical implementation: `convex/agents/tools.ts`
 
 ## Zod Version Boundary

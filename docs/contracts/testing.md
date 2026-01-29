@@ -17,7 +17,7 @@ COVERAGE_PROVIDER: V8
 # Runtime
 NODE_VERSION: 22 LTS
 VITE_VERSION: 6.x
-REACT_VERSION: 19.2.x
+REACT_VERSION: 19.1.x
 ```
 
 ## Critical Rules ([VR1] Enforcement)
@@ -87,7 +87,7 @@ npm run test:integration
 
 ### The Testing Trophy (2025)
 
-```
+```text
        /\        E2E Tests (10%)
       /  \       - Critical user journeys
      /    \      - Smoke tests

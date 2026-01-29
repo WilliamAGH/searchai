@@ -1,9 +1,5 @@
 "use node";
-import {
-  logWorkflow,
-  logContextPipeline,
-  logWorkflowComplete,
-} from "./workflow_logger";
+import { logWorkflow, logContextPipeline, logWorkflowComplete } from "./workflow_logger";
 import { executeParallelResearch } from "./parallel_research";
 import { executeSynthesis } from "./synthesis_executor";
 import { RELEVANCE_SCORES, CONTENT_LIMITS } from "../lib/constants/cache";
@@ -11,30 +7,16 @@ import {
   convertToContextReferences,
   buildSearchResultsFromContextRefs,
 } from "./orchestration_helpers";
-import {
-  buildCompleteEvent,
-  buildMetadataEvent,
-  createWorkflowEvent,
-} from "./workflow_events";
-import type {
-  WorkflowStreamEvent,
-  WorkflowPathArgs,
-} from "./workflow_event_types";
+import { buildCompleteEvent, buildMetadataEvent, createWorkflowEvent } from "./workflow_events";
+import type { WorkflowStreamEvent, WorkflowPathArgs } from "./workflow_event_types";
 import {
   updateChatTitleIfNeeded,
   persistAssistantMessage,
   completeWorkflowWithSignature,
 } from "./orchestration_persistence";
 import { generateMessageId } from "../lib/id_generator";
-import type {
-  ResearchOutput,
-  StreamingPersistPayload,
-} from "../schemas/agents";
-import {
-  mapAsyncGenerator,
-  mapSynthesisEvent,
-  mapResearchEvent,
-} from "./workflow_utils";
+import type { ResearchOutput, StreamingPersistPayload } from "../schemas/agents";
+import { mapAsyncGenerator, mapSynthesisEvent, mapResearchEvent } from "./workflow_utils";
 
 export async function* executeParallelPath({
   ctx,
@@ -47,6 +29,7 @@ export async function* executeParallelPath({
   planningOutput,
 }: WorkflowPathArgs): AsyncGenerator<WorkflowStreamEvent> {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // Dynamic require to avoid circular import with definitions.ts
   const { agents } = require("./definitions");
   const writeEvent = (type: string, data: Record<string, unknown>) =>
     createWorkflowEvent(type, data);
@@ -56,35 +39,27 @@ export async function* executeParallelPath({
   });
 
   // Use mapAsyncGenerator to consume and capture the return value
-  const parallelResearchReturn = yield* mapAsyncGenerator(
-    parallelResearchGenerator,
-    (event) => mapResearchEvent(event, writeEvent),
+  const parallelResearchReturn = yield* mapAsyncGenerator(parallelResearchGenerator, (event) =>
+    mapResearchEvent(event, writeEvent),
   );
   const { harvested, stats: parallelStats } = parallelResearchReturn;
-  logWorkflow(
-    "PARALLEL_EXECUTION_COMPLETE",
-    `Total: ${parallelStats.totalDurationMs}ms`,
-  );
+  logWorkflow("PARALLEL_EXECUTION_COMPLETE", `Total: ${parallelStats.totalDurationMs}ms`);
   const syntheticKeyFindings = harvested.scrapedContent
     .filter(
-      (scraped) =>
-        scraped.summary &&
-        scraped.summary.length > CONTENT_LIMITS.MIN_SUMMARY_LENGTH,
+      (scraped) => scraped.summary && scraped.summary.length > CONTENT_LIMITS.MIN_SUMMARY_LENGTH,
     )
     .slice(0, 5)
     .map((scraped) => ({
       finding:
         scraped.summary.length > CONTENT_LIMITS.LOG_DISPLAY_LENGTH + 3
-          ? scraped.summary.substring(0, CONTENT_LIMITS.LOG_DISPLAY_LENGTH) +
-            "..."
+          ? scraped.summary.substring(0, CONTENT_LIMITS.LOG_DISPLAY_LENGTH) + "..."
           : scraped.summary,
       sources: [scraped.url],
-      confidence:
-        (scraped.relevanceScore ?? 0) >= RELEVANCE_SCORES.HIGH_THRESHOLD
-          ? "high"
-          : (scraped.relevanceScore ?? 0) >= RELEVANCE_SCORES.MEDIUM_THRESHOLD
-            ? "medium"
-            : "low",
+      confidence: ((scraped.relevanceScore ?? 0) >= RELEVANCE_SCORES.HIGH_THRESHOLD
+        ? "high"
+        : (scraped.relevanceScore ?? 0) >= RELEVANCE_SCORES.MEDIUM_THRESHOLD
+          ? "medium"
+          : "low") as "high" | "medium" | "low",
     }));
   const researchOutput: ResearchOutput = {
     researchSummary:
@@ -104,9 +79,7 @@ export async function* executeParallelPath({
       relevanceScore: sc.relevanceScore,
     })),
     serpEnrichment:
-      Object.keys(harvested.serpEnrichment).length > 0
-        ? harvested.serpEnrichment
-        : null,
+      Object.keys(harvested.serpEnrichment).length > 0 ? harvested.serpEnrichment : null,
     researchQuality:
       harvested.scrapedContent.length >= 2
         ? "comprehensive"
@@ -114,24 +87,18 @@ export async function* executeParallelPath({
           ? "adequate"
           : "limited",
   };
-  const scrapedUrlMap = new Map(
-    harvested.scrapedContent.map((s) => [s.url, s]),
-  );
-  const sources: ResearchOutput["sourcesUsed"] = harvested.searchResults.map(
-    (r) => {
-      const scraped = scrapedUrlMap.get(r.url);
-      return {
-        url: r.url,
-        title: r.title,
-        contextId: scraped ? scraped.contextId : generateMessageId(),
-        type: scraped ? "scraped_page" : "search_result",
-        relevance: r.relevanceScore > 0.7 ? "high" : "medium",
-      };
-    },
-  );
-  researchOutput.sourcesUsed = Array.from(
-    new Map(sources.map((s) => [s.url, s])).values(),
-  );
+  const scrapedUrlMap = new Map(harvested.scrapedContent.map((s) => [s.url, s]));
+  const sources: ResearchOutput["sourcesUsed"] = harvested.searchResults.map((r) => {
+    const scraped = scrapedUrlMap.get(r.url);
+    return {
+      url: r.url,
+      title: r.title,
+      contextId: scraped ? scraped.contextId : generateMessageId(),
+      type: scraped ? "scraped_page" : "search_result",
+      relevance: r.relevanceScore > 0.7 ? "high" : "medium",
+    };
+  });
+  researchOutput.sourcesUsed = Array.from(new Map(sources.map((s) => [s.url, s])).values());
   yield writeEvent("progress", {
     stage: "analyzing",
     message: `Analyzing findings from ${researchOutput.sourcesUsed?.length || 0} sources...`,
@@ -147,10 +114,8 @@ export async function* executeParallelPath({
       : harvested.scrapedContent;
 
   const hasAgentEnrichment =
-    researchOutput.serpEnrichment &&
-    Object.keys(researchOutput.serpEnrichment).length > 0;
-  const hasHarvestedEnrichment =
-    Object.keys(harvested.serpEnrichment).length > 0;
+    researchOutput.serpEnrichment && Object.keys(researchOutput.serpEnrichment).length > 0;
+  const hasHarvestedEnrichment = Object.keys(harvested.serpEnrichment).length > 0;
   const mergedSerpEnrichment = hasAgentEnrichment
     ? (researchOutput.serpEnrichment ?? undefined)
     : hasHarvestedEnrichment
@@ -164,11 +129,9 @@ export async function* executeParallelPath({
     agentEnrichmentKeys: Object.keys(researchOutput.serpEnrichment || {}),
     harvestedEnrichmentKeys: Object.keys(harvested.serpEnrichment),
     usingHarvestedScraped:
-      mergedScrapedContent === harvested.scrapedContent &&
-      harvested.scrapedContent.length > 0,
+      mergedScrapedContent === harvested.scrapedContent && harvested.scrapedContent.length > 0,
     usingHarvestedEnrichment:
-      mergedSerpEnrichment === harvested.serpEnrichment &&
-      hasHarvestedEnrichment,
+      mergedSerpEnrichment === harvested.serpEnrichment && hasHarvestedEnrichment,
     hasKnowledgeGraph: !!mergedSerpEnrichment?.knowledgeGraph,
     hasAnswerBox: !!mergedSerpEnrichment?.answerBox,
   });
@@ -212,11 +175,7 @@ export async function* executeParallelPath({
   ) {
     throw new Error("Research output is empty or invalid");
   }
-  if (
-    !parsedAnswer ||
-    typeof parsedAnswer !== "object" ||
-    Object.keys(parsedAnswer).length === 0
-  ) {
+  if (!parsedAnswer || typeof parsedAnswer !== "object" || Object.keys(parsedAnswer).length === 0) {
     throw new Error("Parsed answer is empty or invalid");
   }
 
@@ -255,8 +214,7 @@ export async function* executeParallelPath({
       startTime,
       planning: {
         ...planningOutput,
-        anticipatedChallenges:
-          planningOutput.anticipatedChallenges ?? undefined,
+        anticipatedChallenges: planningOutput.anticipatedChallenges ?? undefined,
       },
       research: {
         ...researchOutput,
