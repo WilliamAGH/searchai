@@ -21,9 +21,8 @@ test.describe("New Chat Stress Tests", () => {
       const creatingBtn = page
         .locator('button:has-text("Creating...")')
         .first();
-      const isCreating = await creatingBtn
-        .isVisible({ timeout: 500 })
-        .catch(() => false);
+      const creatingCount = await creatingBtn.count();
+      const isCreating = creatingCount > 0 && (await creatingBtn.isVisible());
       if (isCreating) {
         await expect(creatingBtn).not.toBeVisible({ timeout: 10000 });
       }

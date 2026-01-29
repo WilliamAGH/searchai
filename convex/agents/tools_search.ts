@@ -101,6 +101,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
     });
 
     try {
+      // @ts-ignore - Known Convex limitation with complex type inference
       const results = await actionCtx.runAction(api.search.searchWeb, {
         query: input.query,
         maxResults: input.maxResults || 5,

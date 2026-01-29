@@ -163,10 +163,10 @@ test.describe("New Chat Resilience", () => {
       )
       .catch(() => {});
 
-    const errorBoundaryVisible = await page
-      .locator("text=/Something went wrong/")
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
+    const errorBoundary = page.locator("text=/Something went wrong/");
+    const errorBoundaryCount = await errorBoundary.count();
+    const errorBoundaryVisible =
+      errorBoundaryCount > 0 && (await errorBoundary.isVisible());
 
     if (errorBoundaryVisible) {
       const homeButton = page.locator('button:has-text("Go to Home")');

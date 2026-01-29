@@ -19,7 +19,8 @@ export async function ensureSidebarOpen(page: Page): Promise<void> {
     const menuButton = page
       .locator('button[aria-label="Toggle sidebar"]')
       .first();
-    const isMenuVisible = await menuButton.isVisible().catch(() => false);
+    const menuButtonCount = await menuButton.count();
+    const isMenuVisible = menuButtonCount > 0 && (await menuButton.isVisible());
 
     if (isMenuVisible) {
       await menuButton.click();
@@ -66,18 +67,18 @@ export async function ensureSidebarOpen(page: Page): Promise<void> {
   } else {
     // Desktop: Check if sidebar is already visible
     const newChatButton = page.locator('button:has-text("New Chat")').first();
-    const isNewChatVisible = await newChatButton
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
+    const newChatCount = await newChatButton.count();
+    const isNewChatVisible =
+      newChatCount > 0 && (await newChatButton.isVisible());
 
     if (!isNewChatVisible) {
       // Try to find and click the sidebar toggle
       const sidebarToggle = page
         .locator('button[aria-label="Toggle sidebar"]')
         .first();
-      const isToggleVisible = await sidebarToggle
-        .isVisible()
-        .catch(() => false);
+      const toggleCount = await sidebarToggle.count();
+      const isToggleVisible =
+        toggleCount > 0 && (await sidebarToggle.isVisible());
 
       if (isToggleVisible) {
         await sidebarToggle.click();
@@ -125,11 +126,9 @@ export async function createNewChat(page: Page): Promise<string> {
   await button.click();
 
   // Wait for loading state if it appears
-  const loadingVisible = await page
-    .locator('button:has-text("Creating...")')
-    .first()
-    .isVisible({ timeout: 500 })
-    .catch(() => false);
+  const loadingButton = page.locator('button:has-text("Creating...")').first();
+  const loadingCount = await loadingButton.count();
+  const loadingVisible = loadingCount > 0 && (await loadingButton.isVisible());
 
   if (loadingVisible) {
     await expect(

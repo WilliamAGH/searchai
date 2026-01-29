@@ -146,15 +146,15 @@ test.describe("New Chat Basics", () => {
     await newChatButton.click();
     await page.waitForURL(/\/(chat)\/.+/, { timeout: 10000 });
 
-    const isStillOpen = await newChatButton
-      .isVisible({ timeout: 1000 })
-      .catch(() => false);
+    const buttonCount = await newChatButton.count();
+    const isStillOpen = buttonCount > 0 && (await newChatButton.isVisible());
 
     if (!isStillOpen) {
       const sidebarToggle = page
         .locator('button[aria-label="Toggle sidebar"]')
         .first();
-      if (await sidebarToggle.isVisible().catch(() => false)) {
+      const toggleCount = await sidebarToggle.count();
+      if (toggleCount > 0 && (await sidebarToggle.isVisible())) {
         await sidebarToggle.click();
       }
     }

@@ -9,20 +9,16 @@ test.describe("smoke: pagination load more", () => {
 
     // If no message list is rendered (no chat/seed), gracefully skip
     const countLocator = page.locator('[data-testid="count"]');
-    const hasCount = await countLocator
-      .first()
-      .isVisible()
-      .catch(() => false);
+    const countCount = await countLocator.first().count();
+    const hasCount = countCount > 0 && (await countLocator.first().isVisible());
     if (!hasCount)
       test.skip(true, "No chat/message list detected in environment");
 
     const initial = await countLocator.first().innerText();
 
     const loadMoreBtn = page.locator('[data-testid="loadMore"]');
-    const hasLoadMore = await loadMoreBtn
-      .first()
-      .isVisible()
-      .catch(() => false);
+    const loadMoreCount = await loadMoreBtn.first().count();
+    const hasLoadMore = loadMoreCount > 0 && (await loadMoreBtn.first().isVisible());
     if (!hasLoadMore) test.skip(true, "No load more button present");
 
     await loadMoreBtn.first().click();
