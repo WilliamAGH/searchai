@@ -34,20 +34,22 @@ jobs:
 
       - name: Test vite preview server directly
         run: |
-          echo "=== Starting vite preview ==="
-          npx vite preview --strictPort --port 5173 --host 127.0.0.1 &
+          # Use port 5174 to avoid conflict with Playwright's port 5173
+          echo "=== Starting vite preview on port 5174 ==="
+          npx vite preview --strictPort --port 5174 --host 127.0.0.1 &
           SERVER_PID=$!
           echo "Server PID: $SERVER_PID"
           sleep 5
           echo "=== Checking if server process is running ==="
           ps aux | grep -E "vite|node" | grep -v grep | head -5 || echo "Process grep failed"
           echo "=== Checking open ports ==="
-          ss -tlnp | grep 5173 || echo "ss command failed or port not found"
+          ss -tlnp | grep 5174 || echo "ss command failed or port not found"
           echo "=== Testing HTTP connection ==="
-          curl -v --connect-timeout 10 http://127.0.0.1:5173/ 2>&1 | head -30 || echo "Curl failed!"
+          curl -v --connect-timeout 10 http://127.0.0.1:5174/ 2>&1 | head -30 || echo "Curl failed!"
           echo "=== Cleanup ==="
           kill $SERVER_PID 2>/dev/null || true
-          sleep 1
+          pkill -f "vite preview.*5174" 2>/dev/null || true
+          sleep 2
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium firefox webkit
