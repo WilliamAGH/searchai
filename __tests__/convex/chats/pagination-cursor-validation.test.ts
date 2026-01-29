@@ -29,35 +29,27 @@ describe("Pagination Cursor Security Requirements", () => {
       accessControl: {
         description: "Chat access is validated before any cursor processing",
         implementation: "Lines 51-72 in messagesPaginated.ts",
-        checks: [
-          "Chat exists",
-          "User is owner OR chat is anonymous OR chat is public/shared",
-        ],
+        checks: ["Chat exists", "User is owner OR chat is anonymous OR chat is public/shared"],
       },
 
       // Requirement 2: Cursor validation prevents cross-chat leakage
       cursorValidation: {
         description: "Cursor must belong to requested chat",
         implementation: "Lines 112-126 in messagesPaginated.ts",
-        checks: [
-          "Cursor message exists",
-          "Cursor message.chatId === requested chatId",
-        ],
+        checks: ["Cursor message exists", "Cursor message.chatId === requested chatId"],
         onFailure: "Return empty result { messages: [], hasMore: false }",
       },
 
       // Requirement 3: No fallback to unfiltered queries
       noFallback: {
         description: "Invalid cursors do not execute queries on original chat",
-        rationale:
-          "Prevents malicious cursor from different chat exposing data",
+        rationale: "Prevents malicious cursor from different chat exposing data",
         implementation: "Early return on validation failure (line 122-125)",
       },
 
       // Requirement 4: Query construction happens after validation
       queryOrder: {
-        description:
-          "Base query is built, then cursor validation, then execution",
+        description: "Base query is built, then cursor validation, then execution",
         steps: [
           "1. Validate chat access (lines 51-72)",
           "2. Build base query (lines 106-109)",
@@ -80,8 +72,7 @@ describe("Pagination Cursor Security Requirements", () => {
     const preventedAttacks = [
       {
         name: "Cross-chat cursor injection",
-        scenario:
-          "Attacker obtains cursor from Chat A, tries to use it with Chat B",
+        scenario: "Attacker obtains cursor from Chat A, tries to use it with Chat B",
         prevention: "Cursor validation checks message.chatId === args.chatId",
         result: "Empty result returned, no data from Chat A or B exposed",
       },
@@ -136,10 +127,9 @@ describe("Pagination Cursor Security Requirements", () => {
         }
       `,
 
-      impact:
-        "Prevented unauthorized access to chat messages via cursor manipulation",
+      impact: "Prevented unauthorized access to chat messages via cursor manipulation",
       fixCommit: "Current commit",
-      fixDate: new Date().toISOString().split("T")[0],
+      fixDate: "2026-01-28", // Actual fix date
     };
 
     expect(vulnerability.severity).toBe("MEDIUM");

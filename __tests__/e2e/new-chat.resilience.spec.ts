@@ -39,10 +39,9 @@ test.describe("New Chat Resilience", () => {
     const newChatButton = await getNewChatButton(page);
     await newChatButton.click();
 
-    await Promise.race([
-      page.waitForLoadState("networkidle", { timeout: 3000 }),
-      page.waitForTimeout(3000),
-    ]);
+    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {
+      // Navigation may have been blocked - this is expected in this test
+    });
 
     page.off("console", consoleListener);
 
@@ -53,9 +52,7 @@ test.describe("New Chat Resilience", () => {
     }
   });
 
-  test("should maintain state consistency during creation", async ({
-    page,
-  }) => {
+  test("should maintain state consistency during creation", async ({ page }) => {
     const logs: string[] = [];
     page.on("console", (msg) => {
       const text = msg.text();
@@ -82,59 +79,58 @@ test.describe("New Chat Resilience", () => {
     await expect(messageInput).toHaveValue("");
   });
 
-  test.fixme(
-    "should handle browser back/forward navigation",
-    async ({ page }) => {
-      const newChatButton = await getNewChatButton(page);
-      await expect(newChatButton).toBeVisible();
-      await newChatButton.click();
-      await page.waitForURL(/\/(chat)\/.+/, { timeout: 10000 });
-      const firstChatUrl = page.url();
+  test.fixme("should handle browser back/forward navigation", async ({ page }) => {
+    const newChatButton = await getNewChatButton(page);
+    await expect(newChatButton).toBeVisible();
+    await newChatButton.click();
+    await page.waitForURL(/\/(chat)\/.+/, { timeout: 10000 });
+    const firstChatUrl = page.url();
 
-      await page.waitForSelector('[data-testid="message-input"]', {
-        state: "visible",
-      });
-      await page.waitForLoadState("networkidle");
+    await page.waitForSelector('[data-testid="message-input"]', {
+      state: "visible",
+    });
+    await page.waitForLoadState("networkidle");
 
-      const newChatButtonSecond = await getNewChatButton(page);
-      await expect(newChatButtonSecond).toBeVisible();
-      await newChatButtonSecond.click();
-      await page.waitForURL(
-        (url) =>
-          url.toString() !== firstChatUrl &&
-          /\/(chat)\/.+/.test(url.toString()),
-        { timeout: 10000 },
-      );
-      const secondChatUrl = page.url();
+    const newChatButtonSecond = await getNewChatButton(page);
+    await expect(newChatButtonSecond).toBeVisible();
+    await newChatButtonSecond.click();
+    await page.waitForURL(
+      (url) => url.toString() !== firstChatUrl && /\/(chat)\/.+/.test(url.toString()),
+      { timeout: 10000 },
+    );
+    const secondChatUrl = page.url();
 
-      expect(firstChatUrl).not.toBe(secondChatUrl);
+    expect(firstChatUrl).not.toBe(secondChatUrl);
 
-      const canGoBack = await page.evaluate(() => window.history.length > 1);
-      if (canGoBack) {
-        await page.goBack();
-        await page.waitForLoadState("domcontentloaded", { timeout: 5000 });
-        await page.waitForTimeout(500);
-        const backUrl = page.url();
-        if (backUrl === firstChatUrl) {
-          expect(backUrl).toBe(firstChatUrl);
-        } else {
-          console.info(
-            "Browser back did not change URL - React Router may use replace instead of push",
-          );
-        }
+    const canGoBack = await page.evaluate(() => window.history.length > 1);
+    if (canGoBack) {
+      await page.goBack();
+      await page.waitForLoadState("domcontentloaded", { timeout: 5000 });
+      await page
+        .waitForURL((url) => url.toString() === firstChatUrl, {
+          timeout: 5000,
+        })
+        .catch(() => {});
+      const backUrl = page.url();
+      if (backUrl === firstChatUrl) {
+        expect(backUrl).toBe(firstChatUrl);
       } else {
-        console.info("No history to go back to");
+        console.info(
+          "Browser back did not change URL - React Router may use replace instead of push",
+        );
       }
+    } else {
+      console.info("No history to go back to");
+    }
 
-      if (canGoBack) {
-        await page.goForward();
-        await page.waitForLoadState("domcontentloaded", { timeout: 5000 });
-        await page.waitForTimeout(500);
-        const forwardUrl = page.url();
-        expect(forwardUrl).toMatch(/\/(chat)\/.+/);
-      }
-    },
-  );
+    if (canGoBack) {
+      await page.goForward();
+      await page.waitForLoadState("domcontentloaded", { timeout: 5000 });
+      await page.waitForURL(/\/(chat)\/.+/, { timeout: 5000 }).catch(() => {});
+      const forwardUrl = page.url();
+      expect(forwardUrl).toMatch(/\/(chat)\/.+/);
+    }
+  });
 
   test("should recover from error boundary", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -155,9 +151,7 @@ test.describe("New Chat Resilience", () => {
 
     await page
       .waitForFunction(
-        () =>
-          window.location.pathname === "/" ||
-          document.querySelector("[data-error-boundary]"),
+        () => window.location.pathname === "/" || document.querySelector("[data-error-boundary]"),
         { timeout: 2000 },
       )
       .catch(() => {});
@@ -192,9 +186,7 @@ test.describe("New Chat Resilience", () => {
     await expect(newChatButton).toBeVisible();
     await newChatButton.click();
 
-    const loadingButton = page
-      .locator('button:has-text("Creating...")')
-      .first();
+    const loadingButton = page.locator('button:has-text("Creating...")').first();
     await expect(loadingButton).toBeVisible({ timeout: 3000 });
 
     await page.waitForURL(/\/(chat)\/.+/, { timeout: 15000 });

@@ -11,33 +11,23 @@ test.describe("New Chat Stress Tests", () => {
     await setupNewChatPage(page);
   });
 
-  test.skip("should handle 5 sequential chat creations", async ({ page }) => {
+  test.fixme("should handle 5 sequential chat creations", async ({ page }) => {
     const chatUrls: string[] = [];
 
     for (let i = 0; i < 5; i++) {
       const newChatButton = page.locator('button:has-text("New Chat")').first();
-      const isNewChatVisible = await newChatButton
-        .isVisible({ timeout: 1000 })
-        .catch(() => false);
+      const isNewChatVisible = await newChatButton.isVisible({ timeout: 1000 }).catch(() => false);
 
       if (!isNewChatVisible) {
-        const sidebarToggle = page
-          .locator('button[aria-label="Toggle sidebar"]')
-          .first();
-        if (
-          await sidebarToggle.isVisible({ timeout: 1000 }).catch(() => false)
-        ) {
+        const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
+        if (await sidebarToggle.isVisible({ timeout: 1000 }).catch(() => false)) {
           await sidebarToggle.click();
           await waitForSidebarAnimation(page);
         }
       }
 
-      const creatingBtn = page
-        .locator('button:has-text("Creating...")')
-        .first();
-      const isCreating = await creatingBtn
-        .isVisible({ timeout: 500 })
-        .catch(() => false);
+      const creatingBtn = page.locator('button:has-text("Creating...")').first();
+      const isCreating = await creatingBtn.isVisible({ timeout: 500 }).catch(() => false);
       if (isCreating) {
         await expect(creatingBtn).not.toBeVisible({ timeout: 10000 });
       }
@@ -50,9 +40,7 @@ test.describe("New Chat Stress Tests", () => {
       try {
         if (previousUrl) {
           await page.waitForURL(
-            (url) =>
-              url.toString() !== previousUrl &&
-              /\/(chat)\/.+/.test(url.toString()),
+            (url) => url.toString() !== previousUrl && /\/(chat)\/.+/.test(url.toString()),
             {
               timeout: 10000,
             },
@@ -72,9 +60,7 @@ test.describe("New Chat Stress Tests", () => {
     expect(uniqueUrls.size).toBeGreaterThanOrEqual(3);
   });
 
-  test("should handle chat creation with existing messages", async ({
-    page,
-  }) => {
+  test("should handle chat creation with existing messages", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const input = page
@@ -88,17 +74,13 @@ test.describe("New Chat Stress Tests", () => {
     await input.press("Enter");
 
     await page.waitForURL(/\/(chat)\/.+/, { timeout: 10000 });
-    await expect(
-      page.locator('[data-testid="message-assistant"]').first(),
-    ).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-testid="message-assistant"]').first()).toBeVisible({
+      timeout: 30000,
+    });
 
-    const sidebarToggle = page
-      .locator('button[aria-label="Toggle sidebar"]')
-      .first();
+    const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
     let newChatButton = page.locator('button:has-text("New Chat")').first();
-    const isNewChatVisible = await newChatButton
-      .isVisible({ timeout: 1000 })
-      .catch(() => false);
+    const isNewChatVisible = await newChatButton.isVisible({ timeout: 1000 }).catch(() => false);
 
     if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
       await sidebarToggle.click();

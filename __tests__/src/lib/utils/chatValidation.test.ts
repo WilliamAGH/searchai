@@ -1,4 +1,4 @@
-// src/lib/utils/__tests__/chatValidation.test.ts
+// __tests__/src/lib/utils/chatValidation.test.ts
 import { describe, it, expect } from "vitest";
 import { validateChatContext } from "../../../../src/lib/utils/chatValidation";
 

@@ -7,9 +7,9 @@ import {
 } from "../../../convex/agents/orchestration_helpers";
 
 // Helper: simple extractContextId and normalize wrappers for test determinism
-const extractId = (o: any) =>
-  o && typeof o === "object" ? (o.contextId ?? null) : null;
+const extractId = (o: any) => (o && typeof o === "object" ? (o.contextId ?? null) : null);
 const norm = (u?: string) => (typeof u === "string" ? u : null);
+const fixedNow = 1700000000000;
 
 describe("convertToContextReferences", () => {
   it("maps sourcesUsed to context references with derived relevanceScore", () => {
@@ -57,7 +57,7 @@ describe("buildUrlContextMap", () => {
         resultCount: 2,
         searchMethod: "serp" as const,
         hasRealResults: true,
-        timestamp: Date.now(),
+        timestamp: fixedNow,
         results: [
           {
             url: "https://example.com/x",
@@ -88,15 +88,9 @@ describe("buildUrlContextMap", () => {
     });
 
     const map = buildUrlContextMap(entries as any, extractId, norm);
-    expect(map.get("https://example.com/x")).toBe(
-      "019a122e-c507-7851-99f7-b8f5d7345b99",
-    );
-    expect(map.get("https://example.com/y")).toBe(
-      "019a122e-c507-7851-99f7-b8f5d7345b99",
-    );
-    expect(map.get("https://example.com/z")).toBe(
-      "019a122e-c507-7851-99f7-b8f5d7345c00",
-    );
+    expect(map.get("https://example.com/x")).toBe("019a122e-c507-7851-99f7-b8f5d7345b99");
+    expect(map.get("https://example.com/y")).toBe("019a122e-c507-7851-99f7-b8f5d7345b99");
+    expect(map.get("https://example.com/z")).toBe("019a122e-c507-7851-99f7-b8f5d7345c00");
   });
 });
 
@@ -109,7 +103,7 @@ describe("formatScrapedContentForPrompt", () => {
         content: "l".repeat(200),
         summary: "low summary",
         contentLength: 200,
-        scrapedAt: Date.now(),
+        scrapedAt: fixedNow,
         contextId: "019a122e-c507-7851-99f7-b8f5d7345b42",
         relevanceScore: 0.2,
       },
@@ -119,7 +113,7 @@ describe("formatScrapedContentForPrompt", () => {
         content: "h".repeat(400),
         summary: "high summary",
         contentLength: 400,
-        scrapedAt: Date.now(),
+        scrapedAt: fixedNow,
         contextId: "019a122e-c507-7851-99f7-b8f5d7345b43",
         relevanceScore: 0.9,
       },

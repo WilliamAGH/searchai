@@ -155,7 +155,15 @@ describe("message enhancement system", () => {
         enhanceSystemPrompt: true,
       });
       const matchedRuleIds = result.matchedRules.map((r) => r.id);
-      expect(new Set(matchedRuleIds)).toEqual(new Set(t.expectedRules));
+      const matchedSet = new Set(matchedRuleIds);
+      const expectedSet = new Set(t.expectedRules);
+      const isMatch =
+        matchedSet.size === expectedSet.size &&
+        Array.from(matchedSet).every((id) => expectedSet.has(id));
+      if (!isMatch) {
+        throw new Error(`Rule match failed: ${t.description}`);
+      }
+      expect(matchedSet).toEqual(expectedSet);
 
       const queryEnhanced = result.enhancedQuery !== t.query;
       expect(queryEnhanced).toBe(t.expectEnhancedQuery);
@@ -177,9 +185,7 @@ describe("message enhancement system", () => {
     const matched = result.matchedRules.map((r) => r.id);
     const creatorIdx = matched.indexOf("creator-author");
     if (creatorIdx !== -1 && matched.length > 1) {
-      const otherIdx = matched.findIndex(
-        (id, i) => id !== "creator-author" && i > -1,
-      );
+      const otherIdx = matched.findIndex((id, i) => id !== "creator-author" && i > -1);
       expect(creatorIdx).toBeLessThan(otherIdx);
     }
   });
@@ -194,9 +200,7 @@ describe("message enhancement system", () => {
     });
     const expectedUrls = ["https://williamcallahan.com", "https://aventure.vc"];
     for (const url of expectedUrls) {
-      expect(result.prioritizedUrls.some((u: string) => u.includes(url))).toBe(
-        true,
-      );
+      expect(result.prioritizedUrls.some((u: string) => u.includes(url))).toBe(true);
     }
   });
 });

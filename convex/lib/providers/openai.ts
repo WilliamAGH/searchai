@@ -26,10 +26,7 @@ import {
 import OpenAI from "openai";
 
 import { createInstrumentedFetch } from "./fetch_instrumentation";
-import {
-  parseOpenRouterProvider,
-  parseReasoningSettings,
-} from "./openai_config";
+import { parseOpenRouterProvider, parseReasoningSettings } from "./openai_config";
 import { scheduleOpenAIHealthCheck } from "./openai_health";
 import type {
   OpenRouterBody as LegacyOpenRouterBody,
@@ -68,16 +65,12 @@ export interface OpenAIEnvironment {
  */
 export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   const baseURL =
-    process.env.LLM_BASE_URL ||
-    process.env.OPENAI_BASE_URL ||
-    process.env.OPENROUTER_BASE_URL;
+    process.env.LLM_BASE_URL || process.env.OPENAI_BASE_URL || process.env.OPENROUTER_BASE_URL;
   const normalizedBase = baseURL?.toLowerCase();
 
   // Detect endpoint type BEFORE selecting API key to enable smart matching
   const isOpenRouter = normalizedBase?.includes("openrouter") ?? false;
-  const isOpenAIEndpoint = normalizedBase
-    ? normalizedBase.includes("api.openai.com")
-    : true;
+  const isOpenAIEndpoint = normalizedBase ? normalizedBase.includes("api.openai.com") : true;
 
   // Select API key with endpoint-aware fallback:
   // 1. LLM_API_KEY always takes precedence (explicit override)
@@ -96,14 +89,12 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
     );
   }
 
-  const isChatCompletionsEndpoint =
-    normalizedBase?.includes("/chat/completions") ?? false;
+  const isChatCompletionsEndpoint = normalizedBase?.includes("/chat/completions") ?? false;
   // Use Chat Completions API for OpenRouter and any endpoint with /chat/completions
   // OpenAI's Responses API is only supported by api.openai.com
   const useChatCompletionsAPI = isOpenRouter || isChatCompletionsEndpoint;
   const debugLogging = process.env.LLM_DEBUG_FETCH === "1";
-  const configuredModel =
-    process.env.LLM_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const configuredModel = process.env.LLM_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   const client = new OpenAI({
     apiKey,
@@ -148,9 +139,7 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   console.info(
     "ModelProvider useResponses:",
     !useChatCompletionsAPI,
-    useChatCompletionsAPI
-      ? "(disabled for Chat Completions)"
-      : "(enabled for Responses API)",
+    useChatCompletionsAPI ? "(disabled for Chat Completions)" : "(enabled for Responses API)",
   );
 
   // Validate OpenAI credentials + model on startup (once per runtime)
@@ -178,11 +167,7 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   };
 
   // Add max_output_tokens if specified
-  if (
-    maxOutputTokens &&
-    !Number.isNaN(maxOutputTokens) &&
-    maxOutputTokens > 0
-  ) {
+  if (maxOutputTokens && !Number.isNaN(maxOutputTokens) && maxOutputTokens > 0) {
     defaultModelSettings.maxTokens = maxOutputTokens;
   }
 
@@ -198,10 +183,7 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
     };
   }
 
-  console.info(
-    "Final defaultModelSettings:",
-    JSON.stringify(defaultModelSettings),
-  );
+  console.info("Final defaultModelSettings:", JSON.stringify(defaultModelSettings));
 
   return {
     client,
@@ -222,9 +204,7 @@ export const getModelName = (): string => {
  */
 export const isOpenRouterEndpoint = (): boolean => {
   const baseURL =
-    process.env.LLM_BASE_URL ||
-    process.env.OPENAI_BASE_URL ||
-    process.env.OPENROUTER_BASE_URL;
+    process.env.LLM_BASE_URL || process.env.OPENAI_BASE_URL || process.env.OPENROUTER_BASE_URL;
   return baseURL?.toLowerCase().includes("openrouter") || false;
 };
 
@@ -233,6 +213,11 @@ export const isOpenRouterEndpoint = (): boolean => {
  * Ensures createOpenAIEnvironment is only called once per runtime
  */
 let cachedOpenAIEnvironment: OpenAIEnvironment | null = null;
+
+export const resetOpenAIEnvironmentForTests = (): void => {
+  if (process.env.NODE_ENV !== "test") return;
+  cachedOpenAIEnvironment = null;
+};
 
 /**
  * Get the singleton OpenAI environment, creating it if necessary
