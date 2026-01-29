@@ -23,7 +23,8 @@
   "include": [
     "vite.config.ts",
     "playwright.config.ts",
-    "tests/playwright-integration.config.ts"
+    "__tests__/playwright-integration.config.ts",
+    "__tests__/config/*.ts"
   ],
   "exclude": ["node_modules"]
 }
