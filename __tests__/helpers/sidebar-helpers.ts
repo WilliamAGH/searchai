@@ -82,49 +82,6 @@ export async function ensureSidebarOpen(page: Page): Promise<void> {
 }
 
 /**
- * Closes the sidebar if it's open
- */
-export async function closeSidebar(page: Page): Promise<void> {
-  const viewport = page.viewportSize();
-  const isMobile = viewport && viewport.width < 1024;
-
-  if (isMobile) {
-    // Mobile: Close dialog if present
-    const dialog = page.locator('[role="dialog"]').first();
-    const isDialogVisible = await dialog.isVisible().catch(() => false);
-
-    if (isDialogVisible) {
-      // Click overlay or close button
-      const overlay = page.locator('[role="dialog"] ~ div[class*="overlay"]').first();
-      const closeButton = page.locator('[role="dialog"] button[aria-label="Close"]').first();
-
-      if (await closeButton.isVisible().catch(() => false)) {
-        await closeButton.click();
-      } else if (await overlay.isVisible().catch(() => false)) {
-        await overlay.click();
-      }
-
-      // Wait for dialog to disappear
-      await expect(dialog).not.toBeVisible({ timeout: 3000 });
-    }
-  } else {
-    // Desktop: Check if sidebar is visible
-    const newChatButton = page.locator('button:has-text("New Chat")').first();
-    const isNewChatVisible = await newChatButton.isVisible({ timeout: 500 }).catch(() => false);
-
-    if (isNewChatVisible) {
-      const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
-      if (await sidebarToggle.isVisible().catch(() => false)) {
-        await sidebarToggle.click();
-        await page.waitForTimeout(300);
-        // Verify it's closed
-        await expect(newChatButton).not.toBeVisible({ timeout: 3000 });
-      }
-    }
-  }
-}
-
-/**
  * Gets the New Chat button, ensuring sidebar is open first
  */
 export async function getNewChatButton(page: Page) {
