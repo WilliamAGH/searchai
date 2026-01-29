@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { clickReactElement } from "./utils/react-click";
-import { waitForNetworkIdle } from "../helpers/wait-conditions";
 
 test.describe("share modal link variants", () => {
   // Skip this test - requires functional backend with API keys
@@ -180,7 +179,7 @@ test.describe("share modal link variants", () => {
     if (buttonText === "Generate URL") {
       console.log("Direct click failed, trying force click...");
       await genBtn.click({ force: true });
-      await waitForNetworkIdle(page);
+      await page.waitForLoadState("networkidle", { timeout: 5000 });
       buttonText = await genBtn.textContent();
       console.log("Button text after force click:", buttonText);
     }
@@ -189,7 +188,7 @@ test.describe("share modal link variants", () => {
     if (buttonText === "Generate URL") {
       console.log("Force click failed, trying event dispatch...");
       await genBtn.dispatchEvent("click");
-      await waitForNetworkIdle(page);
+      await page.waitForLoadState("networkidle", { timeout: 5000 });
       buttonText = await genBtn.textContent();
       console.log("Button text after event dispatch:", buttonText);
     }
