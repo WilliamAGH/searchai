@@ -45,15 +45,6 @@ describe("New Chat functionality", () => {
     };
 
     expect(throwingFn).toThrow("Network error");
-
-    // Verify error handler would be invoked
-    let errorHandled = false;
-    try {
-      throwingFn();
-    } catch {
-      errorHandled = true;
-    }
-    expect(errorHandled).toBe(true);
   });
 
   it("resets state when creating new chat", () => {
