@@ -106,6 +106,7 @@ import type * as lib_security_webContent_text from "../lib/security/webContent_t
 import type * as lib_text from "../lib/text.js";
 import type * as lib_url from "../lib/url.js";
 import type * as lib_uuid from "../lib/uuid.js";
+import type * as lib_uuid_validation from "../lib/uuid_validation.js";
 import type * as lib_validation_zodUtils from "../lib/validation/zodUtils.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as messages from "../messages.js";
@@ -119,6 +120,7 @@ import type * as search_cache from "../search/cache.js";
 import type * as search_executor from "../search/executor.js";
 import type * as search_metrics from "../search/metrics.js";
 import type * as search_plan_search_handler from "../search/plan_search_handler.js";
+import type * as search_plan_search_helpers from "../search/plan_search_helpers.js";
 import type * as search_planner from "../search/planner.js";
 import type * as search_prompts from "../search/prompts.js";
 import type * as search_providers_duckduckgo from "../search/providers/duckduckgo.js";
@@ -241,6 +243,7 @@ declare const fullApi: ApiFromModules<{
   "lib/text": typeof lib_text;
   "lib/url": typeof lib_url;
   "lib/uuid": typeof lib_uuid;
+  "lib/uuid_validation": typeof lib_uuid_validation;
   "lib/validation/zodUtils": typeof lib_validation_zodUtils;
   "lib/validators": typeof lib_validators;
   messages: typeof messages;
@@ -254,6 +257,7 @@ declare const fullApi: ApiFromModules<{
   "search/executor": typeof search_executor;
   "search/metrics": typeof search_metrics;
   "search/plan_search_handler": typeof search_plan_search_handler;
+  "search/plan_search_helpers": typeof search_plan_search_helpers;
   "search/planner": typeof search_planner;
   "search/prompts": typeof search_prompts;
   "search/providers/duckduckgo": typeof search_providers_duckduckgo;
