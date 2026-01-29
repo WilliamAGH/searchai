@@ -157,12 +157,6 @@ describe("message enhancement system", () => {
       const matchedRuleIds = result.matchedRules.map((r) => r.id);
       const matchedSet = new Set(matchedRuleIds);
       const expectedSet = new Set(t.expectedRules);
-      const isMatch =
-        matchedSet.size === expectedSet.size &&
-        Array.from(matchedSet).every((id) => expectedSet.has(id));
-      if (!isMatch) {
-        throw new Error(`Rule match failed: ${t.description}`);
-      }
       expect(matchedSet).toEqual(expectedSet);
 
       const queryEnhanced = result.enhancedQuery !== t.query;
