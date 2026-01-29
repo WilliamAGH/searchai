@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
 // Ensure env vars are available (optional .env)
@@ -8,6 +10,11 @@ try {
   // dotenv not available - this is fine, env vars may be set via other means
 }
 import { desktopViewport } from "./config/viewports";
+
+const ROOT_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
 /**
  * Playwright configuration for integration tests
@@ -53,10 +60,8 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // CRITICAL: DO NOT REMOVE "npx" from "npx vite preview" - CI/CD WILL BREAK!
-      // Inside bash -c, node_modules/.bin is NOT in PATH. Without npx, vite is not
-      // found and the server silently fails, causing a 180s timeout. This was the
-      // root cause of 25+ consecutive CI failures. See commit history for details.
+      cwd: ROOT_DIR,
+      // Run from repo root so vite preview serves dist/ correctly in CI.
       command: process.env.CI
         ? "bash -c 'npm run build && npx vite preview --strictPort --port 5173 --host 127.0.0.1'"
         : "npm run dev:frontend",
