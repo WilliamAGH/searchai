@@ -3,46 +3,9 @@
 
 import { test, expect } from "@playwright/test";
 import { viewports } from "../config/viewports";
+import { ensureSidebarOpen } from "../helpers/sidebar-helpers";
 
 const HOME = "/";
-
-async function ensureSidebarIsOpen(page: any) {
-  const viewport = page.viewportSize();
-  const isMobile = viewport && viewport.width < 1024;
-
-  if (isMobile) {
-    // Mobile: Check if dialog is already open, if not click toggle
-    const newChatInDialog = page.locator('[role="dialog"] button:has-text("New Chat")').first();
-    const isDialogOpen = await newChatInDialog.isVisible({ timeout: 500 }).catch(() => false);
-
-    if (!isDialogOpen) {
-      const btn = page.locator('button[aria-label="Toggle sidebar"]').first();
-      const isVisible = await btn.isVisible({ timeout: 2000 }).catch(() => false);
-      if (isVisible) {
-        await btn.click();
-        // Wait for New Chat button inside dialog to be visible
-        await expect(newChatInDialog).toBeVisible({ timeout: 5000 });
-      }
-    }
-  } else {
-    // Desktop: Check if New Chat button is already visible (sidebar open)
-    const newChatBtn = page.locator('button:has-text("New Chat")').first();
-    const isSidebarOpen = await newChatBtn.isVisible({ timeout: 500 }).catch(() => false);
-
-    if (!isSidebarOpen) {
-      // Click toggle to open sidebar
-      const btn = page.locator('button[aria-label="Toggle sidebar"]').first();
-      const isVisible = await btn.isVisible({ timeout: 2000 }).catch(() => false);
-      if (isVisible) {
-        await btn.click();
-        await page.waitForTimeout(300); // Wait for sidebar animation
-      }
-    }
-
-    // Verify sidebar is now open
-    await expect(newChatBtn).toBeVisible({ timeout: 5000 });
-  }
-}
 
 test.describe("chat navigation", () => {
   test("home without chats does not auto-create immediately; creates on first action", async ({
@@ -78,7 +41,7 @@ test.describe("chat navigation", () => {
     });
 
     // Ensure sidebar is open
-    await ensureSidebarIsOpen(page);
+    await ensureSidebarOpen(page);
 
     // Click New Chat - on mobile it's in dialog
     const newChat = page.locator('[role="dialog"] button:has-text("New Chat")').first();
@@ -98,7 +61,7 @@ test.describe("chat navigation", () => {
     await page.waitForLoadState("networkidle");
 
     // Ensure sidebar is open (works for both desktop and mobile)
-    await ensureSidebarIsOpen(page);
+    await ensureSidebarOpen(page);
 
     // On desktop, New Chat is in sidebar. On mobile it would be in dialog.
     // Default viewport is desktop, so use regular selector.
