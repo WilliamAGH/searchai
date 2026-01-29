@@ -7,20 +7,14 @@
 
 import { v } from "convex/values";
 import { action, internalAction } from "./_generated/server";
-import {
-  vSearchResult,
-  vSerpEnrichment,
-  vSearchMethod,
-} from "./lib/validators";
+import { vSearchResult, vSerpEnrichment, vSearchMethod } from "./lib/validators";
+import { isValidUuidV7 } from "./lib/uuid";
 import { runPlanSearch } from "./search/plan_search_handler";
 import { runSearchWeb } from "./search/search_web_handler";
 import { invalidatePlanCacheForChat as invalidateCacheForChat } from "./search/cache";
 
 // Re-export test utilities for backward compatibility
-export {
-  __extractKeywordsForTest,
-  __augmentQueryForTest,
-} from "./search/utils";
+export { __extractKeywordsForTest, __augmentQueryForTest } from "./search/utils";
 
 /**
  * Perform web search using available providers
@@ -37,9 +31,7 @@ export const searchWeb = action({
     hasRealResults: v.boolean(),
     enrichment: v.optional(vSerpEnrichment),
     // Error tracking - present when fallback was used due to provider failures
-    providerErrors: v.optional(
-      v.array(v.object({ provider: v.string(), error: v.string() })),
-    ),
+    providerErrors: v.optional(v.array(v.object({ provider: v.string(), error: v.string() }))),
     allProvidersFailed: v.optional(v.boolean()),
   }),
   handler: async (_ctx, args) => runSearchWeb(args),
@@ -63,7 +55,12 @@ export const planSearch = action({
     decisionConfidence: v.number(),
     reasons: v.string(),
   }),
-  handler: async (ctx, args) => runPlanSearch(ctx, args),
+  handler: async (ctx, args) => {
+    if (args.sessionId && !isValidUuidV7(args.sessionId)) {
+      throw new Error("Invalid sessionId format");
+    }
+    return runPlanSearch(ctx, args);
+  },
 });
 
 /** Invalidate planner cache for a chat */
