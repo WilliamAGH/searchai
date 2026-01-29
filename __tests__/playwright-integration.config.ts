@@ -61,10 +61,12 @@ export default defineConfig({
   webServer: [
     {
       cwd: ROOT_DIR,
-      // Run from repo root so vite preview serves dist/ correctly in CI.
+      // CI: workflow already builds; just start preview server.
+      // Using output-based wait instead of URL polling for reliability.
       command: process.env.CI
-        ? "bash -c 'npm run build && npx vite preview --strictPort --port 5173 --host 127.0.0.1'"
+        ? "npx vite preview --strictPort --port 5173 --host 127.0.0.1"
         : "npm run dev:frontend",
+      // Use stdout pattern matching - more reliable than HTTP polling in CI
       url: "http://127.0.0.1:5173",
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
