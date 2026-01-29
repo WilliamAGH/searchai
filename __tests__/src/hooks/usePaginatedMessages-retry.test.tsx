@@ -47,7 +47,8 @@ describe.skip("usePaginatedMessages retry behavior", () => {
       },
     });
 
-    const { usePaginatedMessages } = await import("../../../src/hooks/usePaginatedMessages");
+    const { usePaginatedMessages } =
+      await import("../../../src/hooks/usePaginatedMessages");
 
     function Harness() {
       const { messages, loadMore } = usePaginatedMessages({

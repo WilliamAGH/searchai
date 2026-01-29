@@ -7,7 +7,8 @@ import {
 } from "../../../convex/agents/orchestration_helpers";
 
 // Helper: simple extractContextId and normalize wrappers for test determinism
-const extractId = (o: any) => (o && typeof o === "object" ? (o.contextId ?? null) : null);
+const extractId = (o: any) =>
+  o && typeof o === "object" ? (o.contextId ?? null) : null;
 const norm = (u?: string) => (typeof u === "string" ? u : null);
 const fixedNow = 1700000000000;
 
@@ -88,9 +89,15 @@ describe("buildUrlContextMap", () => {
     });
 
     const map = buildUrlContextMap(entries as any, extractId, norm);
-    expect(map.get("https://example.com/x")).toBe("019a122e-c507-7851-99f7-b8f5d7345b99");
-    expect(map.get("https://example.com/y")).toBe("019a122e-c507-7851-99f7-b8f5d7345b99");
-    expect(map.get("https://example.com/z")).toBe("019a122e-c507-7851-99f7-b8f5d7345c00");
+    expect(map.get("https://example.com/x")).toBe(
+      "019a122e-c507-7851-99f7-b8f5d7345b99",
+    );
+    expect(map.get("https://example.com/y")).toBe(
+      "019a122e-c507-7851-99f7-b8f5d7345b99",
+    );
+    expect(map.get("https://example.com/z")).toBe(
+      "019a122e-c507-7851-99f7-b8f5d7345c00",
+    );
   });
 });
 

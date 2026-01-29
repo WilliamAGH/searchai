@@ -14,7 +14,11 @@ interface LoadingBoundaryProps {
 /**
  * Default loading spinner component
  */
-const DefaultLoadingFallback = ({ message = "Loading..." }: { message?: string }) => (
+const DefaultLoadingFallback = ({
+  message = "Loading...",
+}: {
+  message?: string;
+}) => (
   <div className="flex items-center justify-center min-h-[200px] text-center">
     <div className="space-y-4">
       <div className="inline-flex items-center justify-center">
@@ -54,7 +58,9 @@ export const LoadingBoundary: React.FC<LoadingBoundaryProps> = ({
   message,
 }) => {
   return (
-    <Suspense fallback={fallback || <DefaultLoadingFallback message={message} />}>
+    <Suspense
+      fallback={fallback || <DefaultLoadingFallback message={message} />}
+    >
       {children}
     </Suspense>
   );
@@ -71,7 +77,14 @@ export const InlineLoading = () => (
       fill="none"
       viewBox="0 0 24 24"
     >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
       <path
         className="opacity-75"
         fill="currentColor"

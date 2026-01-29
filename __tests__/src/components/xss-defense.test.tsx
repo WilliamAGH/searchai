@@ -66,7 +66,9 @@ describe("XSS Defense - Component Sanitization", () => {
       // The publish route only allows 'user' or 'assistant' roles
       const invalidRole = "system";
       const validated =
-        invalidRole === "user" || invalidRole === "assistant" ? invalidRole : "assistant";
+        invalidRole === "user" || invalidRole === "assistant"
+          ? invalidRole
+          : "assistant";
       expect(validated).toBe("assistant");
     });
   });
@@ -151,7 +153,8 @@ describe("XSS Defense - Component Sanitization", () => {
       for (const testUrl of unsafeProtocolUrls) {
         const parsed = URL.canParse(testUrl) ? new URL(testUrl) : null;
         // Either URL parsing fails OR protocol is not http/https - both are safe rejections
-        const isRejected = parsed === null || !validProtocols.includes(parsed.protocol);
+        const isRejected =
+          parsed === null || !validProtocols.includes(parsed.protocol);
         expect(isRejected).toBe(true);
       }
     });

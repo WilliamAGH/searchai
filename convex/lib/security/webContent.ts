@@ -49,7 +49,8 @@ const DANGEROUS_PATTERNS = [
  * Event handler patterns to remove
  * Matches quoted and unquoted attribute values
  */
-const EVENT_HANDLER_PATTERN = /\s*on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+const EVENT_HANDLER_PATTERN =
+  /\s*on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 /**
  * Dangerous protocols to remove
@@ -127,7 +128,9 @@ export function validateScrapedContent(html: string): ValidationResult {
   const injectionRisk = assessRisk(injectionCheck.matchedCategories);
 
   if (injectionCheck.hasInjection) {
-    removed.push(`Injection patterns detected: ${injectionCheck.matchedCategories.join(", ")}`);
+    removed.push(
+      `Injection patterns detected: ${injectionCheck.matchedCategories.join(", ")}`,
+    );
 
     // Update risk based on injection severity
     if (injectionRisk === "critical") {
@@ -147,7 +150,13 @@ export function validateScrapedContent(html: string): ValidationResult {
   const removedPercentage =
     originalLength > 0
       ? Math.round(
-          Math.min(100, Math.max(0, ((originalLength - cleanedLength) / originalLength) * 100)),
+          Math.min(
+            100,
+            Math.max(
+              0,
+              ((originalLength - cleanedLength) / originalLength) * 100,
+            ),
+          ),
         )
       : 0;
 
@@ -177,7 +186,9 @@ export function validateScrapedContent(html: string): ValidationResult {
  * @param htmlArray - Array of HTML content to validate
  * @returns Array of validation results
  */
-export function validateMultipleContent(htmlArray: string[]): ValidationResult[] {
+export function validateMultipleContent(
+  htmlArray: string[],
+): ValidationResult[] {
   return htmlArray.map((html) => validateScrapedContent(html));
 }
 
@@ -194,7 +205,14 @@ export function isUrlSafe(url: string): boolean {
   const lowerUrl = url.toLowerCase().trim();
 
   // Check for dangerous protocols
-  const dangerousProtocols = ["javascript:", "data:", "vbscript:", "file:", "about:", "chrome:"];
+  const dangerousProtocols = [
+    "javascript:",
+    "data:",
+    "vbscript:",
+    "file:",
+    "about:",
+    "chrome:",
+  ];
 
   for (const protocol of dangerousProtocols) {
     if (lowerUrl.startsWith(protocol)) {
@@ -310,7 +328,9 @@ export function createValidationReport(results: ValidationResult[]): {
 
   // Calculate averages and find common injection types
   report.averageRemovalPercentage =
-    results.length > 0 ? Math.round(totalRemovalPercentage / results.length) : 0;
+    results.length > 0
+      ? Math.round(totalRemovalPercentage / results.length)
+      : 0;
 
   report.commonInjectionTypes = Object.entries(injectionTypeCount)
     .sort((a, b) => b[1] - a[1])

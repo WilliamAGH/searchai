@@ -36,7 +36,8 @@ export default {
       animation: {
         "scan-line": "scan-line 2s ease-in-out infinite",
         "slide-up-fade": "slide-up-fade 0.3s ease-out forwards",
-        "progress-indeterminate": "progress-indeterminate 1.5s ease-in-out infinite",
+        "progress-indeterminate":
+          "progress-indeterminate 1.5s ease-in-out infinite",
         breathe: "breathe 2s ease-in-out infinite",
       },
       colors: {

@@ -37,7 +37,13 @@ const forbiddenPatterns = [
 const checkPaths = ["src/", "convex/"];
 
 // Files/directories to exclude
-const excludePaths = ["convex/_generated", "node_modules", ".next", "dist", "build"];
+const excludePaths = [
+  "convex/_generated",
+  "node_modules",
+  ".next",
+  "dist",
+  "build",
+];
 
 function shouldCheckFile(filePath) {
   // Only check TypeScript files
@@ -64,7 +70,9 @@ function checkFile(filePath) {
       if (pattern.test(line)) {
         // Additional check: ensure it's not importing from _generated
         const prevLines = lines.slice(Math.max(0, index - 5), index).join("\n");
-        const nextLines = lines.slice(index, Math.min(lines.length, index + 5)).join("\n");
+        const nextLines = lines
+          .slice(index, Math.min(lines.length, index + 5))
+          .join("\n");
         const context = prevLines + "\n" + line + "\n" + nextLines;
 
         // Skip if it's importing from _generated
@@ -127,7 +135,9 @@ if (violations.length > 0) {
   console.error("\nHow to fix:");
   console.error("  1. Remove manual type definitions");
   console.error("  2. Import from convex/_generated/dataModel instead:");
-  console.error('     import type { Doc, Id } from "../convex/_generated/dataModel";');
+  console.error(
+    '     import type { Doc, Id } from "../convex/_generated/dataModel";',
+  );
   console.error("  3. Use Convex-generated types:");
   console.error('     type User = Doc<"users">;');
   console.error('     type UserId = Id<"users">;');

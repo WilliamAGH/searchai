@@ -27,8 +27,14 @@ function validateEnv(): EnvConfig {
   // Validate Convex URL format
   try {
     const url = new URL(env.VITE_CONVEX_URL);
-    if (!url.hostname.includes("convex.cloud") && !url.hostname.includes("localhost")) {
-      logger.warn("VITE_CONVEX_URL does not appear to be a valid Convex URL:", env.VITE_CONVEX_URL);
+    if (
+      !url.hostname.includes("convex.cloud") &&
+      !url.hostname.includes("localhost")
+    ) {
+      logger.warn(
+        "VITE_CONVEX_URL does not appear to be a valid Convex URL:",
+        env.VITE_CONVEX_URL,
+      );
     }
   } catch (error) {
     logger.error("Invalid VITE_CONVEX_URL format", {
@@ -80,7 +86,8 @@ export const env = {
       // Fallback for local development and local preview/testing environments
       const isLocalHost =
         typeof window !== "undefined" &&
-        (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost");
+        (window.location.hostname === "127.0.0.1" ||
+          window.location.hostname === "localhost");
       if (import.meta.env.DEV || isLocalHost) {
         logger.warn("Using fallback Convex URL for local environment", {
           error,
@@ -162,7 +169,8 @@ export function initializeEnv(): void {
       try {
         return (
           typeof window !== "undefined" &&
-          (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost")
+          (window.location.hostname === "127.0.0.1" ||
+            window.location.hostname === "localhost")
         );
       } catch (error) {
         logger.error("Failed to detect localhost for env initialization", {
@@ -177,7 +185,9 @@ export function initializeEnv(): void {
       throw new Error("Invalid environment configuration");
     }
     // Otherwise (dev or local preview), warn but continue
-    logger.warn("Continuing with invalid environment configuration (local/dev mode)");
+    logger.warn(
+      "Continuing with invalid environment configuration (local/dev mode)",
+    );
   } else {
     logger.info("[OK] Environment configuration validated");
   }

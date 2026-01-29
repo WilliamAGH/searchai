@@ -18,8 +18,12 @@ test.describe("New Chat Stress Tests", () => {
       // Use helper to ensure sidebar is open and get button
       const newChatButton = await getNewChatButton(page);
 
-      const creatingBtn = page.locator('button:has-text("Creating...")').first();
-      const isCreating = await creatingBtn.isVisible({ timeout: 500 }).catch(() => false);
+      const creatingBtn = page
+        .locator('button:has-text("Creating...")')
+        .first();
+      const isCreating = await creatingBtn
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
       if (isCreating) {
         await expect(creatingBtn).not.toBeVisible({ timeout: 10000 });
       }
@@ -31,7 +35,9 @@ test.describe("New Chat Stress Tests", () => {
       try {
         if (previousUrl) {
           await page.waitForURL(
-            (url) => url.toString() !== previousUrl && /\/(chat)\/.+/.test(url.toString()),
+            (url) =>
+              url.toString() !== previousUrl &&
+              /\/(chat)\/.+/.test(url.toString()),
             {
               timeout: 10000,
             },
@@ -51,7 +57,9 @@ test.describe("New Chat Stress Tests", () => {
     expect(uniqueUrls.size).toBeGreaterThanOrEqual(3);
   });
 
-  test("should handle chat creation with existing messages", async ({ page }) => {
+  test("should handle chat creation with existing messages", async ({
+    page,
+  }) => {
     // Page already at "/" from beforeEach setupNewChatPage
     const input = page
       .locator(
@@ -64,7 +72,9 @@ test.describe("New Chat Stress Tests", () => {
     await input.press("Enter");
 
     await page.waitForURL(/\/(chat)\/.+/, { timeout: 10000 });
-    await expect(page.locator('[data-testid="message-assistant"]').first()).toBeVisible({
+    await expect(
+      page.locator('[data-testid="message-assistant"]').first(),
+    ).toBeVisible({
       timeout: 30000,
     });
 

@@ -5,7 +5,10 @@
 
 import type { ConvexReactClient } from "convex/react";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
-import { BaseRepository, type SearchWebResponse } from "@/lib/repositories/ChatRepository";
+import {
+  BaseRepository,
+  type SearchWebResponse,
+} from "@/lib/repositories/ChatRepository";
 import type { MessageStreamChunk } from "@/lib/types/message";
 import { logger } from "@/lib/logger";
 import { ChatOperations } from "./convex/ChatOperations";
@@ -47,8 +50,10 @@ export class ConvexChatRepository extends BaseRepository {
     // we should ideally update it there too.
     // For simplicity, re-instantiate streamHandler or add setter.
     // Re-instantiation is safer.
-    this.streamHandler = new ConvexStreamHandler(this.client, sessionId, (chatId) =>
-      this.messageOps.getMessages(chatId),
+    this.streamHandler = new ConvexStreamHandler(
+      this.client,
+      sessionId,
+      (chatId) => this.messageOps.getMessages(chatId),
     );
 
     logger.debug("ConvexChatRepository sessionId updated", {
@@ -66,7 +71,9 @@ export class ConvexChatRepository extends BaseRepository {
     return this.chatOps.getChatById(id);
   }
 
-  async createChat(title?: string): Promise<{ chat: Doc<"chats">; isNew: boolean }> {
+  async createChat(
+    title?: string,
+  ): Promise<{ chat: Doc<"chats">; isNew: boolean }> {
     return this.chatOps.createChat(title);
   }
 
@@ -74,7 +81,10 @@ export class ConvexChatRepository extends BaseRepository {
     return this.chatOps.updateChatTitle(id, title);
   }
 
-  async updateChatPrivacy(id: string, privacy: "private" | "shared" | "public"): Promise<void> {
+  async updateChatPrivacy(
+    id: string,
+    privacy: "private" | "shared" | "public",
+  ): Promise<void> {
     return this.chatOps.updateChatPrivacy(id, privacy);
   }
 
@@ -114,11 +124,17 @@ export class ConvexChatRepository extends BaseRepository {
     return this.messageOps.getMessagesPaginated(chatId, limit, cursor);
   }
 
-  async addMessage(chatId: string, message: Partial<Doc<"messages">>): Promise<Doc<"messages">> {
+  async addMessage(
+    chatId: string,
+    message: Partial<Doc<"messages">>,
+  ): Promise<Doc<"messages">> {
     return this.messageOps.addMessage(chatId, message);
   }
 
-  async updateMessage(id: string, updates: Partial<Doc<"messages">>): Promise<void> {
+  async updateMessage(
+    id: string,
+    updates: Partial<Doc<"messages">>,
+  ): Promise<void> {
     return this.messageOps.updateMessage(id, updates);
   }
 
@@ -131,7 +147,10 @@ export class ConvexChatRepository extends BaseRepository {
   }
 
   // Delegate Streaming
-  generateResponse(chatId: string, message: string): AsyncGenerator<MessageStreamChunk> {
+  generateResponse(
+    chatId: string,
+    message: string,
+  ): AsyncGenerator<MessageStreamChunk> {
     return this.streamHandler.generateResponse(chatId, message);
   }
 }

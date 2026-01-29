@@ -27,7 +27,9 @@ export function buildContextSummary(params: {
     .filter((m) => m.role === "user")
     .slice(0, 2)
     .reverse();
-  const lastAssistant = [...recent].reverse().find((m) => m.role === "assistant");
+  const lastAssistant = [...recent]
+    .reverse()
+    .find((m) => m.role === "assistant");
 
   const lines: string[] = [];
   if (rollingSummary) {
@@ -77,7 +79,10 @@ const DEFAULT_TITLE_MAX_LENGTH = 25;
  * Frontend (src/lib/types/unified.ts:TitleUtils) only provides sanitization,
  * NOT generation. All title generation happens here.
  */
-export function generateChatTitle(params: { intent: string; maxLength?: number }): string {
+export function generateChatTitle(params: {
+  intent: string;
+  maxLength?: number;
+}): string {
   const { intent, maxLength = DEFAULT_TITLE_MAX_LENGTH } = params;
   if (!intent) return "New Chat";
 

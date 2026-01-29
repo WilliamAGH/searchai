@@ -207,7 +207,9 @@ export const SerpApiResponseSchema = z.object({
       }),
     )
     .optional(),
-  related_searches: z.array(z.object({ query: z.string().optional() })).optional(),
+  related_searches: z
+    .array(z.object({ query: z.string().optional() }))
+    .optional(),
 });
 
 export type SerpApiResponse = z.infer<typeof SerpApiResponseSchema>;

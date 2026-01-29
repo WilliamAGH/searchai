@@ -14,7 +14,11 @@ export function validateChatContext(
   chats: Array<{ id: string }>,
 ): ChatValidationResult {
   // Case 1: Assistant-first message (prioritize this specific scenario)
-  if (messages.length === 1 && messages[0].role === "assistant" && !currentChatId) {
+  if (
+    messages.length === 1 &&
+    messages[0].role === "assistant" &&
+    !currentChatId
+  ) {
     return {
       isValid: false,
       suggestedChatId: messages[0].chatId,

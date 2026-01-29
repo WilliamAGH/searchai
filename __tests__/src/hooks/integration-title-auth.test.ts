@@ -8,7 +8,8 @@ describe("Integration: Authenticated User Title Generation (simulated)", () => {
     const firstMessage = "How do I configure my database?";
     // after first message
     const trimmed = firstMessage.trim();
-    chatTitle = trimmed.length > 50 ? `${trimmed.substring(0, 50)}...` : trimmed;
+    chatTitle =
+      trimmed.length > 50 ? `${trimmed.substring(0, 50)}...` : trimmed;
     expect(chatTitle).toBe("How do I configure my database?");
   });
 
@@ -16,14 +17,19 @@ describe("Integration: Authenticated User Title Generation (simulated)", () => {
     const longMessage =
       "This is a very long message that should be truncated at exactly fifty characters to maintain consistency";
     const trimmed = longMessage.trim();
-    const chatTitle = trimmed.length > 50 ? `${trimmed.substring(0, 50)}...` : trimmed;
-    expect(chatTitle).toBe("This is a very long message that should be truncat...");
+    const chatTitle =
+      trimmed.length > 50 ? `${trimmed.substring(0, 50)}...` : trimmed;
+    expect(chatTitle).toBe(
+      "This is a very long message that should be truncat...",
+    );
   });
 
   it("parity between auth and unauth flows", () => {
     const content = "What is the weather today?";
-    const authTitle = content.length > 50 ? `${content.substring(0, 50)}...` : content;
-    const unauthTitle = content.length > 50 ? `${content.substring(0, 50)}...` : content;
+    const authTitle =
+      content.length > 50 ? `${content.substring(0, 50)}...` : content;
+    const unauthTitle =
+      content.length > 50 ? `${content.substring(0, 50)}...` : content;
     expect(authTitle).toBe("What is the weather today?");
     expect(unauthTitle).toBe("What is the weather today?");
   });

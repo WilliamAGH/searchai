@@ -1,6 +1,10 @@
 import { Dispatch, SetStateAction } from "react";
 import { ChatState } from "@/hooks/useChatState";
-import type { Message, MessageStreamChunk, PersistedPayload } from "@/lib/types/message";
+import type {
+  Message,
+  MessageStreamChunk,
+  PersistedPayload,
+} from "@/lib/types/message";
 import { logger } from "@/lib/logger";
 import { updateLastAssistantMessage } from "@/hooks/utils/messageStateUpdaters";
 import { safeParseUrl } from "../../../convex/lib/url";
@@ -76,7 +80,9 @@ export class StreamEventHandler {
     }
   }
 
-  private handleProgress(chunk: Extract<MessageStreamChunk, { type: "progress" }>) {
+  private handleProgress(
+    chunk: Extract<MessageStreamChunk, { type: "progress" }>,
+  ) {
     this.setState((prev) => ({
       ...prev,
       searchProgress: {
@@ -97,7 +103,9 @@ export class StreamEventHandler {
     });
   }
 
-  private handleWorkflowStart(chunk: Extract<MessageStreamChunk, { type: "workflow_start" }>) {
+  private handleWorkflowStart(
+    chunk: Extract<MessageStreamChunk, { type: "workflow_start" }>,
+  ) {
     this.workflowId = chunk.workflowId;
     this.workflowNonce = chunk.nonce;
 
@@ -113,7 +121,9 @@ export class StreamEventHandler {
     });
   }
 
-  private handleReasoning(chunk: Extract<MessageStreamChunk, { type: "reasoning" }>) {
+  private handleReasoning(
+    chunk: Extract<MessageStreamChunk, { type: "reasoning" }>,
+  ) {
     this.accumulatedReasoning += chunk.content;
     updateLastAssistantMessage(this.setState, {
       reasoning: this.accumulatedReasoning,
@@ -122,7 +132,11 @@ export class StreamEventHandler {
     logger.debug("Reasoning chunk received");
   }
 
-  private handleContent(chunk: { type: "content"; content?: string; delta?: string }) {
+  private handleContent(chunk: {
+    type: "content";
+    content?: string;
+    delta?: string;
+  }) {
     const delta = chunk.delta || chunk.content;
     if (delta) {
       this.fullContent += delta;
@@ -139,7 +153,9 @@ export class StreamEventHandler {
     }
   }
 
-  private handleMetadata(chunk: Extract<MessageStreamChunk, { type: "metadata" }>) {
+  private handleMetadata(
+    chunk: Extract<MessageStreamChunk, { type: "metadata" }>,
+  ) {
     const metadata = chunk.metadata;
     const contextRefs = metadata.contextReferences;
     const metadataSources = metadata.sources;
@@ -191,7 +207,9 @@ export class StreamEventHandler {
     logger.debug("Stream complete, awaiting persisted event...");
   }
 
-  private handlePersisted(chunk: Extract<MessageStreamChunk, { type: "persisted" }>) {
+  private handlePersisted(
+    chunk: Extract<MessageStreamChunk, { type: "persisted" }>,
+  ) {
     this.persistedConfirmed = true;
     this.persistedDetails = chunk.payload;
 

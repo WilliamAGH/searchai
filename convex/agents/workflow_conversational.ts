@@ -66,7 +66,12 @@ export async function* streamConversationalWorkflow(
   const harvested = createEmptyHarvestedData();
 
   try {
-    const session = await initializeWorkflowSession(ctx, args, workflowId, nonce);
+    const session = await initializeWorkflowSession(
+      ctx,
+      args,
+      workflowId,
+      nonce,
+    );
     workflowTokenId = session.workflowTokenId;
     const { chat, conversationContext } = session;
 
@@ -105,7 +110,10 @@ export async function* streamConversationalWorkflow(
               return null;
             },
             onToolError: (toolName, errorCount) => {
-              logWorkflow("TOOL_OUTPUT_SKIP", `Failed tool output: ${toolName}`);
+              logWorkflow(
+                "TOOL_OUTPUT_SKIP",
+                `Failed tool output: ${toolName}`,
+              );
               assertToolErrorThreshold(errorCount, "Conversational workflow");
               return true;
             },
@@ -214,7 +222,9 @@ export async function* streamConversationalWorkflow(
     const totalDuration = Date.now() - startTime;
 
     if (!finalOutput || finalOutput.trim().length === 0) {
-      throw new Error("Conversational agent produced empty output - no content to save");
+      throw new Error(
+        "Conversational agent produced empty output - no content to save",
+      );
     }
 
     logWorkflowComplete({
@@ -235,12 +245,19 @@ export async function* streamConversationalWorkflow(
       intent: args.userQuery,
     });
 
-    const uniqueContextRefs = buildContextReferencesFromHarvested(harvested, generateMessageId);
+    const uniqueContextRefs = buildContextReferencesFromHarvested(
+      harvested,
+      generateMessageId,
+    );
 
     const searchResults = buildSearchResultsFromContextRefs(uniqueContextRefs);
     const sources = extractSourceUrls(uniqueContextRefs);
 
-    logSourcesSummary(uniqueContextRefs.length, searchResults.length, sources.length);
+    logSourcesSummary(
+      uniqueContextRefs.length,
+      searchResults.length,
+      sources.length,
+    );
 
     const { payload: persistedPayload, signature } = await withErrorContext(
       "Failed to persist and complete workflow",
@@ -292,7 +309,9 @@ export async function* streamConversationalWorkflow(
     });
   } catch (error) {
     await handleError(
-      error instanceof Error ? error : new Error("Conversational workflow failed"),
+      error instanceof Error
+        ? error
+        : new Error("Conversational workflow failed"),
       "conversational",
     );
   }

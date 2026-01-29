@@ -24,7 +24,8 @@ export function generateUuidV7(): string {
  * where y is one of [8, 9, a, b]
  */
 export function isValidUuidV7(id: string): boolean {
-  const uuidV7Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const uuidV7Pattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidV7Pattern.test(id);
 }
 
@@ -46,7 +47,11 @@ export function getTimestampFromUuidV7(id: string): Date | null {
 /**
  * Check if a UUID v7 was generated within a time range
  */
-export function isUuidV7InTimeRange(id: string, startDate: Date, endDate: Date): boolean {
+export function isUuidV7InTimeRange(
+  id: string,
+  startDate: Date,
+  endDate: Date,
+): boolean {
   const timestamp = getTimestampFromUuidV7(id);
   if (!timestamp) return false;
 
@@ -56,7 +61,10 @@ export function isUuidV7InTimeRange(id: string, startDate: Date, endDate: Date):
 /**
  * Sort an array of UUID v7s chronologically
  */
-export function sortUuidV7Chronologically(ids: string[], order: "asc" | "desc" = "asc"): string[] {
+export function sortUuidV7Chronologically(
+  ids: string[],
+  order: "asc" | "desc" = "asc",
+): string[] {
   return [...ids].sort((a, b) => {
     const timeA = getTimestampFromUuidV7(a);
     const timeB = getTimestampFromUuidV7(b);

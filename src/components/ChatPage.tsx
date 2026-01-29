@@ -15,14 +15,16 @@ export function ChatPage({ isSidebarOpen, onToggleSidebar }: ChatPageProps) {
   const location = useLocation();
   const isLocalPreview =
     typeof window !== "undefined" &&
-    (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") &&
+    (window.location.hostname === "127.0.0.1" ||
+      window.location.hostname === "localhost") &&
     !import.meta.env.DEV;
 
   // Set per-route canonical and url metas
   useEffect(() => {
     if (typeof document === "undefined") return;
     if (typeof window === "undefined") return;
-    const canonicalHref = window.location.origin + location.pathname + (location.search || "");
+    const canonicalHref =
+      window.location.origin + location.pathname + (location.search || "");
     let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!link) {
       link = document.createElement("link");
@@ -32,9 +34,13 @@ export function ChatPage({ isSidebarOpen, onToggleSidebar }: ChatPageProps) {
     link.href = canonicalHref;
 
     // Best-effort update for sharing metas
-    const og = document.querySelector<HTMLMetaElement>('meta[property="og:url"]');
+    const og = document.querySelector<HTMLMetaElement>(
+      'meta[property="og:url"]',
+    );
     if (og) og.setAttribute("content", canonicalHref);
-    const tw = document.querySelector<HTMLMetaElement>('meta[name="twitter:url"]');
+    const tw = document.querySelector<HTMLMetaElement>(
+      'meta[name="twitter:url"]',
+    );
     if (tw) tw.setAttribute("content", canonicalHref);
   }, [location.pathname, location.search]);
 

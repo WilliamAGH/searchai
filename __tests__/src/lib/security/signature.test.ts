@@ -44,7 +44,9 @@ describe("verifyPersistedPayload", () => {
 
   it.skipIf(!hasCryptoSubtle)("accepts matching signatures", async () => {
     const signature = await signPayload(payload, nonce, signingKey);
-    await expect(verifyPersistedPayload(payload, nonce, signature, signingKey)).resolves.toBe(true);
+    await expect(
+      verifyPersistedPayload(payload, nonce, signature, signingKey),
+    ).resolves.toBe(true);
   });
 
   it.skipIf(!hasCryptoSubtle)("rejects tampered payloads", async () => {

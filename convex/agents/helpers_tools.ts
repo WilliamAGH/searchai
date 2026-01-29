@@ -25,7 +25,10 @@ export const summarizeToolResult = (output: unknown): string => {
   } catch (serializeError) {
     console.warn("Tool result serialization failed", {
       outputType: typeof output,
-      error: serializeError instanceof Error ? serializeError.message : String(serializeError),
+      error:
+        serializeError instanceof Error
+          ? serializeError.message
+          : String(serializeError),
     });
     return "[unserializable output]";
   }

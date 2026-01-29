@@ -108,7 +108,10 @@ function parseIpv6ToBigInt(hostname: string): bigint | null {
   if (hostname.includes("%")) return null;
   const lower = hostname.toLowerCase();
   const doubleColonIndex = lower.indexOf("::");
-  if (doubleColonIndex !== -1 && lower.indexOf("::", doubleColonIndex + 1) !== -1) {
+  if (
+    doubleColonIndex !== -1 &&
+    lower.indexOf("::", doubleColonIndex + 1) !== -1
+  ) {
     return null;
   }
 
@@ -187,7 +190,9 @@ function isIpv6Private(hostname: string): boolean {
   if (value === null) {
     // Fail closed: treat unparseable IPv6 addresses as private to prevent bypass
     // This catches valid but unsupported syntax (e.g. zone IDs) as well as malformed input
-    console.warn(`isIpv6Private: Failed to parse IPv6 address, treating as private: ${hostname}`);
+    console.warn(
+      `isIpv6Private: Failed to parse IPv6 address, treating as private: ${hostname}`,
+    );
     return true;
   }
 
@@ -195,15 +200,22 @@ function isIpv6Private(hostname: string): boolean {
   if (value === 0n || value === 1n) return true;
 
   // Unique local addresses (fc00::/7)
-  if (value >= IPV6_UNIQUE_LOCAL_START && value <= IPV6_UNIQUE_LOCAL_END) return true;
+  if (value >= IPV6_UNIQUE_LOCAL_START && value <= IPV6_UNIQUE_LOCAL_END)
+    return true;
 
   // Link-local addresses (fe80::/10)
-  if (value >= IPV6_LINK_LOCAL_START && value <= IPV6_LINK_LOCAL_END) return true;
+  if (value >= IPV6_LINK_LOCAL_START && value <= IPV6_LINK_LOCAL_END)
+    return true;
 
   // IPv4-mapped IPv6 addresses (::ffff:0:0/96)
   if (value >= IPV6_IPV4_MAPPED_START && value <= IPV6_IPV4_MAPPED_END) {
     const v4 = Number(value & 0xffffffffn);
-    const parts = [(v4 >>> 24) & 0xff, (v4 >>> 16) & 0xff, (v4 >>> 8) & 0xff, v4 & 0xff];
+    const parts = [
+      (v4 >>> 24) & 0xff,
+      (v4 >>> 16) & 0xff,
+      (v4 >>> 8) & 0xff,
+      v4 & 0xff,
+    ];
     return isIpv4PrivateParts(parts);
   }
 
@@ -234,7 +246,9 @@ const BLOCKED_METADATA_HOSTS = new Set([
   "metadata.azure.com", // Azure metadata
 ]);
 
-export type ScrapeUrlValidation = { ok: true; url: string } | { ok: false; error: string };
+export type ScrapeUrlValidation =
+  | { ok: true; url: string }
+  | { ok: false; error: string };
 
 export function validateScrapeUrl(urlInput: string): ScrapeUrlValidation {
   const url = safeParseUrl(urlInput);
@@ -251,7 +265,8 @@ export function validateScrapeUrl(urlInput: string): ScrapeUrlValidation {
 
   const deployment = process.env.CONVEX_DEPLOYMENT;
   const isDevelopment =
-    process.env.NODE_ENV === "development" || Boolean(deployment && deployment.includes("dev"));
+    process.env.NODE_ENV === "development" ||
+    Boolean(deployment && deployment.includes("dev"));
 
   if (!isDevelopment && isLocalhostAddress(hostname)) {
     return { ok: false, error: "Access to local addresses is not allowed" };

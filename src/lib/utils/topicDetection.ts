@@ -72,7 +72,10 @@ function jaccard(a: string[], b: string[]): number {
  * - Only flags change on substantial difference
  * - Recognizes contextual follow-ups like "What about X?"
  */
-export function isTopicChange(currentMessage: string, previousMessage: string): boolean {
+export function isTopicChange(
+  currentMessage: string,
+  previousMessage: string,
+): boolean {
   if (!previousMessage) return false;
   const cur = (currentMessage || "").trim().toLowerCase();
   const prev = (previousMessage || "").trim().toLowerCase();

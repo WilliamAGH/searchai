@@ -6,7 +6,8 @@ import type { EnhancementRule } from "./types";
 export const technicalDocsEnhancement: EnhancementRule = {
   id: "technical-docs",
   name: "Technical Documentation Enhancement",
-  description: "Improves queries about technical topics by adding documentation sites",
+  description:
+    "Improves queries about technical topics by adding documentation sites",
   enabled: true,
   priority: 2,
 
@@ -34,8 +35,10 @@ export const technicalDocsEnhancement: EnhancementRule = {
 
   enhanceQuery: (query: string) => {
     const lower = query.toLowerCase();
-    if (lower.includes("react")) return `${query} site:react.dev OR site:github.com`;
-    if (lower.includes("python")) return `${query} site:docs.python.org OR site:pypi.org`;
+    if (lower.includes("react"))
+      return `${query} site:react.dev OR site:github.com`;
+    if (lower.includes("python"))
+      return `${query} site:docs.python.org OR site:pypi.org`;
     if (lower.includes("javascript") || lower.includes("js"))
       return `${query} site:developer.mozilla.org`;
     return `${query} documentation official docs`;

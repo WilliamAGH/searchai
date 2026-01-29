@@ -12,7 +12,10 @@ import { logger } from "@/lib/logger";
 import { toConvexId } from "@/lib/utils/idValidation";
 
 /** Map a Convex message to the local Message type */
-function mapConvexMessage(msg: Message, fallbackChatId: string | null): Message {
+function mapConvexMessage(
+  msg: Message,
+  fallbackChatId: string | null,
+): Message {
   return {
     ...msg,
     _id: String(msg._id),
@@ -76,7 +79,9 @@ export function usePaginatedMessages({
   );
 
   // Query for initial messages
-  const initialMessages = useQuery<typeof api.chats.messagesPaginated.getChatMessagesPaginated>(
+  const initialMessages = useQuery<
+    typeof api.chats.messagesPaginated.getChatMessagesPaginated
+  >(
     api.chats.messagesPaginated.getChatMessagesPaginated,
     enabled && resolvedChatId
       ? {
@@ -129,11 +134,14 @@ export function usePaginatedMessages({
         );
 
         if (hasOptimisticMessages) {
-          logger.debug("Skipping initial messages load - preserving optimistic state", {
-            chatId,
-            optimisticCount: prev.length,
-            dbCount: unifiedMessages.length,
-          });
+          logger.debug(
+            "Skipping initial messages load - preserving optimistic state",
+            {
+              chatId,
+              optimisticCount: prev.length,
+              dbCount: unifiedMessages.length,
+            },
+          );
           return prev; // Keep optimistic state
         }
 
@@ -187,7 +195,9 @@ export function usePaginatedMessages({
 
           // Stale-guard: if session changed during async call, ignore results
           if (sessionRef.current !== currentSession) {
-            logger.info("Discarding stale loadMore results due to session change");
+            logger.info(
+              "Discarding stale loadMore results due to session change",
+            );
             return;
           }
           setMessages((prev) => [...prev, ...mappedMessages]);
@@ -197,7 +207,11 @@ export function usePaginatedMessages({
         }
       } catch (err) {
         const errorMessage =
-          err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
+          err instanceof Error
+            ? err.message
+            : typeof err === "string"
+              ? err
+              : "Unknown error";
         const error = err instanceof Error ? err : new Error(errorMessage);
         const failTime = performance.now() - attemptStartTime;
 
@@ -261,7 +275,16 @@ export function usePaginatedMessages({
       setIsLoadingMore(false);
       loadingRef.current = false;
     }
-  }, [chatId, cursor, hasMore, initialLimit, loadMoreAction, error, sessionId, resolvedChatId]);
+  }, [
+    chatId,
+    cursor,
+    hasMore,
+    initialLimit,
+    loadMoreAction,
+    error,
+    sessionId,
+    resolvedChatId,
+  ]);
 
   // Refresh messages (reload from beginning)
   const refresh = useCallback(async () => {

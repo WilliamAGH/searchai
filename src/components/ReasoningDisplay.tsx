@@ -53,7 +53,9 @@ export function ReasoningDisplay({
             <span className="font-medium opacity-80">Thinking</span>
             <span className="opacity-60">({wordCount} words)</span>
             {isStreaming && !hasStartedContent && (
-              <span className="text-blue-500 dark:text-blue-400 animate-pulse font-bold">●</span>
+              <span className="text-blue-500 dark:text-blue-400 animate-pulse font-bold">
+                ●
+              </span>
             )}
           </div>
           <svg
@@ -62,7 +64,12 @@ export function ReasoningDisplay({
             fill="none"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
           </svg>
         </div>
       </button>
@@ -70,7 +77,9 @@ export function ReasoningDisplay({
         <div className="mt-1 p-2 rounded bg-blue-50/30 dark:bg-blue-900/10 border border-blue-200/30 dark:border-blue-800/30 max-w-full overflow-hidden">
           <div className="text-[10px] sm:text-xs text-blue-700/90 dark:text-blue-300/90 font-mono leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-auto opacity-90">
             {reasoning}
-            {isStreaming && !hasStartedContent && <span className="animate-pulse ml-0.5">▊</span>}
+            {isStreaming && !hasStartedContent && (
+              <span className="animate-pulse ml-0.5">▊</span>
+            )}
           </div>
         </div>
       )}

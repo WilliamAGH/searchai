@@ -30,7 +30,11 @@ export function extractKeywordsForTest(text: string, max: number): string[] {
     .map(([w]) => w);
 }
 
-export function augmentQueryForTest(q: string, kws: string[], maxExtras: number): string {
+export function augmentQueryForTest(
+  q: string,
+  kws: string[],
+  maxExtras: number,
+): string {
   const base = serialize(q);
   const words = new Set(tokenize(base));
   const extras: string[] = [];

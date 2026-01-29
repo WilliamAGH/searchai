@@ -8,7 +8,10 @@
 // Import PersistedPayload from the single source of truth
 import type { PersistedPayload } from "@/lib/types/message";
 
-export type PersistedPayloadWire = Omit<PersistedPayload, "assistantMessageId"> & {
+export type PersistedPayloadWire = Omit<
+  PersistedPayload,
+  "assistantMessageId"
+> & {
   assistantMessageId: string;
 };
 

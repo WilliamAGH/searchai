@@ -6,7 +6,10 @@ type MessageInputFocusOptions = {
   disabled: boolean;
 };
 
-export function useMessageInputFocus({ textareaRef, disabled }: MessageInputFocusOptions) {
+export function useMessageInputFocus({
+  textareaRef,
+  disabled,
+}: MessageInputFocusOptions) {
   // Autofocus once and manage focus on disabled changes
   useEffect(() => {
     if (disabled) return;
@@ -41,7 +44,9 @@ export function useMessageInputFocus({ textareaRef, disabled }: MessageInputFocu
       window.matchMedia("(pointer: coarse)").matches;
 
     // Avoid stealing focus if something else is active or a modal is open
-    const hasModalOpen = !!document.querySelector('[role="dialog"][aria-modal="true"]');
+    const hasModalOpen = !!document.querySelector(
+      '[role="dialog"][aria-modal="true"]',
+    );
     const canStealFocus =
       document.activeElement === document.body &&
       document.visibilityState === "visible" &&

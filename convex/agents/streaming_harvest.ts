@@ -14,12 +14,17 @@ import {
  * Returns the number of results harvested.
  * Preserves tool contextId for provenance tracking if present.
  */
-export function harvestSearchResults(output: unknown, harvested: HarvestedData): number {
+export function harvestSearchResults(
+  output: unknown,
+  harvested: HarvestedData,
+): number {
   const parsed = safeParseSearchToolOutput(output, "harvestSearchResults");
   if (!parsed) return 0;
 
   // Capture tool-level contextId for provenance (shared across all results from this call)
-  const toolContextId = isUuidV7(parsed.contextId) ? parsed.contextId : undefined;
+  const toolContextId = isUuidV7(parsed.contextId)
+    ? parsed.contextId
+    : undefined;
 
   let count = 0;
   for (const r of parsed.results) {
@@ -41,7 +46,10 @@ export function harvestSearchResults(output: unknown, harvested: HarvestedData):
  * Harvest scraped content from a tool output.
  * Returns true if content was harvested, false if skipped (duplicate or invalid).
  */
-export function harvestScrapedContent(output: unknown, harvested: HarvestedData): boolean {
+export function harvestScrapedContent(
+  output: unknown,
+  harvested: HarvestedData,
+): boolean {
   const parsed = safeParseScrapeToolOutput(output, "harvestScrapedContent");
   if (!parsed) return false;
   const { url: rawUrl, content } = parsed;
@@ -57,7 +65,9 @@ export function harvestScrapedContent(output: unknown, harvested: HarvestedData)
   harvested.scrapedUrls.add(normalizedUrl);
 
   // Extract or generate context ID
-  const contextId = isUuidV7(parsed.contextId) ? parsed.contextId : generateMessageId();
+  const contextId = isUuidV7(parsed.contextId)
+    ? parsed.contextId
+    : generateMessageId();
 
   harvested.scrapedContent.push({
     url: rawUrl,

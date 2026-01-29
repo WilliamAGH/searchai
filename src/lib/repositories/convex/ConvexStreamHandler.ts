@@ -5,8 +5,15 @@ import type { MessageStreamChunk } from "@/lib/types/message";
 import { logger } from "@/lib/logger";
 import { buildHttpError, readResponseBody } from "@/lib/utils/httpUtils";
 import { getErrorMessage } from "@/lib/utils/errorUtils";
-import { parseSSEStream, isSSEParseError, type SSEEvent } from "@/lib/utils/sseParser";
-import { verifyPersistedPayload, isSignatureVerificationAvailable } from "@/lib/security/signature";
+import {
+  parseSSEStream,
+  isSSEParseError,
+  type SSEEvent,
+} from "@/lib/utils/sseParser";
+import {
+  verifyPersistedPayload,
+  isSignatureVerificationAvailable,
+} from "@/lib/security/signature";
 import { env } from "@/lib/env";
 import { z } from "zod/v4";
 import type { StreamingPersistPayload } from "../../../../convex/agents/schema";
@@ -27,7 +34,10 @@ export class ConvexStreamHandler {
     private fetchMessages: (chatId: string) => Promise<Doc<"messages">[]>,
   ) {}
 
-  async *generateResponse(chatId: string, message: string): AsyncGenerator<MessageStreamChunk> {
+  async *generateResponse(
+    chatId: string,
+    message: string,
+  ): AsyncGenerator<MessageStreamChunk> {
     try {
       const host = window.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
@@ -36,7 +46,9 @@ export class ConvexStreamHandler {
         : `${env.convexUrl.replace(".convex.cloud", ".convex.site")}/api/ai/agent/stream`;
 
       const recent = await this.fetchMessages(chatId);
-      const chatHistory = recent.slice(-20).map((m) => ({ role: m.role, content: m.content }));
+      const chatHistory = recent
+        .slice(-20)
+        .map((m) => ({ role: m.role, content: m.content }));
 
       const response = await fetch(apiUrl, {
         method: "POST",
@@ -57,7 +69,11 @@ export class ConvexStreamHandler {
 
       if (!response.ok) {
         const errorText = await readResponseBody(response);
-        throw buildHttpError(response, errorText, "ConvexChatRepository.generateResponse");
+        throw buildHttpError(
+          response,
+          errorText,
+          "ConvexChatRepository.generateResponse",
+        );
       }
 
       for await (const evt of parseSSEStream(response)) {
@@ -87,7 +103,9 @@ export class ConvexStreamHandler {
     }
   }
 
-  private async handleStreamEvent(evt: SSEEvent): Promise<MessageStreamChunk | null> {
+  private async handleStreamEvent(
+    evt: SSEEvent,
+  ): Promise<MessageStreamChunk | null> {
     if (evt.type === "progress") {
       return this.parseStreamEvent(ProgressEventSchema, evt);
     }
@@ -115,7 +133,9 @@ export class ConvexStreamHandler {
     return null;
   }
 
-  private async handlePersistedEvent(evt: SSEEvent): Promise<MessageStreamChunk | null> {
+  private async handlePersistedEvent(
+    evt: SSEEvent,
+  ): Promise<MessageStreamChunk | null> {
     const parsed = PersistedEventSchema.safeParse(evt);
     if (!parsed.success) {
       logger.error("Invalid persisted SSE event payload", {
@@ -137,9 +157,12 @@ export class ConvexStreamHandler {
           { workflowId: parsed.data.payload.workflowId },
         );
       } else if (!isSignatureVerificationAvailable()) {
-        logger.warn("[WARN] Accepting unverified persisted event: Web Crypto API unavailable", {
-          workflowId: parsed.data.payload.workflowId,
-        });
+        logger.warn(
+          "[WARN] Accepting unverified persisted event: Web Crypto API unavailable",
+          {
+            workflowId: parsed.data.payload.workflowId,
+          },
+        );
       } else {
         const isValid = await verifyPersistedPayload(
           parsed.data.payload,
@@ -149,10 +172,13 @@ export class ConvexStreamHandler {
         );
 
         if (!isValid) {
-          logger.error("[BLOCKED] Invalid signature detected on persisted event", {
-            workflowId: parsed.data.payload.workflowId,
-            nonce: parsed.data.nonce,
-          });
+          logger.error(
+            "[BLOCKED] Invalid signature detected on persisted event",
+            {
+              workflowId: parsed.data.payload.workflowId,
+              nonce: parsed.data.nonce,
+            },
+          );
           return null;
         }
 
@@ -166,7 +192,9 @@ export class ConvexStreamHandler {
     try {
       payloadWithTypedId = {
         ...parsed.data.payload,
-        assistantMessageId: IdUtils.toConvexMessageId(parsed.data.payload.assistantMessageId),
+        assistantMessageId: IdUtils.toConvexMessageId(
+          parsed.data.payload.assistantMessageId,
+        ),
       };
     } catch (error) {
       logger.error("Invalid assistantMessageId in persisted payload", {

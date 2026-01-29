@@ -28,7 +28,8 @@ describe("corsHeadersForRequest", () => {
   });
 
   it("echoes origin when in allow-list", () => {
-    process.env.CONVEX_ALLOWED_ORIGINS = "https://site-a.test, https://site-b.test";
+    process.env.CONVEX_ALLOWED_ORIGINS =
+      "https://site-a.test, https://site-b.test";
     const req = makeRequest("https://site-b.test");
     const headers = corsHeadersForRequest(req, "GET");
     expect(headers["Access-Control-Allow-Origin"]).toBe("https://site-b.test");

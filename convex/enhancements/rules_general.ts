@@ -45,7 +45,8 @@ export const currentEventsEnhancement: EnhancementRule = {
 export const comparisonEnhancement: EnhancementRule = {
   id: "comparison",
   name: "Product & Service Comparison",
-  description: "Enhances comparison queries with review sites and versus searches",
+  description:
+    "Enhances comparison queries with review sites and versus searches",
   enabled: true,
   priority: 5,
 

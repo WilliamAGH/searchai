@@ -29,7 +29,9 @@ export type ExportData = {
   cacheControl: string;
 };
 
-export type ExportDataResult = { ok: true; data: ExportData } | { ok: false; response: Response };
+export type ExportDataResult =
+  | { ok: true; data: ExportData }
+  | { ok: false; response: Response };
 
 type ShareQueryMode = "auth" | "http";
 
@@ -42,33 +44,51 @@ export async function loadExportData(
   const shareIdParam = url.searchParams.get("shareId");
   const publicIdParam = url.searchParams.get("publicId");
 
-  const shareId = shareIdParam ? String(shareIdParam).trim().slice(0, 100) : undefined;
-  const publicId = publicIdParam ? String(publicIdParam).trim().slice(0, 100) : undefined;
+  const shareId = shareIdParam
+    ? String(shareIdParam).trim().slice(0, 100)
+    : undefined;
+  const publicId = publicIdParam
+    ? String(publicIdParam).trim().slice(0, 100)
+    : undefined;
 
   // Validate UUIDv7 format before querying
   if (shareId && !isValidUuidV7(shareId)) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(request, { error: "Invalid shareId format" }, 400),
+      response: buildCorsJsonResponse(
+        request,
+        { error: "Invalid shareId format" },
+        400,
+      ),
     };
   }
   if (publicId && !isValidUuidV7(publicId)) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(request, { error: "Invalid publicId format" }, 400),
+      response: buildCorsJsonResponse(
+        request,
+        { error: "Invalid publicId format" },
+        400,
+      ),
     };
   }
 
   if (!shareId && !publicId) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(request, { error: "Missing shareId or publicId" }, 400),
+      response: buildCorsJsonResponse(
+        request,
+        { error: "Missing shareId or publicId" },
+        400,
+      ),
     };
   }
 
   const chat = shareId
     ? await ctx.runQuery(
-        mode === "auth" ? api.chats.getChatByShareId : api.chats.getChatByShareIdHttp,
+        mode === "auth"
+          ? api.chats.getChatByShareId
+          : api.chats.getChatByShareIdHttp,
         { shareId },
       )
     : await ctx.runQuery(api.chats.getChatByPublicId, { publicId: publicId! });
@@ -76,7 +96,11 @@ export async function loadExportData(
   if (!chat) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(request, { error: "Chat not found or not accessible" }, 404),
+      response: buildCorsJsonResponse(
+        request,
+        { error: "Chat not found or not accessible" },
+        404,
+      ),
     };
   }
 
@@ -89,7 +113,9 @@ export async function loadExportData(
     shareId: typeof chat.shareId === "string" ? chat.shareId : undefined,
     publicId: typeof chat.publicId === "string" ? chat.publicId : undefined,
     privacy:
-      chat.privacy === "private" || chat.privacy === "shared" || chat.privacy === "public"
+      chat.privacy === "private" ||
+      chat.privacy === "shared" ||
+      chat.privacy === "public"
         ? chat.privacy
         : undefined,
     createdAt: typeof chat.createdAt === "number" ? chat.createdAt : undefined,
@@ -109,8 +135,10 @@ export async function loadExportData(
     messages: exportedMessages,
   });
 
-  const robots = exportedChat.privacy === "public" ? "index, follow" : "noindex, nofollow";
-  const cacheControl = exportedChat.privacy === "public" ? "public, max-age=60" : "no-cache";
+  const robots =
+    exportedChat.privacy === "public" ? "index, follow" : "noindex, nofollow";
+  const cacheControl =
+    exportedChat.privacy === "public" ? "public, max-age=60" : "no-cache";
 
   return {
     ok: true,

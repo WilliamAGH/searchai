@@ -11,7 +11,11 @@ interface ScrollToBottomFabProps {
   unseenCount?: number;
 }
 
-export function ScrollToBottomFab({ visible, onClick, unseenCount = 0 }: ScrollToBottomFabProps) {
+export function ScrollToBottomFab({
+  visible,
+  onClick,
+  unseenCount = 0,
+}: ScrollToBottomFabProps) {
   if (!visible) return null;
 
   return (

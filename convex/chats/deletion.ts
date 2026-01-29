@@ -30,7 +30,9 @@ export const deleteChat = mutation({
     }
 
     // Delete all messages in the chat via async iteration to reduce memory usage
-    const q = ctx.db.query("messages").withIndex("by_chatId", (q) => q.eq("chatId", args.chatId));
+    const q = ctx.db
+      .query("messages")
+      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId));
     for await (const message of q) {
       await ctx.db.delete(message._id);
     }

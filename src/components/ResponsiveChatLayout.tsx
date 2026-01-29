@@ -27,7 +27,11 @@ export function ResponsiveChatLayout({
 
       {/* Mobile Sidebar - Headless UI Dialog */}
       <Transition.Root show={isSidebarOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50 lg:hidden" onClose={onToggleSidebar}>
+        <Dialog
+          as="div"
+          className="relative z-50 lg:hidden"
+          onClose={onToggleSidebar}
+        >
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
@@ -61,7 +65,11 @@ export function ResponsiveChatLayout({
                   leaveTo="opacity-0"
                 >
                   <div className="absolute left-full top-0 flex w-16 justify-center pt-5">
-                    <button type="button" className="-m-2.5 p-2.5" onClick={onToggleSidebar}>
+                    <button
+                      type="button"
+                      className="-m-2.5 p-2.5"
+                      onClick={onToggleSidebar}
+                    >
                       <span className="sr-only">Close sidebar</span>
                       <svg
                         className="h-6 w-6 text-white"

@@ -18,13 +18,21 @@ const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 type OpenAIResponsesStreamParams = Parameters<OpenAI["responses"]["stream"]>[0];
 
-type ChatCompletionsStreamParams = Parameters<OpenAI["chat"]["completions"]["stream"]>[0];
+type ChatCompletionsStreamParams = Parameters<
+  OpenAI["chat"]["completions"]["stream"]
+>[0];
 
-type ChatCompletionsCreateParams = Parameters<OpenAI["chat"]["completions"]["create"]>[0];
+type ChatCompletionsCreateParams = Parameters<
+  OpenAI["chat"]["completions"]["create"]
+>[0];
 
-type ChatCompletionsStream = ReturnType<OpenAI["chat"]["completions"]["stream"]>;
+type ChatCompletionsStream = ReturnType<
+  OpenAI["chat"]["completions"]["stream"]
+>;
 
-type ChatCompletionsFinal = Awaited<ReturnType<ChatCompletionsStream["finalChatCompletion"]>>;
+type ChatCompletionsFinal = Awaited<
+  ReturnType<ChatCompletionsStream["finalChatCompletion"]>
+>;
 
 let openRouterClient: OpenAI | null = null;
 

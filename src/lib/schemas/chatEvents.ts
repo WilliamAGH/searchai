@@ -4,7 +4,14 @@ import { StreamingPersistPayloadSchema } from "../../../convex/schemas/agents";
 
 export const ProgressEventSchema = z.object({
   type: z.literal("progress"),
-  stage: z.enum(["thinking", "planning", "searching", "scraping", "analyzing", "generating"]),
+  stage: z.enum([
+    "thinking",
+    "planning",
+    "searching",
+    "scraping",
+    "analyzing",
+    "generating",
+  ]),
   message: z.string(),
   urls: z.array(z.string()).optional(),
   currentUrl: z.string().optional(),

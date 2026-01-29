@@ -3,11 +3,18 @@
 import { run } from "@openai/agents";
 import type { Id } from "../_generated/dataModel";
 import { generateMessageId } from "../lib/id_generator";
-import { AGENT_LIMITS, AGENT_TIMEOUTS, CONFIDENCE_THRESHOLDS } from "../lib/constants/cache";
+import {
+  AGENT_LIMITS,
+  AGENT_TIMEOUTS,
+  CONFIDENCE_THRESHOLDS,
+} from "../lib/constants/cache";
 import { logWorkflowError, logPlanningComplete } from "./workflow_logger";
 import { createWorkflowEvent } from "./workflow_events";
 import type { WorkflowStreamEvent } from "./workflow_event_types";
-import { initializeWorkflowSession, type StreamingWorkflowArgs } from "./orchestration_session";
+import {
+  initializeWorkflowSession,
+  type StreamingWorkflowArgs,
+} from "./orchestration_session";
 import {
   detectInstantResponse,
   detectErrorStage,
@@ -45,7 +52,12 @@ export async function* streamResearchWorkflow(
   });
 
   try {
-    const session = await initializeWorkflowSession(ctx, args, workflowId, nonce);
+    const session = await initializeWorkflowSession(
+      ctx,
+      args,
+      workflowId,
+      nonce,
+    );
     workflowTokenId = session.workflowTokenId;
     const { chat, conversationContext: conversationSource } = session;
 
@@ -74,7 +86,10 @@ export async function* streamResearchWorkflow(
     });
 
     const planningStart = Date.now();
-    const planningInput = buildPlanningInput(args.userQuery, conversationSource);
+    const planningInput = buildPlanningInput(
+      args.userQuery,
+      conversationSource,
+    );
     const planningResult = await run(agents.queryPlanner, planningInput, {
       stream: true,
       context: { actionCtx: ctx },
@@ -82,7 +97,10 @@ export async function* streamResearchWorkflow(
     });
 
     for await (const event of planningResult) {
-      if (event.type === "run_item_stream_event" && event.name === "reasoning_item_created") {
+      if (
+        event.type === "run_item_stream_event" &&
+        event.name === "reasoning_item_created"
+      ) {
         const item = event.item as { content?: string; text?: string };
         yield writeEvent("reasoning", {
           content: item.content || item.text || "",
@@ -90,11 +108,19 @@ export async function* streamResearchWorkflow(
       }
     }
 
-    await withTimeout(planningResult.completed, AGENT_TIMEOUTS.AGENT_STAGE_MS, "planning");
+    await withTimeout(
+      planningResult.completed,
+      AGENT_TIMEOUTS.AGENT_STAGE_MS,
+      "planning",
+    );
     const planningDuration = Date.now() - planningStart;
 
     if (planningResult.error) {
-      logWorkflowError("PLANNING_ERROR", "Planning agent error", planningResult.error);
+      logWorkflowError(
+        "PLANNING_ERROR",
+        "Planning agent error",
+        planningResult.error,
+      );
       const errorMsg =
         planningResult.error instanceof Error
           ? planningResult.error.message
@@ -102,14 +128,19 @@ export async function* streamResearchWorkflow(
       throw new Error(`Planning agent failed: ${errorMsg}`);
     }
 
-    const planningOutput = safeParsePlanningOutput(planningResult.finalOutput, workflowId);
+    const planningOutput = safeParsePlanningOutput(
+      planningResult.finalOutput,
+      workflowId,
+    );
 
     if (!planningOutput) {
       logWorkflowError("PLANNING_ERROR", "Failed to validate planning output", {
         hasError: !!planningResult.error,
         lastAgent: planningResult.lastAgent?.name,
         itemsGenerated: planningResult.newItems?.length || 0,
-        finalOutputKeys: planningResult.finalOutput ? Object.keys(planningResult.finalOutput) : [],
+        finalOutputKeys: planningResult.finalOutput
+          ? Object.keys(planningResult.finalOutput)
+          : [],
       });
       throw new Error(
         "Planning failed: output validation failed. Check OpenAI API key and model availability.",
@@ -119,11 +150,17 @@ export async function* streamResearchWorkflow(
     logPlanningComplete(planningDuration, planningOutput.searchQueries.length);
 
     const searchQueriesCount = planningOutput.searchQueries.length;
-    const informationNeededCount = planningOutput.informationNeeded?.length || 0;
+    const informationNeededCount =
+      planningOutput.informationNeeded?.length || 0;
     const needsResearch =
-      searchQueriesCount > 0 || informationNeededCount > 0 || planningOutput.needsWebScraping;
+      searchQueriesCount > 0 ||
+      informationNeededCount > 0 ||
+      planningOutput.needsWebScraping;
 
-    if (!needsResearch && planningOutput.confidenceLevel >= CONFIDENCE_THRESHOLDS.SKIP_RESEARCH) {
+    if (
+      !needsResearch &&
+      planningOutput.confidenceLevel >= CONFIDENCE_THRESHOLDS.SKIP_RESEARCH
+    ) {
       const fastPathGenerator = executeFastPath({
         ctx,
         args,

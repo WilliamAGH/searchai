@@ -15,6 +15,9 @@ export const MAX_LOOKUP_RETRIES = 5;
  * @param baseMs - Base delay in milliseconds (default: FAST_RETRY_BASE_MS)
  * @returns Delay in milliseconds: base * 2^attempt (e.g., 50ms, 100ms, 200ms, 400ms)
  */
-export function computeFastBackoff(attempt: number, baseMs = FAST_RETRY_BASE_MS): number {
+export function computeFastBackoff(
+  attempt: number,
+  baseMs = FAST_RETRY_BASE_MS,
+): number {
   return baseMs * Math.pow(2, attempt);
 }

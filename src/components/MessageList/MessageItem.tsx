@@ -10,7 +10,10 @@ import { ReasoningDisplay } from "../ReasoningDisplay";
 import { CopyButton } from "../CopyButton";
 import { MessageSources } from "./MessageSources";
 import { ToolProgressIndicator } from "./ToolProgressIndicator";
-import { extractPlainText, formatConversationWithSources } from "@/lib/clipboard";
+import {
+  extractPlainText,
+  formatConversationWithSources,
+} from "@/lib/clipboard";
 import type { Message, SearchProgress } from "@/lib/types/message";
 
 interface MessageItemProps {
@@ -36,7 +39,8 @@ export function MessageItem({
   onCitationHover,
   searchProgress,
 }: MessageItemProps) {
-  const safeTimestamp = typeof message.timestamp === "number" ? message.timestamp : Date.now();
+  const safeTimestamp =
+    typeof message.timestamp === "number" ? message.timestamp : Date.now();
   const safeResults = Array.isArray(message.searchResults)
     ? message.searchResults.filter(
         (r) => r && typeof r.url === "string" && typeof r.title === "string",
@@ -110,59 +114,75 @@ export function MessageItem({
         )}
 
         {/* 2) Thinking status - shows real-time AI processing */}
-        {message.role === "assistant" && message.thinking && message.thinking.trim() && (
-          <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            <span>{message.thinking}</span>
-          </div>
-        )}
+        {message.role === "assistant" &&
+          message.thinking &&
+          message.thinking.trim() && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
+              <svg
+                className="w-4 h-4 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <span>{message.thinking}</span>
+            </div>
+          )}
 
         {/* 3) Reasoning / thinking - positioned below sources */}
-        {message.role === "assistant" && message.reasoning && message.reasoning.trim() && (
-          <div className="mb-4">
-            <ReasoningDisplay
-              id={messageId}
-              reasoning={message.reasoning}
-              isStreaming={message.isStreaming}
-              hasStartedContent={Boolean(message.content && message.content.trim())}
-              collapsed={collapsedById[`reasoning-${messageId}`] ?? false}
-              onToggle={onToggleCollapsed}
-            />
-          </div>
-        )}
+        {message.role === "assistant" &&
+          message.reasoning &&
+          message.reasoning.trim() && (
+            <div className="mb-4">
+              <ReasoningDisplay
+                id={messageId}
+                reasoning={message.reasoning}
+                isStreaming={message.isStreaming}
+                hasStartedContent={Boolean(
+                  message.content && message.content.trim(),
+                )}
+                collapsed={collapsedById[`reasoning-${messageId}`] ?? false}
+                onToggle={onToggleCollapsed}
+              />
+            </div>
+          )}
 
         {/* 4) Search progress status when streaming */}
-        {message.role === "assistant" && searchProgress && searchProgress.stage !== "idle" && (
-          <ToolProgressIndicator
-            stage={searchProgress.stage}
-            message={searchProgress.message}
-            toolReasoning={
-              typeof searchProgress.toolReasoning === "string"
-                ? searchProgress.toolReasoning
-                : undefined
-            }
-            toolQuery={
-              typeof searchProgress.toolQuery === "string" ? searchProgress.toolQuery : undefined
-            }
-            toolUrl={
-              typeof searchProgress.toolUrl === "string" ? searchProgress.toolUrl : undefined
-            }
-          />
-        )}
+        {message.role === "assistant" &&
+          searchProgress &&
+          searchProgress.stage !== "idle" && (
+            <ToolProgressIndicator
+              stage={searchProgress.stage}
+              message={searchProgress.message}
+              toolReasoning={
+                typeof searchProgress.toolReasoning === "string"
+                  ? searchProgress.toolReasoning
+                  : undefined
+              }
+              toolQuery={
+                typeof searchProgress.toolQuery === "string"
+                  ? searchProgress.toolQuery
+                  : undefined
+              }
+              toolUrl={
+                typeof searchProgress.toolUrl === "string"
+                  ? searchProgress.toolUrl
+                  : undefined
+              }
+            />
+          )}
 
         {/* 5) AI/user content last – always appears under sources/thinking */}
         <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden text-[15px] sm:text-base leading-6">

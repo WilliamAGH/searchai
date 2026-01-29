@@ -6,7 +6,11 @@ type AutoResizeOptions = {
   dependencies: Array<unknown>;
 };
 
-export function useAutoResizeTextarea({ textareaRef, maxHeight, dependencies }: AutoResizeOptions) {
+export function useAutoResizeTextarea({
+  textareaRef,
+  maxHeight,
+  dependencies,
+}: AutoResizeOptions) {
   const adjustTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -29,7 +33,8 @@ export function useAutoResizeTextarea({ textareaRef, maxHeight, dependencies }: 
   }, [adjustTextarea, depsKey]);
 
   useEffect(() => {
-    const handler: EventListener = () => requestAnimationFrame(() => adjustTextarea());
+    const handler: EventListener = () =>
+      requestAnimationFrame(() => adjustTextarea());
     window.addEventListener("resize", handler);
     window.addEventListener("orientationchange", handler);
     return () => {

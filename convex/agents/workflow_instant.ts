@@ -39,7 +39,10 @@ export async function* executeInstantPath({
   const writeEvent = (type: string, data: Record<string, unknown>) =>
     createWorkflowEvent(type, data);
 
-  logWorkflow("INSTANT_RESPONSE", "Skipping all agent calls for simple message");
+  logWorkflow(
+    "INSTANT_RESPONSE",
+    "Skipping all agent calls for simple message",
+  );
 
   yield writeEvent("progress", {
     stage: "generating",
@@ -78,8 +81,8 @@ export async function* executeInstantPath({
     intent: args.userQuery,
   });
 
-  const { payload: instantPayload, signature: instantSignature } = await persistAndCompleteWorkflow(
-    {
+  const { payload: instantPayload, signature: instantSignature } =
+    await persistAndCompleteWorkflow({
       ctx,
       chatId: args.chatId,
       content: instantResponse,
@@ -90,8 +93,7 @@ export async function* executeInstantPath({
       contextReferences: [],
       workflowTokenId,
       nonce,
-    },
-  );
+    });
 
   yield writeEvent("persisted", {
     payload: instantPayload,

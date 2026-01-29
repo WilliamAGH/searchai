@@ -68,7 +68,8 @@ export function MobileSidebar({
       try {
         if (!window.confirm("Delete this chat? This cannot be undone.")) return;
 
-        const resolvedChatId = typeof chatId === "string" ? toConvexId<"chats">(chatId) : chatId;
+        const resolvedChatId =
+          typeof chatId === "string" ? toConvexId<"chats">(chatId) : chatId;
         if (!resolvedChatId) {
           throw new Error(`Invalid chat ID for deletion: ${chatId}`);
         }
@@ -136,7 +137,10 @@ export function MobileSidebar({
             leaveFrom="translate-x-0"
             leaveTo="-translate-x-full"
           >
-            <Dialog.Panel tabIndex={-1} className="relative mr-16 flex w-full max-w-xs flex-1">
+            <Dialog.Panel
+              tabIndex={-1}
+              className="relative mr-16 flex w-full max-w-xs flex-1"
+            >
               <Transition.Child
                 as={Fragment}
                 enter="ease-in-out duration-300"
@@ -163,7 +167,11 @@ export function MobileSidebar({
                       aria-label="Close sidebar"
                     >
                       <title>Close sidebar</title>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -200,7 +208,11 @@ export function MobileSidebar({
                     className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isCreatingChat ? (
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <svg
+                        className="w-5 h-5 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
                         <title>Creating chat</title>
                         <circle
                           className="opacity-25"
@@ -241,17 +253,24 @@ export function MobileSidebar({
                       Recent Chats
                     </h3>
                     {chats.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-gray-500">No chats yet</div>
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        No chats yet
+                      </div>
                     ) : (
                       <div className="space-y-1">
                         {chats.map((chat) => (
-                          <div key={chat._id} className="flex items-center gap-2 pr-2 min-w-0">
+                          <div
+                            key={chat._id}
+                            className="flex items-center gap-2 pr-2 min-w-0"
+                          >
                             <button
                               type="button"
                               data-chat-id={String(chat._id)}
                               onClick={handleSelectChatFromBtn}
                               className={`flex-1 min-w-0 px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
-                                currentChatId === chat._id ? "bg-gray-100 dark:bg-gray-800" : ""
+                                currentChatId === chat._id
+                                  ? "bg-gray-100 dark:bg-gray-800"
+                                  : ""
                               }`}
                             >
                               <div className="text-xs font-medium truncate min-w-0 leading-tight">
@@ -259,14 +278,18 @@ export function MobileSidebar({
                               </div>
                               <div className="text-[11px] text-gray-500 flex items-center gap-1 min-w-0 mt-0.5">
                                 <span className="truncate">
-                                  {new Date(chat.updatedAt).toLocaleDateString()}
+                                  {new Date(
+                                    chat.updatedAt,
+                                  ).toLocaleDateString()}
                                 </span>
                               </div>
                             </button>
                             <button
                               type="button"
                               data-chat-id={String(chat._id)}
-                              data-current={currentChatId === chat._id ? "1" : "0"}
+                              data-current={
+                                currentChatId === chat._id ? "1" : "0"
+                              }
                               onClick={handleDeleteChatFromBtn}
                               className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
                               title="Delete chat"

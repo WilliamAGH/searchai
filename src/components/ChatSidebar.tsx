@@ -112,7 +112,8 @@ export function ChatSidebar({
         });
 
         // Navigate away if deleting the current chat
-        const currentIdString = currentChatId !== null ? String(currentChatId) : null;
+        const currentIdString =
+          currentChatId !== null ? String(currentChatId) : null;
         if (chat?._id && currentIdString === String(chat._id)) {
           onSelectChat(null);
         }
@@ -141,7 +142,12 @@ export function ChatSidebar({
             className="p-1 hover:bg-muted rounded transition-colors"
             title="Close sidebar"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <title>Close sidebar</title>
               <path
                 strokeLinecap="round"
@@ -159,7 +165,11 @@ export function ChatSidebar({
           className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isCreatingChat ? (
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
               <title>Creating chat</title>
               <circle
                 className="opacity-25"
@@ -176,7 +186,12 @@ export function ChatSidebar({
               />
             </svg>
           ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <title>New chat</title>
               <path
                 strokeLinecap="round"
@@ -199,10 +214,15 @@ export function ChatSidebar({
           <div className="p-2">
             {chats.map((chat) => {
               const resolvedChatId = String(chat._id);
-              const isSelected = currentChatId !== null && String(currentChatId) === resolvedChatId;
+              const isSelected =
+                currentChatId !== null &&
+                String(currentChatId) === resolvedChatId;
 
               return (
-                <div key={chat._id} className="flex items-center gap-2 mb-1 pr-2 min-w-0">
+                <div
+                  key={chat._id}
+                  className="flex items-center gap-2 mb-1 pr-2 min-w-0"
+                >
                   <button
                     type="button"
                     data-chat-id={resolvedChatId}

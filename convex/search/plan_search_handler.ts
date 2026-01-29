@@ -52,7 +52,11 @@ function buildCacheKey(
 }
 
 /** Parse and validate LLM response */
-function parseLLMResponse(text: string, chatId: Id<"chats">, newMessage: string): LLMPlan | null {
+function parseLLMResponse(
+  text: string,
+  chatId: Id<"chats">,
+  newMessage: string,
+): LLMPlan | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -72,15 +76,24 @@ function parseLLMResponse(text: string, chatId: Id<"chats">, newMessage: string)
   );
 
   if (!planResult.success) {
-    throw new Error(`LLM plan validation failed for chatId=${chatId}: ${planResult.error.message}`);
+    throw new Error(
+      `LLM plan validation failed for chatId=${chatId}: ${planResult.error.message}`,
+    );
   }
 
   return planResult.data;
 }
 
 /** Build final plan from validated LLM response */
-function buildFinalPlanFromLLM(plan: LLMPlan, newMessage: string): PlanResult | null {
-  if (plan.shouldSearch === undefined || !plan.queries || !Array.isArray(plan.queries)) {
+function buildFinalPlanFromLLM(
+  plan: LLMPlan,
+  newMessage: string,
+): PlanResult | null {
+  if (
+    plan.shouldSearch === undefined ||
+    !plan.queries ||
+    !Array.isArray(plan.queries)
+  ) {
     return null;
   }
 
@@ -99,7 +112,10 @@ function buildFinalPlanFromLLM(plan: LLMPlan, newMessage: string): PlanResult | 
     contextSummary: serialize(String(plan.contextSummary || "")).slice(0, 2000),
     queries: queries.length > 0 ? queries : [newMessage],
     suggestNewChat: Boolean(plan.suggestNewChat),
-    decisionConfidence: Math.max(0, Math.min(1, Number(plan.decisionConfidence) || 0.5)),
+    decisionConfidence: Math.max(
+      0,
+      Math.min(1, Number(plan.decisionConfidence) || 0.5),
+    ),
     reasons: serialize(String(plan.reasons || "")).slice(0, 500),
   };
 }
@@ -159,14 +175,19 @@ export async function runPlanSearch(
     Math.max(0, recentMessages.length - maxContext),
   );
 
-  const chat = await ctx.runQuery(api.chats.getChatById, { chatId: args.chatId });
+  const chat = await ctx.runQuery(api.chats.getChatById, {
+    chatId: args.chatId,
+  });
   const rollingSummary =
     chat && (chat as { rollingSummary?: string }).rollingSummary !== undefined
       ? (chat as { rollingSummary?: string }).rollingSummary
       : undefined;
 
   const contextSummary = buildPlanContextSummary(recent, rollingSummary);
-  const { jaccardScore, minutesGap, timeSuggestNew } = computeHeuristics(args.newMessage, recent);
+  const { jaccardScore, minutesGap, timeSuggestNew } = computeHeuristics(
+    args.newMessage,
+    recent,
+  );
 
   const defaultPlan = buildDefaultPlan(
     args.newMessage,
@@ -194,8 +215,9 @@ export async function runPlanSearch(
       messages: [
         {
           role: "system" as const,
-          content: applyEnhancements(args.newMessage, { enhanceSystemPrompt: true })
-            .enhancedSystemPrompt
+          content: applyEnhancements(args.newMessage, {
+            enhanceSystemPrompt: true,
+          }).enhancedSystemPrompt
             ? `${SEARCH_PLANNER_SYSTEM_PROMPT}\n\n${applyEnhancements(args.newMessage, { enhanceSystemPrompt: true }).enhancedSystemPrompt}`
             : SEARCH_PLANNER_SYSTEM_PROMPT,
         },

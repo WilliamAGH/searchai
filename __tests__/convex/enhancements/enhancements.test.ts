@@ -195,7 +195,9 @@ describe("message enhancement system", () => {
     });
     const expectedUrls = ["https://williamcallahan.com", "https://aventure.vc"];
     for (const url of expectedUrls) {
-      expect(result.prioritizedUrls.some((u: string) => u.includes(url))).toBe(true);
+      expect(result.prioritizedUrls.some((u: string) => u.includes(url))).toBe(
+        true,
+      );
     }
   });
 });

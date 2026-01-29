@@ -39,7 +39,10 @@ function MessageSkeletonItem() {
  * Message skeleton loading component
  * Shows multiple skeleton items to indicate loading state
  */
-export function MessageSkeleton({ count = 3, className = "" }: MessageSkeletonProps) {
+export function MessageSkeleton({
+  count = 3,
+  className = "",
+}: MessageSkeletonProps) {
   return (
     <div
       className={`space-y-6 sm:space-y-8 ${className}`}
@@ -108,9 +111,14 @@ export function LoadErrorState({
       role="alert"
       aria-live="polite"
     >
-      <div className="text-red-500 dark:text-red-400 mb-2">Failed to load messages</div>
+      <div className="text-red-500 dark:text-red-400 mb-2">
+        Failed to load messages
+      </div>
       {retryCount > 0 && (
-        <div className="text-gray-500 dark:text-gray-400 mb-2" aria-live="polite">
+        <div
+          className="text-gray-500 dark:text-gray-400 mb-2"
+          aria-live="polite"
+        >
           Retry attempt {retryCount} of 3
         </div>
       )}

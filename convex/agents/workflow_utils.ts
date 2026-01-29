@@ -70,9 +70,12 @@ export const ensureCustomEventPolyfill = (): void => {
     global.CustomEvent = NodeCustomEvent as PolyfillCustomEventConstructor;
   } catch (extendError) {
     // Fallback for environments where Event is not extendable
-    console.warn("CustomEvent polyfill: Event not extendable, using standalone fallback class", {
-      error: extendError,
-    });
+    console.warn(
+      "CustomEvent polyfill: Event not extendable, using standalone fallback class",
+      {
+        error: extendError,
+      },
+    );
     class NodeCustomEvent<T = unknown> {
       type: string;
       detail: T;
@@ -89,7 +92,10 @@ export const ensureCustomEventPolyfill = (): void => {
 // Error & Limit Utilities
 // ============================================
 
-export function assertToolErrorThreshold(errorCount: number, workflowName: string): void {
+export function assertToolErrorThreshold(
+  errorCount: number,
+  workflowName: string,
+): void {
   if (errorCount >= AGENT_LIMITS.MAX_TOOL_ERRORS) {
     throw new Error(
       `${workflowName} failed: too many tool errors (${errorCount}/${AGENT_LIMITS.MAX_TOOL_ERRORS})`,
@@ -192,7 +198,10 @@ export function handleMaxTurnsGracefully(
 // Async Generator Utilities
 // ============================================
 
-type WriteEventFn = (type: string, data: Record<string, unknown>) => WorkflowStreamEvent;
+type WriteEventFn = (
+  type: string,
+  data: Record<string, unknown>,
+) => WorkflowStreamEvent;
 
 /**
  * Transforms an async generator by applying a mapper to each yielded value.

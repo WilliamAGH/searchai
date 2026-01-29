@@ -9,7 +9,10 @@ import {
   sanitizeTextInput,
 } from "./aiAgent_utils";
 
-export async function handleAgentRequest(ctx: ActionCtx, request: Request): Promise<Response> {
+export async function handleAgentRequest(
+  ctx: ActionCtx,
+  request: Request,
+): Promise<Response> {
   const origin = request.headers.get("Origin");
   const probe = corsResponse("{}", 204, origin);
   if (probe.status === 403) return probe;
@@ -27,23 +30,42 @@ export async function handleAgentRequest(ctx: ActionCtx, request: Request): Prom
 
   const message = sanitizeTextInput(payload.message, 10000);
   if (message === undefined) {
-    return corsResponse(JSON.stringify({ error: "Message must be a string" }), 400, origin);
+    return corsResponse(
+      JSON.stringify({ error: "Message must be a string" }),
+      400,
+      origin,
+    );
   }
   if (!message.trim()) {
-    return corsResponse(JSON.stringify({ error: "Message is required" }), 400, origin);
+    return corsResponse(
+      JSON.stringify({ error: "Message is required" }),
+      400,
+      origin,
+    );
   }
 
-  const conversationContext = sanitizeTextInput(payload.conversationContext, 5000);
+  const conversationContext = sanitizeTextInput(
+    payload.conversationContext,
+    5000,
+  );
 
-  const contextReferences = sanitizeContextReferences(payload.contextReferences);
+  const contextReferences = sanitizeContextReferences(
+    payload.contextReferences,
+  );
 
   dlog("AGENT AI ENDPOINT CALLED:");
   dlog("Message length:", message.length);
   dlog("Has context:", !!conversationContext);
   dlog("Context length:", conversationContext?.length || 0);
-  dlog("Context references provided:", contextReferences ? contextReferences.length : 0);
+  dlog(
+    "Context references provided:",
+    contextReferences ? contextReferences.length : 0,
+  );
   dlog("Environment Variables Available:");
-  dlog("- OPENROUTER_API_KEY:", process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET");
+  dlog(
+    "- OPENROUTER_API_KEY:",
+    process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET",
+  );
   dlog("- LLM_MODEL:", process.env.LLM_MODEL || "default");
 
   try {
@@ -136,7 +158,8 @@ export async function handleAgentRequest(ctx: ActionCtx, request: Request): Prom
       error: "Agent workflow failed",
       errorMessage: errorInfo.message,
       // Only include error details in development to avoid leaking stack traces
-      errorDetails: process.env.NODE_ENV === "development" ? errorInfo : undefined,
+      errorDetails:
+        process.env.NODE_ENV === "development" ? errorInfo : undefined,
       answer:
         "I apologize, but I encountered an error while processing your request. Please try again.",
       hasLimitations: true,
@@ -146,7 +169,10 @@ export async function handleAgentRequest(ctx: ActionCtx, request: Request): Prom
       timestamp: new Date().toISOString(),
     };
 
-    dlog("[ERROR] AGENT ERROR RESPONSE:", JSON.stringify(errorResponse, null, 2));
+    dlog(
+      "[ERROR] AGENT ERROR RESPONSE:",
+      JSON.stringify(errorResponse, null, 2),
+    );
 
     return corsResponse(JSON.stringify(errorResponse), 500, origin);
   }

@@ -24,7 +24,11 @@ export const importLocalChats = mutation({
         localId: v.string(),
         title: v.string(),
         privacy: v.optional(
-          v.union(v.literal("private"), v.literal("shared"), v.literal("public")),
+          v.union(
+            v.literal("private"),
+            v.literal("shared"),
+            v.literal("public"),
+          ),
         ),
         createdAt: v.number(),
         updatedAt: v.number(),
@@ -84,7 +88,9 @@ export const importLocalChats = mutation({
       });
 
       // Insert messages in chronological order
-      const ordered = [...ch.messages].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+      const ordered = [...ch.messages].sort(
+        (a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0),
+      );
       for (const m of ordered) {
         await ctx.db.insert("messages", {
           chatId,
@@ -183,7 +189,9 @@ export const publishAnonymousChat = mutation({
     });
 
     // Insert messages in chronological order
-    const ordered = [...args.messages].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+    const ordered = [...args.messages].sort(
+      (a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0),
+    );
     for (const m of ordered) {
       await ctx.db.insert("messages", {
         chatId,

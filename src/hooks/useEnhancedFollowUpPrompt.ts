@@ -51,7 +51,10 @@ function checkFollowUpConditions(
   }
 
   // Only show if there's a topic change
-  const hasTopicChanged = isTopicChange(lastUserMessage.content, previousUserMessage.content);
+  const hasTopicChanged = isTopicChange(
+    lastUserMessage.content,
+    previousUserMessage.content,
+  );
 
   if (hasTopicChanged) {
     const suggestions = generateFollowUpSuggestions(lastMessage.content);
@@ -178,7 +181,13 @@ export function useEnhancedFollowUpPrompt({
     }
 
     await handleNewChat({ userInitiated: true });
-  }, [currentChatId, handleNewChat, pendingMessage, resetFollowUp, summarizeRecentAction]);
+  }, [
+    currentChatId,
+    handleNewChat,
+    pendingMessage,
+    resetFollowUp,
+    summarizeRecentAction,
+  ]);
 
   // Send pending message when chat is ready
   useEffect(() => {

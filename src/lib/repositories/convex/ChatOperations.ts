@@ -37,7 +37,9 @@ export class ChatOperations {
     return chat || null;
   }
 
-  async createChat(title?: string): Promise<{ chat: Doc<"chats">; isNew: boolean }> {
+  async createChat(
+    title?: string,
+  ): Promise<{ chat: Doc<"chats">; isNew: boolean }> {
     try {
       const finalTitle = title || "New Chat";
       logger.debug("Creating chat", {
@@ -84,7 +86,10 @@ export class ChatOperations {
     }
   }
 
-  async updateChatPrivacy(id: string, privacy: "private" | "shared" | "public"): Promise<void> {
+  async updateChatPrivacy(
+    id: string,
+    privacy: "private" | "shared" | "public",
+  ): Promise<void> {
     try {
       await this.client.mutation(api.chats.updateChatPrivacy, {
         chatId: IdUtils.toConvexChatId(id),

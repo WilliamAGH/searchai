@@ -22,7 +22,11 @@ interface UseInputHistoryReturn {
   /** Current history index (null when not navigating) */
   historyIndex: number | null;
   /** Handle arrow key navigation - returns true if handled */
-  handleHistoryNavigation: (key: string, atStart: boolean, atEnd: boolean) => boolean;
+  handleHistoryNavigation: (
+    key: string,
+    atStart: boolean,
+    atEnd: boolean,
+  ) => boolean;
   /** Reset history state */
   resetHistory: () => void;
 }
@@ -38,7 +42,9 @@ export function useInputHistory({
   textareaRef,
 }: UseInputHistoryOptions): UseInputHistoryReturn {
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
-  const [draftBeforeHistory, setDraftBeforeHistory] = useState<string | null>(null);
+  const [draftBeforeHistory, setDraftBeforeHistory] = useState<string | null>(
+    null,
+  );
 
   const moveCaretToEnd = useCallback(() => {
     requestAnimationFrame(() => {

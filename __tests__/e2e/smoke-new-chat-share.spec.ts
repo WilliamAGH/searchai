@@ -2,7 +2,10 @@ import { test, expect } from "@playwright/test";
 
 test.describe("smoke: new chat share flow has no console errors", () => {
   // Skip this test - requires functional backend with API keys
-  test.skip("smoke: create chat, send message, open share modal", async ({ page, baseURL }) => {
+  test.skip("smoke: create chat, send message, open share modal", async ({
+    page,
+    baseURL,
+  }) => {
     const consoleErrors: string[] = [];
     const requestFailures: string[] = [];
     const responseFailures: string[] = [];
@@ -24,12 +27,15 @@ test.describe("smoke: new chat share flow has no console errors", () => {
       consoleErrors.push(t);
     });
     page.on("pageerror", (err) => consoleErrors.push(err.message));
-    const isHttp = (u: string) => u.startsWith("http://") || u.startsWith("https://");
+    const isHttp = (u: string) =>
+      u.startsWith("http://") || u.startsWith("https://");
     page.on("requestfailed", (req) => {
       const url = req.url();
       if (!isHttp(url)) return;
       if (url.endsWith("favicon.ico") || url.endsWith("favicon.svg")) return;
-      requestFailures.push(`${req.method()} ${url} -> ${req.failure()?.errorText}`);
+      requestFailures.push(
+        `${req.method()} ${url} -> ${req.failure()?.errorText}`,
+      );
     });
     page.on("response", (res) => {
       const url = res.url();
@@ -98,12 +104,16 @@ test.describe("smoke: new chat share flow has no console errors", () => {
     const manualStateChange = await page.evaluate(() => {
       try {
         // Find the share button and get its React fiber
-        const shareButton = document.querySelector('[title="Share this conversation"]');
+        const shareButton = document.querySelector(
+          '[title="Share this conversation"]',
+        );
         if (!shareButton) return { error: "Share button not found" };
 
         // Get React fiber key
         const fiberKey = Object.keys(shareButton).find(
-          (key) => key.startsWith("__reactFiber") || key.startsWith("__reactInternalInstance"),
+          (key) =>
+            key.startsWith("__reactFiber") ||
+            key.startsWith("__reactInternalInstance"),
         );
         if (!fiberKey) return { error: "React fiber not found" };
 
@@ -140,7 +150,9 @@ test.describe("smoke: new chat share flow has no console errors", () => {
       .catch(() => {});
 
     // Check if modal appeared
-    const modalCount = await page.locator('[role="dialog"][aria-modal="true"]').count();
+    const modalCount = await page
+      .locator('[role="dialog"][aria-modal="true"]')
+      .count();
     console.log("Modal count after click:", modalCount);
 
     // Debug: Check if there are any hidden modals or elements

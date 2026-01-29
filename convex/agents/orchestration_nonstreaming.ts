@@ -30,7 +30,10 @@ import {
   extractContextIdFromOutput,
   withTimeout,
 } from "./orchestration_helpers";
-import { safeParseResearchOutput, type ResearchOutput } from "../schemas/agents";
+import {
+  safeParseResearchOutput,
+  type ResearchOutput,
+} from "../schemas/agents";
 import { applyEnhancements } from "../enhancements";
 import { logWorkflow } from "./workflow_logger";
 import { assertToolErrorThreshold } from "./workflow_utils";
@@ -82,7 +85,10 @@ export const orchestrateResearchWorkflow = action({
     const workflowId = generateMessageId();
     const startTime = Date.now();
 
-    const planningInput = buildPlanningInput(args.userQuery, args.conversationContext);
+    const planningInput = buildPlanningInput(
+      args.userQuery,
+      args.conversationContext,
+    );
     const planningStart = Date.now();
     const planningResult = await withTimeout(
       run(agents.queryPlanner, planningInput, {
@@ -93,12 +99,15 @@ export const orchestrateResearchWorkflow = action({
       "planning",
     );
     const planningDuration = Date.now() - planningStart;
-    if (!planningResult.finalOutput) throw new Error("Planning failed: no final output");
+    if (!planningResult.finalOutput)
+      throw new Error("Planning failed: no final output");
 
     const plannedQueries = planningResult.finalOutput.searchQueries ?? [];
     const hasPlannedQueries = plannedQueries.length > 0;
     const conversationBlock = buildConversationBlock(args.conversationContext);
-    const referenceBlock = formatContextReferencesForPrompt(args.contextReferences ?? []);
+    const referenceBlock = formatContextReferencesForPrompt(
+      args.contextReferences ?? [],
+    );
 
     // Research
     const researchStart = Date.now();
@@ -131,7 +140,8 @@ export const orchestrateResearchWorkflow = action({
         searchQueries: plannedQueries,
         needsWebScraping: planningResult.finalOutput.needsWebScraping,
         enhancedContext: researchEnhancements.enhancedContext || undefined,
-        enhancedSystemPrompt: researchEnhancements.enhancedSystemPrompt || undefined,
+        enhancedSystemPrompt:
+          researchEnhancements.enhancedSystemPrompt || undefined,
       });
 
       const researchResult = await withTimeout(
@@ -143,10 +153,14 @@ export const orchestrateResearchWorkflow = action({
         "research",
       );
       researchDuration = Date.now() - researchStart;
-      if (!researchResult.finalOutput) throw new Error("Research failed: no final output");
+      if (!researchResult.finalOutput)
+        throw new Error("Research failed: no final output");
 
       // Validate SDK output with Zod per [ZV1a]
-      const validatedOutput = safeParseResearchOutput(researchResult.finalOutput, workflowId);
+      const validatedOutput = safeParseResearchOutput(
+        researchResult.finalOutput,
+        workflowId,
+      );
       if (!validatedOutput) {
         throw new Error("Research failed: output validation failed");
       }
@@ -164,7 +178,11 @@ export const orchestrateResearchWorkflow = action({
       assertToolErrorThreshold(toolErrorCount, "Research");
       toolCallLog = buildToolCallLog(entries, summarizeToolResult);
 
-      const urlContextMap = buildUrlContextMap(entries, extractContextIdFromOutput, normalizeUrl);
+      const urlContextMap = buildUrlContextMap(
+        entries,
+        extractContextIdFromOutput,
+        normalizeUrl,
+      );
       const { normalized, invalidCount } = normalizeSourceContextIds(
         researchOutput.sourcesUsed,
         urlContextMap,
@@ -174,9 +192,13 @@ export const orchestrateResearchWorkflow = action({
       );
       researchOutput.sourcesUsed = normalized;
       if (invalidCount > 0) {
-        logWorkflow("CONTEXT_PIPELINE", `Context references normalized: ${invalidCount}`, {
-          workflowId,
-        });
+        logWorkflow(
+          "CONTEXT_PIPELINE",
+          `Context references normalized: ${invalidCount}`,
+          {
+            workflowId,
+          },
+        );
       }
     }
 
@@ -205,7 +227,8 @@ export const orchestrateResearchWorkflow = action({
       scrapedContent: researchOutput.scrapedContent ?? undefined,
       serpEnrichment: researchOutput.serpEnrichment ?? undefined,
       enhancedContext: synthesisEnhancements.enhancedContext || undefined,
-      enhancedSystemPrompt: synthesisEnhancements.enhancedSystemPrompt || undefined,
+      enhancedSystemPrompt:
+        synthesisEnhancements.enhancedSystemPrompt || undefined,
     });
 
     const synthesisResult = await withTimeout(
@@ -219,14 +242,17 @@ export const orchestrateResearchWorkflow = action({
     const synthesisDuration = Date.now() - synthesisStart;
     const totalDuration = Date.now() - startTime;
     const rawAnswerText =
-      typeof synthesisResult.finalOutput === "string" ? synthesisResult.finalOutput : "";
+      typeof synthesisResult.finalOutput === "string"
+        ? synthesisResult.finalOutput
+        : "";
     if (!rawAnswerText) throw new Error("Synthesis failed: no text output");
     const strippedAnswer = stripTrailingSources(rawAnswerText);
     const parsedAnswer = parseAnswerText(strippedAnswer);
 
     const normalizedPlanning = {
       ...planningResult.finalOutput,
-      anticipatedChallenges: planningResult.finalOutput.anticipatedChallenges ?? undefined,
+      anticipatedChallenges:
+        planningResult.finalOutput.anticipatedChallenges ?? undefined,
     };
     const normalizedResearch = {
       ...researchOutput,

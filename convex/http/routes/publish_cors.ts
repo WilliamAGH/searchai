@@ -63,7 +63,10 @@ export function buildCorsTextResponse(
 /**
  * Build a CORS preflight response
  */
-export function buildCorsPreflightResponse(request: Request, methods: string): Response {
+export function buildCorsPreflightResponse(
+  request: Request,
+  methods: string,
+): Response {
   const requested = request.headers.get("Access-Control-Request-Headers");
   const origin = request.headers.get("Origin");
   const allowOrigin = getAllowedOrigin(origin);

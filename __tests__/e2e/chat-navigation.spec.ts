@@ -44,7 +44,9 @@ test.describe("chat navigation", () => {
     await ensureSidebarOpen(page);
 
     // Click New Chat - on mobile it's in dialog
-    const newChat = page.locator('[role="dialog"] button:has-text("New Chat")').first();
+    const newChat = page
+      .locator('[role="dialog"] button:has-text("New Chat")')
+      .first();
     await expect(newChat).toBeVisible({ timeout: 5000 });
     await newChat.click();
 
@@ -96,7 +98,10 @@ test.describe("chat navigation", () => {
     await page.goto((baseURL ?? "http://localhost:4173") + HOME);
   });
 
-  test.fixme("mobile swipe open/close is idempotent", async ({ page, baseURL }) => {
+  test.fixme("mobile swipe open/close is idempotent", async ({
+    page,
+    baseURL,
+  }) => {
     await page.setViewportSize(viewports.iPhone12);
     await page.goto((baseURL ?? "http://localhost:4173") + HOME);
     // Implement swipe gestures with Playwright touch simulation when CI supports it

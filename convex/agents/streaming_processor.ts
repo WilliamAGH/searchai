@@ -148,7 +148,12 @@ export async function* processAgentStream(
   config: StreamProcessorConfig,
   harvested?: HarvestedData,
 ): AsyncGenerator<StreamProcessorEvent, StreamProcessorStats, undefined> {
-  const { callbacks, harvestData = false, initialStage = "thinking", maxToolErrors = 3 } = config;
+  const {
+    callbacks,
+    harvestData = false,
+    initialStage = "thinking",
+    maxToolErrors = 3,
+  } = config;
 
   const stats: StreamProcessorStats = {
     toolCallCount: 0,
@@ -182,9 +187,14 @@ export async function* processAgentStream(
       const toolName = extractToolName(item);
       const toolArgs = extractToolArgs(item);
 
-      const newStage = callbacks.onToolCall?.(toolName, toolArgs, stats.lastProgressStage);
+      const newStage = callbacks.onToolCall?.(
+        toolName,
+        toolArgs,
+        stats.lastProgressStage,
+      );
 
-      const resolvedStage = newStage ?? getProgressStageForTool(toolName, stats.lastProgressStage);
+      const resolvedStage =
+        newStage ?? getProgressStageForTool(toolName, stats.lastProgressStage);
 
       if (resolvedStage && resolvedStage !== stats.lastProgressStage) {
         stats.lastProgressStage = resolvedStage;
@@ -206,7 +216,10 @@ export async function* processAgentStream(
 
       if (isToolError(output)) {
         stats.toolErrorCount++;
-        const shouldContinue = callbacks.onToolError?.(outputToolName, stats.toolErrorCount);
+        const shouldContinue = callbacks.onToolError?.(
+          outputToolName,
+          stats.toolErrorCount,
+        );
 
         if (shouldContinue === false || stats.toolErrorCount >= maxToolErrors) {
           break;

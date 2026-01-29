@@ -248,7 +248,8 @@ export function checkForInjection(
   const matchedPatterns: string[] = [];
 
   const categoriesToCheck =
-    categories || (Object.keys(INJECTION_PATTERNS) as (keyof typeof INJECTION_PATTERNS)[]);
+    categories ||
+    (Object.keys(INJECTION_PATTERNS) as (keyof typeof INJECTION_PATTERNS)[]);
 
   for (const category of categoriesToCheck) {
     const patterns = INJECTION_PATTERNS[category];
@@ -278,9 +279,19 @@ export function checkForInjection(
  * Pattern severity levels for risk assessment
  */
 export const PATTERN_SEVERITY = {
-  critical: ["systemCommands", "instructionOverrides", "roleEscalation", "jailbreakAttempts"],
+  critical: [
+    "systemCommands",
+    "instructionOverrides",
+    "roleEscalation",
+    "jailbreakAttempts",
+  ],
   high: ["delimiterInjection", "promptLeaking", "commandInjection"],
-  medium: ["templateInjection", "htmlScripts", "eventHandlers", "protocolInjection"],
+  medium: [
+    "templateInjection",
+    "htmlScripts",
+    "eventHandlers",
+    "protocolInjection",
+  ],
   low: ["sqlInjection", "unicodeAttacks"],
 };
 

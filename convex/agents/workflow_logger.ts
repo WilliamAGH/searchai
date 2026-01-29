@@ -114,7 +114,11 @@ export function logWorkflow(
  * @param message - Error message
  * @param error - The error object or details
  */
-export function logWorkflowError(event: WorkflowLogEvent, message: string, error?: unknown): void {
+export function logWorkflowError(
+  event: WorkflowLogEvent,
+  message: string,
+  error?: unknown,
+): void {
   const prefix = LOG_PREFIXES[event];
   if (error) {
     console.error(`${prefix} ${event}: ${message}`, error);
@@ -129,7 +133,10 @@ export function logWorkflowError(event: WorkflowLogEvent, message: string, error
 /**
  * Log workflow start.
  */
-export function logWorkflowStart(workflowType: "conversational" | "research", query: string): void {
+export function logWorkflowStart(
+  workflowType: "conversational" | "research",
+  query: string,
+): void {
   const truncatedQuery =
     query.length > CONTENT_LIMITS.QUERY_DISPLAY_LENGTH
       ? `${query.substring(0, CONTENT_LIMITS.QUERY_DISPLAY_LENGTH)}...`
@@ -181,8 +188,14 @@ export function logToolCall(
 /**
  * Log planning completion.
  */
-export function logPlanningComplete(durationMs: number, queryCount: number): void {
-  logWorkflow("PLANNING_COMPLETE", `PLANNING COMPLETE: ${durationMs}ms | queries: ${queryCount}`);
+export function logPlanningComplete(
+  durationMs: number,
+  queryCount: number,
+): void {
+  logWorkflow(
+    "PLANNING_COMPLETE",
+    `PLANNING COMPLETE: ${durationMs}ms | queries: ${queryCount}`,
+  );
 }
 
 /**
@@ -198,7 +211,11 @@ export function logParallelSearch(queryCount: number): void {
 /**
  * Log individual search result.
  */
-export function logSearchResult(durationMs: number, query: string, resultCount: number): void {
+export function logSearchResult(
+  durationMs: number,
+  query: string,
+  resultCount: number,
+): void {
   logWorkflow(
     "PARALLEL_SEARCH",
     `PARALLEL SEARCH [${durationMs}ms]: "${query}" → ${resultCount} results`,
@@ -208,7 +225,10 @@ export function logSearchResult(durationMs: number, query: string, resultCount: 
 /**
  * Log parallel search completion.
  */
-export function logParallelSearchComplete(durationMs: number, totalResults: number): void {
+export function logParallelSearchComplete(
+  durationMs: number,
+  totalResults: number,
+): void {
   logWorkflow(
     "PARALLEL_SEARCH_COMPLETE",
     `PARALLEL SEARCH COMPLETE [${durationMs}ms]: ${totalResults} total results`,
@@ -219,20 +239,34 @@ export function logParallelSearchComplete(durationMs: number, totalResults: numb
  * Log parallel scrape progress.
  */
 export function logParallelScrape(urlCount: number): void {
-  logWorkflow("PARALLEL_SCRAPE", `PARALLEL SCRAPE: Fetching ${urlCount} URLs simultaneously...`);
+  logWorkflow(
+    "PARALLEL_SCRAPE",
+    `PARALLEL SCRAPE: Fetching ${urlCount} URLs simultaneously...`,
+  );
 }
 
 /**
  * Log individual scrape result.
  */
-export function logScrapeResult(durationMs: number, url: string, charCount: number): void {
-  logWorkflow("PARALLEL_SCRAPE", `PARALLEL SCRAPE [${durationMs}ms]: ${url} → ${charCount} chars`);
+export function logScrapeResult(
+  durationMs: number,
+  url: string,
+  charCount: number,
+): void {
+  logWorkflow(
+    "PARALLEL_SCRAPE",
+    `PARALLEL SCRAPE [${durationMs}ms]: ${url} → ${charCount} chars`,
+  );
 }
 
 /**
  * Log scrape skip due to minimal content.
  */
-export function logScrapeSkip(durationMs: number, url: string, charCount: number): void {
+export function logScrapeSkip(
+  durationMs: number,
+  url: string,
+  charCount: number,
+): void {
   logWorkflow(
     "PARALLEL_SCRAPE_SKIP",
     `PARALLEL SCRAPE SKIP [${durationMs}ms]: ${url} (too short: ${charCount} chars)`,
@@ -273,7 +307,11 @@ export function logContextPipeline(status: {
 /**
  * Log sources summary for conversational workflow.
  */
-export function logSourcesSummary(refCount: number, resultCount: number, urlCount: number): void {
+export function logSourcesSummary(
+  refCount: number,
+  resultCount: number,
+  urlCount: number,
+): void {
   logWorkflow(
     "SOURCES_SUMMARY",
     `CONVERSATIONAL SOURCES: ${refCount} refs, ${resultCount} results, ${urlCount} URLs`,

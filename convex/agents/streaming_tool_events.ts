@@ -29,7 +29,13 @@ export function isToolCallEvent(
  * Handles various SDK patterns for tool name location.
  */
 export function extractToolName(item: StreamingEventItem): string {
-  return item.name || item.rawItem?.name || item.tool?.name || item.function?.name || "tool";
+  return (
+    item.name ||
+    item.rawItem?.name ||
+    item.tool?.name ||
+    item.function?.name ||
+    "tool"
+  );
 }
 
 /**
@@ -49,7 +55,10 @@ function extractString(obj: unknown, key: string): string | undefined {
   }
 
   // Field present but wrong type - log for observability
-  console.warn(`Tool argument "${key}" present but not a string:`, typeof value);
+  console.warn(
+    `Tool argument "${key}" present but not a string:`,
+    typeof value,
+  );
   return undefined;
 }
 

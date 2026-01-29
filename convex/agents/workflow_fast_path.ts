@@ -2,9 +2,19 @@
 
 import { logWorkflow } from "./workflow_logger";
 import { executeFastSynthesis } from "./synthesis_executor";
-import { buildCompleteEvent, buildMetadataEvent, createWorkflowEvent } from "./workflow_events";
-import type { WorkflowStreamEvent, WorkflowPathArgs } from "./workflow_event_types";
-import { updateChatTitleIfNeeded, persistAndCompleteWorkflow } from "./orchestration_persistence";
+import {
+  buildCompleteEvent,
+  buildMetadataEvent,
+  createWorkflowEvent,
+} from "./workflow_events";
+import type {
+  WorkflowStreamEvent,
+  WorkflowPathArgs,
+} from "./workflow_event_types";
+import {
+  updateChatTitleIfNeeded,
+  persistAndCompleteWorkflow,
+} from "./orchestration_persistence";
 import { mapAsyncGenerator, mapSynthesisEvent } from "./workflow_utils";
 
 export async function* executeFastPath({
@@ -63,10 +73,12 @@ export async function* executeFastPath({
       startTime,
       planning: {
         ...planningOutput,
-        anticipatedChallenges: planningOutput.anticipatedChallenges ?? undefined,
+        anticipatedChallenges:
+          planningOutput.anticipatedChallenges ?? undefined,
       },
       research: {
-        researchSummary: "No research required for this conversational message.",
+        researchSummary:
+          "No research required for this conversational message.",
         keyFindings: [],
         sourcesUsed: [],
         researchQuality: "adequate",

@@ -7,7 +7,11 @@
 
 import { v } from "convex/values";
 import { action, internalAction } from "./_generated/server";
-import { vSearchResult, vSerpEnrichment, vSearchMethod } from "./lib/validators";
+import {
+  vSearchResult,
+  vSerpEnrichment,
+  vSearchMethod,
+} from "./lib/validators";
 import { isValidUuidV7 } from "./lib/uuid";
 import { runPlanSearch } from "./search/plan_search_handler";
 import { runSearchWeb } from "./search/search_web_handler";
@@ -31,7 +35,9 @@ export const searchWeb = action({
     hasRealResults: v.boolean(),
     enrichment: v.optional(vSerpEnrichment),
     // Error tracking - present when fallback was used due to provider failures
-    providerErrors: v.optional(v.array(v.object({ provider: v.string(), error: v.string() }))),
+    providerErrors: v.optional(
+      v.array(v.object({ provider: v.string(), error: v.string() })),
+    ),
     allProvidersFailed: v.optional(v.boolean()),
   }),
   handler: async (_ctx, args) => runSearchWeb(args),

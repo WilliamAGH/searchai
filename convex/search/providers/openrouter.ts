@@ -77,7 +77,10 @@ export async function searchWithOpenRouter(
           url: citation.url,
           snippet:
             citation.content ||
-            content.substring(citation.start_index || 0, citation.end_index || 200),
+            content.substring(
+              citation.start_index || 0,
+              citation.end_index || 200,
+            ),
           relevanceScore: OPENROUTER_SCORES.ANNOTATED_CITATION,
         });
       }

@@ -52,7 +52,9 @@ test.describe("New Chat Resilience", () => {
     }
   });
 
-  test("should maintain state consistency during creation", async ({ page }) => {
+  test("should maintain state consistency during creation", async ({
+    page,
+  }) => {
     const logs: string[] = [];
     page.on("console", (msg) => {
       const text = msg.text();
@@ -79,7 +81,9 @@ test.describe("New Chat Resilience", () => {
     await expect(messageInput).toHaveValue("");
   });
 
-  test.fixme("should handle browser back/forward navigation", async ({ page }) => {
+  test.fixme("should handle browser back/forward navigation", async ({
+    page,
+  }) => {
     const newChatButton = await getNewChatButton(page);
     await expect(newChatButton).toBeVisible();
     await newChatButton.click();
@@ -95,7 +99,8 @@ test.describe("New Chat Resilience", () => {
     await expect(newChatButtonSecond).toBeVisible();
     await newChatButtonSecond.click();
     await page.waitForURL(
-      (url) => url.toString() !== firstChatUrl && /\/(chat)\/.+/.test(url.toString()),
+      (url) =>
+        url.toString() !== firstChatUrl && /\/(chat)\/.+/.test(url.toString()),
       { timeout: 10000 },
     );
     const secondChatUrl = page.url();
@@ -151,7 +156,9 @@ test.describe("New Chat Resilience", () => {
 
     await page
       .waitForFunction(
-        () => window.location.pathname === "/" || document.querySelector("[data-error-boundary]"),
+        () =>
+          window.location.pathname === "/" ||
+          document.querySelector("[data-error-boundary]"),
         { timeout: 2000 },
       )
       .catch(() => {});
@@ -186,7 +193,9 @@ test.describe("New Chat Resilience", () => {
     await expect(newChatButton).toBeVisible();
     await newChatButton.click();
 
-    const loadingButton = page.locator('button:has-text("Creating...")').first();
+    const loadingButton = page
+      .locator('button:has-text("Creating...")')
+      .first();
     await expect(loadingButton).toBeVisible({ timeout: 3000 });
 
     await page.waitForURL(/\/(chat)\/.+/, { timeout: 15000 });

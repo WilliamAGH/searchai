@@ -8,7 +8,11 @@
  * @module
  */
 
-import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 import type * as agents_answerParser from "../agents/answerParser.js";
 import type * as agents_definitions from "../agents/definitions.js";
 import type * as agents_helpers_builders from "../agents/helpers_builders.js";
@@ -274,5 +278,11 @@ declare const fullApi: ApiFromModules<{
   workflowTokens: typeof workflowTokens;
   workflowTokensActions: typeof workflowTokensActions;
 }>;
-export declare const api: FilterApi<typeof fullApi, FunctionReference<any, "public">>;
-export declare const internal: FilterApi<typeof fullApi, FunctionReference<any, "internal">>;
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;

@@ -8,10 +8,17 @@
 import { describe, it, expect } from "vitest";
 
 // Frontend utilities
-import { isValidConvexId, toConvexId, isLocalId } from "../../../../src/lib/utils/idValidation";
+import {
+  isValidConvexId,
+  toConvexId,
+  isLocalId,
+} from "../../../../src/lib/utils/idValidation";
 
 // Backend utilities
-import { isValidConvexIdFormat, safeConvexId } from "../../../../convex/lib/validators";
+import {
+  isValidConvexIdFormat,
+  safeConvexId,
+} from "../../../../convex/lib/validators";
 
 describe("Frontend ID Validation", () => {
   describe("isValidConvexId", () => {
@@ -66,7 +73,9 @@ describe("Backend ID Validation", () => {
   describe("isValidConvexIdFormat", () => {
     it("should accept identifiers that are not local", () => {
       expect(isValidConvexIdFormat("kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(true);
-      expect(isValidConvexIdFormat("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(true);
+      expect(isValidConvexIdFormat("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(
+        true,
+      );
     });
 
     it("should reject local identifiers", () => {

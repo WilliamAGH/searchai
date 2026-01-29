@@ -53,7 +53,10 @@ export function registerSearchRoutes(http: HttpRouter) {
       try {
         rawPayload = await request.json();
       } catch (error) {
-        console.error("[ERROR] SEARCH API INVALID JSON:", serializeError(error));
+        console.error(
+          "[ERROR] SEARCH API INVALID JSON:",
+          serializeError(error),
+        );
         return corsResponse(
           JSON.stringify({
             error: "Invalid JSON body",
@@ -70,11 +73,19 @@ export function registerSearchRoutes(http: HttpRouter) {
           ? (rawPayload as Record<string, unknown>)
           : null;
       if (!payload) {
-        return corsResponse(JSON.stringify({ error: "Invalid request payload" }), 400, origin);
+        return corsResponse(
+          JSON.stringify({ error: "Invalid request payload" }),
+          400,
+          origin,
+        );
       }
-      const query = (typeof payload.query === "string" ? payload.query : "").slice(0, 1000);
+      const query = (
+        typeof payload.query === "string" ? payload.query : ""
+      ).slice(0, 1000);
       const maxResults =
-        typeof payload.maxResults === "number" ? Math.max(1, Math.min(payload.maxResults, 50)) : 5;
+        typeof payload.maxResults === "number"
+          ? Math.max(1, Math.min(payload.maxResults, 50))
+          : 5;
 
       if (!query.trim()) {
         return corsResponse(
@@ -93,7 +104,10 @@ export function registerSearchRoutes(http: HttpRouter) {
       dlog("Max Results:", maxResults);
       dlog("Environment Variables Available:");
       dlog("- SERP_API_KEY:", process.env.SERP_API_KEY ? "SET" : "NOT SET");
-      dlog("- OPENROUTER_API_KEY:", process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET");
+      dlog(
+        "- OPENROUTER_API_KEY:",
+        process.env.OPENROUTER_API_KEY ? "SET" : "NOT SET",
+      );
 
       try {
         // Apply universal enhancements to anonymous search queries
@@ -114,7 +128,9 @@ export function registerSearchRoutes(http: HttpRouter) {
         });
 
         // Inject any enhancement-provided results at the front then de-duplicate by normalized URL
-        let mergedResults = Array.isArray(result.results) ? [...result.results] : [];
+        let mergedResults = Array.isArray(result.results)
+          ? [...result.results]
+          : [];
         if (enh.injectedResults && enh.injectedResults.length > 0) {
           mergedResults.unshift(...enh.injectedResults);
         }
@@ -131,9 +147,12 @@ export function registerSearchRoutes(http: HttpRouter) {
         for (const r of mergedResults) {
           const key = normalizeUrlForKey(r.url);
           const prev = byUrl.get(key);
-          const curScore = typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;
+          const curScore =
+            typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;
           const prevScore =
-            typeof prev?.relevanceScore === "number" ? prev.relevanceScore : -Infinity;
+            typeof prev?.relevanceScore === "number"
+              ? prev.relevanceScore
+              : -Infinity;
           if (!prev || curScore > prevScore) byUrl.set(key, r);
         }
         mergedResults = Array.from(byUrl.values()).map((r) => ({
@@ -142,17 +161,24 @@ export function registerSearchRoutes(http: HttpRouter) {
         }));
         // If prioritization hints exist, sort with priority
         if (prioritizedUrls.length > 0 && mergedResults.length > 1) {
-          mergedResults = sortResultsWithPriority(mergedResults, prioritizedUrls);
+          mergedResults = sortResultsWithPriority(
+            mergedResults,
+            prioritizedUrls,
+          );
         }
 
         const enhancedResult = {
           ...result,
           results: mergedResults,
-          hasRealResults: result.hasRealResults || (mergedResults?.length ?? 0) > 0,
+          hasRealResults:
+            result.hasRealResults || (mergedResults?.length ?? 0) > 0,
           // Surface matched rules for debugging in dev if needed (non-breaking)
         } as const;
 
-        dlog("[SEARCH] SEARCH RESULT:", JSON.stringify(enhancedResult, null, 2));
+        dlog(
+          "[SEARCH] SEARCH RESULT:",
+          JSON.stringify(enhancedResult, null, 2),
+        );
 
         return corsResponse(JSON.stringify(enhancedResult), 200, origin);
       } catch (error) {
@@ -177,7 +203,8 @@ export function registerSearchRoutes(http: HttpRouter) {
             {
               title: `Search for: ${query}`,
               url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-              snippet: "Search results temporarily unavailable. Click to search manually.",
+              snippet:
+                "Search results temporarily unavailable. Click to search manually.",
               relevanceScore: 0.3,
             },
           ],
@@ -185,7 +212,10 @@ export function registerSearchRoutes(http: HttpRouter) {
           hasRealResults: false,
         };
 
-        dlog("[SEARCH] SEARCH ERROR RESPONSE:", JSON.stringify(errorResponse, null, 2));
+        dlog(
+          "[SEARCH] SEARCH ERROR RESPONSE:",
+          JSON.stringify(errorResponse, null, 2),
+        );
 
         // Return 500 to indicate server error - clients can still use fallback results
         return corsResponse(JSON.stringify(errorResponse), 500, origin);

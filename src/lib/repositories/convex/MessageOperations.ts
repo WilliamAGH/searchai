@@ -43,13 +43,19 @@ export class MessageOperations {
     nextCursor?: Id<"messages">;
     hasMore: boolean;
   }> {
-    const cursorId = cursor !== undefined ? IdUtils.toConvexMessageId(String(cursor)) : undefined;
-    const result = await this.client.query(api.chats.messagesPaginated.getChatMessagesPaginated, {
-      chatId: IdUtils.toConvexChatId(chatId),
-      limit,
-      cursor: cursorId,
-      sessionId: this.getSessionId(),
-    });
+    const cursorId =
+      cursor !== undefined
+        ? IdUtils.toConvexMessageId(String(cursor))
+        : undefined;
+    const result = await this.client.query(
+      api.chats.messagesPaginated.getChatMessagesPaginated,
+      {
+        chatId: IdUtils.toConvexChatId(chatId),
+        limit,
+        cursor: cursorId,
+        sessionId: this.getSessionId(),
+      },
+    );
 
     if (!result) {
       throw new Error(
@@ -72,20 +78,27 @@ export class MessageOperations {
     };
   }
 
-  async addMessage(chatId: string, _message: Partial<Doc<"messages">>): Promise<Doc<"messages">> {
+  async addMessage(
+    chatId: string,
+    _message: Partial<Doc<"messages">>,
+  ): Promise<Doc<"messages">> {
     throw new Error(
       `Direct message creation is not supported for chat ${chatId}. Use generateResponse instead.`,
     );
   }
 
-  async updateMessage(id: string, updates: Partial<Doc<"messages">>): Promise<void> {
+  async updateMessage(
+    id: string,
+    updates: Partial<Doc<"messages">>,
+  ): Promise<void> {
     const hasMetadataUpdates =
       updates.searchResults !== undefined ||
       updates.sources !== undefined ||
       updates.searchMethod !== undefined ||
       updates.hasRealResults !== undefined;
 
-    const hasContentUpdates = updates.content !== undefined || updates.reasoning !== undefined;
+    const hasContentUpdates =
+      updates.content !== undefined || updates.reasoning !== undefined;
 
     if (hasContentUpdates) {
       throw new Error(

@@ -15,7 +15,7 @@ import { getActionCtx, type AgentToolRunContext } from "./tools_context";
  * Fetches and parses webpage content for detailed information.
  * Uses FunctionTool<any, any, unknown> per [SDK1] policy — required for SDK compatibility.
  */
-// prettier-ignore
+// oxfmt-ignore
 export const scrapeWebpageTool: FunctionTool<any, any, unknown> = tool({  
   name: "scrape_webpage",
   description: `Fetch and parse the full content of a specific webpage. Use this when you need:

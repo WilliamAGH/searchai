@@ -3,7 +3,11 @@
  * Uses Google search via SerpAPI for high-quality results
  */
 
-import type { SearchResult, SearchProviderResult, SerpEnrichment } from "../../schemas/search";
+import type {
+  SearchResult,
+  SearchProviderResult,
+  SerpEnrichment,
+} from "../../schemas/search";
 import { SerpApiResponseSchema } from "../../schemas/search";
 import { safeParseWithLog } from "../../lib/validation/zodUtils";
 import { getErrorMessage } from "../../lib/errors";
@@ -101,7 +105,9 @@ export async function searchWithSerpApiDuckDuckGo(
           description: data.knowledge_graph.description,
           attributes: data.knowledge_graph.attributes
             ? (Object.fromEntries(
-                Object.entries(data.knowledge_graph.attributes).filter(([, v]) => v !== undefined),
+                Object.entries(data.knowledge_graph.attributes).filter(
+                  ([, v]) => v !== undefined,
+                ),
               ) as Record<string, string>)
             : undefined,
           url: data.knowledge_graph.url,

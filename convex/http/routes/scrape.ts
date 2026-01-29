@@ -52,7 +52,10 @@ export function registerScrapeRoutes(http: HttpRouter) {
       try {
         rawPayload = await request.json();
       } catch (error) {
-        console.error("[ERROR] SCRAPE API INVALID JSON:", serializeError(error));
+        console.error(
+          "[ERROR] SCRAPE API INVALID JSON:",
+          serializeError(error),
+        );
         return corsResponse(
           JSON.stringify({
             error: "Invalid JSON body",
@@ -69,13 +72,23 @@ export function registerScrapeRoutes(http: HttpRouter) {
           ? (rawPayload as Record<string, unknown>)
           : null;
       if (!payload) {
-        return corsResponse(JSON.stringify({ error: "Invalid request payload" }), 400, origin);
+        return corsResponse(
+          JSON.stringify({ error: "Invalid request payload" }),
+          400,
+          origin,
+        );
       }
-      const urlInput = (typeof payload.url === "string" ? payload.url : "").slice(0, 2048);
+      const urlInput = (
+        typeof payload.url === "string" ? payload.url : ""
+      ).slice(0, 2048);
 
       const validation = validateScrapeUrl(urlInput);
       if (!validation.ok) {
-        return corsResponse(JSON.stringify({ error: validation.error }), 400, origin);
+        return corsResponse(
+          JSON.stringify({ error: validation.error }),
+          400,
+          origin,
+        );
       }
       const url = validation.url;
 

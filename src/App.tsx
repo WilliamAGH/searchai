@@ -218,12 +218,21 @@ export default function App() {
 
             <main className="flex-1 flex min-h-0 overflow-hidden">
               <Routes>
-                {["/", "/chat", "/chat/:chatId", "/s/:shareId", "/p/:publicId"].map((path) => (
+                {[
+                  "/",
+                  "/chat",
+                  "/chat/:chatId",
+                  "/s/:shareId",
+                  "/p/:publicId",
+                ].map((path) => (
                   <Route
                     key={path}
                     path={path}
                     element={
-                      <ChatPage isSidebarOpen={isSidebarOpen} onToggleSidebar={toggleSidebar} />
+                      <ChatPage
+                        isSidebarOpen={isSidebarOpen}
+                        onToggleSidebar={toggleSidebar}
+                      />
                     }
                   />
                 ))}

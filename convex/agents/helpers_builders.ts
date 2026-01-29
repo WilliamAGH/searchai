@@ -3,11 +3,17 @@
 import { buildTemporalHeader } from "../lib/dateTime";
 import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import { CONTENT_LIMITS } from "../lib/constants/cache";
-import { formatScrapedContentForPrompt, formatSerpEnrichmentForPrompt } from "./helpers_formatters";
+import {
+  formatScrapedContentForPrompt,
+  formatSerpEnrichmentForPrompt,
+} from "./helpers_formatters";
 import { truncate } from "./helpers_utils";
 import { logScrapedContentSummary } from "./workflow_logger";
 
-export function buildPlanningInput(userQuery: string, conversationContext?: string): string {
+export function buildPlanningInput(
+  userQuery: string,
+  conversationContext?: string,
+): string {
   const temporal = buildTemporalHeader();
   return conversationContext
     ? `${temporal}\n\nUser Question: ${userQuery}\n\nConversation Context:\n${conversationContext}`
@@ -132,7 +138,10 @@ export function buildSynthesisInstructions(params: {
     logScrapedContentSummary(
       params.scrapedContent.map((p) => ({
         url: p.url,
-        contentPreview: truncate(p.content || "", CONTENT_LIMITS.PREVIEW_MAX_CHARS),
+        contentPreview: truncate(
+          p.content || "",
+          CONTENT_LIMITS.PREVIEW_MAX_CHARS,
+        ),
       })),
     );
   }
@@ -232,6 +241,10 @@ export function buildConversationContext(
     .slice(0, CONTENT_LIMITS.MAX_CONTEXT_CHARS);
 }
 
-export function buildConversationBlock(conversationContext: string | undefined): string {
-  return conversationContext ? `RECENT CONVERSATION CONTEXT:\n${conversationContext}\n\n` : "";
+export function buildConversationBlock(
+  conversationContext: string | undefined,
+): string {
+  return conversationContext
+    ? `RECENT CONVERSATION CONTEXT:\n${conversationContext}\n\n`
+    : "";
 }

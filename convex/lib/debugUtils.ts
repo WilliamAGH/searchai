@@ -27,7 +27,12 @@ export function findEmptyObjects(obj: unknown, path = "root"): string[] {
   }
 
   for (const key of keys) {
-    results.push(...findEmptyObjects((obj as Record<string, unknown>)[key], `${path}.${key}`));
+    results.push(
+      ...findEmptyObjects(
+        (obj as Record<string, unknown>)[key],
+        `${path}.${key}`,
+      ),
+    );
   }
 
   return results;

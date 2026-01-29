@@ -31,7 +31,11 @@ export interface ReasoningConfig {
  * @see https://openrouter.ai/docs/features/provider-routing
  */
 export const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
-  const sort = process.env.LLM_PROVIDER_SORT as "price" | "throughput" | "latency" | undefined;
+  const sort = process.env.LLM_PROVIDER_SORT as
+    | "price"
+    | "throughput"
+    | "latency"
+    | undefined;
   const orderRaw = process.env.LLM_PROVIDER_ORDER;
   const allowFallbacks = process.env.LLM_PROVIDER_ALLOW_FALLBACKS;
 
@@ -57,7 +61,8 @@ export const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
   }
 
   if (allowFallbacks !== undefined) {
-    provider.allow_fallbacks = allowFallbacks === "true" || allowFallbacks === "1";
+    provider.allow_fallbacks =
+      allowFallbacks === "true" || allowFallbacks === "1";
   } else {
     // Default to allowing fallbacks for better reliability
     provider.allow_fallbacks = true;
@@ -79,7 +84,9 @@ export const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
  * @see https://platform.openai.com/docs/guides/reasoning
  * @see https://openrouter.ai/docs/use-cases/reasoning-tokens
  */
-export const parseReasoningSettings = (): ModelSettings["reasoning"] | undefined => {
+export const parseReasoningSettings = ():
+  | ModelSettings["reasoning"]
+  | undefined => {
   const reasoningEffort = process.env.LLM_REASONING as
     | "minimal"
     | "low"

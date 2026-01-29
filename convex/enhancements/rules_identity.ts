@@ -33,7 +33,8 @@ export const temporalEnhancement: EnhancementRule = {
 export const creatorEnhancement: EnhancementRule = {
   id: "creator-author",
   name: "Creator, SearchAI & aVenture Information",
-  description: "Enhances queries about the creator, SearchAI product, or aVenture investment firm",
+  description:
+    "Enhances queries about the creator, SearchAI product, or aVenture investment firm",
   enabled: true,
   priority: 1,
 
@@ -47,7 +48,9 @@ export const creatorEnhancement: EnhancementRule = {
       lower.includes("search ai") ||
       lower.includes("search-ai.io");
     const mentionsAVenture =
-      lower.includes("aventure") || lower.includes("a]venture") || lower.includes("aventure.vc");
+      lower.includes("aventure") ||
+      lower.includes("a]venture") ||
+      lower.includes("aventure.vc");
 
     const appReferenceKeywords = [
       "this app",
@@ -58,7 +61,9 @@ export const creatorEnhancement: EnhancementRule = {
       "this search",
       "this product",
     ];
-    const isAboutThisApp = appReferenceKeywords.some((keyword) => lower.includes(keyword));
+    const isAboutThisApp = appReferenceKeywords.some((keyword) =>
+      lower.includes(keyword),
+    );
 
     const infoSeekingKeywords = [
       "what is",
@@ -83,10 +88,15 @@ export const creatorEnhancement: EnhancementRule = {
       "describe",
       "features",
     ];
-    const isInfoSeeking = infoSeekingKeywords.some((keyword) => lower.includes(keyword));
+    const isInfoSeeking = infoSeekingKeywords.some((keyword) =>
+      lower.includes(keyword),
+    );
 
     return (
-      mentionsWilliam || mentionsSearchAI || mentionsAVenture || (isInfoSeeking && isAboutThisApp)
+      mentionsWilliam ||
+      mentionsSearchAI ||
+      mentionsAVenture ||
+      (isInfoSeeking && isAboutThisApp)
     );
   },
 
@@ -154,5 +164,9 @@ CRITICAL INSTRUCTIONS FOR SEARCHAI/AVENTURE/WILLIAM CALLAHAN QUERIES:
 - Do NOT confuse William Callahan (SearchAI founder) with other people named William Callahan`;
   },
 
-  prioritizeUrls: ["https://search-ai.io", "https://williamcallahan.com", "https://aventure.vc"],
+  prioritizeUrls: [
+    "https://search-ai.io",
+    "https://williamcallahan.com",
+    "https://aventure.vc",
+  ],
 };

@@ -13,7 +13,9 @@ export function useMetaTags({ currentChatId, allChats }: MetaTagsProps) {
   useEffect(() => {
     const originalTitle = document.title;
     const resolvedChat = currentChatId
-      ? allChats.find((chat) => String(chat._id ?? "") === String(currentChatId))
+      ? allChats.find(
+          (chat) => String(chat._id ?? "") === String(currentChatId),
+        )
       : undefined;
 
     if (resolvedChat?.title) {

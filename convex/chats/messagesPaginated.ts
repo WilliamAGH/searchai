@@ -8,7 +8,12 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import { hasSessionAccess, hasUserAccess, isUnownedChat, isSharedOrPublicChat } from "../lib/auth";
+import {
+  hasSessionAccess,
+  hasUserAccess,
+  isUnownedChat,
+  isSharedOrPublicChat,
+} from "../lib/auth";
 import { vContextReference, vSearchResult } from "../lib/validators";
 import { isValidUuidV7 } from "../lib/uuid";
 
@@ -40,7 +45,11 @@ export const getChatMessagesPaginated = query({
         _id: v.id("messages"),
         _creationTime: v.number(),
         chatId: v.id("chats"),
-        role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+        role: v.union(
+          v.literal("user"),
+          v.literal("assistant"),
+          v.literal("system"),
+        ),
         content: v.optional(v.string()),
         timestamp: v.optional(v.number()),
         isStreaming: v.optional(v.boolean()),
@@ -96,7 +105,9 @@ export const getChatMessagesPaginated = query({
       const hasMorePage = docs.length > pageSize;
       const pageDocs = docs.slice(0, pageSize);
       const nextCursorPage =
-        hasMorePage && pageDocs.length > 0 ? pageDocs[pageDocs.length - 1]._id : undefined;
+        hasMorePage && pageDocs.length > 0
+          ? pageDocs[pageDocs.length - 1]._id
+          : undefined;
       const formatted = [...pageDocs].reverse().map((m) => ({
         _id: m._id,
         _creationTime: m._creationTime,

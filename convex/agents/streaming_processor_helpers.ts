@@ -2,7 +2,10 @@ import type { StreamingEventItem, ToolCallArgs } from "./streaming_event_types";
 import type { AgentStreamResult } from "./streaming_processor_types";
 import type { HarvestedData } from "../schemas/agents";
 import { extractTextDelta } from "./streaming_tool_events";
-import { harvestSearchResults, harvestScrapedContent } from "./streaming_harvest";
+import {
+  harvestSearchResults,
+  harvestScrapedContent,
+} from "./streaming_harvest";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

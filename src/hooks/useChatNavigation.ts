@@ -36,7 +36,9 @@ export function useChatNavigation({
   const navigateWithVerification = useCallback(
     async (chatId: string) => {
       const normalizedChatId = String(chatId);
-      const chatExists = allChats.some((chat) => resolveChatId(chat) === normalizedChatId);
+      const chatExists = allChats.some(
+        (chat) => resolveChatId(chat) === normalizedChatId,
+      );
 
       if (!chatExists) {
         return false;

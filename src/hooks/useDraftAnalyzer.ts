@@ -36,7 +36,10 @@ export function useDraftAnalyzer({
       // Perform basic analysis
       const analysis: DraftAnalysis = {
         length: draft.length,
-        hasQuestion: /\?|^(what|when|where|who|why|how|is|are|can|could|would|should)/i.test(draft),
+        hasQuestion:
+          /\?|^(what|when|where|who|why|how|is|are|can|could|would|should)/i.test(
+            draft,
+          ),
         topics: extractTopics(draft),
         sentiment: detectSentiment(draft),
       };

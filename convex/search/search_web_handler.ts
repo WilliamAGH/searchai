@@ -6,7 +6,10 @@ import { searchWithSerpApiDuckDuckGo } from "./providers/serpapi";
 import { searchWithDuckDuckGo } from "./providers/duckduckgo";
 import { getCachedSearchResults, setCachedSearchResults } from "./cache";
 
-export async function runSearchWeb(args: { query: string; maxResults?: number }) {
+export async function runSearchWeb(args: {
+  query: string;
+  maxResults?: number;
+}) {
   const maxResults = args.maxResults || 5;
   const trimmedQuery = args.query.trim();
 
@@ -33,7 +36,10 @@ export async function runSearchWeb(args: { query: string; maxResults?: number })
   // Try SERP API for DuckDuckGo first if available
   if (process.env.SERP_API_KEY) {
     try {
-      const serpResults = await searchWithSerpApiDuckDuckGo(args.query, maxResults);
+      const serpResults = await searchWithSerpApiDuckDuckGo(
+        args.query,
+        maxResults,
+      );
       if (serpResults.results.length > 0) {
         const result = {
           results: serpResults.results,
@@ -58,7 +64,10 @@ export async function runSearchWeb(args: { query: string; maxResults?: number })
   // Try OpenRouter web search as fallback
   if (process.env.OPENROUTER_API_KEY) {
     try {
-      const openRouterResults = await searchWithOpenRouter(args.query, maxResults);
+      const openRouterResults = await searchWithOpenRouter(
+        args.query,
+        maxResults,
+      );
       if (openRouterResults.results.length > 0) {
         return {
           results: openRouterResults.results,
@@ -84,7 +93,9 @@ export async function runSearchWeb(args: { query: string; maxResults?: number })
       return {
         results: ddgResults.results,
         searchMethod: "duckduckgo" as const,
-        hasRealResults: ddgResults.results.some((r) => (r.relevanceScore ?? 0) > 0.6),
+        hasRealResults: ddgResults.results.some(
+          (r) => (r.relevanceScore ?? 0) > 0.6,
+        ),
         enrichment: ddgResults.enrichment,
       };
     }
@@ -102,7 +113,8 @@ export async function runSearchWeb(args: { query: string; maxResults?: number })
     {
       title: `Search for: ${args.query}`,
       url: `https://duckduckgo.com/?q=${encodeURIComponent(args.query)}`,
-      snippet: "Search results temporarily unavailable. Click to search manually.",
+      snippet:
+        "Search results temporarily unavailable. Click to search manually.",
       relevanceScore: 0.3,
     },
   ];

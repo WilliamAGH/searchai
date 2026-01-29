@@ -175,7 +175,12 @@ export function formatConversationMarkdown(params: {
   const lines: string[] = [];
   if (params.title) lines.push(`# ${extractPlainText(params.title)}`, "");
   for (const m of params.messages) {
-    const role = m.role === "user" ? "User" : m.role === "assistant" ? "Assistant" : "System";
+    const role =
+      m.role === "user"
+        ? "User"
+        : m.role === "assistant"
+          ? "Assistant"
+          : "System";
     lines.push(`${role}: ${extractPlainText(m.content || "")}`);
     if (m.role === "assistant") {
       const src: string[] = [];

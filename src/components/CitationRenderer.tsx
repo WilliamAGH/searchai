@@ -98,7 +98,9 @@ export function CitationRenderer({
   hoveredSourceUrl,
   onCitationHover,
 }: CitationRendererProps) {
-  const [processedContent, setProcessedContent] = useState<React.ReactNode[]>([]);
+  const [processedContent, setProcessedContent] = useState<React.ReactNode[]>(
+    [],
+  );
 
   // Create a map of domains to URLs for quick lookup
   const domainToUrlMap = React.useMemo(() => {
@@ -129,7 +131,11 @@ export function CitationRenderer({
       // Add text before the citation (trim trailing space)
       if (match.index > lastIndex) {
         const textBefore = content.substring(lastIndex, match.index);
-        parts.push(<span key={`text-${keyIndex++}`}>{textBefore.replace(/\s+$/, " ")}</span>);
+        parts.push(
+          <span key={`text-${keyIndex++}`}>
+            {textBefore.replace(/\s+$/, " ")}
+          </span>,
+        );
       }
 
       const citedText = match[1];
@@ -157,7 +163,9 @@ export function CitationRenderer({
         // If not found, try to find a URL that contains this path
         if (!matchedUrl) {
           const matchingResult = searchResults.find(
-            (r) => r.url.includes(citedText) || getDomainFromUrl(r.url) === citedDomain,
+            (r) =>
+              r.url.includes(citedText) ||
+              getDomainFromUrl(r.url) === citedDomain,
           );
           if (matchingResult) {
             matchedUrl = matchingResult.url;
@@ -198,7 +206,11 @@ export function CitationRenderer({
     // Add remaining text after last citation (trim leading space)
     if (lastIndex < content.length) {
       const textAfter = content.substring(lastIndex);
-      parts.push(<span key={`text-${keyIndex++}`}>{textAfter.replace(/^\s+/, " ")}</span>);
+      parts.push(
+        <span key={`text-${keyIndex++}`}>
+          {textAfter.replace(/^\s+/, " ")}
+        </span>,
+      );
     }
 
     // If no citations found, return content as-is

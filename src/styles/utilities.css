@@ -41,13 +41,14 @@
 
   /* Font utilities for explicit control */
   .font-serif {
-    font-family: "Playfair Display", "Georgia", "Times New Roman", serif !important;
+    font-family:
+      "Playfair Display", "Georgia", "Times New Roman", serif !important;
   }
 
   .font-mono {
     font-family:
-      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Source Code Pro",
-      monospace !important;
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace !important;
   }
 
   /* Dynamic viewport units to avoid mobile 100vh bugs */

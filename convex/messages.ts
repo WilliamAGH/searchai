@@ -2,7 +2,11 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { vSearchResult, vContextReference, vSearchMethod } from "./lib/validators";
+import {
+  vSearchResult,
+  vContextReference,
+  vSearchMethod,
+} from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
 import { isAuthorized, isUnownedChat, hasSessionAccess } from "./lib/auth";
@@ -35,7 +39,8 @@ export const addMessage = internalMutation({
 
     // Authorization: require ownership; shared/public chats are read-only.
     const authorized =
-      isAuthorized(chat, userId, args.sessionId) || (isUnownedChat(chat) && !!args.sessionId);
+      isAuthorized(chat, userId, args.sessionId) ||
+      (isUnownedChat(chat) && !!args.sessionId);
 
     if (!authorized) {
       throw new Error("Unauthorized");
@@ -90,7 +95,8 @@ export const addMessageHttp = internalMutation({
 
     // Authorization: require ownership; shared/public chats are read-only.
     const authorized =
-      hasSessionAccess(chat, args.sessionId) || (isUnownedChat(chat) && !!args.sessionId);
+      hasSessionAccess(chat, args.sessionId) ||
+      (isUnownedChat(chat) && !!args.sessionId);
 
     if (!authorized) {
       throw new Error("Unauthorized");
@@ -124,7 +130,9 @@ export const internalUpdateMessageContent = internalMutation({
     const message = await ctx.db.get(args.messageId);
     if (!message) {
       // Silently fail, to avoid crashing the stream
-      console.warn(`Message not found: ${args.messageId}, could not append chunk.`);
+      console.warn(
+        `Message not found: ${args.messageId}, could not append chunk.`,
+      );
       return;
     }
     await ctx.db.patch(args.messageId, {
@@ -142,7 +150,9 @@ export const internalUpdateMessageReasoning = internalMutation({
     const message = await ctx.db.get(args.messageId);
     if (!message) {
       // Silently fail, to avoid crashing the stream
-      console.warn(`Message not found: ${args.messageId}, could not append reasoning chunk.`);
+      console.warn(
+        `Message not found: ${args.messageId}, could not append reasoning chunk.`,
+      );
       return;
     }
     await ctx.db.patch(args.messageId, {
@@ -166,7 +176,9 @@ export const updateMessageMetadata = mutation({
     const message = await ctx.db.get(messageId);
     if (!message) {
       // Silently fail
-      console.warn(`Message not found: ${messageId}, could not update metadata.`);
+      console.warn(
+        `Message not found: ${messageId}, could not update metadata.`,
+      );
       return null;
     }
 
@@ -177,7 +189,9 @@ export const updateMessageMetadata = mutation({
       throw new Error("Chat not found");
     }
     if (!isAuthorized(chat, userId, sessionId)) {
-      throw new Error("Unauthorized: You can only update messages in your own chats");
+      throw new Error(
+        "Unauthorized: You can only update messages in your own chats",
+      );
     }
 
     await ctx.db.patch(messageId, metadata);
@@ -251,7 +265,10 @@ export const deleteMessage = mutation({
       // Log but don't propagate - the delete succeeded, cache invalidation is best-effort
       console.error("Failed to schedule plan cache invalidation", {
         chatId: message.chatId,
-        error: schedulerError instanceof Error ? schedulerError.message : String(schedulerError),
+        error:
+          schedulerError instanceof Error
+            ? schedulerError.message
+            : String(schedulerError),
       });
     }
 

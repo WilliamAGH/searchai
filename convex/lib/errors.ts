@@ -18,7 +18,10 @@
  *   console.error("Operation failed:", getErrorMessage(e));
  * }
  */
-export function getErrorMessage(error: unknown, fallback = "Unknown error"): string {
+export function getErrorMessage(
+  error: unknown,
+  fallback = "Unknown error",
+): string {
   if (error instanceof Error) {
     return error.message;
   }
@@ -37,5 +40,6 @@ export const ERROR_MESSAGES = {
   CHAT_ACCESS_DENIED: "Chat not found or access denied",
   MESSAGE_NOT_FOUND: "Message not found",
   UNAUTHORIZED: "Unauthorized",
-  UNAUTHORIZED_CHAT_ACCESS: "Unauthorized: You can only access messages in your own chats",
+  UNAUTHORIZED_CHAT_ACCESS:
+    "Unauthorized: You can only access messages in your own chats",
 } as const;

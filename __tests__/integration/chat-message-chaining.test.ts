@@ -14,7 +14,9 @@ test.describe("Chat Message Chaining", () => {
     await page.waitForSelector('[data-testid="message-user"]');
 
     // Get chat ID from user message
-    const firstMessage = await page.locator('[data-testid="message-user"]').first();
+    const firstMessage = await page
+      .locator('[data-testid="message-user"]')
+      .first();
     const chatIdBefore = await firstMessage.getAttribute("data-chat-id");
     expect(chatIdBefore).toBeTruthy();
 
@@ -29,7 +31,9 @@ test.describe("Chat Message Chaining", () => {
     await page.waitForSelector('[data-testid="message-user"] >> nth=1');
 
     // Verify same chat ID on the new message
-    const secondUserMessage = await page.locator('[data-testid="message-user"]').nth(1);
+    const secondUserMessage = await page
+      .locator('[data-testid="message-user"]')
+      .nth(1);
     const chatIdAfter = await secondUserMessage.getAttribute("data-chat-id");
 
     expect(chatIdAfter).toBe(chatIdBefore);
@@ -54,7 +58,9 @@ test.describe("Chat Message Chaining", () => {
       const allMessages = await page.locator('[data-testid^="message-"]').all();
       expect(allMessages.length).toBeGreaterThanOrEqual(3);
 
-      const chatIds = await Promise.all(allMessages.map((msg) => msg.getAttribute("data-chat-id")));
+      const chatIds = await Promise.all(
+        allMessages.map((msg) => msg.getAttribute("data-chat-id")),
+      );
 
       const validChatIds = chatIds.filter(Boolean);
       expect(validChatIds.length).toBeGreaterThan(0);

@@ -28,7 +28,10 @@ This is **documented SDK behavior**, not a workaround. The SDK's own `Tool` type
 
 ```typescript
 // From @openai/agents-core/dist/tool.d.ts
-export type Tool<Context = unknown> = FunctionTool<Context, any, any> | ComputerTool | HostedTool;
+export type Tool<Context = unknown> =
+  | FunctionTool<Context, any, any>
+  | ComputerTool
+  | HostedTool;
 ```
 
 ### Correct Pattern
@@ -38,12 +41,17 @@ import { tool } from "@openai/agents";
 import type { FunctionTool, Tool } from "@openai/agents";
 
 // Individual tool — use FunctionTool<any, any, unknown>
-// prettier-ignore
-export const myTool: FunctionTool<any, any, unknown> = tool({ // eslint-disable-line @typescript-eslint/no-explicit-any
+// oxfmt-ignore
+export const myTool: FunctionTool<any, any, unknown> = tool({
+  // eslint-disable-line @typescript-eslint/no-explicit-any
   name: "my_tool",
   description: "...",
-  parameters: z.object({ /* ... */ }),
-  execute: async (input, ctx) => { /* ... */ },
+  parameters: z.object({
+    /* ... */
+  }),
+  execute: async (input, ctx) => {
+    /* ... */
+  },
 });
 
 // Tool array — use Tool[] for Agent.create() compatibility

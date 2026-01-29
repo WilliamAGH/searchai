@@ -1,5 +1,9 @@
 import { v } from "convex/values";
-import { vContextReference, vScrapedContent, vSerpEnrichment } from "../lib/validators";
+import {
+  vContextReference,
+  vScrapedContent,
+  vSerpEnrichment,
+} from "../lib/validators";
 
 export const orchestrateResearchWorkflowArgs = {
   userQuery: v.string(),
@@ -40,7 +44,11 @@ export const orchestrateResearchWorkflowReturns = v.object({
       v.object({
         finding: v.string(),
         sources: v.array(v.string()),
-        confidence: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+        confidence: v.union(
+          v.literal("high"),
+          v.literal("medium"),
+          v.literal("low"),
+        ),
       }),
     ),
     sourcesUsed: v.array(
@@ -53,7 +61,11 @@ export const orchestrateResearchWorkflowReturns = v.object({
           v.literal("scraped_page"),
           v.literal("research_summary"),
         ),
-        relevance: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+        relevance: v.union(
+          v.literal("high"),
+          v.literal("medium"),
+          v.literal("low"),
+        ),
       }),
     ),
     informationGaps: v.optional(v.array(v.string())),

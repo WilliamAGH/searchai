@@ -55,8 +55,12 @@ function formatZodIssues(error: z.ZodError, maxIssues = 10): string[] {
     const receivedValue = "received" in issue ? issue.received : undefined;
     const actualValue = receivedValue ?? inputValue;
 
-    const received = actualValue !== undefined ? ` (received: ${JSON.stringify(actualValue)})` : "";
-    const expected = "expected" in issue ? ` (expected: ${issue.expected})` : "";
+    const received =
+      actualValue !== undefined
+        ? ` (received: ${JSON.stringify(actualValue)})`
+        : "";
+    const expected =
+      "expected" in issue ? ` (expected: ${issue.expected})` : "";
 
     return `  - ${path}: ${issue.message}${expected}${received}`;
   });
@@ -80,10 +84,16 @@ function formatZodIssues(error: z.ZodError, maxIssues = 10): string[] {
  * //   - title: Required (expected: string) (received: undefined)
  * // Payload keys: url, snippet, relevance
  */
-export function logZodFailure(context: string, error: unknown, payload?: unknown): void {
+export function logZodFailure(
+  context: string,
+  error: unknown,
+  payload?: unknown,
+): void {
   // Summarize payload structure (keys only, not values)
   const payloadKeys =
-    typeof payload === "object" && payload !== null ? Object.keys(payload).slice(0, 20) : [];
+    typeof payload === "object" && payload !== null
+      ? Object.keys(payload).slice(0, 20)
+      : [];
 
   if (error instanceof z.ZodError) {
     const issueSummaries = formatZodIssues(error);
@@ -156,7 +166,11 @@ export function safeParseWithLog<T>(
  * @param context - Context string including record identifier
  * @returns Parsed data or null (failure is logged)
  */
-export function safeParseOrNull<T>(schema: z.ZodType<T>, raw: unknown, context: string): T | null {
+export function safeParseOrNull<T>(
+  schema: z.ZodType<T>,
+  raw: unknown,
+  context: string,
+): T | null {
   const result = safeParseWithLog(schema, raw, context);
   return result.success ? result.data : null;
 }

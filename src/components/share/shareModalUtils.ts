@@ -1,4 +1,7 @@
-import type { PersistedPrivacy, PrivacyOption } from "@/components/share/shareModalTypes";
+import type {
+  PersistedPrivacy,
+  PrivacyOption,
+} from "@/components/share/shareModalTypes";
 import { logger } from "@/lib/logger";
 
 export const toPersistedPrivacy = (option: PrivacyOption): PersistedPrivacy =>

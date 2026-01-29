@@ -63,7 +63,9 @@ export const REMARK_PLUGINS: PluggableList = [remarkGfm, remarkBreaks];
  * Rehype plugins for HTML sanitization.
  * Static - no need for memoization.
  */
-export const REHYPE_PLUGINS: PluggableList = [[rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]];
+export const REHYPE_PLUGINS: PluggableList = [
+  [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA],
+];
 
 /**
  * Code block renderer that ensures children are stringified.
@@ -79,7 +81,11 @@ export const CodeRenderer: NonNullable<Components["code"]> = ({
     typeof children === "string" || typeof children === "number"
       ? String(children)
       : Array.isArray(children)
-        ? children.map((c) => (typeof c === "string" || typeof c === "number" ? c : "")).join("")
+        ? children
+            .map((c) =>
+              typeof c === "string" || typeof c === "number" ? c : "",
+            )
+            .join("")
         : "";
   return (
     <code className={className} {...props}>

@@ -17,7 +17,9 @@ function createFallbackKey(message: Message, seed?: string): string {
   fallbackKeyCounter += 1;
 
   const timestamp =
-    typeof message.timestamp === "number" ? message.timestamp : (message._creationTime ?? 0);
+    typeof message.timestamp === "number"
+      ? message.timestamp
+      : (message._creationTime ?? 0);
 
   const role = message.role ?? "unknown";
   const seedSuffix = seed ? `-${seed}` : "";

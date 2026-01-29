@@ -7,7 +7,13 @@
 
 import type { PlanResult } from "./cache";
 import { setCachedPlan } from "./cache";
-import { extractKeyEntities, serialize, tokSet, jaccard, diversifyQueries } from "./utils";
+import {
+  extractKeyEntities,
+  serialize,
+  tokSet,
+  jaccard,
+  diversifyQueries,
+} from "./utils";
 import { getErrorMessage } from "../lib/errors";
 import { buildContextSummary } from "../chats/utils";
 
@@ -54,10 +60,17 @@ export function computeHeuristics(
     [...recentMessages]
       .reverse()
       .find(
-        (m: ChatMessageView) => m.role === "user" && serialize(m.content || "") !== newContent,
-      ) || [...recentMessages].reverse().find((m: ChatMessageView) => m.role === "user");
+        (m: ChatMessageView) =>
+          m.role === "user" && serialize(m.content || "") !== newContent,
+      ) ||
+    [...recentMessages]
+      .reverse()
+      .find((m: ChatMessageView) => m.role === "user");
 
-  const jaccardScore = jaccard(tokSet(serialize(prevUser?.content)), tokSet(newContent));
+  const jaccardScore = jaccard(
+    tokSet(serialize(prevUser?.content)),
+    tokSet(newContent),
+  );
   const lastTs = prevUser?.timestamp as number | undefined;
   const minutesGap = lastTs ? Math.floor((Date.now() - lastTs) / 60000) : 0;
   const timeSuggestNew = minutesGap >= 120;
@@ -104,9 +117,13 @@ export function buildDefaultPlan(
       .filter((t) => t.length > 3)
       .slice(0, 10);
     const variants: string[] = [newMessage];
-    if (ctxTokens.length >= 2) variants.push(`${newMessage} ${ctxTokens[0]} ${ctxTokens[1]}`);
-    if (ctxTokens.length >= 4) variants.push(`${newMessage} ${ctxTokens[2]} ${ctxTokens[3]}`);
-    const pool = Array.from(new Set(variants.map((q) => q.trim()).filter(Boolean)));
+    if (ctxTokens.length >= 2)
+      variants.push(`${newMessage} ${ctxTokens[0]} ${ctxTokens[1]}`);
+    if (ctxTokens.length >= 4)
+      variants.push(`${newMessage} ${ctxTokens[2]} ${ctxTokens[3]}`);
+    const pool = Array.from(
+      new Set(variants.map((q) => q.trim()).filter(Boolean)),
+    );
     const selected = diversifyQueries(pool, newMessage);
     if (selected.length > 0) defaultPlan.queries = selected;
   } catch (diversifyError) {
@@ -150,7 +167,10 @@ export function isFollowUpMessage(message: string): boolean {
 }
 
 /** Determine if LLM planning should be used */
-export function shouldUseLLMPlanning(jaccardScore: number, newMessage: string): boolean {
+export function shouldUseLLMPlanning(
+  jaccardScore: number,
+  newMessage: string,
+): boolean {
   const isFollowUp = isFollowUpMessage(newMessage);
   return (jaccardScore >= 0.35 && jaccardScore <= 0.75) || isFollowUp;
 }

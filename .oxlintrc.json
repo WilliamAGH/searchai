@@ -30,15 +30,28 @@
       {
         "patterns": [
           {
-            "group": ["**/convexTypes", "**/convexTypes.ts", "**/convex-types", "**/types/convex"],
+            "group": [
+              "**/convexTypes",
+              "**/convexTypes.ts",
+              "**/convex-types",
+              "**/types/convex"
+            ],
             "message": "NEVER create abstraction layers over Convex _generated types. Import directly from 'convex/_generated/' as per Convex best practices."
           },
           {
-            "group": ["./lib/convexTypes", "../lib/convexTypes", "../../lib/convexTypes"],
+            "group": [
+              "./lib/convexTypes",
+              "../lib/convexTypes",
+              "../../lib/convexTypes"
+            ],
             "message": "CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See AGENTS.md for correct patterns."
           },
           {
-            "group": ["**/lib/convex*", "**/wrappers/convex*", "**/abstractions/convex*"],
+            "group": [
+              "**/lib/convex*",
+              "**/wrappers/convex*",
+              "**/abstractions/convex*"
+            ],
             "message": "Do not create wrapper files for Convex types. The _generated directory IS the abstraction layer."
           }
         ]

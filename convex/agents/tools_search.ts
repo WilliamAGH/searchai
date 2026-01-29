@@ -8,6 +8,17 @@ import { generateMessageId } from "../lib/id_generator";
 import { getErrorMessage } from "../lib/errors";
 import { getActionCtx, type AgentToolRunContext } from "./tools_context";
 
+/** Default relevance score when search results don't include one */
+const DEFAULT_RELEVANCE_SCORE = 0.5;
+
+/** Tool name constant for metadata tracking */
+const TOOL_NAME = "search_web" as const;
+
+/** Creates standardized metadata for tool call tracing */
+function createToolCallMetadata(callStart: number, durationMs: number) {
+  return { toolName: TOOL_NAME, callStart, durationMs };
+}
+
 /**
  * Get the current year for temporal context in tool descriptions.
  * This ensures the LLM knows the current date when formulating search queries.
@@ -29,7 +40,7 @@ function getCurrentDateString(): string {
  * Searches the web and returns results with UUIDv7 context tracking.
  * Uses FunctionTool<any, any, unknown> per [SDK1] policy — required for SDK compatibility.
  */
-// prettier-ignore
+// oxfmt-ignore
 export const searchWebTool: FunctionTool<any, any, unknown> = tool({  
   name: "search_web",
   description: `Search the web for current information. 
@@ -90,7 +101,6 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
     });
 
     try {
-      // @ts-ignore - Known Convex limitation with complex type inference (TS2589)
       const results = await actionCtx.runAction(api.search.searchWeb, {
         query: input.query,
         maxResults: input.maxResults || 5,
@@ -123,15 +133,11 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
             title: r.title,
             url: r.url,
             snippet: r.snippet,
-            relevanceScore: r.relevanceScore ?? 0.5,
+            relevanceScore: r.relevanceScore ?? DEFAULT_RELEVANCE_SCORE,
           }),
         ),
         timestamp: Date.now(),
-        _toolCallMetadata: {
-          toolName: "search_web",
-          callStart,
-          durationMs,
-        },
+        _toolCallMetadata: createToolCallMetadata(callStart, durationMs),
       };
 
       return output;
@@ -153,11 +159,7 @@ Always propagate the top-level contextId into every sourcesUsed entry you derive
         resultCount: 0,
         hasRealResults: false,
         timestamp: Date.now(),
-        _toolCallMetadata: {
-          toolName: "search_web",
-          callStart,
-          durationMs,
-        },
+        _toolCallMetadata: createToolCallMetadata(callStart, durationMs),
       };
     }
   },

@@ -73,7 +73,11 @@ function SearchIcon() {
  * @param onClose - Callback to close modal
  * @param onSwitchToSignUp - Callback to switch to sign-up modal
  */
-export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalProps) {
+export function SignInModal({
+  isOpen,
+  onClose,
+  onSwitchToSignUp,
+}: SignInModalProps) {
   const { signIn } = useAuthActions();
   const [submitting, setSubmitting] = useState(false);
 
@@ -88,7 +92,10 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
         const errorMessage = getResultErrorMessage(result);
         if (errorMessage) {
           toast.error(
-            getAuthToastMessage(errorMessage, "Could not sign in. Please check your credentials."),
+            getAuthToastMessage(
+              errorMessage,
+              "Could not sign in. Please check your credentials.",
+            ),
           );
         } else {
           onClose();
@@ -96,7 +103,10 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
       } catch (error: unknown) {
         const maybeMessage = extractAuthErrorMessage(error);
         toast.error(
-          getAuthToastMessage(maybeMessage, "Could not sign in. Please check your credentials."),
+          getAuthToastMessage(
+            maybeMessage,
+            "Could not sign in. Please check your credentials.",
+          ),
         );
       } finally {
         setSubmitting(false);
@@ -145,7 +155,9 @@ export function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignInModalPr
             Sign in
           </button>
           <div className="text-center text-sm">
-            <span className="text-gray-600 dark:text-gray-400">Don't have an account? </span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Don't have an account?{" "}
+            </span>
             <button
               type="button"
               className="text-primary hover:text-primary/80 hover:underline font-medium cursor-pointer dark:text-white"

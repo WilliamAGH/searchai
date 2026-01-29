@@ -57,16 +57,18 @@ describe.skip("usePaginatedMessages behavior (jsdom)", () => {
     { timeout: 10000 },
     async () => {
       setupInitialAndLoadMoreMocks();
-      const { usePaginatedMessages } = await import("../../../src/hooks/usePaginatedMessages");
+      const { usePaginatedMessages } =
+        await import("../../../src/hooks/usePaginatedMessages");
 
       // Render the harness with Testing Library (wraps updates in act)
 
       function Harness() {
-        const { messages, hasMore, isLoading, isLoadingMore, loadMore } = usePaginatedMessages({
-          chatId: "c1",
-          initialLimit: 2,
-          enabled: true,
-        });
+        const { messages, hasMore, isLoading, isLoadingMore, loadMore } =
+          usePaginatedMessages({
+            chatId: "c1",
+            initialLimit: 2,
+            enabled: true,
+          });
         const [loaded, setLoaded] = useState(false);
         useEffect(() => {
           if (!isLoading) setLoaded(true);

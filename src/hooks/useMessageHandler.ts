@@ -75,7 +75,9 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
       if (!activeChatId && deps.chatState.messages.length > 0) {
         const firstMsg = deps.chatState.messages[0];
         const existingChatId =
-          firstMsg && typeof firstMsg.chatId === "string" ? firstMsg.chatId : undefined;
+          firstMsg && typeof firstMsg.chatId === "string"
+            ? firstMsg.chatId
+            : undefined;
         if (existingChatId) {
           logger.info("[OK] Found existing chat from messages", {
             existingChatId,
@@ -119,7 +121,9 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         logger.error("Failed to send message", error);
         // Surface error to user via UI feedback
         if (deps.setErrorMessage) {
-          deps.setErrorMessage(getErrorMessage(error, "Failed to send message"));
+          deps.setErrorMessage(
+            getErrorMessage(error, "Failed to send message"),
+          );
         }
       } finally {
         deps.setIsGenerating(false);

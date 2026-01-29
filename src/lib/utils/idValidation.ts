@@ -51,7 +51,9 @@ export function isValidConvexId(str: string | null | undefined): boolean {
   return extractRawIdentifier(str) !== null;
 }
 
-export function isConvexId<TableName extends TableNames>(str: string): str is Id<TableName> {
+export function isConvexId<TableName extends TableNames>(
+  str: string,
+): str is Id<TableName> {
   return isValidConvexId(str);
 }
 

@@ -32,10 +32,13 @@ export function robustSanitize(input: string): string {
 
   // 3. Convert fullwidth/special Unicode to ASCII
   // Fullwidth characters can be used to disguise malicious input
-  clean = clean.replace(/[\uFF01-\uFF5E]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+  clean = clean.replace(/[\uFF01-\uFF5E]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0xfee0),
+  );
 
   // 4. Detect and neutralize base64 encoded injections
-  const base64Pattern = /(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?/g;
+  const base64Pattern =
+    /(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?/g;
   clean = clean.replace(base64Pattern, (match) => {
     // Skip short matches that are likely not base64
     if (match.length < 20) return match;
@@ -46,7 +49,9 @@ export function robustSanitize(input: string): string {
       const decoded = atob(match);
 
       // Check for common injection keywords in decoded content
-      if (/system|ignore|instruction|assistant|forget|disregard/i.test(decoded)) {
+      if (
+        /system|ignore|instruction|assistant|forget|disregard/i.test(decoded)
+      ) {
         return "[BASE64_BLOCKED]";
       }
     } catch (error) {
@@ -169,7 +174,10 @@ export function sanitizeHtmlContent(html: string): string {
   let clean = html;
 
   // Remove all script tags and content
-  clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+  clean = clean.replace(
+    /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+    "",
+  );
 
   // Remove all style tags and content
   clean = clean.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");

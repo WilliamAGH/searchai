@@ -13,7 +13,10 @@ import {
   sanitizeTextInput,
 } from "./aiAgent_utils";
 
-export async function handleAgentStream(ctx: ActionCtx, request: Request): Promise<Response> {
+export async function handleAgentStream(
+  ctx: ActionCtx,
+  request: Request,
+): Promise<Response> {
   const origin = request.headers.get("Origin");
   const probe = corsResponse("{}", 204, origin);
   if (probe.status === 403) return probe;
@@ -32,27 +35,49 @@ export async function handleAgentStream(ctx: ActionCtx, request: Request): Promi
 
   const message = sanitizeTextInput(payload.message, 10000);
   if (!message) {
-    return corsResponse(JSON.stringify({ error: "Message must be a string" }), 400, origin);
+    return corsResponse(
+      JSON.stringify({ error: "Message must be a string" }),
+      400,
+      origin,
+    );
   }
 
   if (!payload.chatId || typeof payload.chatId !== "string") {
-    return corsResponse(JSON.stringify({ error: "chatId is required" }), 400, origin);
+    return corsResponse(
+      JSON.stringify({ error: "chatId is required" }),
+      400,
+      origin,
+    );
   }
 
   const chatId = safeConvexId<"chats">(payload.chatId);
   if (!chatId) {
-    return corsResponse(JSON.stringify({ error: "Invalid chatId" }), 400, origin);
+    return corsResponse(
+      JSON.stringify({ error: "Invalid chatId" }),
+      400,
+      origin,
+    );
   }
 
-  const sessionIdRaw = typeof payload.sessionId === "string" ? payload.sessionId : undefined;
+  const sessionIdRaw =
+    typeof payload.sessionId === "string" ? payload.sessionId : undefined;
   if (sessionIdRaw && !isValidUuidV7(sessionIdRaw)) {
-    return corsResponse(JSON.stringify({ error: "Invalid sessionId format" }), 400, origin);
+    return corsResponse(
+      JSON.stringify({ error: "Invalid sessionId format" }),
+      400,
+      origin,
+    );
   }
   const sessionId = sessionIdRaw;
 
-  const conversationContext = sanitizeTextInput(payload.conversationContext, 5000);
+  const conversationContext = sanitizeTextInput(
+    payload.conversationContext,
+    5000,
+  );
 
-  const contextReferences = sanitizeContextReferences(payload.contextReferences);
+  const contextReferences = sanitizeContextReferences(
+    payload.contextReferences,
+  );
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -80,7 +105,10 @@ export async function handleAgentStream(ctx: ActionCtx, request: Request): Promi
 
         dlog("[OK] STREAMING CONVERSATIONAL WORKFLOW COMPLETE");
       } catch (error) {
-        console.error("[ERROR] STREAMING WORKFLOW ERROR:", serializeError(error));
+        console.error(
+          "[ERROR] STREAMING WORKFLOW ERROR:",
+          serializeError(error),
+        );
         sendEvent({
           type: "error",
           error: serializeError(error).message,

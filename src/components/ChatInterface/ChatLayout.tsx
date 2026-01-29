@@ -19,7 +19,10 @@ type ChatSidebarProps = React.ComponentProps<typeof ChatSidebar>;
 type MobileSidebarProps = React.ComponentProps<typeof MobileSidebar>;
 type MessageListProps = React.ComponentProps<typeof MessageList>;
 type MessageInputProps = React.ComponentProps<typeof MessageInput>;
-type SwipeHandlers = Pick<React.HTMLAttributes<HTMLDivElement>, "onTouchStart" | "onTouchEnd">;
+type SwipeHandlers = Pick<
+  React.HTMLAttributes<HTMLDivElement>,
+  "onTouchStart" | "onTouchEnd"
+>;
 
 interface ChatLayoutProps {
   // Layout state
@@ -49,7 +52,9 @@ interface ChatLayoutProps {
 
   // Callbacks
   setShowShareModal: (show: boolean) => void;
-  setUndoBanner: (banner: { message: string; action?: () => void } | null) => void;
+  setUndoBanner: (
+    banner: { message: string; action?: () => void } | null,
+  ) => void;
   handleContinueChat: () => void;
   handleNewChatForFollowUp: () => void;
   handleNewChatWithSummary: () => void;

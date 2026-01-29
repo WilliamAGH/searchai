@@ -20,7 +20,9 @@ test.describe("Critical User Paths", () => {
     await input.press("Enter");
 
     // Verify message appears
-    await expect(page.locator('text="Test message for smoke test"')).toBeVisible({
+    await expect(
+      page.locator('text="Test message for smoke test"'),
+    ).toBeVisible({
       timeout: 15000,
     });
   });
@@ -41,7 +43,9 @@ test.describe("Critical User Paths", () => {
     await page.goto("/");
 
     // Look for sign in button
-    const signInBtn = page.locator('button:has-text("Sign"), a:has-text("Sign")').first();
+    const signInBtn = page
+      .locator('button:has-text("Sign"), a:has-text("Sign")')
+      .first();
 
     if (await signInBtn.isVisible({ timeout: 3000 })) {
       await signInBtn.click();
@@ -67,7 +71,9 @@ test.describe("Critical User Paths", () => {
     await input.press("Enter");
 
     // Wait for message to be sent (user message appears)
-    await expect(page.locator('[data-testid="message-user"]').first()).toBeVisible({
+    await expect(
+      page.locator('[data-testid="message-user"]').first(),
+    ).toBeVisible({
       timeout: 10000,
     });
 
@@ -88,7 +94,9 @@ test.describe("Critical User Paths", () => {
 
     // Wait for assistant response
     // Messages use data-testid="message-{role}" format
-    await expect(page.locator('[data-testid="message-assistant"]').first()).toBeVisible({
+    await expect(
+      page.locator('[data-testid="message-assistant"]').first(),
+    ).toBeVisible({
       timeout: 30000,
     });
   });

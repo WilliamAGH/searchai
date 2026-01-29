@@ -46,7 +46,10 @@ export { deleteChat } from "./chats/deletion";
 export { importLocalChats, publishAnonymousChat } from "./chats/migration";
 
 // Re-export subscription operations
-export { subscribeToChatUpdates, subscribeToMessageStream } from "./chats/subscriptions";
+export {
+  subscribeToChatUpdates,
+  subscribeToMessageStream,
+} from "./chats/subscriptions";
 
 // Re-export cleanup operations
 export { cleanupEmptyChats } from "./chats/cleanup";

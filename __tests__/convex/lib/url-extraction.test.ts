@@ -4,7 +4,9 @@ import { createUserProvidedSearchResults } from "../../../convex/enhancements.ts
 
 describe("URL extraction and enhancement", () => {
   it("extracts full HTTP URLs", () => {
-    const urls = extractUrlsFromMessage("Check out https://example.com for more info");
+    const urls = extractUrlsFromMessage(
+      "Check out https://example.com for more info",
+    );
     expect(urls).toContain("https://example.com");
   });
 
@@ -21,7 +23,9 @@ describe("URL extraction and enhancement", () => {
   });
 
   it("extracts bare domains and converts to HTTPS", () => {
-    const urls = extractUrlsFromMessage("Check github.com and stackoverflow.com for code examples");
+    const urls = extractUrlsFromMessage(
+      "Check github.com and stackoverflow.com for code examples",
+    );
     expect(urls).toContain("https://github.com");
     expect(urls).toContain("https://stackoverflow.com");
   });
@@ -32,12 +36,18 @@ describe("URL extraction and enhancement", () => {
     );
     expect(urls.length).toBe(3);
     expect(urls).toEqual(
-      expect.arrayContaining(["https://react.dev", "https://vuejs.org", "https://angular.io"]),
+      expect.arrayContaining([
+        "https://react.dev",
+        "https://vuejs.org",
+        "https://angular.io",
+      ]),
     );
   });
 
   it("deduplicates identical URLs", () => {
-    const urls = extractUrlsFromMessage("Check https://example.com and again https://example.com");
+    const urls = extractUrlsFromMessage(
+      "Check https://example.com and again https://example.com",
+    );
     expect(urls.length).toBe(1);
     expect(urls[0]).toBe("https://example.com");
   });
@@ -54,9 +64,13 @@ describe("URL extraction and enhancement", () => {
   });
 
   it("handles subdomains and ignores invalid domains", () => {
-    const urls1 = extractUrlsFromMessage("Check api.github.com and docs.api.github.com");
+    const urls1 = extractUrlsFromMessage(
+      "Check api.github.com and docs.api.github.com",
+    );
     expect(urls1).toEqual(expect.arrayContaining(["https://api.github.com"]));
-    expect(urls1.some((u) => u.startsWith("https://docs.api.github"))).toBe(true);
+    expect(urls1.some((u) => u.startsWith("https://docs.api.github"))).toBe(
+      true,
+    );
     const urls2 = extractUrlsFromMessage("Not a domain: test.x or single.");
     expect(urls2.length).toBe(0);
   });
@@ -85,17 +99,26 @@ describe("URL extraction and enhancement", () => {
   });
 
   it("handles multiple URLs and extracts hostname in title", () => {
-    const urls = ["https://react.dev", "https://nextjs.org", "https://vercel.com"];
+    const urls = [
+      "https://react.dev",
+      "https://nextjs.org",
+      "https://vercel.com",
+    ];
     const results = createUserProvidedSearchResults(urls);
     expect(results.length).toBe(3);
     for (const r of results) expect(r.relevanceScore).toBe(0.95);
 
-    const docs = createUserProvidedSearchResults(["https://docs.convex.dev/functions"]);
+    const docs = createUserProvidedSearchResults([
+      "https://docs.convex.dev/functions",
+    ]);
     expect(docs[0].title).toContain("docs.convex.dev");
   });
 
   it("handles invalid URLs gracefully", () => {
-    const results = createUserProvidedSearchResults(["not-a-valid-url", "https://valid.com"]);
+    const results = createUserProvidedSearchResults([
+      "not-a-valid-url",
+      "https://valid.com",
+    ]);
     expect(results.length).toBe(2);
     expect(results[0].title).toContain("not-a-valid-url");
     expect(results[1].title).toContain("valid.com");
@@ -105,23 +128,43 @@ describe("URL extraction and enhancement", () => {
     const urlsMd = extractUrlsFromMessage(
       "Check [this guide](https://guide.com) and [docs](https://docs.com)",
     );
-    expect(urlsMd.some((u) => u.replace(/[)\]]+$/, "") === "https://guide.com")).toBe(true);
-    expect(urlsMd.some((u) => u.replace(/[)\]]+$/, "") === "https://docs.com")).toBe(true);
     expect(
-      extractUrlsFromMessage("Local server at http://localhost:3000 and https://example.com:8080"),
-    ).toEqual(expect.arrayContaining(["http://localhost:3000", "https://example.com:8080"]));
-    expect(extractUrlsFromMessage("Check example.co.uk and website.com.au")).toEqual(
-      expect.arrayContaining(["https://example.co.uk", "https://website.com.au"]),
+      urlsMd.some((u) => u.replace(/[)\]]+$/, "") === "https://guide.com"),
+    ).toBe(true);
+    expect(
+      urlsMd.some((u) => u.replace(/[)\]]+$/, "") === "https://docs.com"),
+    ).toBe(true);
+    expect(
+      extractUrlsFromMessage(
+        "Local server at http://localhost:3000 and https://example.com:8080",
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "http://localhost:3000",
+        "https://example.com:8080",
+      ]),
+    );
+    expect(
+      extractUrlsFromMessage("Check example.co.uk and website.com.au"),
+    ).toEqual(
+      expect.arrayContaining([
+        "https://example.co.uk",
+        "https://website.com.au",
+      ]),
     );
     const urlsQuoted = extractUrlsFromMessage(
       "Visit \"https://example.com\" or 'https://test.org'",
     );
     const normalized = urlsQuoted.map((u) => u.replace(/["']+$/, ""));
-    expect(normalized).toEqual(expect.arrayContaining(["https://example.com", "https://test.org"]));
+    expect(normalized).toEqual(
+      expect.arrayContaining(["https://example.com", "https://test.org"]),
+    );
     expect(
       extractUrlsFromMessage(
         "Documentation (https://docs.com) and examples (https://examples.org)",
       ),
-    ).toEqual(expect.arrayContaining(["https://docs.com", "https://examples.org"]));
+    ).toEqual(
+      expect.arrayContaining(["https://docs.com", "https://examples.org"]),
+    );
   });
 });

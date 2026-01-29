@@ -34,8 +34,9 @@ export function useUrlStateSync({
   const location = useLocation();
   const lastResolvedChatIdRef = useRef<string | null>(null);
 
-  const resolveChatId = (chat: Doc<"chats"> | null | undefined): string | null =>
-    chat?._id ? String(chat._id) : null;
+  const resolveChatId = (
+    chat: Doc<"chats"> | null | undefined,
+  ): string | null => (chat?._id ? String(chat._id) : null);
 
   useEffect(() => {
     const isShareRoute = location.pathname.startsWith("/s/");
@@ -45,9 +46,12 @@ export function useUrlStateSync({
       location.pathname === "/chat" ||
       location.pathname.startsWith("/chat/");
 
-    const shareChatId = propShareId && isShareRoute ? resolveChatId(chatByShareId) : null;
-    const publicChatId = propPublicId && isPublicRoute ? resolveChatId(chatByPublicId) : null;
-    const opaqueChatId = propChatId && isChatRoute ? resolveChatId(chatByOpaqueId) : null;
+    const shareChatId =
+      propShareId && isShareRoute ? resolveChatId(chatByShareId) : null;
+    const publicChatId =
+      propPublicId && isPublicRoute ? resolveChatId(chatByPublicId) : null;
+    const opaqueChatId =
+      propChatId && isChatRoute ? resolveChatId(chatByOpaqueId) : null;
 
     const targetChatId =
       shareChatId ??

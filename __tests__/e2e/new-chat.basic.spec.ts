@@ -12,7 +12,9 @@ test.describe("New Chat Basics", () => {
     await setupNewChatPage(page);
   });
 
-  test("should create new chat when clicking New Chat button", async ({ page }) => {
+  test("should create new chat when clicking New Chat button", async ({
+    page,
+  }) => {
     const newChatButton = await getNewChatButton(page);
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
     await expect(newChatButton).toBeEnabled();
@@ -36,20 +38,26 @@ test.describe("New Chat Basics", () => {
     await expect(messageInput).toBeVisible({ timeout: 5000 });
     await expect(messageInput).toBeEnabled();
 
-    const creatingButtons = await page.locator('button:has-text("Creating...")').count();
+    const creatingButtons = await page
+      .locator('button:has-text("Creating...")')
+      .count();
     expect(creatingButtons).toBe(0);
 
     const newButton = await getNewChatButton(page);
     await expect(newButton).toBeEnabled();
   });
 
-  test("should prevent multiple simultaneous chat creations", async ({ page }) => {
+  test("should prevent multiple simultaneous chat creations", async ({
+    page,
+  }) => {
     const newChatButton = await getNewChatButton(page);
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
     const clickPromises = [];
     for (let i = 0; i < 5; i++) {
-      clickPromises.push(newChatButton.click({ force: true, noWaitAfter: true }));
+      clickPromises.push(
+        newChatButton.click({ force: true, noWaitAfter: true }),
+      );
     }
 
     await Promise.all(clickPromises);
@@ -71,7 +79,9 @@ test.describe("New Chat Basics", () => {
     await newChatButton.click();
 
     try {
-      await expect(page.locator('button:has-text("Creating...")').first()).toBeVisible({
+      await expect(
+        page.locator('button:has-text("Creating...")').first(),
+      ).toBeVisible({
         timeout: 1000,
       });
     } catch {
@@ -83,8 +93,14 @@ test.describe("New Chat Basics", () => {
     await expect(page.locator('[role="dialog"]')).not.toBeVisible();
   });
 
-  test("should create local chat for unauthenticated users", async ({ page, browserName }) => {
-    test.skip(browserName === "firefox", "Unauth chat creation flaky on Firefox");
+  test("should create local chat for unauthenticated users", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName === "firefox",
+      "Unauth chat creation flaky on Firefox",
+    );
 
     await page.evaluate(() => {
       localStorage.clear();
@@ -109,7 +125,9 @@ test.describe("New Chat Basics", () => {
     await input.fill("Test message");
     await page.keyboard.press("Enter");
 
-    await expect(page.locator('[data-testid="message-assistant"]').first()).toBeVisible({
+    await expect(
+      page.locator('[data-testid="message-assistant"]').first(),
+    ).toBeVisible({
       timeout: 30000,
     });
 
@@ -128,10 +146,14 @@ test.describe("New Chat Basics", () => {
     await newChatButton.click();
     await page.waitForURL(/\/(chat)\/.+/, { timeout: 10000 });
 
-    const isStillOpen = await newChatButton.isVisible({ timeout: 1000 }).catch(() => false);
+    const isStillOpen = await newChatButton
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
 
     if (!isStillOpen) {
-      const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
+      const sidebarToggle = page
+        .locator('button[aria-label="Toggle sidebar"]')
+        .first();
       if (await sidebarToggle.isVisible().catch(() => false)) {
         await sidebarToggle.click();
       }

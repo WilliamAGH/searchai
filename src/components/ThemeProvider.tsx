@@ -5,7 +5,13 @@
  * Provides theme context to entire application
  */
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { logger } from "@/lib/logger";
@@ -96,7 +102,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         return stored;
       }
       // Default to system preference
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
     }
     return "light";
   });
@@ -107,7 +115,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize theme from user preferences, but don't override localStorage
   useEffect(() => {
-    if (userPrefs?.theme && userPrefs.theme !== "system" && !storageService.hasTheme()) {
+    if (
+      userPrefs?.theme &&
+      userPrefs.theme !== "system" &&
+      !storageService.hasTheme()
+    ) {
       setThemeState(userPrefs.theme);
     }
   }, [userPrefs]);
@@ -137,9 +149,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [isAuthenticated, updatePrefs],
   );
 
-  const contextValue = useMemo(() => ({ theme, setTheme, actualTheme: theme }), [theme, setTheme]);
+  const contextValue = useMemo(
+    () => ({ theme, setTheme, actualTheme: theme }),
+    [theme, setTheme],
+  );
 
-  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={contextValue}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 /**

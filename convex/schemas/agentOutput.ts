@@ -88,7 +88,9 @@ export const ResearchOutputSchema = z.object({
   informationGaps: z.array(z.string()).nullable().optional(),
   scrapedContent: z.array(ScrapedContentSchema).nullable().optional(),
   serpEnrichment: SerpEnrichmentSchema.nullable().optional(),
-  researchQuality: z.enum(["comprehensive", "adequate", "limited"]).default("adequate"),
+  researchQuality: z
+    .enum(["comprehensive", "adequate", "limited"])
+    .default("adequate"),
 });
 
 export type ResearchOutput = z.infer<typeof ResearchOutputSchema>;
@@ -106,8 +108,15 @@ export type ResearchOutput = z.infer<typeof ResearchOutputSchema>;
  * @param workflowId - Workflow identifier for logging
  * @returns Parsed PlanningOutput or null (failure logged)
  */
-export function safeParsePlanningOutput(value: unknown, workflowId: string): PlanningOutput | null {
-  return safeParseOrNull(PlanningOutputSchema, value, `PlanningOutput [workflow=${workflowId}]`);
+export function safeParsePlanningOutput(
+  value: unknown,
+  workflowId: string,
+): PlanningOutput | null {
+  return safeParseOrNull(
+    PlanningOutputSchema,
+    value,
+    `PlanningOutput [workflow=${workflowId}]`,
+  );
 }
 
 /**
@@ -119,6 +128,13 @@ export function safeParsePlanningOutput(value: unknown, workflowId: string): Pla
  * @param workflowId - Workflow identifier for logging
  * @returns Parsed ResearchOutput or null (failure logged)
  */
-export function safeParseResearchOutput(value: unknown, workflowId: string): ResearchOutput | null {
-  return safeParseOrNull(ResearchOutputSchema, value, `ResearchOutput [workflow=${workflowId}]`);
+export function safeParseResearchOutput(
+  value: unknown,
+  workflowId: string,
+): ResearchOutput | null {
+  return safeParseOrNull(
+    ResearchOutputSchema,
+    value,
+    `ResearchOutput [workflow=${workflowId}]`,
+  );
 }

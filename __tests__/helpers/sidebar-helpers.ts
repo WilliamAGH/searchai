@@ -16,7 +16,9 @@ export async function ensureSidebarOpen(page: Page): Promise<void> {
 
   if (isMobile) {
     // Mobile: Look for sidebar toggle button (same as desktop but opens modal)
-    const menuButton = page.locator('button[aria-label="Toggle sidebar"]').first();
+    const menuButton = page
+      .locator('button[aria-label="Toggle sidebar"]')
+      .first();
     const isMenuVisible = await menuButton.isVisible().catch(() => false);
 
     if (isMenuVisible) {
@@ -56,18 +58,26 @@ export async function ensureSidebarOpen(page: Page): Promise<void> {
       );
 
       // Verify New Chat button is visible (this confirms the dialog is open)
-      const newChatButton = page.locator('[role="dialog"] button:has-text("New Chat")').first();
+      const newChatButton = page
+        .locator('[role="dialog"] button:has-text("New Chat")')
+        .first();
       await expect(newChatButton).toBeVisible({ timeout: 3000 });
     }
   } else {
     // Desktop: Check if sidebar is already visible
     const newChatButton = page.locator('button:has-text("New Chat")').first();
-    const isNewChatVisible = await newChatButton.isVisible({ timeout: 500 }).catch(() => false);
+    const isNewChatVisible = await newChatButton
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
 
     if (!isNewChatVisible) {
       // Try to find and click the sidebar toggle
-      const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
-      const isToggleVisible = await sidebarToggle.isVisible().catch(() => false);
+      const sidebarToggle = page
+        .locator('button[aria-label="Toggle sidebar"]')
+        .first();
+      const isToggleVisible = await sidebarToggle
+        .isVisible()
+        .catch(() => false);
 
       if (isToggleVisible) {
         await sidebarToggle.click();
@@ -122,7 +132,9 @@ export async function createNewChat(page: Page): Promise<string> {
     .catch(() => false);
 
   if (loadingVisible) {
-    await expect(page.locator('button:has-text("Creating...")').first()).not.toBeVisible({
+    await expect(
+      page.locator('button:has-text("Creating...")').first(),
+    ).not.toBeVisible({
       timeout: 10000,
     });
   }

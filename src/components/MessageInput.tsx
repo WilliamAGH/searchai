@@ -44,13 +44,14 @@ export function MessageInput({
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { historyIndex, handleHistoryNavigation, resetHistory } = useInputHistory({
-    history,
-    currentMessage: message,
-    setMessage,
-    onDraftChange,
-    textareaRef,
-  });
+  const { historyIndex, handleHistoryNavigation, resetHistory } =
+    useInputHistory({
+      history,
+      currentMessage: message,
+      setMessage,
+      onDraftChange,
+      textareaRef,
+    });
 
   /**
    * Handle form submission
@@ -98,7 +99,9 @@ export function MessageInput({
       const ta = textareaRef.current;
       if (!ta) return;
       const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
-      const atEnd = ta.selectionStart === message.length && ta.selectionEnd === message.length;
+      const atEnd =
+        ta.selectionStart === message.length &&
+        ta.selectionEnd === message.length;
 
       if (handleHistoryNavigation(e.key, atStart, atEnd)) {
         e.preventDefault();

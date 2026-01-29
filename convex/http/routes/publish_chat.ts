@@ -19,7 +19,10 @@ function toSafeUrl(value: unknown): string {
   }
 }
 
-export async function handlePublishChat(ctx: ActionCtx, request: Request): Promise<Response> {
+export async function handlePublishChat(
+  ctx: ActionCtx,
+  request: Request,
+): Promise<Response> {
   let rawPayload: unknown;
   try {
     rawPayload = await request.json();
@@ -30,7 +33,9 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
       request,
       {
         error: "Invalid JSON body",
-        ...(process.env.NODE_ENV === "development" ? { errorDetails: errorInfo } : {}),
+        ...(process.env.NODE_ENV === "development"
+          ? { errorDetails: errorInfo }
+          : {}),
       },
       400,
     );
@@ -38,10 +43,15 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
 
   const payload = isRecord(rawPayload) ? rawPayload : null;
   if (!payload) {
-    return buildCorsJsonResponse(request, { error: "Invalid request payload" }, 400);
+    return buildCorsJsonResponse(
+      request,
+      { error: "Invalid request payload" },
+      400,
+    );
   }
 
-  const rawTitle = typeof payload.title === "string" ? payload.title : "Shared Chat";
+  const rawTitle =
+    typeof payload.title === "string" ? payload.title : "Shared Chat";
   const title = rawTitle.trim().slice(0, 200);
   const privacy = payload.privacy === "public" ? "public" : "shared";
   // Validate shareId/publicId as UUIDv7 to maintain data integrity
@@ -57,17 +67,27 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
   const messages = Array.isArray(payload.messages)
     ? payload.messages.slice(0, 100).map((m: unknown) => {
         const msg = isRecord(m) ? m : {};
-        const role: "user" | "assistant" = msg.role === "user" ? "user" : "assistant";
+        const role: "user" | "assistant" =
+          msg.role === "user" ? "user" : "assistant";
         return {
           role,
-          content: typeof msg.content === "string" ? msg.content.slice(0, 50000) : undefined,
+          content:
+            typeof msg.content === "string"
+              ? msg.content.slice(0, 50000)
+              : undefined,
           searchResults: Array.isArray(msg.searchResults)
             ? msg.searchResults.slice(0, 20).map((r: unknown) => {
                 const result = isRecord(r) ? r : {};
                 return {
-                  title: (typeof result.title === "string" ? result.title : "").slice(0, 200),
+                  title: (typeof result.title === "string"
+                    ? result.title
+                    : ""
+                  ).slice(0, 200),
                   url: toSafeUrl(result.url),
-                  snippet: (typeof result.snippet === "string" ? result.snippet : "").slice(0, 500),
+                  snippet: (typeof result.snippet === "string"
+                    ? result.snippet
+                    : ""
+                  ).slice(0, 500),
                   relevanceScore:
                     typeof result.relevanceScore === "number"
                       ? Math.max(0, Math.min(1, result.relevanceScore))
@@ -102,14 +122,22 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
     const origin = request.headers.get("Origin");
     const allowOrigin = getAllowedOrigin(origin);
     const baseUrl =
-      allowOrigin !== "*" && allowOrigin !== "null" ? allowOrigin : process.env.SITE_URL || "";
+      allowOrigin !== "*" && allowOrigin !== "null"
+        ? allowOrigin
+        : process.env.SITE_URL || "";
     const shareUrl = `${baseUrl}/s/${result.shareId}`;
     const publicUrl = `${baseUrl}/p/${result.publicId}`;
     const convexBase = (process.env.CONVEX_SITE_URL || "").replace(/\/+$/, "");
-    const exportBase = convexBase ? `${convexBase}/api/exportChat` : `/api/exportChat`;
+    const exportBase = convexBase
+      ? `${convexBase}/api/exportChat`
+      : `/api/exportChat`;
     const llmTxtUrl = `${exportBase}?shareId=${encodeURIComponent(result.shareId)}&format=txt`;
 
-    return buildCorsJsonResponse(request, { ...result, shareUrl, publicUrl, llmTxtUrl }, 200);
+    return buildCorsJsonResponse(
+      request,
+      { ...result, shareUrl, publicUrl, llmTxtUrl },
+      200,
+    );
   } catch (error: unknown) {
     const errorInfo = serializeError(error);
     console.error("[ERROR] PUBLISH CHAT:", errorInfo);
@@ -118,7 +146,9 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
       request,
       {
         error: errorMessage,
-        ...(process.env.NODE_ENV === "development" ? { errorDetails: errorInfo } : {}),
+        ...(process.env.NODE_ENV === "development"
+          ? { errorDetails: errorInfo }
+          : {}),
       },
       500,
     );
