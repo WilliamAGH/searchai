@@ -10,6 +10,7 @@ node_modules
 
 # Convex generated files
 .convex
+convex/_generated
 
 # Claude configuration (exclude from formatting)
 .claude/
