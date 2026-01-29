@@ -5,6 +5,7 @@ import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import { CONTENT_LIMITS } from "../lib/constants/cache";
 import { formatScrapedContentForPrompt, formatSerpEnrichmentForPrompt } from "./helpers_formatters";
 import { truncate } from "./helpers_utils";
+import { logScrapedContentSummary } from "./workflow_logger";
 
 export function buildPlanningInput(userQuery: string, conversationContext?: string): string {
   const temporal = buildTemporalHeader();
@@ -128,14 +129,12 @@ export function buildSynthesisInstructions(params: {
     .join("\n");
 
   if (params.scrapedContent?.length) {
-    console.log("SCRAPED CONTENT FOR SYNTHESIS:", {
-      pageCount: params.scrapedContent.length,
-      totalChars: params.scrapedContent.reduce((sum, p) => sum + (p.content?.length || 0), 0),
-      pages: params.scrapedContent.map((p) => ({
+    logScrapedContentSummary(
+      params.scrapedContent.map((p) => ({
         url: p.url,
         contentPreview: truncate(p.content || "", CONTENT_LIMITS.PREVIEW_MAX_CHARS),
       })),
-    });
+    );
   }
 
   const scrapedSection = params.scrapedContent?.length

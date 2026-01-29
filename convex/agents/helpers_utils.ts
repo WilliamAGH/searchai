@@ -30,42 +30,43 @@ export const truncate = (text: string, maxChars: number): string =>
 // Instant Response Detection
 // ============================================
 
+// Patterns for instant responses - no `i` flag needed since input is lowercased
 const INSTANT_RESPONSE_MAP: ReadonlyArray<{
   pattern: RegExp;
   response: string;
 }> = [
   {
-    pattern: /^(hi|hello|hey|howdy|greetings|yo)[\s!.,?]*$/i,
+    pattern: /^(hi|hello|hey|howdy|greetings|yo)[\s!.,?]*$/,
     response:
       "Hello! I'm ready to help you search and research any topic. What would you like to know?",
   },
   {
-    pattern: /^(good\s*(morning|afternoon|evening|night))[\s!.,?]*$/i,
+    pattern: /^(good\s*(morning|afternoon|evening|night))[\s!.,?]*$/,
     response:
       "Hello! I'm ready to help you search and research any topic. What would you like to know?",
   },
   {
-    pattern: /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/i,
+    pattern: /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/,
     response: "Test confirmed! This chat is working. What would you like to research?",
   },
   {
-    pattern: /^this is a new chat[\s!.,?]*$/i,
+    pattern: /^this is a new chat[\s!.,?]*$/,
     response: "Test confirmed! This chat is working. What would you like to research?",
   },
   {
-    pattern: /^(thanks|thank you|thx|ty)[\s!.,?]*$/i,
+    pattern: /^(thanks|thank you|thx|ty)[\s!.,?]*$/,
     response: "You're welcome! Let me know if you need anything else.",
   },
   {
-    pattern: /^(bye|goodbye|see you|later|cya)[\s!.,?]*$/i,
+    pattern: /^(bye|goodbye|see you|later|cya)[\s!.,?]*$/,
     response: "Goodbye! Feel free to start a new chat anytime.",
   },
   {
-    pattern: /^(ok|okay|sure|yes|no|yep|nope|yeah|nah)[\s!.,?]*$/i,
+    pattern: /^(ok|okay|sure|yes|no|yep|nope|yeah|nah)[\s!.,?]*$/,
     response: "Got it. What would you like to know?",
   },
   {
-    pattern: /^(help|help me|\?)[\s!.,?]*$/i,
+    pattern: /^(help|help me|\?)[\s!.,?]*$/,
     response:
       "I'm a research assistant that can search the web and find information for you. Just ask me a question about any topic!",
   },
