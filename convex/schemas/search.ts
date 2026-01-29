@@ -156,3 +156,97 @@ export const DEFAULT_SEARCH_RESPONSE: SearchResponse = {
   searchMethod: "fallback",
   hasRealResults: false,
 };
+
+// ============================================
+// Raw API Response Schemas (External Validation)
+// ============================================
+
+/**
+ * SerpAPI raw organic result from external API.
+ * Per [ZV1]: Validate external data at boundary.
+ */
+export const SerpApiOrganicResultSchema = z.object({
+  title: z.string().optional(),
+  link: z.string(), // Required - URL of the result
+  snippet: z.string().optional(),
+  displayed_link: z.string().optional(),
+  position: z.number().optional(),
+});
+
+export type SerpApiOrganicResult = z.infer<typeof SerpApiOrganicResultSchema>;
+
+/**
+ * SerpAPI raw response from external API.
+ * Fields are optional since external APIs may omit them.
+ */
+export const SerpApiResponseSchema = z.object({
+  organic_results: z.array(SerpApiOrganicResultSchema).optional(),
+  knowledge_graph: z
+    .object({
+      title: z.string().optional(),
+      type: z.string().optional(),
+      description: z.string().optional(),
+      url: z.string().optional(),
+      attributes: z.record(z.string(), z.string().optional()).optional(),
+    })
+    .optional(),
+  answer_box: z
+    .object({
+      type: z.string().optional(),
+      answer: z.string().optional(),
+      snippet: z.string().optional(),
+      link: z.string().optional(),
+      title: z.string().optional(),
+    })
+    .optional(),
+  people_also_ask: z
+    .array(
+      z.object({
+        question: z.string().optional(),
+        snippet: z.string().optional(),
+      }),
+    )
+    .optional(),
+  related_searches: z.array(z.object({ query: z.string().optional() })).optional(),
+});
+
+export type SerpApiResponse = z.infer<typeof SerpApiResponseSchema>;
+
+/**
+ * OpenRouter URL citation from annotations.
+ */
+export const OpenRouterUrlCitationSchema = z.object({
+  title: z.string().optional(),
+  url: z.string(), // Required
+  content: z.string().optional(),
+  start_index: z.number().optional(),
+  end_index: z.number().optional(),
+});
+
+/**
+ * OpenRouter annotation schema.
+ */
+export const OpenRouterAnnotationSchema = z.object({
+  type: z.string(),
+  url_citation: OpenRouterUrlCitationSchema.optional(),
+});
+
+/**
+ * OpenRouter raw response from SDK completion.
+ */
+export const OpenRouterResponseSchema = z.object({
+  choices: z
+    .array(
+      z.object({
+        message: z
+          .object({
+            content: z.string().nullish(),
+            annotations: z.array(OpenRouterAnnotationSchema).optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+export type OpenRouterResponse = z.infer<typeof OpenRouterResponseSchema>;

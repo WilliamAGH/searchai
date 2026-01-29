@@ -13,13 +13,7 @@ import {
 } from "./prompts";
 import { applyEnhancements } from "../enhancements";
 import { collectOpenRouterChatCompletionText } from "../lib/providers/openai_streaming";
-import {
-  extractKeyEntities,
-  serialize,
-  tokSet,
-  jaccard,
-  diversifyQueries,
-} from "./utils";
+import { extractKeyEntities, serialize, tokSet, jaccard, diversifyQueries } from "./utils";
 import {
   type PlanResult,
   planCache,
@@ -29,6 +23,8 @@ import {
   getCachedPlan,
   setCachedPlan,
 } from "./cache";
+import { safeParseWithLog } from "../lib/validation/zodUtils";
+import { LLMPlanSchema, type LLMPlan } from "../schemas/planner";
 
 // Local view types for clarity
 type ChatRole = "user" | "assistant" | "system";
@@ -36,15 +32,7 @@ interface ChatMessageView {
   role: ChatRole;
   content?: string;
   timestamp?: number;
-}
-
-interface LLMPlan {
-  shouldSearch?: boolean;
-  contextSummary?: string;
-  queries?: string[];
-  suggestNewChat?: boolean;
-  decisionConfidence?: number;
-  reasons?: string;
+  _creationTime?: number;
 }
 
 export async function runPlanSearch(
@@ -92,7 +80,8 @@ export async function runPlanSearch(
     },
   );
   const messageCountKey = recentMessages.length;
-  const cacheKey = `${args.chatId}|${normMsg}|${messageCountKey}`;
+  const lastCreationTime = recentMessages.at(-1)?._creationTime ?? 0;
+  const cacheKey = `${args.chatId}|${normMsg}|${messageCountKey}|${lastCreationTime}`;
 
   // Check cache first - cache hits bypass rate limiting
   const cachedPlan = getCachedPlan(cacheKey, now);
@@ -129,9 +118,7 @@ export async function runPlanSearch(
     chatId: args.chatId,
   });
 
-  const recent: ChatMessageView[] = messages.slice(
-    Math.max(0, messages.length - maxContext),
-  );
+  const recent: ChatMessageView[] = messages.slice(Math.max(0, messages.length - maxContext));
 
   // Simple lexical overlap heuristic with the previous user message
   const newContent = serialize(args.newMessage);
@@ -139,14 +126,9 @@ export async function runPlanSearch(
     [...recent]
       .reverse()
       .find(
-        (m: ChatMessageView) =>
-          m.role === "user" && serialize(m.content || "") !== newContent,
-      ) ||
-    [...recent].reverse().find((m: ChatMessageView) => m.role === "user");
-  const jaccardScore = jaccard(
-    tokSet(serialize(prevUser?.content)),
-    tokSet(newContent),
-  );
+        (m: ChatMessageView) => m.role === "user" && serialize(m.content || "") !== newContent,
+      ) || [...recent].reverse().find((m: ChatMessageView) => m.role === "user");
+  const jaccardScore = jaccard(tokSet(serialize(prevUser?.content)), tokSet(newContent));
 
   // Time-based heuristic
   const lastTs = prevUser?.timestamp as number | undefined;
@@ -182,13 +164,9 @@ export async function runPlanSearch(
       .filter((t) => t.length > 3)
       .slice(0, 10);
     const variants: string[] = [args.newMessage];
-    if (ctxTokens.length >= 2)
-      variants.push(`${args.newMessage} ${ctxTokens[0]} ${ctxTokens[1]}`);
-    if (ctxTokens.length >= 4)
-      variants.push(`${args.newMessage} ${ctxTokens[2]} ${ctxTokens[3]}`);
-    const pool = Array.from(
-      new Set(variants.map((q) => q.trim()).filter(Boolean)),
-    );
+    if (ctxTokens.length >= 2) variants.push(`${args.newMessage} ${ctxTokens[0]} ${ctxTokens[1]}`);
+    if (ctxTokens.length >= 4) variants.push(`${args.newMessage} ${ctxTokens[2]} ${ctxTokens[3]}`);
+    const pool = Array.from(new Set(variants.map((q) => q.trim()).filter(Boolean)));
     const selected = diversifyQueries(pool, args.newMessage);
     if (selected.length > 0) defaultPlan.queries = selected;
   } catch (diversifyError) {
@@ -214,8 +192,7 @@ export async function runPlanSearch(
     messageLC.includes("how about") ||
     messageLC.startsWith("and ") ||
     messageLC.match(/^(it|they|this|that|these|those)\s/);
-  const shouldUseLLM =
-    (jaccardScore >= 0.35 && jaccardScore <= 0.75) || isFollowUp;
+  const shouldUseLLM = (jaccardScore >= 0.35 && jaccardScore <= 0.75) || isFollowUp;
   if (!shouldUseLLM) {
     // Even without LLM, enhance queries with context for better understanding
     // This helps with pronoun resolution and follow-up questions
@@ -273,12 +250,19 @@ export async function runPlanSearch(
       parsed = match ? JSON.parse(match[0]) : null;
     }
 
-    const plan = parsed as Partial<LLMPlan> | null;
-    if (
-      plan?.shouldSearch !== undefined &&
-      plan?.queries &&
-      Array.isArray(plan.queries)
-    ) {
+    // Validate parsed JSON with Zod - per [ZV1c] log failures with context
+    const planResult = safeParseWithLog(
+      LLMPlanSchema,
+      parsed,
+      `LLMPlan [chatId=${args.chatId}, msg=${args.newMessage.substring(0, 30)}]`,
+    );
+    if (!planResult.success) {
+      // Validation failed - error already logged with context
+      setCachedPlan(cacheKey, defaultPlan);
+      return defaultPlan;
+    }
+    const plan = planResult.data;
+    if (plan.shouldSearch !== undefined && plan.queries && Array.isArray(plan.queries)) {
       // Sanitize and diversify via MMR
       const baseList = Array.from(
         new Set(
@@ -291,16 +275,10 @@ export async function runPlanSearch(
       const queries = diversifyQueries(baseList as string[], args.newMessage);
       const finalPlan = {
         shouldSearch: Boolean(plan.shouldSearch),
-        contextSummary: serialize(String(plan.contextSummary || "")).slice(
-          0,
-          2000,
-        ),
+        contextSummary: serialize(String(plan.contextSummary || "")).slice(0, 2000),
         queries: queries.length > 0 ? queries : [args.newMessage],
         suggestNewChat: Boolean(plan.suggestNewChat),
-        decisionConfidence: Math.max(
-          0,
-          Math.min(1, Number(plan.decisionConfidence) || 0.5),
-        ),
+        decisionConfidence: Math.max(0, Math.min(1, Number(plan.decisionConfidence) || 0.5)),
         reasons: serialize(String(plan.reasons || "")).slice(0, 500),
       };
       setCachedPlan(cacheKey, finalPlan);

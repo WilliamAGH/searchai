@@ -6,6 +6,8 @@
  */
 
 import type { SearchResult, SearchProviderResult } from "../../schemas/search";
+import { OpenRouterResponseSchema } from "../../schemas/search";
+import { safeParseWithLog } from "../../lib/validation/zodUtils";
 import { collectOpenRouterChatCompletionText } from "../../lib/providers/openai_streaming";
 
 // Provider-specific relevance scores
@@ -16,24 +18,6 @@ const OPENROUTER_SCORES = {
   /** URLs extracted via regex fallback - lower confidence, no verification */
   REGEX_EXTRACTED: 0.75,
 } as const;
-
-interface OpenRouterResponse {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-      annotations?: Array<{
-        type: string;
-        url_citation?: {
-          title?: string;
-          url: string;
-          content?: string;
-          start_index?: number;
-          end_index?: number;
-        };
-      }>;
-    };
-  }>;
-}
 
 /**
  * Search via OpenRouter model
@@ -66,7 +50,16 @@ export async function searchWithOpenRouter(
     temperature: 0.1,
   });
 
-  const data: OpenRouterResponse = completion;
+  const parseResult = safeParseWithLog(
+    OpenRouterResponseSchema,
+    completion,
+    `OpenRouter [query=${query.substring(0, 50)}]`,
+  );
+  if (!parseResult.success) {
+    // Error already logged with context by safeParseWithLog
+    return { results: [] };
+  }
+  const data = parseResult.data;
   const content = text || data.choices?.[0]?.message?.content || "";
   const annotations = data.choices?.[0]?.message?.annotations || [];
 
@@ -82,10 +75,7 @@ export async function searchWithOpenRouter(
           url: citation.url,
           snippet:
             citation.content ||
-            content.substring(
-              citation.start_index || 0,
-              citation.end_index || 200,
-            ),
+            content.substring(citation.start_index || 0, citation.end_index || 200),
           relevanceScore: OPENROUTER_SCORES.ANNOTATED_CITATION,
         });
       }

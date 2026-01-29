@@ -8,11 +8,7 @@
  * @module
  */
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
+import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
 import type * as agents_answerParser from "../agents/answerParser.js";
 import type * as agents_definitions from "../agents/definitions.js";
 import type * as agents_helpers_builders from "../agents/helpers_builders.js";
@@ -117,6 +113,7 @@ import type * as migrations_remove_system_role from "../migrations/remove_system
 import type * as preferences from "../preferences.js";
 import type * as schemas_agentOutput from "../schemas/agentOutput.js";
 import type * as schemas_agents from "../schemas/agents.js";
+import type * as schemas_planner from "../schemas/planner.js";
 import type * as schemas_search from "../schemas/search.js";
 import type * as search_cache from "../search/cache.js";
 import type * as search_executor from "../search/executor.js";
@@ -251,6 +248,7 @@ declare const fullApi: ApiFromModules<{
   preferences: typeof preferences;
   "schemas/agentOutput": typeof schemas_agentOutput;
   "schemas/agents": typeof schemas_agents;
+  "schemas/planner": typeof schemas_planner;
   "schemas/search": typeof schemas_search;
   "search/cache": typeof search_cache;
   "search/executor": typeof search_executor;
@@ -272,11 +270,5 @@ declare const fullApi: ApiFromModules<{
   workflowTokens: typeof workflowTokens;
   workflowTokensActions: typeof workflowTokensActions;
 }>;
-export declare const api: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "public">
->;
-export declare const internal: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "internal">
->;
+export declare const api: FilterApi<typeof fullApi, FunctionReference<any, "public">>;
+export declare const internal: FilterApi<typeof fullApi, FunctionReference<any, "internal">>;

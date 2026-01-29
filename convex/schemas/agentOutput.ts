@@ -56,7 +56,7 @@ export type PlanningOutput = z.infer<typeof PlanningOutputSchema>;
 export const KeyFindingSchema = z.object({
   finding: z.string(),
   sources: z.array(z.string()),
-  confidence: z.string(), // "high" | "medium" | "low" - string for SDK compatibility
+  confidence: z.enum(["high", "medium", "low"]),
 });
 
 export type KeyFinding = z.infer<typeof KeyFindingSchema>;
@@ -66,7 +66,7 @@ export type KeyFinding = z.infer<typeof KeyFindingSchema>;
  * Tracks provenance via contextId.
  */
 export const SourceUsedSchema = z.object({
-  url: z.string().optional(),
+  url: z.string().max(2000).optional(),
   title: z.string().optional(),
   contextId: z.string(),
   type: z.enum(["search_result", "scraped_page"]),
@@ -88,9 +88,7 @@ export const ResearchOutputSchema = z.object({
   informationGaps: z.array(z.string()).nullable().optional(),
   scrapedContent: z.array(ScrapedContentSchema).nullable().optional(),
   serpEnrichment: SerpEnrichmentSchema.nullable().optional(),
-  researchQuality: z
-    .enum(["comprehensive", "adequate", "limited"])
-    .default("adequate"),
+  researchQuality: z.enum(["comprehensive", "adequate", "limited"]).default("adequate"),
 });
 
 export type ResearchOutput = z.infer<typeof ResearchOutputSchema>;
@@ -108,15 +106,8 @@ export type ResearchOutput = z.infer<typeof ResearchOutputSchema>;
  * @param workflowId - Workflow identifier for logging
  * @returns Parsed PlanningOutput or null (failure logged)
  */
-export function safeParsePlanningOutput(
-  value: unknown,
-  workflowId: string,
-): PlanningOutput | null {
-  return safeParseOrNull(
-    PlanningOutputSchema,
-    value,
-    `PlanningOutput [workflow=${workflowId}]`,
-  );
+export function safeParsePlanningOutput(value: unknown, workflowId: string): PlanningOutput | null {
+  return safeParseOrNull(PlanningOutputSchema, value, `PlanningOutput [workflow=${workflowId}]`);
 }
 
 /**
@@ -128,13 +119,6 @@ export function safeParsePlanningOutput(
  * @param workflowId - Workflow identifier for logging
  * @returns Parsed ResearchOutput or null (failure logged)
  */
-export function safeParseResearchOutput(
-  value: unknown,
-  workflowId: string,
-): ResearchOutput | null {
-  return safeParseOrNull(
-    ResearchOutputSchema,
-    value,
-    `ResearchOutput [workflow=${workflowId}]`,
-  );
+export function safeParseResearchOutput(value: unknown, workflowId: string): ResearchOutput | null {
+  return safeParseOrNull(ResearchOutputSchema, value, `ResearchOutput [workflow=${workflowId}]`);
 }

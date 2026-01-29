@@ -3,42 +3,11 @@
  * Uses Google search via SerpAPI for high-quality results
  */
 
-import type {
-  SearchResult,
-  SearchProviderResult,
-  SerpEnrichment,
-} from "../../schemas/search";
+import type { SearchResult, SearchProviderResult, SerpEnrichment } from "../../schemas/search";
+import { SerpApiResponseSchema } from "../../schemas/search";
+import { safeParseWithLog } from "../../lib/validation/zodUtils";
 import { getErrorMessage } from "../../lib/errors";
 export type { SearchResult } from "../../schemas/search";
-
-interface SerpApiResponse {
-  organic_results?: Array<{
-    title?: string;
-    link: string;
-    snippet?: string;
-    displayed_link?: string;
-    position?: number;
-  }>;
-  knowledge_graph?: {
-    title?: string;
-    type?: string;
-    description?: string;
-    url?: string;
-    attributes?: Record<string, string | undefined>;
-  };
-  answer_box?: {
-    type?: string;
-    answer?: string;
-    snippet?: string;
-    link?: string;
-    title?: string;
-  };
-  people_also_ask?: Array<{
-    question?: string;
-    snippet?: string;
-  }>;
-  related_searches?: Array<{ query?: string }>;
-}
 
 /**
  * Query SerpAPI (Google engine)
@@ -93,7 +62,17 @@ export async function searchWithSerpApiDuckDuckGo(
       throw new Error(errorMessage);
     }
 
-    const data: SerpApiResponse = await response.json();
+    const rawData: unknown = await response.json();
+    const parseResult = safeParseWithLog(
+      SerpApiResponseSchema,
+      rawData,
+      `SerpAPI [query=${query.substring(0, 50)}]`,
+    );
+    if (!parseResult.success) {
+      // Error already logged with context by safeParseWithLog
+      return { results: [] };
+    }
+    const data = parseResult.data;
     console.info("[OK] SERP API Success:", {
       hasOrganic: !!data.organic_results,
       count: data.organic_results?.length || 0,
@@ -120,9 +99,7 @@ export async function searchWithSerpApiDuckDuckGo(
           description: data.knowledge_graph.description,
           attributes: data.knowledge_graph.attributes
             ? (Object.fromEntries(
-                Object.entries(data.knowledge_graph.attributes).filter(
-                  ([, v]) => v !== undefined,
-                ),
+                Object.entries(data.knowledge_graph.attributes).filter(([, v]) => v !== undefined),
               ) as Record<string, string>)
             : undefined,
           url: data.knowledge_graph.url,
@@ -163,9 +140,9 @@ export async function searchWithSerpApiDuckDuckGo(
         })),
         hasEnrichment: Boolean(
           enrichment.knowledgeGraph ||
-            enrichment.answerBox ||
-            enrichment.peopleAlsoAsk?.length ||
-            enrichment.relatedSearches?.length,
+          enrichment.answerBox ||
+          enrichment.peopleAlsoAsk?.length ||
+          enrichment.relatedSearches?.length,
         ),
         timestamp: new Date().toISOString(),
       });
@@ -173,7 +150,7 @@ export async function searchWithSerpApiDuckDuckGo(
       return { results, enrichment };
     }
 
-    console.log("[WARN] SERP API No Results:", {
+    console.warn("[WARN] SERP API No Results:", {
       queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
