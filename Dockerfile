@@ -9,7 +9,9 @@ COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including dev) for build
 # Use npm ci for reproducible builds from package-lock.json
-RUN npm ci
+# --ignore-scripts skips postinstall scripts (ast-grep binary download, playwright install, husky)
+# which aren't needed for vite build and may fail on Alpine ARM64
+RUN npm ci --ignore-scripts
 
 # Stage 2: Builder
 FROM public.ecr.aws/docker/library/node:22.17.0-alpine AS builder
