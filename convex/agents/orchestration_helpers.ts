@@ -7,7 +7,6 @@ export {
   detectInstantResponse,
   detectErrorStage,
   withTimeout,
-  AgentTimeoutError,
 } from "./helpers_utils";
 
 export {

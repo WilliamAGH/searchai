@@ -3,7 +3,7 @@ import {
   safeParseScrapeToolOutput,
   safeParseSearchToolOutput,
 } from "../schemas/agents";
-import { isUuidV7 } from "./helpers_utils";
+import { isUuidV7, normalizeUrl } from "./helpers_utils";
 import type { RunToolCallItem, RunToolCallOutputItem } from "@openai/agents";
 
 const TOOL_RESULT_MAX_LENGTH = 200;
@@ -153,8 +153,6 @@ export function buildToolCallLog(
 
 export function buildUrlContextMap(
   toolCallEntries: Map<string, ToolCallEntry>,
-  extractContextIdFromOutput: (output: unknown) => string | null,
-  normalizeUrl: (url: string | undefined) => string | null,
 ): Map<string, string> {
   const urlContextMap = new Map<string, string>();
 

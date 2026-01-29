@@ -245,10 +245,7 @@ export async function* streamConversationalWorkflow(
       intent: args.userQuery,
     });
 
-    const uniqueContextRefs = buildContextReferencesFromHarvested(
-      harvested,
-      generateMessageId,
-    );
+    const uniqueContextRefs = buildContextReferencesFromHarvested(harvested);
 
     const searchResults = buildSearchResultsFromContextRefs(uniqueContextRefs);
     const sources = extractSourceUrls(uniqueContextRefs);

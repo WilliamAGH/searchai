@@ -178,17 +178,10 @@ export const orchestrateResearchWorkflow = action({
       assertToolErrorThreshold(toolErrorCount, "Research");
       toolCallLog = buildToolCallLog(entries, summarizeToolResult);
 
-      const urlContextMap = buildUrlContextMap(
-        entries,
-        extractContextIdFromOutput,
-        normalizeUrl,
-      );
+      const urlContextMap = buildUrlContextMap(entries);
       const { normalized, invalidCount } = normalizeSourceContextIds(
         researchOutput.sourcesUsed,
         urlContextMap,
-        isUuidV7,
-        normalizeUrl,
-        generateMessageId,
       );
       researchOutput.sourcesUsed = normalized;
       if (invalidCount > 0) {

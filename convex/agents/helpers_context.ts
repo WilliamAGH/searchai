@@ -1,8 +1,9 @@
 "use node";
 
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
+import { generateMessageId } from "../lib/id_generator";
 import type { ResearchContextReference } from "../schemas/agents";
-import { normalizeUrl } from "./helpers_utils";
+import { isUuidV7, normalizeUrl } from "./helpers_utils";
 
 export function normalizeSourceContextIds(
   sourcesUsed: Array<{
@@ -11,9 +12,6 @@ export function normalizeSourceContextIds(
     type: "search_result" | "scraped_page";
   }>,
   urlContextMap: Map<string, string>,
-  isUuidV7: (value: string | undefined) => boolean,
-  normalizeUrl: (url: string | undefined) => string | null,
-  generateMessageId: () => string,
 ): {
   normalized: Array<{
     url?: string;
@@ -50,24 +48,21 @@ export function normalizeSourceContextIds(
   return { normalized, invalidCount: invalidSources.length };
 }
 
-export function buildContextReferencesFromHarvested(
-  harvested: {
-    scrapedContent: Array<{
-      contextId: string;
-      url: string;
-      title: string;
-      scrapedAt?: number;
-      relevanceScore?: number;
-    }>;
-    searchResults: Array<{
-      contextId?: string;
-      url: string;
-      title: string;
-      relevanceScore?: number;
-    }>;
-  },
-  generateContextId: () => string,
-): ResearchContextReference[] {
+export function buildContextReferencesFromHarvested(harvested: {
+  scrapedContent: Array<{
+    contextId: string;
+    url: string;
+    title: string;
+    scrapedAt?: number;
+    relevanceScore?: number;
+  }>;
+  searchResults: Array<{
+    contextId?: string;
+    url: string;
+    title: string;
+    relevanceScore?: number;
+  }>;
+}): ResearchContextReference[] {
   const contextReferences: ResearchContextReference[] = [];
   const now = Date.now();
 
@@ -92,7 +87,7 @@ export function buildContextReferencesFromHarvested(
     const normalizedResultUrl = normalizeUrl(result.url) ?? result.url;
     if (!scrapedNormalizedUrls.has(normalizedResultUrl)) {
       contextReferences.push({
-        contextId: result.contextId ?? generateContextId(),
+        contextId: result.contextId ?? generateMessageId(),
         type: "search_result",
         url: result.url,
         title: result.title,
