@@ -1,5 +1,3 @@
-"use node";
-
 import {
   safeParsePlanResearchToolOutput,
   safeParseScrapeToolOutput,
@@ -27,10 +25,7 @@ export const summarizeToolResult = (output: unknown): string => {
   } catch (serializeError) {
     console.warn("Tool result serialization failed", {
       outputType: typeof output,
-      error:
-        serializeError instanceof Error
-          ? serializeError.message
-          : String(serializeError),
+      error: serializeError instanceof Error ? serializeError.message : String(serializeError),
     });
     return "[unserializable output]";
   }
@@ -120,7 +115,7 @@ export function buildToolCallLog(
   toolName: string;
   timestamp: number;
   reasoning: string;
-  input: any;
+  input: unknown;
   resultSummary: string;
   durationMs: number;
   success: boolean;
