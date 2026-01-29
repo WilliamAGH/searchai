@@ -18,7 +18,8 @@ test.describe("smoke: pagination load more", () => {
 
     const loadMoreBtn = page.locator('[data-testid="loadMore"]');
     const loadMoreCount = await loadMoreBtn.first().count();
-    const hasLoadMore = loadMoreCount > 0 && (await loadMoreBtn.first().isVisible());
+    const hasLoadMore =
+      loadMoreCount > 0 && (await loadMoreBtn.first().isVisible());
     if (!hasLoadMore) test.skip(true, "No load more button present");
 
     await loadMoreBtn.first().click();
