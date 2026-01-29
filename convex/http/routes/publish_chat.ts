@@ -1,18 +1,37 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
+import { isValidUuidV7 } from "../../lib/uuid";
 import { isRecord } from "../../lib/validation/zodUtils";
 import { serializeError } from "../utils";
 import { buildCorsJsonResponse, getAllowedOrigin } from "./publish_cors";
+
+/**
+ * Validate and normalize URL to safe http/https protocols only
+ */
+function toSafeUrl(value: unknown): string {
+  if (typeof value !== "string") return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    return url.toString().slice(0, 2048);
+  } catch {
+    return "";
+  }
+}
 
 export async function handlePublishChat(ctx: ActionCtx, request: Request): Promise<Response> {
   let rawPayload: unknown;
   try {
     rawPayload = await request.json();
   } catch (error) {
-    console.error("[ERROR] PUBLISH INVALID JSON:", serializeError(error));
+    const errorInfo = serializeError(error);
+    console.error("[ERROR] PUBLISH INVALID JSON:", errorInfo);
     return buildCorsJsonResponse(
       request,
-      { error: "Invalid JSON body", errorDetails: serializeError(error) },
+      {
+        error: "Invalid JSON body",
+        ...(process.env.NODE_ENV === "development" ? { errorDetails: errorInfo } : {}),
+      },
       400,
     );
   }
@@ -25,9 +44,15 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
   const rawTitle = typeof payload.title === "string" ? payload.title : "Shared Chat";
   const title = rawTitle.trim().slice(0, 200);
   const privacy = payload.privacy === "public" ? "public" : "shared";
-  const shareId = typeof payload.shareId === "string" ? payload.shareId.slice(0, 100) : undefined;
+  // Validate shareId/publicId as UUIDv7 to maintain data integrity
+  const shareId =
+    typeof payload.shareId === "string" && isValidUuidV7(payload.shareId)
+      ? payload.shareId
+      : undefined;
   const publicId =
-    typeof payload.publicId === "string" ? payload.publicId.slice(0, 100) : undefined;
+    typeof payload.publicId === "string" && isValidUuidV7(payload.publicId)
+      ? payload.publicId
+      : undefined;
 
   const messages = Array.isArray(payload.messages)
     ? payload.messages.slice(0, 100).map((m: unknown) => {
@@ -41,7 +66,7 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
                 const result = isRecord(r) ? r : {};
                 return {
                   title: (typeof result.title === "string" ? result.title : "").slice(0, 200),
-                  url: (typeof result.url === "string" ? result.url : "").slice(0, 2048),
+                  url: toSafeUrl(result.url),
                   snippet: (typeof result.snippet === "string" ? result.snippet : "").slice(0, 500),
                   relevanceScore:
                     typeof result.relevanceScore === "number"
@@ -87,7 +112,15 @@ export async function handlePublishChat(ctx: ActionCtx, request: Request): Promi
     return buildCorsJsonResponse(request, { ...result, shareUrl, publicUrl, llmTxtUrl }, 200);
   } catch (error: unknown) {
     const errorInfo = serializeError(error);
+    console.error("[ERROR] PUBLISH CHAT:", errorInfo);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return buildCorsJsonResponse(request, { error: errorMessage, errorDetails: errorInfo }, 500);
+    return buildCorsJsonResponse(
+      request,
+      {
+        error: errorMessage,
+        ...(process.env.NODE_ENV === "development" ? { errorDetails: errorInfo } : {}),
+      },
+      500,
+    );
   }
 }

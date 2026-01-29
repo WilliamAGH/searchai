@@ -1,6 +1,28 @@
 import { corsResponse, serializeError } from "../utils";
 import type { ResearchContextReference } from "../../schemas/agents";
 
+/**
+ * Regex pattern to match ASCII control characters (except tab, newline, carriage return)
+ * Uses Unicode escapes to avoid Biome lint errors for literal control characters
+ */
+const CONTROL_CHARS_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+/**
+ * Validate and normalize URL to safe http/https protocols only.
+ * Returns undefined for invalid URLs or non-http(s) protocols - safe by design.
+ */
+function safeParseUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.toString().slice(0, 2000);
+  } catch {
+    // Invalid URL format - return undefined as intended
+    return undefined;
+  }
+}
+
 type JsonPayloadResult =
   | { ok: true; payload: Record<string, unknown> }
   | { ok: false; response: Response };
@@ -30,13 +52,14 @@ export async function parseJsonPayload(
   try {
     rawPayload = await request.json();
   } catch (error) {
-    console.error(`[ERROR] ${logPrefix} INVALID JSON:`, serializeError(error));
+    const errorInfo = serializeError(error);
+    console.error(`[ERROR] ${logPrefix} INVALID JSON:`, errorInfo);
     return {
       ok: false,
       response: corsResponse(
         JSON.stringify({
           error: "Invalid JSON body",
-          errorDetails: serializeError(error),
+          ...(process.env.NODE_ENV === "development" ? { errorDetails: errorInfo } : {}),
         }),
         400,
         origin,
@@ -56,7 +79,7 @@ export async function parseJsonPayload(
 
 export function sanitizeTextInput(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== "string") return undefined;
-  return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").slice(0, maxLength);
+  return value.replace(CONTROL_CHARS_PATTERN, "").slice(0, maxLength);
 }
 
 export function sanitizeContextReferences(input: unknown): ResearchContextReference[] | undefined {
@@ -81,8 +104,9 @@ export function sanitizeContextReferences(input: unknown): ResearchContextRefere
         timestamp: typeof refRaw.timestamp === "number" ? refRaw.timestamp : Date.now(),
       };
 
-      if (typeof refRaw.url === "string") {
-        sanitized.url = refRaw.url.slice(0, 2000);
+      const safeUrl = safeParseUrl(refRaw.url);
+      if (safeUrl) {
+        sanitized.url = safeUrl;
       }
       if (typeof refRaw.title === "string") {
         sanitized.title = refRaw.title.slice(0, 500);

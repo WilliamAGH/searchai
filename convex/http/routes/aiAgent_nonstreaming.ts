@@ -135,7 +135,8 @@ export async function handleAgentRequest(ctx: ActionCtx, request: Request): Prom
     const errorResponse = {
       error: "Agent workflow failed",
       errorMessage: errorInfo.message,
-      errorDetails: errorInfo,
+      // Only include error details in development to avoid leaking stack traces
+      errorDetails: process.env.NODE_ENV === "development" ? errorInfo : undefined,
       answer:
         "I apologize, but I encountered an error while processing your request. Please try again.",
       hasLimitations: true,
