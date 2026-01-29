@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "ignorePatterns": [
+    "dist",
+    "build",
+    "coverage",
+    "node_modules",
+    ".convex",
+    "convex/_generated",
+    "convex/_generated/**",
+    "convex/_generated/api.d.ts",
+    ".claude/",
+    ".env*",
+    "*.log",
+    ".DS_Store"
+  ]
+}
