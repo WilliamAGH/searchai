@@ -3,8 +3,8 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { waitForSidebarAnimation } from "../helpers/wait-conditions";
 import { setupNewChatPage } from "../helpers/new-chat";
+import { getNewChatButton } from "../helpers/sidebar-helpers";
 
 test.describe("New Chat Stress Tests", () => {
   test.beforeEach(async ({ page }) => {
@@ -15,16 +15,8 @@ test.describe("New Chat Stress Tests", () => {
     const chatUrls: string[] = [];
 
     for (let i = 0; i < 5; i++) {
-      const newChatButton = page.locator('button:has-text("New Chat")').first();
-      const isNewChatVisible = await newChatButton.isVisible({ timeout: 1000 }).catch(() => false);
-
-      if (!isNewChatVisible) {
-        const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
-        if (await sidebarToggle.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await sidebarToggle.click();
-          await waitForSidebarAnimation(page);
-        }
-      }
+      // Use helper to ensure sidebar is open and get button
+      const newChatButton = await getNewChatButton(page);
 
       const creatingBtn = page.locator('button:has-text("Creating...")').first();
       const isCreating = await creatingBtn.isVisible({ timeout: 500 }).catch(() => false);
@@ -32,7 +24,6 @@ test.describe("New Chat Stress Tests", () => {
         await expect(creatingBtn).not.toBeVisible({ timeout: 10000 });
       }
 
-      await expect(newChatButton).toBeVisible({ timeout: 10000 });
       await expect(newChatButton).toBeEnabled({ timeout: 3000 });
       await newChatButton.click();
 
@@ -78,16 +69,8 @@ test.describe("New Chat Stress Tests", () => {
       timeout: 30000,
     });
 
-    const sidebarToggle = page.locator('button[aria-label="Toggle sidebar"]').first();
-    let newChatButton = page.locator('button:has-text("New Chat")').first();
-    const isNewChatVisible = await newChatButton.isVisible({ timeout: 1000 }).catch(() => false);
-
-    if (!isNewChatVisible && (await sidebarToggle.isVisible())) {
-      await sidebarToggle.click();
-      await waitForSidebarAnimation(page);
-    }
-
-    newChatButton = page.locator('button:has-text("New Chat")').first();
+    // Use helper to ensure sidebar is open and get button
+    const newChatButton = await getNewChatButton(page);
     await newChatButton.click();
 
     await page.waitForURL(/\/(chat)\/.+/, { timeout: 10000 });
