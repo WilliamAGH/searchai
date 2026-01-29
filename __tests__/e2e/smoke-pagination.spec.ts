@@ -7,7 +7,10 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("smoke: pagination", () => {
-  test("basic pagination elements render without errors", async ({ page, baseURL }) => {
+  test("basic pagination elements render without errors", async ({
+    page,
+    baseURL,
+  }) => {
     const consoleErrors: string[] = [];
     const requestFailures: string[] = [];
     const responseFailures: string[] = [];
@@ -22,12 +25,16 @@ test.describe("smoke: pagination", () => {
           text.includes("Failed to send message") ||
           text.includes("403 (Forbidden)") ||
           text.includes("Failed to load resource") ||
-          text.includes('Viewport argument key "interactive-widget" not recognized')
+          text.includes(
+            'Viewport argument key "interactive-widget" not recognized',
+          )
         ) {
           return;
         }
         const loc = msg.location();
-        const where = loc.url ? `${loc.url}:${loc.lineNumber ?? 0}:${loc.columnNumber ?? 0}` : "";
+        const where = loc.url
+          ? `${loc.url}:${loc.lineNumber ?? 0}:${loc.columnNumber ?? 0}`
+          : "";
         consoleErrors.push(`${msg.text()}${where ? ` at ${where}` : ""}`);
       }
     });
@@ -42,7 +49,9 @@ test.describe("smoke: pagination", () => {
       if (url.startsWith("http://") || url.startsWith("https://")) {
         // Ignore favicon requests
         if (url.includes("favicon")) return;
-        requestFailures.push(`${req.method()} ${url} -> ${req.failure()?.errorText}`);
+        requestFailures.push(
+          `${req.method()} ${url} -> ${req.failure()?.errorText}`,
+        );
       }
     });
 
@@ -100,13 +109,20 @@ test.describe("smoke: pagination", () => {
     // The message list is the flex-1 overflow-y-auto container
     const messageList = page.locator(".flex-1.overflow-y-auto").first();
 
-    // If no message list found, check for empty state instead
-    const hasMessageList = await messageList.isVisible().catch(() => false);
-    const emptyState = page.locator('text="No messages yet"').first();
-    const hasEmptyState = await emptyState.isVisible().catch(() => false);
+    // Check visibility - count() is safe and won't throw
+    const messageListCount = await messageList.count();
+    const hasMessageList =
+      messageListCount > 0 && (await messageList.isVisible());
 
-    // Either message list or empty state should be visible
-    expect(hasMessageList || hasEmptyState).toBeTruthy();
+    const emptyState = page.locator('text="No messages yet"').first();
+    const emptyStateCount = await emptyState.count();
+    const hasEmptyState = emptyStateCount > 0 && (await emptyState.isVisible());
+
+    // Either message list or empty state should be visible - this is a required assertion
+    expect(
+      hasMessageList || hasEmptyState,
+      "Either message list or empty state should be visible",
+    ).toBeTruthy();
 
     // If we have a message list, test scrolling behavior
     if (hasMessageList) {
@@ -120,20 +136,26 @@ test.describe("smoke: pagination", () => {
       });
 
       // Check if load-more button exists (only appears when there are more messages)
+      // This is optional - new chats may not have enough messages to trigger pagination
       const loadMoreButton = page.locator('[data-testid="loadMore"]');
-      const hasLoadMore = await loadMoreButton.isVisible().catch(() => false);
+      const loadMoreCount = await loadMoreButton.count();
 
-      if (hasLoadMore) {
-        // Verify button is clickable (doesn't throw)
-        await loadMoreButton.click().catch(() => {
-          // Button might be disabled or loading, that's ok for smoke test
-        });
+      if (loadMoreCount > 0 && (await loadMoreButton.isVisible())) {
+        // If the button exists and is visible, it should be clickable
+        // Use soft assertion - pagination is optional in smoke tests
+        await expect
+          .soft(loadMoreButton, "Load more button should be enabled")
+          .toBeEnabled();
+        await loadMoreButton.click();
       }
     }
 
     // Final assertions - ensure no errors occurred
     expect
-      .soft(consoleErrors, `No console errors during pagination test.\n${consoleErrors.join("\n")}`)
+      .soft(
+        consoleErrors,
+        `No console errors during pagination test.\n${consoleErrors.join("\n")}`,
+      )
       .toEqual([]);
 
     expect
@@ -173,37 +195,40 @@ test.describe("smoke: pagination", () => {
     await page.keyboard.press("Enter");
 
     // Wait for "Creating..." state to clear first (backend operation in progress)
+    // The button may not appear if creation is instant, so we check count first
     const creatingButton = page.locator('button:has-text("Creating")');
-    await creatingButton.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {}); // May not appear at all if fast
-
-    // Then wait for chat navigation with extended timeout
-    const navigated = await page
-      .waitForURL(/\/(chat|s|p)\//, { timeout: 30000 })
-      .then(() => true)
-      .catch(() => false);
-
-    // Skip accessibility checks if chat creation failed
-    if (!navigated) {
-      return;
+    const creatingCount = await creatingButton.count();
+    if (creatingCount > 0) {
+      await creatingButton.waitFor({ state: "hidden", timeout: 30000 });
     }
 
-    // Check for ARIA attributes on pagination elements
+    // Wait for chat navigation - required for accessibility checks
+    await page.waitForURL(/\/(chat|s|p)\//, { timeout: 30000 });
+
+    // Check for ARIA attributes on pagination elements (element may not exist)
+    // These are optional elements - only assert if they exist and are visible
     const loadMoreButton = page.locator('[data-testid="loadMore"]');
-    if (await loadMoreButton.isVisible().catch(() => false)) {
-      // Check button has proper ARIA labels
+    const loadMoreCount = await loadMoreButton.count();
+    if (loadMoreCount > 0 && (await loadMoreButton.isVisible())) {
+      // If load more button exists and is visible, it must have proper accessibility
       const ariaLabel = await loadMoreButton.getAttribute("aria-label");
-      expect(ariaLabel).toBeTruthy();
+      expect(ariaLabel, "Load more button should have aria-label").toBeTruthy();
 
-      // Check button has proper role or is semantic button
-      const tagName = await loadMoreButton.evaluate((el) => el.tagName.toLowerCase());
-      expect(tagName).toBe("button");
+      const tagName = await loadMoreButton.evaluate((el) =>
+        el.tagName.toLowerCase(),
+      );
+      expect(tagName, "Load more should be a semantic button").toBe("button");
     }
 
-    // Check for scroll-to-bottom button accessibility
+    // Check for scroll-to-bottom button accessibility (element may not exist)
     const scrollButton = page.locator('[aria-label*="scroll"]').first();
-    if (await scrollButton.isVisible().catch(() => false)) {
+    const scrollCount = await scrollButton.count();
+    if (scrollCount > 0 && (await scrollButton.isVisible())) {
+      // If scroll button exists and is visible, it must have proper accessibility
       const ariaLabel = await scrollButton.getAttribute("aria-label");
-      expect(ariaLabel).toContain("scroll");
+      expect(ariaLabel, "Scroll button should have aria-label").toContain(
+        "scroll",
+      );
     }
   });
 });
