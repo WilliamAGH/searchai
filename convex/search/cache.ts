@@ -25,14 +25,11 @@ export const PLAN_CACHE_TTL_MS = CACHE_TTL.PLAN_MS;
 export const SEARCH_CACHE_TTL_MS = CACHE_TTL.SEARCH_MS;
 
 // Ephemeral in-process cache for planner decisions (best-effort only)
-export const planCache: Map<string, { expires: number; result: PlanResult }> =
-  new Map();
+export const planCache: Map<string, { expires: number; result: PlanResult }> = new Map();
 
 // Search result cache for avoiding duplicate searches
-export const searchResultCache: Map<
-  string,
-  { expires: number; results: SearchResponse }
-> = new Map();
+export const searchResultCache: Map<string, { expires: number; results: SearchResponse }> =
+  new Map();
 
 // Simple per-chat leaky bucket limiter
 export const planRate: Map<string, number[]> = new Map();
@@ -70,10 +67,7 @@ export function checkRateLimit(
 /**
  * Record a rate limit attempt
  */
-export function recordRateLimitAttempt(
-  chatId: string,
-  timestamp: number = Date.now(),
-): void {
+export function recordRateLimitAttempt(chatId: string, timestamp: number = Date.now()): void {
   const { pruned } = checkRateLimit(chatId, timestamp);
   pruned.push(timestamp);
   planRate.set(String(chatId), pruned);
@@ -82,10 +76,7 @@ export function recordRateLimitAttempt(
 /**
  * Get cached plan result
  */
-export function getCachedPlan(
-  cacheKey: string,
-  now: number = Date.now(),
-): PlanResult | null {
+export function getCachedPlan(cacheKey: string, now: number = Date.now()): PlanResult | null {
   const hit = planCache.get(cacheKey);
   if (hit && hit.expires >= now) {
     return hit.result;
@@ -117,10 +108,7 @@ export function getCachedSearchResults(
 ): SearchResponse | null {
   const cached = searchResultCache.get(cacheKey);
   if (cached && cached.expires > now) {
-    console.info(
-      "[CACHE] Using cached search results for cache key:",
-      cacheKey,
-    );
+    console.info("[CACHE] Using cached search results for cache key:", cacheKey);
     return cached.results;
   }
   return null;
