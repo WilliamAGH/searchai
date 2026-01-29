@@ -104,7 +104,7 @@ test.describe("New Chat Basics", () => {
   });
 
   test("should handle follow-up new chat creation", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    // Page already at "/" from beforeEach setupNewChatPage
     const input = page.locator('textarea, [role="textbox"]').first();
     await input.fill("Test message");
     await page.keyboard.press("Enter");
