@@ -5,6 +5,8 @@
     "typescript",
     "unicorn",
     "react",
+    "react-hooks",
+    "nextjs",
     "jsx-a11y",
     "promise",
     "vitest",
@@ -21,34 +23,22 @@
     "no-debugger": "error",
     "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
     "no-control-regex": "off",
+    "no-empty": ["error", { "allowEmptyCatch": false }],
 
     "no-restricted-imports": [
       "error",
       {
         "patterns": [
           {
-            "group": [
-              "**/convexTypes",
-              "**/convexTypes.ts",
-              "**/convex-types",
-              "**/types/convex"
-            ],
+            "group": ["**/convexTypes", "**/convexTypes.ts", "**/convex-types", "**/types/convex"],
             "message": "NEVER create abstraction layers over Convex _generated types. Import directly from 'convex/_generated/' as per Convex best practices."
           },
           {
-            "group": [
-              "./lib/convexTypes",
-              "../lib/convexTypes",
-              "../../lib/convexTypes"
-            ],
+            "group": ["./lib/convexTypes", "../lib/convexTypes", "../../lib/convexTypes"],
             "message": "CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See AGENTS.md for correct patterns."
           },
           {
-            "group": [
-              "**/lib/convex*",
-              "**/wrappers/convex*",
-              "**/abstractions/convex*"
-            ],
+            "group": ["**/lib/convex*", "**/wrappers/convex*", "**/abstractions/convex*"],
             "message": "Do not create wrapper files for Convex types. The _generated directory IS the abstraction layer."
           }
         ]
@@ -59,8 +49,10 @@
     "import/order": "off",
     "import/no-duplicates": "error",
 
-    "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/no-non-null-assertion": "warn",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "warn",
+    "typescript/no-unsafe-type-assertion": "warn",
+    "typescript/no-floating-promises": "warn",
 
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
@@ -107,7 +99,7 @@
         "scripts/**/*"
       ],
       "rules": {
-        "@typescript-eslint/no-explicit-any": "off",
+        "typescript/no-explicit-any": "off",
         "no-console": "off",
         "unicorn/prefer-node-protocol": "off"
       }
@@ -116,8 +108,8 @@
       "files": ["convex/**/*.ts"],
       "rules": {
         "no-console": "off",
-        "@typescript-eslint/no-explicit-any": "off",
-        "@typescript-eslint/no-non-null-assertion": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-non-null-assertion": "off",
         "no-restricted-imports": [
           "error",
           {
