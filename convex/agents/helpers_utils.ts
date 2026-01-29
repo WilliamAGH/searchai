@@ -34,29 +34,32 @@ export const truncate = (text: string, maxChars: number): string =>
 // ============================================
 
 // Patterns for instant responses - no `i` flag needed since input is lowercased
+const RESPONSES = {
+  GREETING:
+    "Hello! I'm ready to help you search and research any topic. What would you like to know?",
+  TEST_CONFIRMATION:
+    "Test confirmed! This chat is working. What would you like to research?",
+} as const;
+
 const INSTANT_RESPONSE_MAP: ReadonlyArray<{
   pattern: RegExp;
   response: string;
 }> = [
   {
     pattern: /^(hi|hello|hey|howdy|greetings|yo)[\s!.,?]*$/,
-    response:
-      "Hello! I'm ready to help you search and research any topic. What would you like to know?",
+    response: RESPONSES.GREETING,
   },
   {
     pattern: /^(good\s*(morning|afternoon|evening|night))[\s!.,?]*$/,
-    response:
-      "Hello! I'm ready to help you search and research any topic. What would you like to know?",
+    response: RESPONSES.GREETING,
   },
   {
     pattern: /^(test|testing|this is a test|new chat|start)[\s!.,?]*$/,
-    response:
-      "Test confirmed! This chat is working. What would you like to research?",
+    response: RESPONSES.TEST_CONFIRMATION,
   },
   {
     pattern: /^this is a new chat[\s!.,?]*$/,
-    response:
-      "Test confirmed! This chat is working. What would you like to research?",
+    response: RESPONSES.TEST_CONFIRMATION,
   },
   {
     pattern: /^(thanks|thank you|thx|ty)[\s!.,?]*$/,
