@@ -53,8 +53,12 @@ export default defineConfig({
   ],
   webServer: [
     {
+      // CRITICAL: DO NOT REMOVE "npx" from "npx vite preview" - CI/CD WILL BREAK!
+      // Inside bash -c, node_modules/.bin is NOT in PATH. Without npx, vite is not
+      // found and the server silently fails, causing a 180s timeout. This was the
+      // root cause of 25+ consecutive CI failures. See commit history for details.
       command: process.env.CI
-        ? "bash -c 'npm run build && vite preview --strictPort --port 5173 --host 127.0.0.1'"
+        ? "bash -c 'npm run build && npx vite preview --strictPort --port 5173 --host 127.0.0.1'"
         : "npm run dev:frontend",
       url: "http://127.0.0.1:5173",
       timeout: 180_000,

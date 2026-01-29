@@ -5,7 +5,7 @@
   "typescript.tsserver.watchOptions": {
     "watchFile": "useFsEvents",
     "watchDirectory": "useFsEvents",
-    "fallbackPolling": "dynamicPriority"
+    "fallbackPolling": "dynamicPriorityPolling"
   },
   "files.watcherExclude": {
     "**/node_modules/**": true,
