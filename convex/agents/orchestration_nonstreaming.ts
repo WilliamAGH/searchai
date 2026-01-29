@@ -24,10 +24,6 @@ import {
   buildToolCallLog,
   buildUrlContextMap,
   normalizeSourceContextIds,
-  isUuidV7,
-  summarizeToolResult,
-  normalizeUrl,
-  extractContextIdFromOutput,
   withTimeout,
 } from "./orchestration_helpers";
 import {
@@ -176,7 +172,7 @@ export const orchestrateResearchWorkflow = action({
         isToolErrorOutput(entry.output),
       ).length;
       assertToolErrorThreshold(toolErrorCount, "Research");
-      toolCallLog = buildToolCallLog(entries, summarizeToolResult);
+      toolCallLog = buildToolCallLog(entries);
 
       const urlContextMap = buildUrlContextMap(entries);
       const { normalized, invalidCount } = normalizeSourceContextIds(

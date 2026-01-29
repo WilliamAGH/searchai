@@ -123,7 +123,7 @@ export function detectErrorStage(
 // Timeout Utilities
 // ============================================
 
-export class AgentTimeoutError extends Error {
+class AgentTimeoutError extends Error {
   readonly stage: string;
   readonly timeoutMs: number;
 

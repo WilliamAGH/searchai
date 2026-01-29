@@ -153,10 +153,9 @@ export function convertToContextReferences(
 ): ResearchContextReference[] {
   const now = Date.now();
   const relevanceToScore: Record<"high" | "medium" | "low", number> = {
-    high: RELEVANCE_SCORES.SCRAPED_PAGE, // 0.9
-    medium:
-      (RELEVANCE_SCORES.SCRAPED_PAGE + RELEVANCE_SCORES.SEARCH_RESULT) / 2, // 0.7
-    low: RELEVANCE_SCORES.SEARCH_RESULT, // 0.5
+    high: RELEVANCE_SCORES.HIGH_LABEL,
+    medium: RELEVANCE_SCORES.MEDIUM_LABEL,
+    low: RELEVANCE_SCORES.LOW_LABEL,
   };
 
   return sources.map((source) => ({

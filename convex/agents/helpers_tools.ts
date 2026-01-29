@@ -113,7 +113,6 @@ export function processToolCalls(
 
 export function buildToolCallLog(
   toolCallEntries: Map<string, ToolCallEntry>,
-  summarizeToolResult: (output: unknown) => string,
 ): Array<{
   toolName: string;
   timestamp: number;
