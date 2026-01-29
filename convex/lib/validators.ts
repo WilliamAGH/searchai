@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import type { Id, TableNames } from "../_generated/dataModel";
-import type { ResearchContextReference as ResearchContextReferenceType } from "../schemas/agents";
 
 // Shared validators for backend-only usage
 // Note: Do not re-export Convex-generated types from _generated/*
@@ -107,12 +106,6 @@ export interface ContextReference {
   relevanceScore?: number;
   metadata?: unknown;
 }
-
-// Re-export the TS type used across orchestration to keep validator and TS shape aligned.
-// NOTE: This indirection prevents V8 runtimes from importing `orchestration_helpers.ts`
-// (which uses `node:crypto`). Always import the type from `../schemas/agents` or from this
-// re-export, never from the Node-only helpers.
-export type ResearchContextReference = ResearchContextReferenceType;
 
 const LOCAL_ID_PREFIXES = ["local_", "chat_", "msg_"];
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;

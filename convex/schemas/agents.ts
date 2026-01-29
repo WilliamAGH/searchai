@@ -12,9 +12,6 @@ import {
   SearchResultStrictSchema,
   ScrapedContentSchema,
   SerpEnrichmentSchema,
-  type SearchResultStrict,
-  type ScrapedContent,
-  type SerpEnrichment,
 } from "./search";
 import { safeParseOrNull } from "../lib/validation/zodUtils";
 
