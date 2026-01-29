@@ -52,8 +52,7 @@ test.describe("New Chat Stress Tests", () => {
   });
 
   test("should handle chat creation with existing messages", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-
+    // Page already at "/" from beforeEach setupNewChatPage
     const input = page
       .locator(
         'textarea[data-testid="message-input"], textarea[placeholder*="Type"], [role="textbox"]',
