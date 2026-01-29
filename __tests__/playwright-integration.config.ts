@@ -29,7 +29,7 @@ export default defineConfig({
     ["json", { outputFile: "../test-results/integration-results.json" }],
   ],
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: "http://127.0.0.1:5173",
     trace: "on",
     screenshot: "on",
     video: "retain-on-failure",
@@ -54,9 +54,9 @@ export default defineConfig({
   webServer: [
     {
       command: process.env.CI
-        ? "npm run build && vite preview --strictPort --port 5173"
+        ? "bash -c 'npm run build && vite preview --strictPort --port 5173 --host 127.0.0.1'"
         : "npm run dev:frontend",
-      url: "http://localhost:5173",
+      url: "http://127.0.0.1:5173",
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
       stdout: "pipe",
