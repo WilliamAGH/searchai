@@ -1,5 +1,3 @@
-"use node";
-
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
 import { normalizeUrl as normalizeUrlUtil } from "../lib/url";
 import { isValidUuidV7 } from "../lib/uuid_validation";
@@ -105,6 +103,11 @@ export function detectErrorStage(
 ): string {
   if (isInstantPath) {
     return "instant";
+  }
+
+  // Handle timeout errors thrown by withTimeout()
+  if (error instanceof AgentTimeoutError) {
+    return error.stage;
   }
 
   if (error instanceof Error) {

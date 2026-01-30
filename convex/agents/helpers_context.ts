@@ -134,8 +134,11 @@ export function extractSourceUrls(
   contextReferences: ResearchContextReference[],
 ): string[] {
   return contextReferences
-    .filter((ref) => ref.url)
-    .map((ref) => ref.url as string);
+    .filter(
+      (ref): ref is ResearchContextReference & { url: string } =>
+        typeof ref.url === "string",
+    )
+    .map((ref) => ref.url);
 }
 
 /**
