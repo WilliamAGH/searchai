@@ -36,6 +36,10 @@ export function useEffectiveMessages({
   currentChatId,
 }: UseEffectiveMessagesOptions): Message[] {
   return useMemo(() => {
+    const safePaginatedMessages = currentChatId
+      ? paginatedMessages.filter((m) => m.chatId === currentChatId)
+      : paginatedMessages;
+
     // Check if unified messages have optimistic state (isStreaming or unpersisted)
     const hasOptimisticMessages = messages.some(
       (m) => m.isStreaming === true || m.persisted === false,
@@ -56,8 +60,8 @@ export function useEffectiveMessages({
       lastAssistantMessage.content.length > 0 &&
       // Use ID-based comparison when available, fall back to content comparison
       (lastAssistantKey
-        ? !paginatedMessages.some((m) => m._id === lastAssistantKey)
-        : !paginatedMessages.some(
+        ? !safePaginatedMessages.some((m) => m._id === lastAssistantKey)
+        : !safePaginatedMessages.some(
             (m) =>
               m.role === "assistant" &&
               typeof m.content === "string" &&
@@ -75,12 +79,12 @@ export function useEffectiveMessages({
     }
 
     // Otherwise, use paginated messages if available
-    if (currentChatId && paginatedMessages.length > 0) {
+    if (currentChatId && safePaginatedMessages.length > 0) {
       logger.debug("Using paginated messages - no optimistic state", {
-        count: paginatedMessages.length,
+        count: safePaginatedMessages.length,
         chatId: currentChatId,
       });
-      return paginatedMessages;
+      return safePaginatedMessages;
     }
 
     // Fallback to unified messages
