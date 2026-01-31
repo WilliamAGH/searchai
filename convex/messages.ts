@@ -10,7 +10,6 @@ import {
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
 import { isAuthorized, isUnownedChat, hasSessionAccess } from "./lib/auth";
-
 export const addMessage = internalMutation({
   args: {
     chatId: v.id("chats"),
@@ -68,7 +67,6 @@ export const addMessage = internalMutation({
     });
   },
 });
-
 // HTTP-only variant for actions without auth context.
 export const addMessageHttp = internalMutation({
   args: {
@@ -120,7 +118,6 @@ export const addMessageHttp = internalMutation({
     });
   },
 });
-
 export const internalUpdateMessageContent = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -140,7 +137,6 @@ export const internalUpdateMessageContent = internalMutation({
     });
   },
 });
-
 export const internalUpdateMessageReasoning = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -160,7 +156,6 @@ export const internalUpdateMessageReasoning = internalMutation({
     });
   },
 });
-
 export const updateMessageMetadata = mutation({
   args: {
     messageId: v.id("messages"),
@@ -198,7 +193,6 @@ export const updateMessageMetadata = mutation({
     return null;
   },
 });
-
 export const updateMessage = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -219,7 +213,6 @@ export const updateMessage = internalMutation({
     await ctx.db.patch(messageId, { ...rest });
   },
 });
-
 /** Count user messages for a chat. */
 export const countMessages = internalMutation({
   args: { chatId: v.id("chats") },
@@ -233,7 +226,6 @@ export const countMessages = internalMutation({
     return messages.length;
   },
 });
-
 export const deleteMessage = mutation({
   args: {
     messageId: v.id("messages"),
@@ -282,7 +274,6 @@ export const deleteMessage = mutation({
     return null;
   },
 });
-
 export const addMessageWithTransaction = internalMutation({
   args: {
     chatId: v.id("chats"),
@@ -301,6 +292,12 @@ export const addMessageWithTransaction = internalMutation({
         return { success: false, error: "Chat not found" };
       }
 
+      let threadId = chat.threadId;
+      if (!threadId) {
+        threadId = generateThreadId();
+        await ctx.db.patch(args.chatId, { threadId });
+      }
+
       const messages = await ctx.db
         .query("messages")
         .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
@@ -313,6 +310,8 @@ export const addMessageWithTransaction = internalMutation({
         chatId: args.chatId,
         role: "user",
         content: args.userMessage,
+        messageId: generateMessageId(),
+        threadId,
         timestamp: Date.now(),
       });
 
@@ -334,6 +333,8 @@ export const addMessageWithTransaction = internalMutation({
         role: "assistant",
         content: "",
         isStreaming: true,
+        messageId: generateMessageId(),
+        threadId,
         timestamp: Date.now(),
       });
 
