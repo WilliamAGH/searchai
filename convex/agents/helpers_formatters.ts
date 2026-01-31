@@ -24,8 +24,8 @@ export function formatScrapedContentForPrompt(
     .sort(
       (a, b) =>
         (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0) ||
-        (b.contentLength ?? b.content.length) -
-          (a.contentLength ?? a.content.length),
+        (b.contentLength ?? b.content?.length ?? 0) -
+          (a.contentLength ?? a.content?.length ?? 0),
     )
     .map((page, idx) => {
       const safeContent = page.content || "";
