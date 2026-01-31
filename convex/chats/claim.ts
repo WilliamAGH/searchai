@@ -40,12 +40,8 @@ export const claimAnonymousChats = mutation({
       return isUnclaimed || isOwnedByUser;
     });
 
-    // Check if there are any unclaimed chats that need claiming
-    const unclaimedChats = processableChats.filter((chat) => !chat.userId);
-
-    // If no unclaimed chats, skip rotation entirely to avoid redundant writes
-    // This prevents session rotation on every login for users with no new chats to claim
-    if (unclaimedChats.length === 0) {
+    // If no processable chats, avoid redundant writes
+    if (processableChats.length === 0) {
       return { claimed: 0, newSessionId: args.sessionId };
     }
 
