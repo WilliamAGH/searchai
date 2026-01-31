@@ -15,7 +15,7 @@ import { registerSearchRoutes } from "./http/routes/search";
 import { registerScrapeRoutes } from "./http/routes/scrape";
 import { registerAgentAIRoutes } from "./http/routes/aiAgent";
 import { registerPublishRoutes } from "./http/routes/publish";
-import { corsJsonResponseForRequest } from "./http/utils";
+import { corsResponse } from "./http/cors";
 
 /**
  * HTTP router for unauthenticated endpoints.
@@ -45,11 +45,10 @@ http.route({
   path: "/health",
   method: "GET",
   handler: httpAction(async (_ctx, request) => {
-    return corsJsonResponseForRequest(
-      request,
+    return corsResponse(
       JSON.stringify({ status: "ok", timestamp: Date.now() }),
       200,
-      "GET, OPTIONS",
+      request.headers.get("Origin"),
     );
   }),
 });
