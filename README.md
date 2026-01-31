@@ -1,6 +1,6 @@
 # search-ai.io
 
-AI-powered search chat built with React + Vite and Convex.
+AI-powered search chat built with Convex, Vite, & React.
 
 ![search-ai.io](public/images/opengraph/searchai-io-og.png)
 
@@ -63,6 +63,6 @@ See `CONTRIBUTING.md`.
 
 ## License
 
-Copyright © 2026 William Callahan.
+Copyright © 2026 [William Callahan](https://williamcallahan.com).
 
 See `LICENSE.md`.
