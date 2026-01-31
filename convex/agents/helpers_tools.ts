@@ -3,6 +3,7 @@ import {
   safeParseScrapeToolOutput,
   safeParseSearchToolOutput,
 } from "../schemas/agents";
+import { isRecord } from "../lib/validation/zodUtils";
 import { isUuidV7, normalizeUrl } from "./helpers_utils";
 import type { RunToolCallItem, RunToolCallOutputItem } from "@openai/agents";
 
@@ -35,18 +36,48 @@ export const summarizeToolResult = (output: unknown): string => {
 };
 
 export const extractContextIdFromOutput = (output: unknown): string | null => {
-  const searchOutput = safeParseSearchToolOutput(output);
-  if (searchOutput && isUuidV7(searchOutput.contextId)) {
-    return searchOutput.contextId;
+  if (!isRecord(output)) {
+    return null;
   }
-  const scrapeOutput = safeParseScrapeToolOutput(output);
-  if (scrapeOutput && isUuidV7(scrapeOutput.contextId)) {
-    return scrapeOutput.contextId;
+
+  const toolName =
+    isRecord(output._toolCallMetadata) &&
+    typeof output._toolCallMetadata.toolName === "string"
+      ? output._toolCallMetadata.toolName
+      : null;
+
+  const runSearchParse = () => {
+    const parsed = safeParseSearchToolOutput(output);
+    return parsed && isUuidV7(parsed.contextId) ? parsed.contextId : null;
+  };
+  const runScrapeParse = () => {
+    const parsed = safeParseScrapeToolOutput(output);
+    return parsed && isUuidV7(parsed.contextId) ? parsed.contextId : null;
+  };
+  const runPlanParse = () => {
+    const parsed = safeParsePlanResearchToolOutput(output);
+    return parsed && isUuidV7(parsed.contextId) ? parsed.contextId : null;
+  };
+
+  if (toolName === "search_web") return runSearchParse();
+  if (toolName === "scrape_webpage") return runScrapeParse();
+  if (toolName === "plan_research") return runPlanParse();
+
+  if (Array.isArray(output.results)) return runSearchParse();
+  if (
+    typeof output.contentLength === "number" ||
+    typeof output.scrapedAt === "number" ||
+    typeof output.content === "string"
+  ) {
+    return runScrapeParse();
   }
-  const planOutput = safeParsePlanResearchToolOutput(output);
-  if (planOutput && isUuidV7(planOutput.contextId)) {
-    return planOutput.contextId;
+  if (
+    output.status === "research_planned" ||
+    Array.isArray(output.searchQueries)
+  ) {
+    return runPlanParse();
   }
+
   return null;
 };
 
@@ -83,12 +114,14 @@ export function processToolCalls(
           });
           parsedArgs = rawCall.arguments;
         }
+        const existing = toolCallEntries.get(rawCall.callId);
         toolCallEntries.set(rawCall.callId, {
+          ...existing,
           toolName: rawCall.name,
           args: parsedArgs,
-          startTimestamp: timestamp,
+          startTimestamp: existing?.startTimestamp ?? timestamp,
           status: rawCall.status,
-          order: idx,
+          order: existing?.order ?? idx,
         });
       }
     } else if (item instanceof RunToolCallOutputItemClass) {
