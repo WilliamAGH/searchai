@@ -82,6 +82,8 @@ describe("buildUrlContextMap", () => {
         title: "Example Z",
         content: "Full content of page Z",
         summary: "Summary of page Z",
+        contentLength: "Full content of page Z".length,
+        scrapedAt: fixedNow,
       },
     });
 
