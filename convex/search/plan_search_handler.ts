@@ -149,11 +149,16 @@ export async function runPlanSearch(
     { chatId: args.chatId, sessionId: args.sessionId, limit: 25 },
   );
 
+  let lastCreationTime = 0;
+  for (const msg of recentMessages) {
+    lastCreationTime = Math.max(lastCreationTime, msg._creationTime ?? 0);
+  }
+
   const cacheKey = buildCacheKey(
     args.chatId,
     normMsg,
     recentMessages.length,
-    recentMessages.at(-1)?._creationTime ?? 0,
+    lastCreationTime,
   );
 
   // Check cache first
