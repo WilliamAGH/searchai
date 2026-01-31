@@ -55,6 +55,12 @@ npm run dev
 
 See `CONTRIBUTING.md`.
 
+## Other Projects
+
+- [Composer](https://composerai.app) — AI-assisted email application ([GitHub](https://github.com/WilliamAGH/ComposerAI))
+- [TUI4J](https://github.com/WilliamAGH/tui4j) — Modern terminal user interface library for Java
+- [Brief](https://williamcallahan.com/projects/brief) — Beautiful terminal AI chat with tool calling ([GitHub](https://github.com/WilliamAGH/brief))
+
 ## License
 
 Copyright © 2026 William Callahan.
