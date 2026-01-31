@@ -5,6 +5,14 @@ import type { Id, TableNames } from "../_generated/dataModel";
 // Note: Do not re-export Convex-generated types from _generated/*
 
 /**
+ * Type guard to check if a value is a plain record (object).
+ * Shared utility to avoid duplicate implementations across modules.
+ */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
  * Search method validator.
  * Values must match SEARCH_METHODS const in constants/search.ts (source of truth).
  * @see {@link ./constants/search.ts} SEARCH_METHODS - canonical list

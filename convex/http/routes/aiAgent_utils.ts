@@ -1,5 +1,6 @@
 import { corsResponse, serializeError } from "../utils";
 import type { ResearchContextReference } from "../../schemas/agents";
+import { isRecord } from "../../lib/validators";
 
 /**
  * Regex pattern to match ASCII control characters (except tab, newline, carriage return)
@@ -40,10 +41,6 @@ export function rateLimitExceededResponse(
     429,
     origin,
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export async function parseJsonPayload(
@@ -129,16 +126,15 @@ export function sanitizeContextReferences(
       if (typeof refRaw.title === "string") {
         sanitized.title = refRaw.title.slice(0, 500);
       }
-      if (typeof refRaw.relevanceScore === "number") {
+      if (
+        refRaw.relevanceScore !== undefined &&
+        typeof refRaw.relevanceScore === "number"
+      ) {
         sanitized.relevanceScore = refRaw.relevanceScore;
       }
       if (
-        refRaw.metadata !== null &&
-        refRaw.metadata !== undefined &&
-        !(
-          typeof refRaw.metadata === "object" &&
-          Object.keys(refRaw.metadata).length === 0
-        )
+        isRecord(refRaw.metadata) &&
+        Object.keys(refRaw.metadata).length > 0
       ) {
         sanitized.metadata = refRaw.metadata;
       }

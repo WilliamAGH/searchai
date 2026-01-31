@@ -12,6 +12,7 @@
 import { action } from "../_generated/server";
 import { run, RunToolCallItem, RunToolCallOutputItem } from "@openai/agents";
 import { generateMessageId } from "../lib/id_generator";
+import { isRecord } from "../lib/validators";
 import { parseAnswerText, stripTrailingSources } from "./answerParser";
 import { AGENT_TIMEOUTS, AGENT_LIMITS } from "../lib/constants/cache";
 import {
@@ -50,10 +51,6 @@ interface ToolCallLogEntry {
   resultSummary: string;
   durationMs: number;
   success: boolean;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isToolErrorOutput(output: unknown): boolean {
