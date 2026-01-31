@@ -1,10 +1,10 @@
-# search-ai.io
+# [searchAI](https://search-ai.io)
 
 AI-powered search chat built with Convex, Vite, & React.
 
 ![search-ai.io](public/images/opengraph/searchai-io-og.png)
 
-- Live: [search-ai.io](https://search-ai.io)
+- Use It Now: [search-ai.io](https://search-ai.io)
 - Docs: [docs/README.md](docs/README.md)
 
 ## Features
@@ -14,7 +14,7 @@ AI-powered search chat built with Convex, Vite, & React.
 - Chat sharing + export (markdown/html/json/txt)
 - Local-only mode and Convex-backed mode
 
-## Quick start
+## Development
 
 ```bash
 npm install
