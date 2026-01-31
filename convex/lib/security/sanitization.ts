@@ -99,9 +99,18 @@ export function robustSanitize(input: string): string {
   }
 
   // 6. Remove HTML/Script tags
-  clean = clean.replace(/<script[^>]*>.*?<\/script>/gi, "[SCRIPT_BLOCKED]");
-  clean = clean.replace(/<iframe[^>]*>.*?<\/iframe>/gi, "[IFRAME_BLOCKED]");
-  clean = clean.replace(/<object[^>]*>.*?<\/object>/gi, "[OBJECT_BLOCKED]");
+  clean = clean.replace(
+    /<script[^>]*>[\s\S]*?<\/script>/gi,
+    "[SCRIPT_BLOCKED]",
+  );
+  clean = clean.replace(
+    /<iframe[^>]*>[\s\S]*?<\/iframe>/gi,
+    "[IFRAME_BLOCKED]",
+  );
+  clean = clean.replace(
+    /<object[^>]*>[\s\S]*?<\/object>/gi,
+    "[OBJECT_BLOCKED]",
+  );
   clean = clean.replace(/<embed[^>]*>/gi, "[EMBED_BLOCKED]");
 
   // 7. Remove javascript: and data: URLs
