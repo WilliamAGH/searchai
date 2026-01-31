@@ -37,14 +37,19 @@ type ChatCompletionsFinal = Awaited<
 let openRouterClient: OpenAI | null = null;
 
 const getOpenRouterBaseUrl = (): string => {
-  const base = process.env.OPENROUTER_BASE_URL || DEFAULT_OPENROUTER_BASE_URL;
+  const base =
+    process.env.LLM_BASE_URL ||
+    process.env.OPENROUTER_BASE_URL ||
+    DEFAULT_OPENROUTER_BASE_URL;
   return base.replace(/\/+$/, "");
 };
 
 const getOpenRouterApiKey = (): string => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY is required for OpenRouter requests");
+    throw new Error(
+      "OPENROUTER_API_KEY or LLM_API_KEY is required for OpenRouter requests",
+    );
   }
   return apiKey;
 };
