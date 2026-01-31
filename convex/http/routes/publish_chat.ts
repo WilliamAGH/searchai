@@ -23,6 +23,16 @@ export async function handlePublishChat(
   ctx: ActionCtx,
   request: Request,
 ): Promise<Response> {
+  const origin = request.headers.get("Origin");
+  const allowOrigin = getAllowedOrigin(origin);
+  if (!allowOrigin) {
+    return buildCorsJsonResponse(
+      request,
+      { error: "Unauthorized origin" },
+      403,
+    );
+  }
+
   let rawPayload: unknown;
   try {
     rawPayload = await request.json();
@@ -119,8 +129,6 @@ export async function handlePublishChat(
       publicId,
       messages,
     });
-    const origin = request.headers.get("Origin");
-    const allowOrigin = getAllowedOrigin(origin);
     const baseUrl =
       allowOrigin !== "*" && allowOrigin !== "null"
         ? allowOrigin

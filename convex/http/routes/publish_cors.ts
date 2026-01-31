@@ -1,17 +1,21 @@
+import { validateOrigin } from "../cors";
 import { serializeError } from "../utils";
 
 /**
- * Helper: determine allowed origin (env-driven; defaults to *)
+ * Helper: determine allowed origin using strict validation
  */
-export function getAllowedOrigin(origin: string | null): string {
-  const allowed = process.env.CONVEX_ALLOWED_ORIGINS;
-  if (!allowed || allowed === "*") return "*";
-  const list = allowed
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!origin) return list[0] || "*";
-  return list.includes(origin) ? origin : list[0] || "*";
+export function getAllowedOrigin(origin: string | null): string | null {
+  return validateOrigin(origin);
+}
+
+function buildUnauthorizedOriginResponse(): Response {
+  return new Response(JSON.stringify({ error: "Unauthorized origin" }), {
+    status: 403,
+    headers: {
+      "Content-Type": "application/json",
+      Vary: "Origin",
+    },
+  });
 }
 
 /**
@@ -25,6 +29,9 @@ export function buildCorsJsonResponse(
 ): Response {
   const origin = request.headers.get("Origin");
   const allowOrigin = getAllowedOrigin(origin);
+  if (!allowOrigin) {
+    return buildUnauthorizedOriginResponse();
+  }
   const jsonBody = typeof body === "string" ? body : JSON.stringify(body);
   return new Response(jsonBody, {
     status,
@@ -49,6 +56,9 @@ export function buildCorsTextResponse(
 ): Response {
   const origin = request.headers.get("Origin");
   const allowOrigin = getAllowedOrigin(origin);
+  if (!allowOrigin) {
+    return buildUnauthorizedOriginResponse();
+  }
   return new Response(body, {
     status,
     headers: {
@@ -70,6 +80,9 @@ export function buildCorsPreflightResponse(
   const requested = request.headers.get("Access-Control-Request-Headers");
   const origin = request.headers.get("Origin");
   const allowOrigin = getAllowedOrigin(origin);
+  if (!allowOrigin) {
+    return buildUnauthorizedOriginResponse();
+  }
   return new Response(null, {
     status: 204,
     headers: {

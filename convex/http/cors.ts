@@ -40,19 +40,29 @@ const DEV_VITE_ORIGINS = new Set([
   "https://localhost:4173",
 ]);
 
+const DEV_VITE_PORTS = new Set(["5173", "5174", "4173"]);
+
+function isLocalDevOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    const isLocalhost =
+      url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    const isHttp = url.protocol === "http:" || url.protocol === "https:";
+    return isHttp && isLocalhost && DEV_VITE_PORTS.has(url.port);
+  } catch (error) {
+    console.warn(
+      `[WARN] Skipping invalid origin in CONVEX_ALLOWED_ORIGINS: ${origin}`,
+      error,
+    );
+    return false;
+  }
+}
+
 function normalizeDevOrigins(origins: string[]): string[] {
   const set = new Set(origins);
 
   // If any localhost/127.0.0.1 Vite origin is present, ensure all dev/preview ports are allowed.
-  const hasLocalDevOrigin = origins.some(
-    (origin) =>
-      origin.includes("localhost:5173") ||
-      origin.includes("localhost:5174") ||
-      origin.includes("localhost:4173") ||
-      origin.includes("127.0.0.1:5173") ||
-      origin.includes("127.0.0.1:5174") ||
-      origin.includes("127.0.0.1:4173"),
-  );
+  const hasLocalDevOrigin = origins.some((origin) => isLocalDevOrigin(origin));
 
   if (hasLocalDevOrigin) {
     for (const devOrigin of DEV_VITE_ORIGINS) {
@@ -67,7 +77,7 @@ function normalizeDevOrigins(origins: string[]): string[] {
  * Validate if origin is allowed
  * Returns the validated origin or null if not allowed
  */
-function validateOrigin(requestOrigin: string | null): string | null {
+export function validateOrigin(requestOrigin: string | null): string | null {
   if (!requestOrigin) {
     // No origin header means same-origin or direct API call
     // For security, we reject these by default
