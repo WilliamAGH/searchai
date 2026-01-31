@@ -13,8 +13,8 @@ import { ToolProgressIndicator } from "./ToolProgressIndicator";
 import {
   extractPlainText,
   formatConversationWithSources,
-} from "../../lib/clipboard";
-import type { Message } from "../../lib/types/message";
+} from "@/lib/clipboard";
+import type { Message, SearchProgress } from "@/lib/types/message";
 
 interface MessageItemProps {
   message: Message;
@@ -25,26 +25,7 @@ interface MessageItemProps {
   onDeleteMessage: (messageId: Id<"messages"> | string | undefined) => void;
   onSourceHover: (url: string | null) => void;
   onCitationHover: (url: string | null) => void;
-  searchProgress?: {
-    stage:
-      | "idle"
-      | "thinking"
-      | "planning"
-      | "searching"
-      | "scraping"
-      | "analyzing"
-      | "generating";
-    message?: string;
-    urls?: string[];
-    currentUrl?: string;
-    queries?: string[];
-    /** LLM's schema-enforced reasoning for this tool call */
-    toolReasoning?: string;
-    /** Search query being executed */
-    toolQuery?: string;
-    /** URL being scraped */
-    toolUrl?: string;
-  } | null;
+  searchProgress?: SearchProgress | null;
 }
 
 export function MessageItem({
@@ -65,8 +46,8 @@ export function MessageItem({
         (r) => r && typeof r.url === "string" && typeof r.title === "string",
       )
     : [];
-
-  const messageId = message._id || String(index);
+  const messageId = message._id ? String(message._id) : "";
+  const canDelete = messageId.length > 0;
 
   const handleDeleteClick = React.useCallback(() => {
     onDeleteMessage(message._id);
@@ -241,7 +222,7 @@ export function MessageItem({
               title="Copy message"
               ariaLabel="Copy message to clipboard"
             />
-            {message._id && (
+            {canDelete && (
               <button
                 type="button"
                 onClick={handleDeleteClick}

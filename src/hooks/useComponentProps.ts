@@ -1,47 +1,32 @@
 import { useMemo } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { Chat } from "../lib/types/chat";
-import type { Message } from "../lib/types/message";
+import type { Chat } from "@/lib/types/chat";
+import type {
+  Message,
+  SearchProgress,
+  PaginationState,
+} from "@/lib/types/message";
 
 interface UseComponentPropsArgs {
   allChats: Chat[];
   currentChatId: string | null;
-  currentChat: Chat | null;
   currentMessages: Message[];
   sidebarOpen: boolean;
   isMobile: boolean;
   isGenerating: boolean;
-  searchProgress: {
-    stage: string;
-    message: string;
-    progress: number;
-  } | null;
+  searchProgress: SearchProgress | null;
   isCreatingChat: boolean;
-  showShareModal: boolean;
-  isAuthenticated: boolean;
-  handleSelectChat: (chatId: string | Id<"chats">) => void;
+  handleSelectChat: (chatId: string | Id<"chats"> | null) => void;
   handleToggleSidebar: () => void;
   handleNewChatButton: () => Promise<void>;
-  startNewChatSession: () => Promise<void>;
-  handleDeleteLocalChat: (chatId: string) => void;
-  handleRequestDeleteChat: (chatId: Id<"chats">) => void;
-  handleDeleteLocalMessage: (messageId: string) => void;
-  handleRequestDeleteMessage: (messageId: Id<"messages">) => void;
+  handleRequestDeleteChat: (chatId: Id<"chats"> | string) => void;
+  handleRequestDeleteMessage: (messageId: Id<"messages"> | string) => void;
   handleMobileSidebarClose: () => void;
   handleSendMessage: (message: string) => Promise<void>;
   handleDraftChange: (draft: string) => void;
   setShowShareModal: (show: boolean) => void;
   userHistory: string[];
-  // Pagination props
-  isLoadingMore?: boolean;
-  hasMore?: boolean;
-  onLoadMore?: () => Promise<void>;
-  isLoadingMessages?: boolean;
-  loadError?: Error | null;
-  retryCount?: number;
-  onClearError?: () => void;
-  // Session ID for authorization (anonymous users)
-  sessionId?: string;
+  pagination?: Partial<PaginationState>;
 }
 
 /**
@@ -50,53 +35,43 @@ interface UseComponentPropsArgs {
 export function useComponentProps({
   allChats,
   currentChatId,
-  currentChat: _currentChat,
   currentMessages,
   sidebarOpen,
   isMobile,
   isGenerating,
   searchProgress,
   isCreatingChat,
-  isAuthenticated,
   handleSelectChat,
+  handleToggleSidebar,
   handleNewChatButton,
-  handleDeleteLocalChat,
   handleRequestDeleteChat,
-  handleDeleteLocalMessage,
   handleRequestDeleteMessage,
   handleMobileSidebarClose,
   handleSendMessage,
   handleDraftChange,
   setShowShareModal,
   userHistory,
-  // Pagination props
-  isLoadingMore,
-  hasMore,
-  onLoadMore,
-  isLoadingMessages,
-  loadError,
-  retryCount,
-  onClearError,
-  sessionId,
+  pagination,
 }: UseComponentPropsArgs) {
   const chatSidebarProps = useMemo(
     () => ({
       chats: allChats,
       currentChatId,
       onSelectChat: handleSelectChat,
-      // Pass both handlers explicitly; component decides which to use per chat
-      onDeleteLocalChat: handleDeleteLocalChat,
       onRequestDeleteChat: handleRequestDeleteChat,
       onNewChat: handleNewChatButton,
+      isOpen: sidebarOpen,
+      onToggle: handleToggleSidebar,
       isCreatingChat,
     }),
     [
       allChats,
+      sidebarOpen,
       currentChatId,
       isCreatingChat,
       handleSelectChat,
-      handleDeleteLocalChat,
       handleRequestDeleteChat,
+      handleToggleSidebar,
       handleNewChatButton,
     ],
   );
@@ -107,8 +82,6 @@ export function useComponentProps({
       chats: allChats,
       currentChatId,
       onSelectChat: handleSelectChat,
-      // Pass both handlers explicitly; component decides which to use per chat
-      onDeleteLocalChat: handleDeleteLocalChat,
       onRequestDeleteChat: handleRequestDeleteChat,
       onNewChat: handleNewChatButton,
       onClose: handleMobileSidebarClose,
@@ -121,7 +94,6 @@ export function useComponentProps({
       currentChatId,
       isCreatingChat,
       handleSelectChat,
-      handleDeleteLocalChat,
       handleRequestDeleteChat,
       handleNewChatButton,
       handleMobileSidebarClose,
@@ -133,37 +105,25 @@ export function useComponentProps({
       messages: currentMessages,
       isGenerating,
       searchProgress,
-      chatId: currentChatId,
-      onDeleteMessage: isAuthenticated
-        ? handleRequestDeleteMessage
-        : handleDeleteLocalMessage,
-      // Pagination props (optional, passed through)
-      isLoadingMore,
-      hasMore,
-      onLoadMore,
-      isLoadingMessages,
-      loadError,
-      retryCount,
-      onClearError,
-      // Session ID for authorization (anonymous users)
-      sessionId,
+      onToggleSidebar: handleToggleSidebar,
+      onRequestDeleteMessage: (messageId: string) =>
+        handleRequestDeleteMessage(messageId),
+      // Pagination props (spread from grouped state)
+      isLoadingMore: pagination?.isLoadingMore,
+      hasMore: pagination?.hasMore,
+      onLoadMore: pagination?.onLoadMore,
+      isLoadingMessages: pagination?.isLoadingMessages,
+      loadError: pagination?.loadError,
+      retryCount: pagination?.retryCount,
+      onClearError: pagination?.onClearError,
     }),
     [
       currentMessages,
       isGenerating,
       searchProgress,
-      currentChatId,
-      isAuthenticated,
       handleRequestDeleteMessage,
-      handleDeleteLocalMessage,
-      isLoadingMore,
-      hasMore,
-      onLoadMore,
-      isLoadingMessages,
-      loadError,
-      retryCount,
-      onClearError,
-      sessionId,
+      handleToggleSidebar,
+      pagination,
     ],
   );
 

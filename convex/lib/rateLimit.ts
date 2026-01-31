@@ -97,7 +97,7 @@ export function checkIpRateLimit(
     const resetAt = oldestTimestamp + windowMs;
 
     console.warn(
-      `🚫 Rate limit exceeded for ${endpoint} by ${ip}: ${validTimestamps.length}/${limit} requests in ${windowMs}ms window`,
+      `[BLOCKED] Rate limit exceeded for ${endpoint} by ${ip}: ${validTimestamps.length}/${limit} requests in ${windowMs}ms window`,
     );
 
     return {
@@ -128,7 +128,7 @@ export function checkIpRateLimit(
 export function clearRateLimit(ip: string, endpoint: string): void {
   const key = `${endpoint}:${ip}`;
   ipBuckets.delete(key);
-  console.info(`✅ Cleared rate limit for ${endpoint} by ${ip}`);
+  console.info(`[OK] Cleared rate limit for ${endpoint} by ${ip}`);
 }
 
 /**
@@ -138,7 +138,7 @@ export function clearRateLimit(ip: string, endpoint: string): void {
 export function clearAllRateLimits(): void {
   const count = ipBuckets.size;
   ipBuckets.clear();
-  console.info(`✅ Cleared all rate limits (${count} entries)`);
+  console.info(`[OK] Cleared all rate limits (${count} entries)`);
 }
 
 /**

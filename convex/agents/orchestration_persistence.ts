@@ -17,7 +17,7 @@ import { generateChatTitle } from "../chats/utils";
 import type {
   ResearchContextReference,
   StreamingPersistPayload,
-} from "./schema";
+} from "../schemas/agents";
 
 // ============================================
 // Types
@@ -40,11 +40,14 @@ import type {
  * Uses Pick<ActionCtx, ...> pattern matching StreamingWorkflowCtx in orchestration.ts
  * for proper type inference on Convex mutation/query/action calls.
  */
-type PersistenceCtx = Pick<ActionCtx, "runMutation" | "runQuery" | "runAction">;
+export type WorkflowActionCtx = Pick<
+  ActionCtx,
+  "runMutation" | "runQuery" | "runAction"
+>;
 
 /** Parameters for chat title update */
 export interface UpdateChatTitleParams {
-  ctx: PersistenceCtx;
+  ctx: WorkflowActionCtx;
   chatId: Id<"chats">;
   currentTitle: string | undefined;
   intent: string;
@@ -56,7 +59,7 @@ export interface UpdateChatTitleParams {
  */
 export interface PersistAssistantMessageParams {
   /** Convex action context for running mutations */
-  ctx: PersistenceCtx;
+  ctx: WorkflowActionCtx;
   /** Target chat for the message */
   chatId: Id<"chats">;
   /** Message content (markdown text) */
@@ -80,7 +83,7 @@ export interface PersistAssistantMessageParams {
 
 /** Parameters for workflow completion */
 export interface CompleteWorkflowParams {
-  ctx: PersistenceCtx;
+  ctx: WorkflowActionCtx;
   workflowTokenId: Id<"workflowTokens"> | null;
   payload: StreamingPersistPayload;
   nonce: string;
@@ -160,7 +163,10 @@ export async function completeWorkflowWithSignature(
 
   const signature = await ctx.runAction(
     internal.workflowTokensActions.signPersistedPayload,
-    { payload, nonce },
+    {
+      payload,
+      nonce,
+    },
   );
 
   if (workflowTokenId) {
@@ -171,4 +177,37 @@ export async function completeWorkflowWithSignature(
   }
 
   return signature;
+}
+
+/**
+ * Combined helper to persist message and complete workflow.
+ * Encapsulates the common pattern: persist -> payload -> sign -> return details.
+ */
+export async function persistAndCompleteWorkflow(
+  params: PersistAssistantMessageParams & {
+    workflowTokenId: Id<"workflowTokens"> | null;
+    nonce: string;
+  },
+): Promise<{
+  payload: StreamingPersistPayload;
+  signature: string;
+}> {
+  const assistantMessageId = await persistAssistantMessage(params);
+
+  const payload: StreamingPersistPayload = {
+    assistantMessageId,
+    workflowId: params.workflowId,
+    answer: params.content,
+    sources: params.sources || [],
+    contextReferences: params.contextReferences || [],
+  };
+
+  const signature = await completeWorkflowWithSignature({
+    ctx: params.ctx,
+    workflowTokenId: params.workflowTokenId,
+    payload,
+    nonce: params.nonce,
+  });
+
+  return { payload, signature };
 }

@@ -1,0 +1,35 @@
+# [IM1b] Use @/ Alias Imports in src/
+# In src/**/* files, always use @/ alias for local imports within src/.
+# Never use relative ../ for imports that stay within src/.
+# Exception: Imports TO convex/ must use relative paths (no @/ alias for convex)
+# Exception: Sibling imports (./types, ./styles.css) are allowed.
+# See AGENTS.md [IM1b]
+
+id: src-use-alias-imports
+language: typescript
+severity: error
+message: |
+  [IM1b] Relative import in src/ file. Use @/ alias instead.
+  In src/**/* files, use @/ for all local imports within src/.
+
+  Fix: import { foo } from "@/lib/foo" (not "../lib/foo")
+
+  Note: Imports to convex/ must use relative paths (no @/ alias).
+  Note: Sibling imports like ./types are acceptable.
+
+rule:
+  kind: import_statement
+  all:
+    - has:
+        kind: string
+        # Match ../ imports (parent directory traversal)
+        regex: "^['\"]\\.\\./"
+    - not:
+        has:
+          kind: string
+          # Exclude imports to convex/ (those must be relative)
+          regex: "convex/"
+
+files:
+  - "src/**/*.ts"
+  - "src/**/*.tsx"

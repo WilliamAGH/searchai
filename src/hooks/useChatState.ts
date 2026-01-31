@@ -4,7 +4,8 @@
  */
 
 import { useState } from "react";
-import type { UnifiedChat, UnifiedMessage } from "../lib/types/unified";
+import type { Doc } from "../../convex/_generated/dataModel";
+import type { Message, WorkflowStage } from "@/lib/types/message";
 
 /**
  * Complete chat application state interface
@@ -13,13 +14,13 @@ import type { UnifiedChat, UnifiedMessage } from "../lib/types/unified";
  */
 export interface ChatState {
   /** List of all available chats */
-  chats: UnifiedChat[];
+  chats: Doc<"chats">[];
   /** ID of the currently active chat */
   currentChatId: string | null;
   /** Full data of the current chat, null if no chat selected */
-  currentChat: UnifiedChat | null;
-  /** Messages in the current chat */
-  messages: UnifiedMessage[];
+  currentChat: Doc<"chats"> | null;
+  /** Messages in the current chat (includes UI-only streaming fields) */
+  messages: Message[];
   /** General loading state indicator */
   isLoading: boolean;
   /** Flag indicating AI response generation in progress */
@@ -29,15 +30,7 @@ export interface ChatState {
   /** Real-time search progress tracking */
   searchProgress: {
     /** Current stage of the search/response process */
-    stage:
-      | "idle"
-      | "thinking"
-      | "planning"
-      | "searching"
-      | "scraping"
-      | "analyzing"
-      | "generating"
-      | "finalizing"; // waiting for persistence confirmation
+    stage: WorkflowStage;
     /** Optional status message for current stage */
     message?: string;
     /** URLs being processed during scraping */

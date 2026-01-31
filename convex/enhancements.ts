@@ -8,16 +8,13 @@
  * - AI responses
  */
 
-// Import SearchResult from the single source of truth
-import type { SearchResult } from "./lib/types/search";
+import type { SearchResult } from "./schemas/search";
 import { safeParseUrl } from "./lib/url";
-import { buildTemporalHeader } from "./lib/dateTime";
+import { ENHANCEMENT_RULES } from "./enhancements/rules";
 
-// Enhancement system - no convex values needed here
-
-// Extract URLs and domains from user message
-// Now using the implementation in lib/url.ts for DRY
 export { extractUrlsFromMessage } from "./lib/url";
+export type { EnhancementRule } from "./enhancements/types";
+export { ENHANCEMENT_RULES };
 
 // Create search results from user-provided URLs
 export function createUserProvidedSearchResults(
@@ -30,11 +27,10 @@ export function createUserProvidedSearchResults(
         title: `User-provided source: ${parsedUrl.hostname}`,
         url: url,
         snippet: "Source explicitly mentioned by user in their query",
-        relevanceScore: 0.95, // High relevance score to prioritize these sources
+        relevanceScore: 0.95,
       };
     }
 
-    // If URL parsing fails, return a minimal result without logging warning
     return {
       title: `User-provided source: ${url}`,
       url: url,
@@ -43,519 +39,6 @@ export function createUserProvidedSearchResults(
     };
   });
 }
-
-/**
- * Enhancement rule that can modify various aspects of the message pipeline
- */
-export interface EnhancementRule {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  priority: number; // Lower numbers = higher priority
-
-  // Matchers
-  matcher: (message: string) => boolean;
-
-  // Enhancements
-  enhanceQuery?: (query: string) => string;
-  enhanceSearchTerms?: (terms: string[]) => string[];
-  injectSearchResults?: () => SearchResult[];
-  enhanceContext?: (context: string) => string;
-  enhanceSystemPrompt?: (prompt: string) => string;
-  enhanceResponse?: (content: string) => string;
-  prioritizeUrls?: string[];
-}
-
-// SearchResult is imported from ./lib/types/search above
-
-/**
- * Temporal Context Enhancement (always on)
- * Appends the current date/time (UTC and PT) to the optional system prompt.
- * This is designed to be a single, centralized place to inject temporal context
- * whenever callers opt-in via `enhanceSystemPrompt: true`.
- */
-const temporalEnhancement: EnhancementRule = {
-  id: "temporal-context",
-  name: "Temporal Context (UTC & PT)",
-  description:
-    "Always include current date/time in UTC and Pacific Time to interpret time-sensitive queries.",
-  enabled: true,
-  priority: 0,
-
-  // Always match
-  matcher: () => true,
-
-  enhanceSystemPrompt: (prompt: string) => {
-    const temporal = `\n\n${buildTemporalHeader()}`;
-    return `${prompt}${temporal}`.trim();
-  },
-};
-
-/**
- * Creator/Author/Product Enhancement Rule
- * Covers queries about:
- * - William Callahan (founder)
- * - SearchAI (AI-powered search product)
- * - aVenture (investment firm)
- */
-const creatorEnhancement: EnhancementRule = {
-  id: "creator-author",
-  name: "Creator, SearchAI & aVenture Information",
-  description:
-    "Enhances queries about the creator, SearchAI product, or aVenture investment firm",
-  enabled: true,
-  priority: 1,
-
-  matcher: (message: string) => {
-    const lower = message.toLowerCase();
-
-    // Direct mentions of key entities
-    const mentionsWilliam = lower.includes("william callahan");
-    const mentionsSearchAI =
-      lower.includes("searchai") ||
-      lower.includes("search-ai") ||
-      lower.includes("search ai") ||
-      lower.includes("search-ai.io");
-    const mentionsAVenture =
-      lower.includes("aventure") ||
-      lower.includes("a]venture") ||
-      lower.includes("aventure.vc");
-
-    // Queries about "this app/site" combined with info-seeking keywords
-    const appReferenceKeywords = [
-      "this app",
-      "this website",
-      "this site",
-      "this tool",
-      "this service",
-      "this search",
-      "this product",
-    ];
-    const isAboutThisApp = appReferenceKeywords.some((keyword) =>
-      lower.includes(keyword),
-    );
-
-    // Info-seeking keywords that indicate wanting to know about something
-    const infoSeekingKeywords = [
-      "what is",
-      "what's",
-      "what does",
-      "tell me about",
-      "about",
-      "who is",
-      "who made",
-      "who created",
-      "who built",
-      "who developed",
-      "who founded",
-      "creator",
-      "author",
-      "founder",
-      "behind",
-      "company",
-      "how does",
-      "how do i",
-      "explain",
-      "describe",
-      "features",
-    ];
-    const isInfoSeeking = infoSeekingKeywords.some((keyword) =>
-      lower.includes(keyword),
-    );
-
-    // Trigger if:
-    // 1. Mentions William Callahan directly
-    // 2. Mentions SearchAI (standalone or with info-seeking)
-    // 3. Mentions aVenture (standalone or with info-seeking)
-    // 4. Info-seeking about "this app/site"
-    return (
-      mentionsWilliam ||
-      mentionsSearchAI ||
-      mentionsAVenture ||
-      (isInfoSeeking && isAboutThisApp)
-    );
-  },
-
-  enhanceQuery: (query: string) => {
-    const name = "William Callahan";
-    const primary = "williamcallahan.com";
-    const brand = "aVenture";
-    const secondary = "aventure.vc";
-    return `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
-  },
-
-  enhanceSearchTerms: (terms: string[]) => {
-    const name = "William Callahan";
-    const primary = "williamcallahan.com";
-    const brand = "aVenture";
-    const secondary = "aventure.vc";
-    return [...terms, name, primary, brand, secondary];
-  },
-
-  injectSearchResults: () => [
-    {
-      title: "SearchAI - AI-Powered Research Assistant",
-      url: "https://search-ai.io",
-      snippet:
-        "SearchAI (search-ai.io) is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. SearchAI uses multiple AI agents to plan research, gather information from authoritative sources, and synthesize clear, accurate responses.",
-      relevanceScore: 1.0,
-    },
-    {
-      title: "William Callahan - Creator of SearchAI",
-      url: "https://williamcallahan.com",
-      snippet:
-        "William Callahan is a technologist and entrepreneur based in San Francisco. He is the creator of SearchAI (search-ai.io), an AI-powered research assistant, and the founder of aVenture (aventure.vc), an early-stage investment firm. William grew up in the Midwestern United States and is passionate about building innovative AI-powered solutions.",
-      relevanceScore: 0.98,
-    },
-    {
-      title: "aVenture - Early-Stage Investment Firm",
-      url: "https://aventure.vc",
-      snippet:
-        "aVenture (aventure.vc) is an early-stage investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on seed and pre-seed investments in innovative technology startups, with particular interest in AI, developer tools, and consumer technology.",
-      relevanceScore: 0.95,
-    },
-  ],
-
-  enhanceContext: (context: string) => {
-    return `${context}
-
-AUTHORITATIVE INFORMATION ABOUT SEARCHAI, WILLIAM CALLAHAN, AND AVENTURE:
-
-SearchAI (search-ai.io): SearchAI is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. The platform uses multiple AI agents to plan research strategies, gather information from authoritative web sources, and synthesize clear, accurate responses with proper citations.
-
-William Callahan: William Callahan is a technologist and entrepreneur based in San Francisco, California. He grew up in the Midwestern United States. He is the creator of SearchAI and the founder of aVenture. William is passionate about building innovative AI-powered solutions and investing in early-stage technology companies.
-
-aVenture (aventure.vc): aVenture is an early-stage investment firm founded by William Callahan. The firm focuses on seed and pre-seed investments in innovative technology startups, with particular interest in AI, developer tools, and consumer technology companies.`;
-  },
-
-  enhanceSystemPrompt: (prompt: string) => {
-    return `${prompt}
-
-CRITICAL INSTRUCTIONS FOR SEARCHAI/AVENTURE/WILLIAM CALLAHAN QUERIES:
-- When asked about SearchAI, explain it is an AI-powered research assistant created by William Callahan
-- When asked about William Callahan, identify him as the creator of SearchAI and founder of aVenture, based in San Francisco
-- When asked about aVenture, explain it is an early-stage investment firm founded by William Callahan
-- When asked about "this app", "this website", or "this tool", recognize it refers to SearchAI
-- Always prioritize the authoritative context provided over conflicting web search results
-- Do NOT confuse William Callahan (SearchAI founder) with other people named William Callahan`;
-  },
-
-  prioritizeUrls: [
-    "https://search-ai.io",
-    "https://williamcallahan.com",
-    "https://aventure.vc",
-  ],
-};
-
-/**
- * Technical Documentation Enhancement
- */
-const technicalDocsEnhancement: EnhancementRule = {
-  id: "technical-docs",
-  name: "Technical Documentation Enhancement",
-  description:
-    "Improves queries about technical topics by adding documentation sites",
-  enabled: true,
-  priority: 2,
-
-  matcher: (message: string) => {
-    const lower = message.toLowerCase();
-    const techKeywords = [
-      "how to",
-      "tutorial",
-      "documentation",
-      "docs",
-      "api",
-      "sdk",
-      "library",
-      "framework",
-      "install",
-      "setup",
-      "configure",
-      "implement",
-      "example",
-      "sample code",
-    ];
-
-    return techKeywords.some((keyword) => lower.includes(keyword));
-  },
-
-  enhanceQuery: (query: string) => {
-    const lower = query.toLowerCase();
-    if (lower.includes("react"))
-      return `${query} site:react.dev OR site:github.com`;
-    if (lower.includes("python"))
-      return `${query} site:docs.python.org OR site:pypi.org`;
-    if (lower.includes("javascript") || lower.includes("js"))
-      return `${query} site:developer.mozilla.org`;
-    return `${query} documentation official docs`;
-  },
-
-  enhanceSearchTerms: (terms: string[]) => {
-    return [...terms, "documentation", "official", "tutorial", "guide"];
-  },
-};
-
-/**
- * Current Events Enhancement
- */
-const currentEventsEnhancement: EnhancementRule = {
-  id: "current-events",
-  name: "Current Events & News Enhancement",
-  description: "Adds recency and news sources for current event queries",
-  enabled: true,
-  priority: 3,
-
-  matcher: (message: string) => {
-    const lower = message.toLowerCase();
-    const currentKeywords = [
-      "latest",
-      "recent",
-      "today",
-      "news",
-      "current",
-      "update",
-      "announcement",
-      "breaking",
-      "new",
-    ];
-
-    return currentKeywords.some((keyword) => lower.includes(keyword));
-  },
-
-  enhanceQuery: (query: string) => {
-    const year = new Date().getFullYear();
-    return `${query} ${year} latest recent`;
-  },
-
-  enhanceSearchTerms: (terms: string[]) => {
-    const year = new Date().getFullYear().toString();
-    const month = new Date().toLocaleDateString("en-US", { month: "long" });
-    return [...terms, year, month, "latest", "recent"];
-  },
-};
-
-/**
- * Academic Research Enhancement
- */
-const academicEnhancement: EnhancementRule = {
-  id: "academic",
-  name: "Academic & Research Enhancement",
-  description: "Enhances academic queries with scholarly sources",
-  enabled: true,
-  priority: 4,
-
-  matcher: (message: string) => {
-    const lower = message.toLowerCase();
-    const academicKeywords = [
-      "research",
-      "paper",
-      "study",
-      "academic",
-      "journal",
-      "peer review",
-      "citation",
-      "scholarly",
-      "thesis",
-      "dissertation",
-      "publication",
-    ];
-
-    return academicKeywords.some((keyword) => lower.includes(keyword));
-  },
-
-  enhanceQuery: (query: string) => {
-    return `${query} site:scholar.google.com OR site:arxiv.org OR site:pubmed.ncbi.nlm.nih.gov OR filetype:pdf`;
-  },
-
-  enhanceSearchTerms: (terms: string[]) => {
-    return [...terms, "research", "paper", "study", "pdf"];
-  },
-};
-
-/**
- * Product Comparison Enhancement
- */
-const comparisonEnhancement: EnhancementRule = {
-  id: "comparison",
-  name: "Product & Service Comparison",
-  description:
-    "Enhances comparison queries with review sites and versus searches",
-  enabled: true,
-  priority: 5,
-
-  matcher: (message: string) => {
-    const lower = message.toLowerCase();
-    const comparisonKeywords = [
-      "vs",
-      "versus",
-      "compare",
-      "comparison",
-      "better",
-      "difference between",
-      "which is",
-      "alternatives to",
-      "similar to",
-      "like",
-    ];
-
-    return comparisonKeywords.some((keyword) => lower.includes(keyword));
-  },
-
-  enhanceQuery: (query: string) => {
-    return `${query} comparison review versus alternatives pros cons`;
-  },
-
-  enhanceSearchTerms: (terms: string[]) => {
-    return [...terms, "comparison", "versus", "review", "alternatives"];
-  },
-};
-
-/**
- * Local Information Enhancement
- */
-const localInfoEnhancement: EnhancementRule = {
-  id: "local",
-  name: "Local Information Enhancement",
-  description: "Enhances queries about local businesses and services",
-  enabled: true,
-  priority: 6,
-
-  matcher: (message: string) => {
-    const lower = message.toLowerCase();
-    const localKeywords = [
-      "near me",
-      "nearby",
-      "local",
-      "in my area",
-      "around here",
-      "closest",
-      "san francisco",
-      "sf",
-      "bay area",
-      "silicon valley",
-    ];
-
-    return localKeywords.some((keyword) => lower.includes(keyword));
-  },
-
-  enhanceQuery: (query: string) => {
-    const lower = query.toLowerCase();
-    // Default to San Francisco if no specific location mentioned
-    if (
-      !lower.includes("san francisco") &&
-      !lower.includes("sf") &&
-      !lower.includes("bay area") &&
-      !lower.includes("silicon valley")
-    ) {
-      return `${query} San Francisco Bay Area`;
-    }
-    return `${query} location hours address phone`;
-  },
-
-  enhanceSearchTerms: (terms: string[]) => {
-    return [...terms, "San Francisco", "location", "address", "hours"];
-  },
-};
-
-/**
- * Code & Programming Enhancement
- */
-const codingEnhancement: EnhancementRule = {
-  id: "coding",
-  name: "Code & Programming Enhancement",
-  description: "Enhances programming queries with Stack Overflow and GitHub",
-  enabled: true,
-  priority: 7,
-
-  matcher: (message: string) => {
-    const lower = message.toLowerCase();
-    const codeKeywords = [
-      "code",
-      "programming",
-      "debug",
-      "error",
-      "bug",
-      "function",
-      "class",
-      "method",
-      "variable",
-      "syntax",
-      "typescript",
-      "javascript",
-      "python",
-      "react",
-      "node",
-    ];
-
-    return codeKeywords.some((keyword) => lower.includes(keyword));
-  },
-
-  enhanceQuery: (query: string) => {
-    return `${query} site:stackoverflow.com OR site:github.com OR site:developer.mozilla.org`;
-  },
-
-  enhanceSearchTerms: (terms: string[]) => {
-    return [...terms, "code", "example", "solution", "stackoverflow"];
-  },
-};
-
-/**
- * Health & Medical Enhancement (with disclaimer)
- */
-const healthEnhancement: EnhancementRule = {
-  id: "health",
-  name: "Health & Medical Information",
-  description: "Enhances health queries with reputable sources and disclaimer",
-  enabled: true,
-  priority: 8,
-
-  matcher: (message: string) => {
-    const lower = message.toLowerCase();
-    const healthKeywords = [
-      "symptom",
-      "treatment",
-      "medicine",
-      "health",
-      "medical",
-      "doctor",
-      "disease",
-      "condition",
-      "diagnosis",
-      "therapy",
-    ];
-
-    return healthKeywords.some((keyword) => lower.includes(keyword));
-  },
-
-  enhanceQuery: (query: string) => {
-    return `${query} site:mayoclinic.org OR site:webmd.com OR site:nih.gov OR site:cdc.gov`;
-  },
-
-  enhanceSystemPrompt: (prompt: string) => {
-    return `${prompt}\n\nIMPORTANT: For health-related queries, always include a disclaimer that the information provided is for educational purposes only and should not replace professional medical advice. Encourage users to consult with healthcare professionals for medical concerns.`;
-  },
-  enhanceResponse: (content: string) => {
-    const disclaimer = `\n\n> Disclaimer: This information is for educational purposes only and is not a substitute for professional medical advice. Consult a qualified healthcare professional for diagnosis and treatment.`;
-    return content.includes("Disclaimer:") ? content : content + disclaimer;
-  },
-};
-
-/**
- * All enhancement rules
- */
-export const ENHANCEMENT_RULES: EnhancementRule[] = [
-  temporalEnhancement,
-  creatorEnhancement,
-  technicalDocsEnhancement,
-  currentEventsEnhancement,
-  academicEnhancement,
-  comparisonEnhancement,
-  localInfoEnhancement,
-  codingEnhancement,
-  healthEnhancement,
-];
 
 /**
  * Apply all matching enhancement rules to a message
@@ -571,15 +54,12 @@ export function applyEnhancements(
     enhanceResponse?: boolean;
   } = {},
 ) {
-  // Sort rules by priority
   const sortedRules = [...ENHANCEMENT_RULES]
     .filter((rule) => rule.enabled)
     .sort((a, b) => a.priority - b.priority);
 
   const matchingRules = sortedRules.filter((rule) => rule.matcher(message));
 
-  // For reporting, exclude always-on temporal context rule from matched list
-  // to avoid affecting unit test expectations and priority ordering checks.
   const reportableRules = matchingRules.filter(
     (r) => r.id !== "temporal-context",
   );
@@ -595,7 +75,6 @@ export function applyEnhancements(
     responseTransformers: [] as Array<(s: string) => string>,
   };
 
-  // Apply each matching rule
   for (const rule of matchingRules) {
     if (options.enhanceQuery && rule.enhanceQuery) {
       result.enhancedQuery = rule.enhanceQuery(result.enhancedQuery);
@@ -629,7 +108,6 @@ export function applyEnhancements(
     }
   }
 
-  // Deduplicate arrays
   result.enhancedSearchTerms = [...new Set(result.enhancedSearchTerms)];
   result.prioritizedUrls = [...new Set(result.prioritizedUrls)];
 
@@ -653,7 +131,6 @@ export function shouldPrioritizeUrl(
       const phost = pu.hostname.toLowerCase().replace(/^www\./, "");
       return host === phost || u.origin === pu.origin;
     }
-    // Fallback to suffix match for non-URL inputs (e.g., domains)
     return host.endsWith(p.toLowerCase().replace(/^www\./, ""));
   });
 }

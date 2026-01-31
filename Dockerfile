@@ -1,7 +1,7 @@
 # Multi-stage build for optimized production image
 # Using AWS ECR Public mirror to avoid Docker Hub rate limits
 # Stage 1: Dependencies
-FROM public.ecr.aws/docker/library/node:22-alpine AS deps
+FROM public.ecr.aws/docker/library/node:22.17.0-alpine AS deps
 WORKDIR /app
 
 # Copy package files
@@ -9,10 +9,12 @@ COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including dev) for build
 # Use npm ci for reproducible builds from package-lock.json
-RUN npm ci
+# --ignore-scripts skips postinstall scripts (ast-grep binary download, playwright install, husky)
+# which aren't needed for vite build and may fail on Alpine ARM64
+RUN npm ci --ignore-scripts
 
 # Stage 2: Builder
-FROM public.ecr.aws/docker/library/node:22-alpine AS builder
+FROM public.ecr.aws/docker/library/node:22.17.0-alpine AS builder
 WORKDIR /app
 
 # Copy dependencies from deps stage
@@ -47,14 +49,14 @@ RUN test -n "$VITE_CONVEX_URL" || (echo "ERROR: VITE_CONVEX_URL is required at b
 RUN npm run build
 
 # Stage 3: Production runtime
-FROM public.ecr.aws/docker/library/node:22-alpine AS runtime
+FROM public.ecr.aws/docker/library/node:22.17.0-alpine AS runtime
 WORKDIR /app
 
 RUN apk add --no-cache wget
 
 # Copy built application only
 COPY --from=builder /app/dist ./dist
-COPY server.mjs ./server.mjs
+COPY scripts/server.mjs ./server.mjs
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \

@@ -7,18 +7,40 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { UnifiedMessage } from "../lib/types/unified";
-import type { SearchResult } from "../lib/types/message";
-import { logger } from "../lib/logger";
+import type { Message } from "@/lib/types/message";
+import { logger } from "@/lib/logger";
+import { toConvexId } from "@/lib/utils/idValidation";
+
+/** Map a Convex message to the local Message type */
+function mapConvexMessage(
+  msg: Message,
+  fallbackChatId: string | null,
+): Message {
+  return {
+    ...msg,
+    _id: String(msg._id),
+    chatId: String(msg.chatId ?? fallbackChatId ?? ""),
+    _creationTime: msg._creationTime ?? msg.timestamp ?? Date.now(),
+    timestamp: msg.timestamp ?? msg._creationTime ?? Date.now(),
+    content: msg.content ?? "",
+  };
+}
+
+/** Compute exponential backoff delay (ms) capped at 5s */
+function computeBackoffDelay(attempt: number): number {
+  const base = Math.pow(2, Math.max(0, attempt - 1));
+  return Math.min(1000 * base, 5000);
+}
 
 interface UsePaginatedMessagesOptions {
   chatId: string | null;
   initialLimit?: number;
   enabled?: boolean;
+  sessionId?: string;
 }
 
 interface PaginatedMessagesState {
-  messages: UnifiedMessage[];
+  messages: Message[];
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
@@ -37,34 +59,41 @@ export function usePaginatedMessages({
   chatId,
   initialLimit = 50,
   enabled = true,
+  sessionId,
 }: UsePaginatedMessagesOptions): PaginatedMessagesState {
-  const [messages, setMessages] = useState<UnifiedMessage[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [cursor, setCursor] = useState<Id<"messages"> | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const loadingRef = useRef(false);
-  const retryTimeoutRef = useRef<NodeJS.Timeout>();
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Session guard to avoid applying stale results after chat/navigation changes
   const sessionRef = useRef(0);
+  const resolvedChatId = toConvexId<"chats">(chatId);
 
   // Get the load more action
-  const loadMoreAction = useAction(api.chats.loadMore.loadMoreMessages);
+  const loadMoreAction = useAction<typeof api.chats.loadMore.loadMoreMessages>(
+    api.chats.loadMore.loadMoreMessages,
+  );
 
   // Query for initial messages
-  const initialMessages = useQuery(
+  const initialMessages = useQuery<
+    typeof api.chats.messagesPaginated.getChatMessagesPaginated
+  >(
     api.chats.messagesPaginated.getChatMessagesPaginated,
-    enabled && chatId
+    enabled && resolvedChatId
       ? {
-          chatId: chatId as Id<"chats">,
+          chatId: resolvedChatId,
           limit: initialLimit,
+          sessionId: sessionId || undefined,
         }
       : "skip",
   );
 
   // Track initial load time
-  const initialLoadStartRef = useRef<number>();
+  const initialLoadStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (enabled && chatId && !initialLoadStartRef.current) {
@@ -73,31 +102,16 @@ export function usePaginatedMessages({
   }, [enabled, chatId]);
 
   // Pre-map initial messages for immediate render to avoid UI flicker in tests/SSR
-  const initialUnifiedMessages = useMemo<UnifiedMessage[]>(() => {
+  const initialUIMessages = useMemo<Message[]>(() => {
     if (!initialMessages) return [];
     const convexMessages = initialMessages.messages || [];
-    return convexMessages.map((msg) => ({
-      id: msg._id,
-      chatId:
-        chatId ?? String((msg as unknown as { chatId?: string }).chatId ?? ""),
-      role: msg.role,
-      content: msg.content || "",
-      timestamp: msg.timestamp || Date.now(),
-      isStreaming: msg.isStreaming,
-      streamedContent: msg.streamedContent,
-      thinking: msg.thinking,
-      searchResults: msg.searchResults,
-      sources: msg.sources,
-      reasoning: msg.reasoning,
-      synced: true,
-      source: "convex" as const,
-    }));
+    return convexMessages.map((msg) => mapConvexMessage(msg, chatId));
   }, [initialMessages, chatId]);
 
   // Load initial messages when they arrive (stateful for subsequent appends)
   useEffect(() => {
     if (initialMessages) {
-      const unifiedMessages = initialUnifiedMessages;
+      const unifiedMessages = initialUIMessages;
 
       // Log initial load performance
       if (initialLoadStartRef.current) {
@@ -108,7 +122,7 @@ export function usePaginatedMessages({
           loadTime: Math.round(loadTime),
           hasMore: initialMessages.hasMore,
         });
-        initialLoadStartRef.current = undefined;
+        initialLoadStartRef.current = null;
       }
 
       // CRITICAL FIX: Don't replace messages if we have optimistic state
@@ -134,15 +148,15 @@ export function usePaginatedMessages({
         // No optimistic state - safe to load from DB
         return unifiedMessages;
       });
-      setCursor(initialMessages.nextCursor);
+      setCursor(initialMessages.nextCursor ?? null);
       setHasMore(initialMessages.hasMore);
       setError(null);
     }
-  }, [initialMessages, chatId, initialUnifiedMessages]);
+  }, [initialMessages, chatId, initialUIMessages]);
 
   // Load more messages with retry logic
   const loadMore = useCallback(async () => {
-    if (!chatId || !cursor || !hasMore || loadingRef.current) return;
+    if (!resolvedChatId || !cursor || !hasMore || loadingRef.current) return;
 
     loadingRef.current = true;
     setIsLoadingMore(true);
@@ -158,9 +172,10 @@ export function usePaginatedMessages({
         logger.debug("Loading more messages", { chatId, cursor, attempt });
 
         const moreMessages = await loadMoreAction({
-          chatId: chatId as Id<"chats">,
+          chatId: resolvedChatId,
           cursor,
           limit: initialLimit,
+          sessionId: sessionId || undefined,
         });
 
         // Track performance metrics
@@ -174,22 +189,9 @@ export function usePaginatedMessages({
         });
 
         if (moreMessages) {
-          const newUnifiedMessages: UnifiedMessage[] =
-            moreMessages.messages.map((msg) => ({
-              id: msg._id,
-              chatId: chatId,
-              role: msg.role,
-              content: msg.content || "",
-              timestamp: msg.timestamp || Date.now(),
-              isStreaming: msg.isStreaming,
-              streamedContent: msg.streamedContent,
-              thinking: msg.thinking,
-              searchResults: msg.searchResults,
-              sources: msg.sources,
-              reasoning: msg.reasoning,
-              synced: true,
-              source: "convex" as const,
-            }));
+          const mappedMessages = moreMessages.messages.map((msg: Message) =>
+            mapConvexMessage(msg, chatId),
+          );
 
           // Stale-guard: if session changed during async call, ignore results
           if (sessionRef.current !== currentSession) {
@@ -198,13 +200,19 @@ export function usePaginatedMessages({
             );
             return;
           }
-          setMessages((prev) => [...prev, ...newUnifiedMessages]);
-          setCursor(moreMessages.nextCursor);
+          setMessages((prev) => [...prev, ...mappedMessages]);
+          setCursor(moreMessages.nextCursor ?? null);
           setHasMore(moreMessages.hasMore);
           setRetryCount(0); // Reset retry count on success
         }
       } catch (err) {
-        const error = err as Error;
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : typeof err === "string"
+              ? err
+              : "Unknown error";
+        const error = err instanceof Error ? err : new Error(errorMessage);
         const failTime = performance.now() - attemptStartTime;
 
         logger.error(`Failed to load more messages (attempt ${attempt})`, {
@@ -234,7 +242,7 @@ export function usePaginatedMessages({
           retryTimeoutRef.current = setTimeout(() => {
             // If session changed while waiting, do not retry
             if (sessionRef.current !== currentSession) return;
-            attemptLoad(attempt + 1);
+            void attemptLoad(attempt + 1);
           }, delay);
         } else {
           // Max retries reached
@@ -267,13 +275,22 @@ export function usePaginatedMessages({
       setIsLoadingMore(false);
       loadingRef.current = false;
     }
-  }, [chatId, cursor, hasMore, initialLimit, loadMoreAction, error]);
+  }, [
+    chatId,
+    cursor,
+    hasMore,
+    initialLimit,
+    loadMoreAction,
+    error,
+    sessionId,
+    resolvedChatId,
+  ]);
 
   // Refresh messages (reload from beginning)
   const refresh = useCallback(async () => {
     if (!chatId) return;
 
-    setCursor(undefined);
+    setCursor(null);
     setHasMore(false);
     setMessages([]);
     setError(null);
@@ -292,7 +309,7 @@ export function usePaginatedMessages({
     // Bump session to invalidate any in-flight async operations
     sessionRef.current++;
     setMessages([]);
-    setCursor(undefined);
+    setCursor(null);
     setHasMore(false);
     setError(null);
     setRetryCount(0);
@@ -313,7 +330,7 @@ export function usePaginatedMessages({
   }, []);
 
   return {
-    messages: messages.length > 0 ? messages : initialUnifiedMessages,
+    messages: messages.length > 0 ? messages : initialUIMessages,
     isLoading: !initialMessages && enabled && !!chatId,
     isLoadingMore,
     hasMore,
@@ -323,99 +340,4 @@ export function usePaginatedMessages({
     refresh,
     clearError,
   };
-}
-
-/**
- * Hook for detecting when user scrolls near the top of a container
- * Useful for triggering "load more" when user scrolls up in message history
- */
-export function useScrollTopDetection(
-  containerRef: React.RefObject<HTMLElement>,
-  threshold = 100,
-  onNearTop?: () => void,
-) {
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container || !onNearTop) return;
-
-    const handleScroll = () => {
-      const { scrollTop } = container;
-
-      // Check if we're near the top
-      if (scrollTop < threshold) {
-        onNearTop();
-      }
-    };
-
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, [containerRef, threshold, onNearTop]);
-}
-/**
- * Compute exponential backoff delay (ms) capped at 5s.
- * attempt=1 => 1000ms, 2 => 2000ms, 3 => 4000ms, >=4 => 5000ms
- */
-export function computeBackoffDelay(attempt: number): number {
-  const base = Math.pow(2, Math.max(0, attempt - 1));
-  return Math.min(1000 * base, 5000);
-}
-
-/**
- * Map Convex message documents to unified message shape for UI.
- * Performs minimal coercion and preserves optional fields.
- */
-export function mapConvexMessagesToUnified(
-  chatId: string | null,
-  docs: Array<{
-    _id: string;
-    role: "user" | "assistant" | "system";
-    content?: string;
-    timestamp?: number;
-    isStreaming?: boolean;
-    streamedContent?: string;
-    thinking?: string;
-    searchResults?: unknown;
-    sources?: unknown;
-    reasoning?: string;
-  }>,
-) {
-  const toSearchResults = (value: unknown): SearchResult[] | undefined => {
-    if (!Array.isArray(value)) return undefined;
-    const items: SearchResult[] = [];
-    for (const v of value) {
-      if (
-        v &&
-        typeof v === "object" &&
-        typeof (v as { title?: unknown }).title === "string" &&
-        typeof (v as { url?: unknown }).url === "string" &&
-        typeof (v as { snippet?: unknown }).snippet === "string" &&
-        typeof (v as { relevanceScore?: unknown }).relevanceScore === "number"
-      ) {
-        items.push(v as SearchResult);
-      }
-    }
-    return items.length ? items : undefined;
-  };
-
-  const toSources = (value: unknown): string[] | undefined => {
-    if (!Array.isArray(value)) return undefined;
-    const items = value.filter((x): x is string => typeof x === "string");
-    return items.length ? items : undefined;
-  };
-
-  return docs.map((msg) => ({
-    id: msg._id,
-    chatId: chatId ?? "",
-    role: msg.role,
-    content: msg.content || "",
-    timestamp: msg.timestamp || Date.now(),
-    isStreaming: msg.isStreaming,
-    streamedContent: msg.streamedContent,
-    thinking: msg.thinking,
-    searchResults: toSearchResults(msg.searchResults),
-    sources: toSources(msg.sources),
-    reasoning: msg.reasoning,
-    synced: true as const,
-    source: "convex" as const,
-  }));
 }

@@ -3,32 +3,38 @@
  * Provides unified access to Convex chat data for all users
  *
  * MIGRATION COMPLETE (Phase 3):
- * ✅ LocalChatRepository deleted
- * ✅ MigrationService deleted
- * ✅ Migration hooks removed
- * ✅ All users (auth + anon) now use Convex directly via sessionId
+ * - LocalChatRepository deleted
+ * - MigrationService deleted
+ * - Migration hooks removed
+ * - All users (auth + anon) now use Convex directly via sessionId
  *
  * ARCHITECTURE:
  * - ConvexChatRepository is the ONLY implementation
- * - Uses UnifiedChat/UnifiedMessage bridge types for flexibility
+ * - Uses Convex Doc<T> types directly (no wrapper types)
  * - Supports both authenticated users (userId) and anonymous (sessionId)
  * - Repository pattern provides clean abstraction over Convex operations
- *
- * NOTE: This abstraction is intentionally kept because:
- * - Encapsulates complex Convex operations
- * - Provides consistent API for hooks layer
- * - Simplifies testing and mocking
- * - UnifiedChat/UnifiedMessage types bridge local and Convex formats nicely
  */
 
-import {
-  UnifiedChat,
-  UnifiedMessage,
-  StreamChunk,
-  ChatResponse,
-  TitleUtils,
-} from "../types/unified";
-import { generateUuidV7 } from "../utils/uuid";
+import type { MessageStreamChunk } from "@/lib/types/message";
+import type { CreateChatResult } from "@/lib/types/chat";
+import type { Doc } from "../../../convex/_generated/dataModel";
+import type {
+  SearchResult,
+  SerpEnrichment,
+} from "../../../convex/schemas/search";
+
+/**
+ * Search web response type - mirrors Convex action return type without importing convex/server.
+ * This avoids bundling server-side code into client bundles.
+ */
+export interface SearchWebResponse {
+  results: SearchResult[];
+  searchMethod: "serp" | "openrouter" | "duckduckgo" | "fallback";
+  hasRealResults: boolean;
+  enrichment?: SerpEnrichment;
+  providerErrors?: string[] | { provider: string; error: string }[];
+  allProvidersFailed?: boolean;
+}
 
 /**
  * Base Chat Repository Interface
@@ -36,9 +42,9 @@ import { generateUuidV7 } from "../utils/uuid";
  */
 export interface IChatRepository {
   // Chat operations
-  getChats(): Promise<UnifiedChat[]>;
-  getChatById(id: string): Promise<UnifiedChat | null>;
-  createChat(title?: string): Promise<ChatResponse>;
+  getChats(): Promise<Doc<"chats">[]>;
+  getChatById(id: string): Promise<Doc<"chats"> | null>;
+  createChat(title?: string): Promise<CreateChatResult>;
   updateChatTitle(id: string, title: string): Promise<void>;
   updateChatPrivacy(
     id: string,
@@ -47,28 +53,28 @@ export interface IChatRepository {
   deleteChat(id: string): Promise<void>;
 
   // Message operations
-  getMessages(chatId: string): Promise<UnifiedMessage[]>;
+  getMessages(chatId: string): Promise<Doc<"messages">[]>;
   addMessage(
     chatId: string,
-    message: Partial<UnifiedMessage>,
-  ): Promise<UnifiedMessage>;
-  updateMessage(id: string, updates: Partial<UnifiedMessage>): Promise<void>;
+    message: Partial<Doc<"messages">>,
+  ): Promise<Doc<"messages">>;
+  updateMessage(id: string, updates: Partial<Doc<"messages">>): Promise<void>;
   deleteMessage(id: string): Promise<void>;
 
   // Search and AI operations
   generateResponse(
     chatId: string,
     message: string,
-  ): AsyncGenerator<StreamChunk>;
-  searchWeb(query: string): Promise<unknown>;
+  ): AsyncGenerator<MessageStreamChunk>;
+  searchWeb(query: string): Promise<SearchWebResponse>;
 
   // Sharing operations
   shareChat(
     id: string,
     privacy: "shared" | "public",
   ): Promise<{ shareId?: string; publicId?: string }>;
-  getChatByShareId(shareId: string): Promise<UnifiedChat | null>;
-  getChatByPublicId(publicId: string): Promise<UnifiedChat | null>;
+  getChatByShareId(shareId: string): Promise<Doc<"chats"> | null>;
+  getChatByPublicId(publicId: string): Promise<Doc<"chats"> | null>;
 
   // Utility
   isAvailable(): boolean;
@@ -81,30 +87,13 @@ export interface IChatRepository {
 export abstract class BaseRepository implements IChatRepository {
   protected abstract storageType: "local" | "convex" | "hybrid";
 
-  // Default implementations that can be overridden
-  async createChat(title?: string): Promise<ChatResponse> {
-    const finalTitle = title || "New Chat";
-    const chat: UnifiedChat = {
-      id: generateUuidV7(),
-      title: TitleUtils.sanitize(finalTitle),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      privacy: "private",
-      source: this.storageType === "convex" ? "convex" : "local",
-      synced: this.storageType === "convex",
-    };
-
-    // Subclasses implement actual storage
-    return { chat, isNew: true };
-  }
-
-  async updateChatTitle(id: string, title: string): Promise<void> {
-    const sanitized = TitleUtils.sanitize(title);
-    if (!sanitized) throw new Error("Title cannot be empty");
-
-    // Subclasses implement actual storage update
-    throw new Error("Not implemented");
-  }
+  /**
+   * Update chat title. Subclasses must implement.
+   * @param id - Chat ID
+   * @param title - New title (will be sanitized)
+   * @throws Error if title is empty after sanitization
+   */
+  abstract updateChatTitle(id: string, title: string): Promise<void>;
 
   isAvailable(): boolean {
     return true;
@@ -115,35 +104,36 @@ export abstract class BaseRepository implements IChatRepository {
   }
 
   // Abstract methods that must be implemented
-  abstract getChats(): Promise<UnifiedChat[]>;
-  abstract getChatById(id: string): Promise<UnifiedChat | null>;
+  abstract getChats(): Promise<Doc<"chats">[]>;
+  abstract getChatById(id: string): Promise<Doc<"chats"> | null>;
+  abstract createChat(title?: string): Promise<CreateChatResult>;
   abstract updateChatPrivacy(
     id: string,
     privacy: "private" | "shared" | "public",
   ): Promise<void>;
   abstract deleteChat(id: string): Promise<void>;
 
-  abstract getMessages(chatId: string): Promise<UnifiedMessage[]>;
+  abstract getMessages(chatId: string): Promise<Doc<"messages">[]>;
   abstract addMessage(
     chatId: string,
-    message: Partial<UnifiedMessage>,
-  ): Promise<UnifiedMessage>;
+    message: Partial<Doc<"messages">>,
+  ): Promise<Doc<"messages">>;
   abstract updateMessage(
     id: string,
-    updates: Partial<UnifiedMessage>,
+    updates: Partial<Doc<"messages">>,
   ): Promise<void>;
   abstract deleteMessage(id: string): Promise<void>;
 
   abstract generateResponse(
     chatId: string,
     message: string,
-  ): AsyncGenerator<StreamChunk>;
-  abstract searchWeb(query: string): Promise<unknown>;
+  ): AsyncGenerator<MessageStreamChunk>;
+  abstract searchWeb(query: string): Promise<SearchWebResponse>;
 
   abstract shareChat(
     id: string,
     privacy: "shared" | "public",
   ): Promise<{ shareId?: string; publicId?: string }>;
-  abstract getChatByShareId(shareId: string): Promise<UnifiedChat | null>;
-  abstract getChatByPublicId(publicId: string): Promise<UnifiedChat | null>;
+  abstract getChatByShareId(shareId: string): Promise<Doc<"chats"> | null>;
+  abstract getChatByPublicId(publicId: string): Promise<Doc<"chats"> | null>;
 }

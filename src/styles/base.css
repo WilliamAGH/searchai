@@ -1,0 +1,168 @@
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 158.1 64.4% 51.6%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 158.1 64.4% 51.6%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 166.1 76.5% 46.7%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 166.1 76.5% 46.7%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Light mode - Beautiful serif font with proper sizing */
+  html:not(.dark) body {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.7;
+    letter-spacing: 0.01em;
+  }
+
+  /* Dark mode - Sleek mono, tuned for compact mobile readability */
+  html.dark body {
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace;
+    font-weight: 400;
+    font-size: 15px; /* smaller on mobile to avoid oversized feel */
+    line-height: 1.6;
+    letter-spacing: 0.01em; /* tighten tracking to reduce horizontal spread */
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Headers get special treatment */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+  }
+
+  /* Light mode headers - elegant serif with proper weight */
+  html:not(.dark) h1,
+  html:not(.dark) h2,
+  html:not(.dark) h3,
+  html:not(.dark) h4,
+  html:not(.dark) h5,
+  html:not(.dark) h6 {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+
+  /* Dark mode headers - bold mono, tighter tracking to avoid wide look */
+  html.dark h1,
+  html.dark h2,
+  html.dark h3,
+  html.dark h4,
+  html.dark h5,
+  html.dark h6 {
+    font-family: "JetBrains Mono", "SF Mono", monospace;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.4;
+    text-transform: none;
+    font-size: 1em; /* avoid dark-mode heading inflation */
+  }
+
+  /* Input fields should match body font */
+  textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"] {
+    font-family: inherit !important;
+  }
+
+  /* Light mode inputs use serif */
+  html:not(.dark) textarea,
+  html:not(.dark) input[type="text"],
+  html:not(.dark) input[type="email"],
+  html:not(.dark) input[type="password"] {
+    font-family:
+      "Playfair Display", "Georgia", "Times New Roman", serif !important;
+  }
+
+  /* Dark mode inputs use mono */
+  html.dark textarea,
+  html.dark input[type="text"],
+  html.dark input[type="email"],
+  html.dark input[type="password"] {
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace !important;
+  }
+
+  /* Buttons and selects: match light mode body (serif) for consistency */
+  html:not(.dark) button,
+  html:not(.dark) select {
+    font-family: "Playfair Display", "Georgia", "Times New Roman", serif;
+    font-size: 16px;
+  }
+
+  html.dark button,
+  html.dark select {
+    font-family:
+      "JetBrains Mono", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono",
+      "Source Code Pro", monospace !important;
+    font-size: 16px;
+  }
+
+  /* Force 16px font size on mobile inputs */
+  @media (max-width: 768px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+}

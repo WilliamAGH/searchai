@@ -36,12 +36,12 @@ npm run dev
 
 ## Docs
 
-- [Development](docs/development.md)
-- [Configuration](docs/configuration.md)
-- [Testing](docs/testing.md)
-- [API](docs/api.md)
-- [Deployment](docs/deployment.md)
-- [Architecture](docs/architecture.md)
+- [Development](docs/domains/development.md)
+- [Configuration](docs/domains/configuration.md)
+- [Testing](docs/contracts/testing.md)
+- [API](docs/domains/api.md)
+- [Deployment](docs/domains/deployment.md)
+- [Architecture](docs/domains/architecture.md)
 
 ## Scripts
 

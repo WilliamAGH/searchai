@@ -8,6 +8,8 @@
  * - Template injections
  */
 
+import { RELEVANCE_SCORES } from "../constants/cache";
+
 /**
  * Main sanitization function that applies all security measures
  * @param input - Raw user input to sanitize
@@ -203,19 +205,18 @@ export function sanitizeJson(jsonString: string): string | null {
     const parsed = JSON.parse(jsonString);
 
     // Recursively sanitize all string values in the JSON
-    const sanitizeObject = (obj: any): any => {
+    const sanitizeObject = (obj: unknown): unknown => {
       if (typeof obj === "string") {
         return robustSanitize(obj);
       } else if (Array.isArray(obj)) {
         return obj.map(sanitizeObject);
       } else if (obj !== null && typeof obj === "object") {
-        const result: any = {};
-        for (const key in obj) {
-          if (obj.hasOwnProperty(key)) {
-            // Sanitize the key as well
-            const sanitizedKey = robustSanitize(key);
-            result[sanitizedKey] = sanitizeObject(obj[key]);
-          }
+        const typedObj = obj as Record<string, unknown>;
+        const result: Record<string, unknown> = {};
+        for (const key of Object.keys(typedObj)) {
+          // Sanitize the key as well
+          const sanitizedKey = robustSanitize(key);
+          result[sanitizedKey] = sanitizeObject(typedObj[key]);
         }
         return result;
       }
@@ -239,7 +240,7 @@ export function sanitizeJson(jsonString: string): string | null {
  * @param result - Raw search result from external source
  * @returns Normalized SearchResult with guaranteed fields
  */
-export function normalizeSearchResult(result: any): {
+export function normalizeSearchResult(result: unknown): {
   title: string;
   url: string;
   snippet: string;
@@ -255,23 +256,31 @@ export function normalizeSearchResult(result: any): {
     };
   }
 
+  // Type guard: we know result is a non-null object
+  const r = result as Record<string, unknown>;
+
   // Normalize relevanceScore - must be a number between 0 and 1
-  let relevanceScore = 0.5; // Default
-  if (typeof result.relevanceScore === "number") {
+  let relevanceScore: number = RELEVANCE_SCORES.SEARCH_RESULT; // Default
+  if (typeof r.relevanceScore === "number") {
     // Clamp to valid range [0, 1]
-    relevanceScore = Math.max(0, Math.min(1, result.relevanceScore));
-  } else if (result.relevanceScore !== undefined) {
-    // Try to parse if it's a string number
-    const parsed = parseFloat(result.relevanceScore);
+    relevanceScore = Math.max(0, Math.min(1, r.relevanceScore));
+  } else if (typeof r.relevanceScore === "string") {
+    // Parse string numbers
+    const parsed = parseFloat(r.relevanceScore);
     if (!isNaN(parsed)) {
       relevanceScore = Math.max(0, Math.min(1, parsed));
     }
   }
 
+  // Extract string fields safely - only use string values, not objects
+  const titleValue = typeof r.title === "string" ? r.title : "Untitled";
+  const urlValue = typeof r.url === "string" ? r.url : "";
+  const snippetValue = typeof r.snippet === "string" ? r.snippet : "";
+
   return {
-    title: robustSanitize(String(result.title || "Untitled")),
-    url: String(result.url || ""), // Don't sanitize URLs - might break them
-    snippet: robustSanitize(String(result.snippet || "")),
+    title: robustSanitize(titleValue),
+    url: urlValue, // Don't sanitize URLs - might break them
+    snippet: robustSanitize(snippetValue),
     relevanceScore,
   };
 }
@@ -282,7 +291,7 @@ export function normalizeSearchResult(result: any): {
  * @param results - Raw array of search results
  * @returns Array of normalized SearchResult objects
  */
-export function normalizeSearchResults(results: any): Array<{
+export function normalizeSearchResults(results: unknown): Array<{
   title: string;
   url: string;
   snippet: string;

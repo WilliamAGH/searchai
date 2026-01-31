@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { getDomainFromUrl } from "../lib/utils/favicon";
+import { getDomainFromUrl } from "@/lib/utils/favicon";
 
 interface CitationRendererProps {
   content: string;

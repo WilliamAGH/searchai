@@ -6,14 +6,14 @@
 
 import React from "react";
 import ReactMarkdown from "react-markdown";
-import { useDomainToUrlMap } from "../hooks/utils/useDomainToUrlMap";
-import { useCitationProcessor } from "../hooks/utils/useCitationProcessor";
-import { createCitationAnchorRenderer } from "../lib/utils/citationAnchorRenderer";
+import { useDomainToUrlMap } from "@/hooks/utils/useDomainToUrlMap";
+import { useCitationProcessor } from "@/hooks/utils/useCitationProcessor";
+import { createCitationAnchorRenderer } from "@/lib/utils/citationAnchorRenderer";
 import {
   REMARK_PLUGINS,
   REHYPE_PLUGINS,
   CodeRenderer,
-} from "../lib/utils/markdownConfig";
+} from "@/lib/utils/markdownConfig";
 
 interface ContentWithCitationsProps {
   content: string;
@@ -61,7 +61,7 @@ export function ContentWithCitations({
 
   return (
     <>
-      {/* 
+      {/*
         DO NOT REMOVE OR OVERRIDE: Overflow Protection Wrapper
         This wrapper is CRITICAL for preventing horizontal layout blowout from:
         1. Long continuous strings (URLs, base64, etc.)

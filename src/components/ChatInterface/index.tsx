@@ -1,8 +1,4 @@
-/**
- * Main chat interface - orchestrates chats/messages for all users
- * Refactored to use sub-components for better organization
- */
-
+/** Main chat interface - orchestrates chats/messages for all users. */
 import { useAction, useMutation } from "convex/react";
 import React, {
   useCallback,
@@ -13,32 +9,30 @@ import React, {
 } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { useUnifiedChat } from "../../hooks/useUnifiedChat";
-import { useChatNavigation } from "../../hooks/useChatNavigation";
-import { useDraftAnalyzer } from "../../hooks/useDraftAnalyzer";
-import { useMessageHandler } from "../../hooks/useMessageHandler";
-import { useEnhancedFollowUpPrompt } from "../../hooks/useEnhancedFollowUpPrompt";
-import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
-import { useComponentProps } from "../../hooks/useComponentProps";
-import { useDeletionHandlers } from "../../hooks/useDeletionHandlers";
-import { useAnonymousSession } from "../../hooks/useAnonymousSession";
-import { useIsMobile } from "../../hooks/useIsMobile";
-import { useUrlStateSync } from "../../hooks/useUrlStateSync";
-import { useMetaTags } from "../../hooks/useMetaTags";
-import { useAutoCreateFirstChat } from "../../hooks/useAutoCreateFirstChat";
-import { useConvexQueries } from "../../hooks/useConvexQueries";
-import { useSidebarTiming } from "../../hooks/useSidebarTiming";
-import { usePaginatedMessages } from "../../hooks/usePaginatedMessages";
-import { useEffectiveMessages } from "../../hooks/useEffectiveMessages";
-import { logger } from "../../lib/logger";
-import { ChatLayout } from "./ChatLayout";
-import type { Chat } from "../../lib/types/chat";
-import { createChatFromData } from "../../lib/types/chat";
-import { DRAFT_MIN_LENGTH } from "../../lib/constants/topicDetection";
-import { buildApiBase, resolveApiPath } from "../../lib/utils/httpUtils";
-import { isTopicChange } from "../../lib/utils/topicDetection";
-import { mapMessagesToLocal } from "../../lib/utils/messageMapper";
-import { buildUserHistory } from "../../lib/utils/chatHistory";
+import { useUnifiedChat } from "@/hooks/useUnifiedChat";
+import { useChatNavigation } from "@/hooks/useChatNavigation";
+import { useDraftAnalyzer } from "@/hooks/useDraftAnalyzer";
+import { useMessageHandler } from "@/hooks/useMessageHandler";
+import { useEnhancedFollowUpPrompt } from "@/hooks/useEnhancedFollowUpPrompt";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useComponentProps } from "@/hooks/useComponentProps";
+import { useDeletionHandlers } from "@/hooks/useDeletionHandlers";
+import { useAnonymousSession } from "@/hooks/useAnonymousSession";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { useUrlStateSync } from "@/hooks/useUrlStateSync";
+import { useMetaTags } from "@/hooks/useMetaTags";
+import { useAutoCreateFirstChat } from "@/hooks/useAutoCreateFirstChat";
+import { useSidebarTiming } from "@/hooks/useSidebarTiming";
+import { useConvexQueries } from "@/hooks/useConvexQueries";
+import { usePaginatedMessages } from "@/hooks/usePaginatedMessages";
+import { useEffectiveMessages } from "@/hooks/useEffectiveMessages";
+import { logger } from "@/lib/logger";
+import { ChatLayout } from "@/components/ChatInterface/ChatLayout";
+import type { Chat } from "@/lib/types/chat";
+import { DRAFT_MIN_LENGTH } from "@/lib/constants/topicDetection";
+import { buildApiBase, resolveApiPath } from "@/lib/utils/httpUtils";
+import { mapMessagesToLocal } from "@/lib/utils/messageMapper";
+import { buildUserHistory } from "@/lib/utils/chatHistory";
 
 function ChatInterfaceComponent({
   isAuthenticated,
@@ -47,8 +41,6 @@ function ChatInterfaceComponent({
   chatId: propChatId,
   shareId: propShareId,
   publicId: propPublicId,
-  onRequestSignUp,
-  onRequestSignIn: _onRequestSignIn,
 }: {
   isAuthenticated: boolean;
   isSidebarOpen?: boolean;
@@ -56,8 +48,6 @@ function ChatInterfaceComponent({
   chatId?: string;
   shareId?: string;
   publicId?: string;
-  onRequestSignUp?: () => void;
-  onRequestSignIn?: () => void;
 }) {
   const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
   const apiBase = buildApiBase(convexUrl);
@@ -67,7 +57,6 @@ function ChatInterfaceComponent({
   );
 
   const [localIsGenerating, setIsGenerating] = useState(false);
-  // aiService removed - no longer needed with unified flow
 
   const unified = useUnifiedChat();
   const chatState = unified;
@@ -81,7 +70,6 @@ function ChatInterfaceComponent({
 
   const sidebarOpen = isSidebarOpen ?? false;
   const { handleMobileSidebarClose } = useSidebarTiming({
-    sidebarOpen,
     onToggleSidebar,
   });
 
@@ -94,58 +82,33 @@ function ChatInterfaceComponent({
   const sessionId = useAnonymousSession();
 
   const userSelectedChatAtRef = useRef<number | null>(null);
+  // @ts-ignore - Convex api type instantiation is too deep here
   const deleteChat = useMutation(api.chats.deleteChat);
-  const deleteMessage = useMutation(api.messages.deleteMessage);
+  const deleteMessage = useMutation<typeof api.messages.deleteMessage>(
+    api.messages.deleteMessage,
+  );
 
-  // Get all chats (either from Convex or local storage)
-  const allChats = useMemo(() => {
-    let baseChats: Chat[] = [];
-
-    // The unified hook handles both authenticated and unauthenticated states
-    // Convert from unified format to local format for compatibility
-    if (chats && chats.length > 0) {
-      baseChats = chats.map((chat) =>
-        createChatFromData({
-          _id: chat.id || chat._id,
-          title: chat.title,
-          createdAt: chat.createdAt,
-          updatedAt: chat.updatedAt,
-          privacy: chat.privacy,
-          shareId: chat.shareId,
-          publicId: chat.publicId,
-          userId: chat.userId,
-          _creationTime: chat._creationTime,
-        }),
-      );
-    }
-
-    return baseChats;
-  }, [chats]);
+  // Get all chats (Convex-backed only)
+  const allChats = useMemo<Chat[]>(() => chats ?? [], [chats]);
 
   const { navigateWithVerification, handleSelectChat: navHandleSelectChat } =
     useChatNavigation({
       currentChatId,
       allChats,
-      isAuthenticated,
       onSelectChat: chatActions.selectChat,
     });
-  const planSearch = useAction(api.search.planSearch);
-  const recordClientMetric = useAction(api.search.recordClientMetric);
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
 
   const { chatByOpaqueId, chatByShareId, chatByPublicId } = useConvexQueries({
-    isAuthenticated,
     propChatId,
     propShareId,
     propPublicId,
-    currentChatId,
+    sessionId: sessionId || undefined,
   });
 
   // Use deletion handlers hook for all deletion operations
   const {
-    handleDeleteLocalChat,
     handleRequestDeleteChat,
-    handleDeleteLocalMessage,
     handleRequestDeleteMessage,
     undoBanner,
     setUndoBanner,
@@ -157,19 +120,20 @@ function ChatInterfaceComponent({
     sessionId: sessionId || undefined,
   });
 
-  const [lastPlannerCallAtByChat, setLastPlannerCallAtByChat] = useState<
-    Record<string, number>
-  >({});
-
   const handleSelectChat = useCallback(
-    (id: Id<"chats"> | string) => {
+    (id: Id<"chats"> | string | null) => {
       userSelectedChatAtRef.current = Date.now();
-      navHandleSelectChat(String(id));
+      if (!id) {
+        void chatActions.selectChat(null);
+        return;
+      }
+      void navHandleSelectChat(String(id));
     },
-    [navHandleSelectChat],
+    [chatActions, navHandleSelectChat],
   );
 
   // Use paginated messages for authenticated users with Convex chats
+  const usePagination = isAuthenticated && !!currentChatId;
   const {
     messages: paginatedMessages,
     isLoading: isLoadingMessages,
@@ -178,15 +142,11 @@ function ChatInterfaceComponent({
     error: loadError,
     retryCount,
     loadMore,
-    refresh: _refreshMessages,
     clearError,
   } = usePaginatedMessages({
-    chatId:
-      isAuthenticated && currentChatId && !currentChat?.isLocal
-        ? currentChatId
-        : null,
+    chatId: usePagination ? currentChatId : null,
     initialLimit: 50,
-    enabled: isAuthenticated && !!currentChatId && !currentChat?.isLocal,
+    enabled: usePagination,
   });
 
   const handlePaginatedLoadMore = useCallback(async () => {
@@ -197,14 +157,12 @@ function ChatInterfaceComponent({
   const effectiveMessages = useEffectiveMessages({
     messages,
     paginatedMessages,
-    isAuthenticated,
     currentChatId,
-    currentChat,
   });
 
   const currentMessages = useMemo(
-    () => mapMessagesToLocal(effectiveMessages, isAuthenticated),
-    [effectiveMessages, isAuthenticated],
+    () => mapMessagesToLocal(effectiveMessages),
+    [effectiveMessages],
   );
   const userHistory = useMemo(
     () => buildUserHistory(currentMessages),
@@ -213,16 +171,13 @@ function ChatInterfaceComponent({
 
   useUrlStateSync({
     currentChatId,
-    isAuthenticated,
     propChatId,
     propShareId,
     propPublicId,
     chatByOpaqueId,
     chatByShareId,
     chatByPublicId,
-    localChats: chatState.chats,
     selectChat: chatActions.selectChat,
-    userSelectedChatAtRef,
   });
   useMetaTags({ currentChatId, allChats });
 
@@ -232,11 +187,11 @@ function ChatInterfaceComponent({
       try {
         // Simply use the createChat action from useUnifiedChat
         const chat = await chatActions.createChat("New Chat");
-        if (chat?.id) {
+        if (chat?._id) {
           // Navigate to the new chat
-          await navigateWithVerification(`/chat/${chat.id}`);
+          await navigateWithVerification(`/chat/${chat._id}`);
           setIsCreatingChat(false);
-          return chat.id;
+          return chat._id;
         }
       } catch (error) {
         logger.error("Failed to create chat:", error);
@@ -251,24 +206,9 @@ function ChatInterfaceComponent({
     if (isCreatingChat && currentChatId) setIsCreatingChat(false);
   }, [isCreatingChat, currentChatId]);
 
-  // Unified flow: Use chatActions.sendMessage for all message handling
-  // The repository layer handles both authenticated and anonymous users
-  const generateUnauthenticatedResponse = useCallback(
-    async (message: string, chatId: string) => {
-      // Use the unified chat actions sendMessage method
-      if (chatActions.sendMessage) {
-        await chatActions.sendMessage(chatId, message);
-      } else {
-        logger.error("sendMessage not available in chatActions");
-      }
-    },
-    [chatActions],
-  );
-
   const sendRefTemp = useRef<((message: string) => Promise<void>) | null>(null);
   const {
     showFollowUpPrompt,
-    pendingMessage: _pendingMessage,
     plannerHint,
     resetFollowUp,
     maybeShowFollowUpPrompt,
@@ -277,11 +217,9 @@ function ChatInterfaceComponent({
     handleNewChatForFollowUp,
     handleNewChatWithSummary,
   } = useEnhancedFollowUpPrompt({
-    isAuthenticated,
     currentChatId,
     handleNewChat,
     sendRef: sendRefTemp,
-    recordClientMetric,
     summarizeRecentAction,
     chatState,
   });
@@ -291,33 +229,15 @@ function ChatInterfaceComponent({
     // State
     isGenerating,
     currentChatId,
-    showFollowUpPrompt,
-    isAuthenticated,
     messageCount,
-    messages,
     chatState,
-    lastPlannerCallAtByChat,
 
     // Actions
     setIsGenerating,
     setMessageCount,
-    setLastPlannerCallAtByChat,
-    setPendingMessage,
 
     // Functions
     handleNewChat,
-    resetFollowUp,
-    onRequestSignUp,
-    planSearch,
-    isTopicChange,
-    generateResponse: async (args: { chatId: string; message: string }) => {
-      if (!chatActions.sendMessage) {
-        throw new Error("Message sending is currently unavailable.");
-      }
-
-      await chatActions.sendMessage(args.chatId, args.message);
-    },
-    generateUnauthenticatedResponse,
     maybeShowFollowUpPrompt,
     chatActions,
     setErrorMessage: chatActions.setError,
@@ -338,54 +258,30 @@ function ChatInterfaceComponent({
     [isGenerating, analyzeDraft],
   );
 
-  // Auto-create first chat for new users
-  useAutoCreateFirstChat({
-    allChats,
-    chats,
-    currentChatId,
-    isAuthenticated,
-    isCreatingChat,
-    propChatId,
-    propShareId,
-    propPublicId,
-    handleNewChat,
-    userSelectedChatAtRef,
-    isLoading: chatState.isLoading, // Prevent creation while loading existing chats
-  });
+  // Auto-create first chat for new users (currently disabled)
+  useAutoCreateFirstChat();
 
   // Track if we're on mobile for rendering decisions
   const isMobile = useIsMobile(1024);
 
   // Keyboard shortcuts and interaction handlers
-  const {
-    swipeHandlers,
-    handleToggleSidebar,
-    handleNewChatButton,
-    startNewChatSession,
-  } = useKeyboardShortcuts({
-    isMobile,
-    sidebarOpen,
-    onToggleSidebar,
-    onNewChat: async () => {
-      // Reset state first
-      userSelectedChatAtRef.current = Date.now();
-      setMessageCount(0);
-      resetFollowUp();
-      setPendingMessage("");
+  const { swipeHandlers, handleToggleSidebar, handleNewChatButton } =
+    useKeyboardShortcuts({
+      isMobile,
+      sidebarOpen,
+      onToggleSidebar,
+      onNewChat: async () => {
+        // Reset state first
+        userSelectedChatAtRef.current = Date.now();
+        setMessageCount(0);
+        resetFollowUp();
+        setPendingMessage("");
 
-      // Create the chat immediately
-      const newChatId = await handleNewChat();
-
-      if (!newChatId) {
-        // Navigate to home as fallback
-        await navigateWithVerification("/").catch((error) => {
-          logger.error("Navigation failed during new chat fallback:", error);
-          window.location.href = "/";
-        });
-      }
-    },
-    onShare: openShareModal,
-  });
+        // Create chat and navigate to it
+        await handleNewChat({ userInitiated: true });
+      },
+      onShare: openShareModal,
+    });
 
   // Prepare props for all child components
   const {
@@ -396,38 +292,31 @@ function ChatInterfaceComponent({
   } = useComponentProps({
     allChats,
     currentChatId,
-    currentChat,
     currentMessages,
     sidebarOpen,
     isMobile,
     isGenerating,
     searchProgress,
     isCreatingChat,
-    showShareModal,
-    isAuthenticated,
     handleSelectChat,
     handleToggleSidebar,
     handleNewChatButton,
-    startNewChatSession,
-    handleDeleteLocalChat,
     handleRequestDeleteChat,
-    handleDeleteLocalMessage,
     handleRequestDeleteMessage,
     handleMobileSidebarClose,
     handleSendMessage,
     handleDraftChange,
     setShowShareModal,
     userHistory,
-    // Pagination props
-    isLoadingMore,
-    hasMore,
-    onLoadMore: handlePaginatedLoadMore,
-    isLoadingMessages,
-    loadError,
-    retryCount,
-    onClearError: clearError,
-    // Session ID for authorization (anonymous users)
-    sessionId: sessionId || undefined,
+    pagination: {
+      isLoadingMore,
+      hasMore,
+      onLoadMore: handlePaginatedLoadMore,
+      isLoadingMessages,
+      loadError,
+      retryCount,
+      onClearError: clearError,
+    },
   });
 
   return (

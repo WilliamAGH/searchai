@@ -1,0 +1,62 @@
+# [TST1] Misplaced Test Files
+# Tests must live in __tests__/ or tests/ at the repository root.
+# Test code in src/ or convex/ violates project structure.
+#
+# Violations:
+#   - src/**/*.test.ts, src/**/*.spec.ts
+#   - src/**/__tests__/**, src/**/__mocks__/**
+#   - convex/**/*.test.ts, convex/**/*.spec.ts
+#   - convex/**/__tests__/**, convex/**/__mocks__/**
+#
+# Valid locations:
+#   - __tests__/**
+#   - tests/**
+
+id: misplaced-tests
+language: typescript
+severity: error
+message: |
+  [TST1] Test file in wrong location. Tests must live in __tests__/ or tests/ at repo root.
+  Move this file to the appropriate location:
+    - Unit tests: __tests__/src/... or __tests__/convex/...
+    - E2E tests: tests/e2e/...
+    - Integration tests: tests/integration/...
+
+rule:
+  any:
+    # Match describe() calls - primary test suite marker
+    - pattern: describe($NAME, $BODY)
+    # Match it() calls
+    - pattern: it($NAME, $BODY)
+    # Match test() calls
+    - pattern: test($NAME, $BODY)
+    # Match vitest expect
+    - pattern: expect($EXPR)
+    # Match beforeEach/afterEach hooks
+    - pattern: beforeEach($BODY)
+    - pattern: afterEach($BODY)
+    # Match beforeAll/afterAll hooks
+    - pattern: beforeAll($BODY)
+    - pattern: afterAll($BODY)
+
+# Only scan source directories where tests should NOT exist
+# This triggers on any test pattern found in these locations
+files:
+  # Test files by naming convention in src/
+  - "src/**/*.test.ts"
+  - "src/**/*.test.tsx"
+  - "src/**/*.spec.ts"
+  - "src/**/*.spec.tsx"
+  # Test files by naming convention in convex/
+  - "convex/**/*.test.ts"
+  - "convex/**/*.spec.ts"
+  # __tests__ directories inside src/
+  - "src/**/__tests__/**/*.ts"
+  - "src/**/__tests__/**/*.tsx"
+  # __tests__ directories inside convex/
+  - "convex/**/__tests__/**/*.ts"
+  # __mocks__ directories inside src/
+  - "src/**/__mocks__/**/*.ts"
+  - "src/**/__mocks__/**/*.tsx"
+  # __mocks__ directories inside convex/
+  - "convex/**/__mocks__/**/*.ts"

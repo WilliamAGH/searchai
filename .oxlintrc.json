@@ -5,6 +5,8 @@
     "typescript",
     "unicorn",
     "react",
+    "react-hooks",
+    "nextjs",
     "jsx-a11y",
     "promise",
     "vitest",
@@ -21,6 +23,7 @@
     "no-debugger": "error",
     "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
     "no-control-regex": "off",
+    "no-empty": ["error", { "allowEmptyCatch": false }],
 
     "no-restricted-imports": [
       "error",
@@ -33,7 +36,7 @@
               "**/convex-types",
               "**/types/convex"
             ],
-            "message": "❌ NEVER create abstraction layers over Convex _generated types. Import directly from 'convex/_generated/' as per Convex best practices."
+            "message": "NEVER create abstraction layers over Convex _generated types. Import directly from 'convex/_generated/' as per Convex best practices."
           },
           {
             "group": [
@@ -41,7 +44,7 @@
               "../lib/convexTypes",
               "../../lib/convexTypes"
             ],
-            "message": "❌ CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See CLAUDE.md for correct patterns."
+            "message": "CRITICAL ERROR: Never import from convexTypes.ts! Use direct imports from '_generated' directory. See AGENTS.md for correct patterns."
           },
           {
             "group": [
@@ -49,7 +52,7 @@
               "**/wrappers/convex*",
               "**/abstractions/convex*"
             ],
-            "message": "❌ Do not create wrapper files for Convex types. The _generated directory IS the abstraction layer."
+            "message": "Do not create wrapper files for Convex types. The _generated directory IS the abstraction layer."
           }
         ]
       }
@@ -59,8 +62,10 @@
     "import/order": "off",
     "import/no-duplicates": "error",
 
-    "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/no-non-null-assertion": "warn",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "warn",
+    "typescript/no-unsafe-type-assertion": "warn",
+    "typescript/no-floating-promises": "warn",
 
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
@@ -80,6 +85,9 @@
     "jsx-a11y/anchor-is-valid": "warn",
     "jsx-a11y/alt-text": "error",
     "jsx-a11y/no-aria-hidden-on-focusable": "error",
+
+    "nextjs/no-html-link-for-pages": "off",
+    "nextjs/no-img-element": "off",
 
     "promise/no-return-await": "error",
     "promise/catch-or-return": "warn",
@@ -104,10 +112,20 @@
         "*.spec.tsx",
         "*.mjs",
         "tests/**/*",
+        "__tests__/**/*",
         "scripts/**/*"
       ],
       "rules": {
-        "@typescript-eslint/no-explicit-any": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/unbound-method": "off",
+        "typescript/no-floating-promises": "off",
+        "typescript/no-base-to-string": "off",
+        "typescript/no-redundant-type-constituents": "off",
+        "typescript/await-thenable": "off",
+        "vitest/no-disabled-tests": "off",
+        "vitest/no-conditional-expect": "off",
+        "vitest/expect-expect": "off",
         "no-console": "off",
         "unicorn/prefer-node-protocol": "off"
       }
@@ -116,15 +134,18 @@
       "files": ["convex/**/*.ts"],
       "rules": {
         "no-console": "off",
-        "@typescript-eslint/no-explicit-any": "off",
-        "@typescript-eslint/no-non-null-assertion": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/no-base-to-string": "off",
+        "typescript/restrict-template-expressions": "off",
+        "typescript/no-non-null-assertion": "off",
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
                 "group": ["./lib/convexTypes", "../lib/convexTypes"],
-                "message": "❌ In Convex backend files, import from './_generated/' not from wrapper files"
+                "message": "In Convex backend files, import from './_generated/' not from wrapper files"
               }
             ]
           }
@@ -140,7 +161,7 @@
             "patterns": [
               {
                 "group": ["**/convex/lib/convexTypes", "**/convexTypes"],
-                "message": "❌ In frontend files, import from 'convex/_generated/' not from wrapper files"
+                "message": "In frontend files, import from 'convex/_generated/' not from wrapper files"
               }
             ]
           }

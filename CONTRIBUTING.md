@@ -12,7 +12,7 @@ Contributions and feedback are welcome, and Pull Requests (PRs) are encouraged.
 2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/searchai-io.git`
 3. Create a feature branch: `git checkout -b my-feature`
 4. Install dependencies: `npm install`
-5. Set up env: `cp .env.example .env.local` and configure `VITE_CONVEX_URL` (see `docs/development.md`)
+5. Set up env: `cp .env.example .env.local` and configure `VITE_CONVEX_URL` (see `docs/domains/development.md`)
 6. Make your changes
 7. Run validation: `npm run validate`
 8. Commit your changes with a descriptive message

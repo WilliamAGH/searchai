@@ -7,38 +7,11 @@ import type {
   SearchResult,
   SearchProviderResult,
   SerpEnrichment,
-} from "../../lib/types/search";
+} from "../../schemas/search";
+import { SerpApiResponseSchema } from "../../schemas/search";
+import { safeParseWithLog } from "../../lib/validation/zodUtils";
 import { getErrorMessage } from "../../lib/errors";
-export type { SearchResult } from "../../lib/types/search";
-
-interface SerpApiResponse {
-  organic_results?: Array<{
-    title?: string;
-    link: string;
-    snippet?: string;
-    displayed_link?: string;
-    position?: number;
-  }>;
-  knowledge_graph?: {
-    title?: string;
-    type?: string;
-    description?: string;
-    url?: string;
-    attributes?: Record<string, string | undefined>;
-  };
-  answer_box?: {
-    type?: string;
-    answer?: string;
-    snippet?: string;
-    link?: string;
-    title?: string;
-  };
-  people_also_ask?: Array<{
-    question?: string;
-    snippet?: string;
-  }>;
-  related_searches?: Array<{ query?: string }>;
-}
+export type { SearchResult } from "../../schemas/search";
 
 /**
  * Query SerpAPI (Google engine)
@@ -60,7 +33,7 @@ export async function searchWithSerpApiDuckDuckGo(
     maxResults,
     timestamp: new Date().toISOString(),
   };
-  console.info("🔍 SERP API Request:", requestLog);
+  console.info("[SEARCH] SERP API Request:", requestLog);
 
   try {
     const response = await fetch(apiUrl, {
@@ -77,12 +50,12 @@ export async function searchWithSerpApiDuckDuckGo(
       endpoint: "https://serpapi.com/search.json",
       queryLength: query.length,
     } as const;
-    console.info("📊 SERP API Response:", safeLog);
+    console.info("SERP API Response:", safeLog);
 
     if (!response.ok) {
       const errorText = await response.text();
       const errorMessage = `SERP API returned ${response.status} ${response.statusText}: ${errorText}`;
-      console.error("❌ SERP API Error Details:", {
+      console.error("[ERROR] SERP API Error Details:", {
         status: response.status,
         statusText: response.statusText,
         errorText,
@@ -93,8 +66,20 @@ export async function searchWithSerpApiDuckDuckGo(
       throw new Error(errorMessage);
     }
 
-    const data: SerpApiResponse = await response.json();
-    console.info("✅ SERP API Success:", {
+    const rawData: unknown = await response.json();
+    const parseResult = safeParseWithLog(
+      SerpApiResponseSchema,
+      rawData,
+      `SerpAPI [query=${query.substring(0, 50)}]`,
+    );
+    if (!parseResult.success) {
+      // Per [EH1b]: Surface failures, don't swallow - throw with context
+      throw new Error(
+        `SerpAPI response validation failed for query "${query.substring(0, 50)}": ${parseResult.error.message}`,
+      );
+    }
+    const data = parseResult.data;
+    console.info("[OK] SERP API Success:", {
       hasOrganic: !!data.organic_results,
       count: data.organic_results?.length || 0,
       queryLength: query.length,
@@ -154,7 +139,7 @@ export async function searchWithSerpApiDuckDuckGo(
           .filter((q): q is string => typeof q === "string" && q.length > 0);
       }
 
-      console.info("📋 SERP API Results Parsed:", {
+      console.info("SERP API Results Parsed:", {
         resultCount: results.length,
         sampleResults: results.slice(0, 2).map((r) => ({
           title: r.title,
@@ -163,9 +148,9 @@ export async function searchWithSerpApiDuckDuckGo(
         })),
         hasEnrichment: Boolean(
           enrichment.knowledgeGraph ||
-            enrichment.answerBox ||
-            enrichment.peopleAlsoAsk?.length ||
-            enrichment.relatedSearches?.length,
+          enrichment.answerBox ||
+          enrichment.peopleAlsoAsk?.length ||
+          enrichment.relatedSearches?.length,
         ),
         timestamp: new Date().toISOString(),
       });
@@ -173,13 +158,13 @@ export async function searchWithSerpApiDuckDuckGo(
       return { results, enrichment };
     }
 
-    console.log("⚠️ SERP API No Results:", {
+    console.warn("[WARN] SERP API No Results:", {
       queryLength: query.length,
       timestamp: new Date().toISOString(),
     });
     return { results: [] };
   } catch (error) {
-    console.error("💥 SERP API Exception:", {
+    console.error("[ERROR] SERP API Exception:", {
       error: getErrorMessage(error),
       stack: error instanceof Error ? error.stack : "No stack trace",
       queryLength: query.length,

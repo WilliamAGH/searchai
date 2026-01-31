@@ -10,20 +10,16 @@
  */
 
 import { useMemo } from "react";
-import type { UnifiedMessage, UnifiedChat } from "../lib/types/unified";
-import { logger } from "../lib/logger";
+import type { Message } from "@/lib/types/message";
+import { logger } from "@/lib/logger";
 
 interface UseEffectiveMessagesOptions {
   /** Messages from unified chat state (includes optimistic updates) */
-  messages: UnifiedMessage[];
+  messages: Message[];
   /** Messages from paginated query (DB source of truth) */
-  paginatedMessages: UnifiedMessage[];
-  /** Whether user is authenticated */
-  isAuthenticated: boolean;
+  paginatedMessages: Message[];
   /** Current chat ID */
   currentChatId: string | null;
-  /** Current chat object (to check isLocal) */
-  currentChat: UnifiedChat | null;
 }
 
 /**
@@ -37,10 +33,8 @@ interface UseEffectiveMessagesOptions {
 export function useEffectiveMessages({
   messages,
   paginatedMessages,
-  isAuthenticated,
   currentChatId,
-  currentChat,
-}: UseEffectiveMessagesOptions): UnifiedMessage[] {
+}: UseEffectiveMessagesOptions): Message[] {
   return useMemo(() => {
     // Check if unified messages have optimistic state (isStreaming or unpersisted)
     const hasOptimisticMessages = messages.some(
@@ -51,12 +45,8 @@ export function useEffectiveMessages({
       .reverse()
       .find((m) => m.role === "assistant");
 
-    // Extract stable ID from the last assistant message (prefer messageId > _id > id)
-    const lastAssistantKey =
-      lastAssistantMessage?.messageId ??
-      lastAssistantMessage?._id ??
-      lastAssistantMessage?.id ??
-      null;
+    // Extract stable ID from the last assistant message
+    const lastAssistantKey = lastAssistantMessage?._id ?? null;
 
     const persistedAssistantMissingInPaginated =
       !!lastAssistantMessage &&
@@ -66,9 +56,7 @@ export function useEffectiveMessages({
       lastAssistantMessage.content.length > 0 &&
       // Use ID-based comparison when available, fall back to content comparison
       (lastAssistantKey
-        ? !paginatedMessages.some(
-            (m) => (m.messageId ?? m._id ?? m.id ?? null) === lastAssistantKey,
-          )
+        ? !paginatedMessages.some((m) => m._id === lastAssistantKey)
         : !paginatedMessages.some(
             (m) =>
               m.role === "assistant" &&
@@ -86,13 +74,8 @@ export function useEffectiveMessages({
       return messages;
     }
 
-    // Otherwise, use paginated messages if available (for authenticated users with DB data)
-    if (
-      isAuthenticated &&
-      currentChatId &&
-      !currentChat?.isLocal &&
-      paginatedMessages.length > 0
-    ) {
+    // Otherwise, use paginated messages if available
+    if (currentChatId && paginatedMessages.length > 0) {
       logger.debug("Using paginated messages - no optimistic state", {
         count: paginatedMessages.length,
         chatId: currentChatId,
@@ -106,11 +89,5 @@ export function useEffectiveMessages({
       chatId: currentChatId,
     });
     return messages;
-  }, [
-    isAuthenticated,
-    currentChatId,
-    currentChat?.isLocal,
-    paginatedMessages,
-    messages,
-  ]);
+  }, [currentChatId, paginatedMessages, messages]);
 }

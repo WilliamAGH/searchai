@@ -17,7 +17,7 @@ export function tokenize(t: string): string[] {
 }
 
 // Test helpers that use the production utilities above
-export function __extractKeywordsForTest(text: string, max: number): string[] {
+export function extractKeywordsForTest(text: string, max: number): string[] {
   const freq = new Map<string, number>();
   for (const tok of tokenize(text || "")) {
     if (tok.length < 4) continue;
@@ -30,7 +30,7 @@ export function __extractKeywordsForTest(text: string, max: number): string[] {
     .map(([w]) => w);
 }
 
-export function __augmentQueryForTest(
+export function augmentQueryForTest(
   q: string,
   kws: string[],
   maxExtras: number,

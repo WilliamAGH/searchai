@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { getErrorMessage } from "./lib/errors";
+import { escapeHtml } from "./http/utils";
 
 // Helper function to send emails via MailPit
 async function sendEmailToMailPit(args: {
@@ -116,7 +117,7 @@ export const sendWelcomeEmail = action({
           </div>
           
           <div style="padding: 0 20px;">
-            <h2 style="color: #1f2937;">Hi ${args.userName || "there"}! 👋</h2>
+            <h2 style="color: #1f2937;">Hi ${escapeHtml(args.userName || "there")}!</h2>
             
             <p>Thank you for joining SearchAI! You now have access to:</p>
             

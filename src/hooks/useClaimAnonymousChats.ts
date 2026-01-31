@@ -6,7 +6,7 @@
 import { useEffect, useRef } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { logger } from "../lib/logger";
+import { logger } from "@/lib/logger";
 
 const SESSION_KEY = "searchai:anonymousSessionId";
 
@@ -30,7 +30,9 @@ export function useClaimAnonymousChats() {
             // Reason: HTTP actions lack Convex auth context and validate via sessionId
             // The sessionId may be rotated during claim to prevent cross-user access.
             const nextSessionId =
-              (result as { newSessionId?: string })?.newSessionId ?? sessionId;
+              typeof result.newSessionId === "string"
+                ? result.newSessionId
+                : sessionId;
             if (nextSessionId && nextSessionId !== sessionId) {
               localStorage.setItem(SESSION_KEY, nextSessionId);
               window.dispatchEvent(new Event("searchai:session-id-updated"));
@@ -44,7 +46,7 @@ export function useClaimAnonymousChats() {
       }
     }
 
-    claim();
+    void claim();
   }, [isAuthenticated, claimChats]);
 
   useEffect(() => {

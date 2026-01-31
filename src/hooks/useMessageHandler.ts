@@ -6,10 +6,9 @@
  */
 
 import { useCallback, useRef } from "react";
-import { logger } from "../lib/logger";
-import { getErrorMessage } from "../lib/utils/errorUtils";
-import type { Message } from "../lib/types/message";
-import type { Chat } from "../lib/types/chat";
+import { logger } from "@/lib/logger";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
+import type { ChatActions, ChatState } from "@/hooks/types";
 
 /**
  * Dependencies required by the message handler hook
@@ -21,65 +20,25 @@ interface UseMessageHandlerDeps {
   isGenerating: boolean;
   /** ID of the currently active chat, null if no chat selected */
   currentChatId: string | null;
-  /** Whether to show follow-up prompt suggestions */
-  showFollowUpPrompt: boolean;
   /** User authentication status */
-  isAuthenticated: boolean;
   /** Total number of messages sent in current session */
   messageCount: number;
-  /** List of messages in current context */
-  messages: Message[];
   /** Current chat state including messages and available chats */
-  chatState: {
-    messages: Message[];
-    chats: Chat[];
-  };
-  /** Tracking of last planner API calls by chat ID for rate limiting */
-  lastPlannerCallAtByChat: Record<string, number>;
+  chatState: Pick<ChatState, "messages" | "chats">;
 
   // Actions
   /** Update the generation status flag */
   setIsGenerating: (value: boolean) => void;
   /** Update the message counter */
   setMessageCount: (value: number) => void;
-  /** Update planner call tracking */
-  setLastPlannerCallAtByChat: (value: Record<string, number>) => void;
-  /** Set a pending message to be sent */
-  setPendingMessage: (value: string) => void;
 
   // Functions
   /** Create a new chat and return its ID */
   handleNewChat: (opts?: { userInitiated?: boolean }) => Promise<string | null>;
-  /** Reset follow-up prompt state */
-  resetFollowUp: () => void;
-  /** Optional callback to trigger sign-up flow */
-  onRequestSignUp?: () => void;
-  /** Search planning function (implementation varies) */
-  planSearch: unknown;
-  /** Check if the message indicates a topic change */
-  isTopicChange: (current: string, previous: string) => boolean;
-  /** Generate AI response for authenticated users */
-  generateResponse: (args: {
-    chatId: string;
-    message: string;
-    isReplyToAssistant?: boolean;
-  }) => Promise<unknown>;
-  /** Generate AI response for unauthenticated users */
-  generateUnauthenticatedResponse: (
-    message: string,
-    chatId: string,
-  ) => Promise<void>;
   /** Conditionally show follow-up prompts based on context */
   maybeShowFollowUpPrompt: () => void;
   /** Chat management actions */
-  chatActions: {
-    /** Select and activate a chat */
-    selectChat: (id: string) => Promise<void>;
-    /** Update chat properties */
-    updateChat: (id: string, updates: Partial<Chat>) => Promise<void>;
-    /** Send a message in the current chat */
-    sendMessage?: (chatId: string, message: string) => Promise<void>;
-  };
+  chatActions: ChatActions;
   /** Surface user-visible errors when message sending fails */
   setErrorMessage?: (message: string) => void;
 }
@@ -104,15 +63,11 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
    * Main message sending handler
    * Manages chat selection/creation and message dispatch
    *
-   * @param {unknown} messageInput - The message to send (coerced to string)
+   * @param {string} messageInput - The message to send
    */
   const handleSendMessage = useCallback(
-    async (messageInput: unknown) => {
-      const message =
-        typeof messageInput === "string"
-          ? messageInput
-          : String(messageInput ?? "");
-      if (!message.trim()) return;
+    async (messageInput: string) => {
+      if (!messageInput.trim()) return;
 
       let activeChatId: string | null = deps.currentChatId;
 
@@ -124,7 +79,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
             ? firstMsg.chatId
             : undefined;
         if (existingChatId) {
-          logger.info("✅ Found existing chat from messages", {
+          logger.info("[OK] Found existing chat from messages", {
             existingChatId,
           });
           activeChatId = existingChatId;
@@ -135,10 +90,10 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
       // Only create new chat if truly needed
       if (!activeChatId) {
-        logger.debug("📝 No chat exists, creating new one");
+        logger.debug("No chat exists, creating new one");
         const newChatId = await deps.handleNewChat();
         if (!newChatId) {
-          logger.error("❌ Failed to create chat for message");
+          logger.error("[ERROR] Failed to create chat for message");
           return;
         }
         // Frontend uses string chat IDs; avoid unsafe casts
@@ -156,7 +111,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
           throw new Error("Message sending is currently unavailable.");
         }
 
-        await deps.chatActions.sendMessage(activeChatId, message.trim());
+        await deps.chatActions.sendMessage(activeChatId, messageInput.trim());
 
         // Title updates handled server-side during streaming persistence
         // This ensures titles persist to Convex and survive page refresh
@@ -164,6 +119,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         deps.maybeShowFollowUpPrompt();
       } catch (error) {
         logger.error("Failed to send message", error);
+        // Surface error to user via UI feedback
         if (deps.setErrorMessage) {
           deps.setErrorMessage(
             getErrorMessage(error, "Failed to send message"),

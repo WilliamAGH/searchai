@@ -51,11 +51,11 @@ export const scheduleOpenAIHealthCheck = (params: {
         ),
       ]);
       console.info(
-        "✅ OpenAI health check passed",
+        "[OK] OpenAI health check passed",
         `${params.model} (${Date.now() - start}ms)`,
       );
     } catch (error) {
-      console.error("❌ OpenAI health check failed", {
+      console.error("[ERROR] OpenAI health check failed", {
         model: params.model,
         error: getErrorMessage(error),
       });

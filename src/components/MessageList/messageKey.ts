@@ -1,4 +1,4 @@
-import type { Message } from "../../lib/types/message";
+import type { Message } from "@/lib/types/message";
 
 /**
  * Tracks generated fallback keys to ensure stability across renders.
@@ -17,10 +17,9 @@ function createFallbackKey(message: Message, seed?: string): string {
   fallbackKeyCounter += 1;
 
   const timestamp =
-    message.timestamp ??
-    ("_creationTime" in message
-      ? ((message as { _creationTime?: number })._creationTime ?? 0)
-      : 0);
+    typeof message.timestamp === "number"
+      ? message.timestamp
+      : (message._creationTime ?? 0);
 
   const role = message.role ?? "unknown";
   const seedSuffix = seed ? `-${seed}` : "";
@@ -32,16 +31,11 @@ function createFallbackKey(message: Message, seed?: string): string {
 
 /**
  * Resolve a stable key for a message, falling back to a unique generator when
- * Convex/local identifiers are not available.
+ * identifiers are not available.
  */
 export function resolveMessageKey(message: Message, seed?: string): string {
   if (typeof message._id === "string" && message._id.length > 0) {
     return message._id;
-  }
-
-  const candidateId = (message as { id?: string }).id;
-  if (typeof candidateId === "string" && candidateId.length > 0) {
-    return candidateId;
   }
 
   return createFallbackKey(message, seed);

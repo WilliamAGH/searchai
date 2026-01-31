@@ -6,7 +6,7 @@
  */
 
 import React, { Component, ReactNode } from "react";
-import { logger } from "../lib/logger";
+import { logger } from "@/lib/logger";
 
 /**
  * Props for the ErrorBoundary component
@@ -74,7 +74,7 @@ export class ErrorBoundary extends Component<Props, State> {
    */
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log error details for debugging
-    logger.error("❌ ErrorBoundary caught error:", {
+    logger.error("[ERROR] ErrorBoundary caught error:", {
       error: error.toString(),
       stack: error.stack,
       componentStack: errorInfo.componentStack,

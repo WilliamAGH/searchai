@@ -1,13 +1,13 @@
 import { v } from "convex/values";
 import type { Id, TableNames } from "../_generated/dataModel";
-import type { ResearchContextReference as ResearchContextReferenceType } from "../agents/schema";
 
 // Shared validators for backend-only usage
 // Note: Do not re-export Convex-generated types from _generated/*
 
 /**
- * Search method validator - single source of truth for search provider types.
- * Used in schema.ts, messages.ts, search.ts, and migration files.
+ * Search method validator.
+ * Values must match SEARCH_METHODS const in constants/search.ts (source of truth).
+ * @see {@link ./constants/search.ts} SEARCH_METHODS - canonical list
  */
 export const vSearchMethod = v.union(
   v.literal("serp"),
@@ -96,11 +96,16 @@ export const vContextReference = v.object({
   metadata: v.optional(v.any()),
 });
 
-// Re-export the TS type used across orchestration to keep validator and TS shape aligned.
-// NOTE: This indirection prevents V8 runtimes from importing `orchestration_helpers.ts`
-// (which uses `node:crypto`). Always import the type from `../agents/schema` or from this
-// re-export, never from the Node-only helpers.
-export type ResearchContextReference = ResearchContextReferenceType;
+/** TypeScript type for context references (derived from validator) */
+export interface ContextReference {
+  contextId: string;
+  type: "search_result" | "scraped_page" | "research_summary";
+  url?: string;
+  title?: string;
+  timestamp: number;
+  relevanceScore?: number;
+  metadata?: unknown;
+}
 
 const LOCAL_ID_PREFIXES = ["local_", "chat_", "msg_"];
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
@@ -132,6 +137,12 @@ export function isValidConvexIdFormat(str: string): boolean {
   return extractRawIdentifier(str) !== null;
 }
 
+export function isConvexId<TableName extends TableNames>(
+  str: string,
+): str is Id<TableName> {
+  return isValidConvexIdFormat(str);
+}
+
 /**
  * Safely cast a string to a Convex ID with runtime validation
  * Returns null if the string is not a valid Convex ID format
@@ -148,9 +159,9 @@ export function isValidConvexIdFormat(str: string): boolean {
 export function safeConvexId<TableName extends TableNames>(
   str: string | null | undefined,
 ): Id<TableName> | null {
-  if (!str || !isValidConvexIdFormat(str)) {
+  if (!str || !isConvexId<TableName>(str)) {
     return null;
   }
 
-  return str as Id<TableName>;
+  return str;
 }

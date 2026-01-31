@@ -53,7 +53,10 @@ export function registerSearchRoutes(http: HttpRouter) {
       try {
         rawPayload = await request.json();
       } catch (error) {
-        console.error("❌ SEARCH API INVALID JSON:", serializeError(error));
+        console.error(
+          "[ERROR] SEARCH API INVALID JSON:",
+          serializeError(error),
+        );
         return corsResponse(
           JSON.stringify({
             error: "Invalid JSON body",
@@ -76,7 +79,9 @@ export function registerSearchRoutes(http: HttpRouter) {
           origin,
         );
       }
-      const query = String(payload.query || "").slice(0, 1000);
+      const query = (
+        typeof payload.query === "string" ? payload.query : ""
+      ).slice(0, 1000);
       const maxResults =
         typeof payload.maxResults === "number"
           ? Math.max(1, Math.min(payload.maxResults, 50))
@@ -94,7 +99,7 @@ export function registerSearchRoutes(http: HttpRouter) {
         );
       }
 
-      dlog("🔍 SEARCH ENDPOINT CALLED:");
+      dlog("[SEARCH] SEARCH ENDPOINT CALLED:");
       dlog("Query:", query);
       dlog("Max Results:", maxResults);
       dlog("Environment Variables Available:");
@@ -170,13 +175,16 @@ export function registerSearchRoutes(http: HttpRouter) {
           // Surface matched rules for debugging in dev if needed (non-breaking)
         } as const;
 
-        dlog("🔍 SEARCH RESULT:", JSON.stringify(enhancedResult, null, 2));
+        dlog(
+          "[SEARCH] SEARCH RESULT:",
+          JSON.stringify(enhancedResult, null, 2),
+        );
 
         return corsResponse(JSON.stringify(enhancedResult), 200, origin);
       } catch (error) {
         const errorInfo = serializeError(error);
         const errorMessage = errorInfo.message;
-        console.error("❌ SEARCH API ERROR:", {
+        console.error("[ERROR] SEARCH API ERROR:", {
           query: query.substring(0, 100),
           error: errorMessage,
           errorDetails: errorInfo,
@@ -205,7 +213,7 @@ export function registerSearchRoutes(http: HttpRouter) {
         };
 
         dlog(
-          "🔍 SEARCH ERROR RESPONSE:",
+          "[SEARCH] SEARCH ERROR RESPONSE:",
           JSON.stringify(errorResponse, null, 2),
         );
 

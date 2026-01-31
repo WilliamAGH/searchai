@@ -1,18 +1,22 @@
+/**
+ * Hook for chat navigation with verification
+ * Handles URL-based navigation ensuring chat existence before routing.
+ * Provides path building and verified navigation for chat selection.
+ */
+
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Chat } from "../lib/types/chat";
+import type { Chat } from "@/lib/types/chat";
 
 interface UseChatNavigationProps {
   currentChatId: string | null;
   allChats: Chat[];
-  isAuthenticated: boolean;
   onSelectChat: (chatId: string) => Promise<void>;
 }
 
 export function useChatNavigation({
   currentChatId,
   allChats,
-  isAuthenticated: _isAuthenticated,
   onSelectChat,
 }: UseChatNavigationProps) {
   const navigate = useNavigate();
@@ -22,13 +26,8 @@ export function useChatNavigation({
   }, []);
 
   const resolveChatId = useCallback((chat: Chat): string => {
-    if (typeof (chat as { id?: unknown }).id === "string") {
-      return String((chat as { id: string }).id);
-    }
-
-    const maybeId = (chat as { _id?: unknown })._id;
-    if (typeof maybeId === "string") {
-      return maybeId;
+    if (typeof chat._id === "string") {
+      return chat._id;
     }
 
     return "";
@@ -46,7 +45,7 @@ export function useChatNavigation({
       }
 
       await onSelectChat(normalizedChatId);
-      navigate(buildChatPath(normalizedChatId));
+      void navigate(buildChatPath(normalizedChatId));
       return true;
     },
     [allChats, onSelectChat, navigate, buildChatPath, resolveChatId],

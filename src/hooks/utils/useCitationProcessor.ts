@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { getDomainFromUrl } from "../../lib/utils/favicon";
-import { logger } from "../../lib/logger";
+import { getDomainFromUrl } from "@/lib/utils/favicon";
+import { logger } from "@/lib/logger";
 
 /**
  * Hook to process content and replace citations with interactive markers

@@ -18,6 +18,21 @@ export const AGENT_LIMITS = {
   MAX_SEARCH_QUERIES: 3,
   MIN_SCRAPE_URLS: 2,
   MAX_SCRAPE_URLS: 4,
+  /**
+   * Maximum agent turns (LLM round-trips) before forcing completion.
+   *
+   * Turn budget calculation for conversational agent:
+   * - 1 turn for plan_research
+   * - Up to MAX_SEARCH_QUERIES turns for search_web (if sequential)
+   * - Up to MAX_SCRAPE_URLS turns for scrape_webpage (if sequential)
+   * - 1 turn for final synthesis
+   *
+   * Worst case: 1 + 3 + 4 + 1 = 9 turns. Set to 12 for safety margin.
+   * Note: If model batches tool calls, actual turns used will be fewer.
+   */
+  MAX_AGENT_TURNS: 12,
+  /** Maximum consecutive tool errors before aborting workflow */
+  MAX_TOOL_ERRORS: 3,
 } as const;
 
 /**
@@ -63,4 +78,40 @@ export const AGENT_TIMEOUTS = {
   AGENT_STAGE_MS: 60_000,
   /** Timeout for research stage with tool calls (search + scrape) */
   TOOL_EXECUTION_MS: 120_000,
+} as const;
+
+/**
+ * Content length limits for truncation and previews.
+ * Centralizes magic numbers used across agent modules.
+ */
+export const CONTENT_LIMITS = {
+  /** Maximum characters for content preview in logs */
+  PREVIEW_MAX_CHARS: 200,
+  /** Maximum recent messages to include in context */
+  MAX_CONTEXT_MESSAGES: 20,
+  /** Maximum characters for full conversation context */
+  MAX_CONTEXT_CHARS: 4000,
+  /** Minimum content length to consider valid (filters noise) */
+  MIN_CONTENT_LENGTH: 100,
+  /** Minimum summary length to consider useful */
+  MIN_SUMMARY_LENGTH: 50,
+  /** Standard summary truncation length */
+  SUMMARY_TRUNCATE_LENGTH: 500,
+  /** Log display truncation (297 + "..." = 300) */
+  LOG_DISPLAY_LENGTH: 297,
+  /** Short field truncation (e.g., userQuestion, researchGoal) */
+  SHORT_FIELD_LENGTH: 100,
+  /** Query display length in logs */
+  QUERY_DISPLAY_LENGTH: 50,
+} as const;
+
+/**
+ * Token budgets for prompt construction.
+ * Controls how much content is included in LLM prompts.
+ */
+export const TOKEN_BUDGETS = {
+  /** Total tokens allocated for scraped content in synthesis prompt */
+  TOTAL_CONTENT_TOKENS: 12_000,
+  /** Maximum tokens per individual page */
+  MAX_TOKENS_PER_PAGE: 3_000,
 } as const;

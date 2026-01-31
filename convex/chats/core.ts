@@ -9,6 +9,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { generateShareId, generatePublicId } from "../lib/uuid";
 import { hasUserAccess, hasSessionAccess } from "../lib/auth";
 
@@ -28,6 +29,11 @@ export const createChat = mutation({
   },
   returns: v.id("chats"),
   handler: async (ctx, args) => {
+    // Validate sessionId if provided - reject empty strings
+    if (args.sessionId !== undefined && args.sessionId.trim() === "") {
+      throw new Error("sessionId cannot be an empty string");
+    }
+
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
 
@@ -98,7 +104,7 @@ export const getUserChats = query({
  * 2. HTTP endpoints (use sessionId, since httpAction has no auth context)
  */
 async function validateChatAccess(
-  ctx: any,
+  ctx: QueryCtx | MutationCtx,
   chatId: Id<"chats">,
   sessionId?: string,
 ) {

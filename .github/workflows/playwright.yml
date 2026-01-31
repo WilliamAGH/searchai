@@ -2,9 +2,9 @@ name: Playwright Integration Tests
 
 on:
   push:
-    branches: [ dev ]
+    branches: [dev]
   pull_request:
-    branches: [ dev ]
+    branches: [dev]
 
 jobs:
   e2e:
@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: "22.17.0"
 
       - name: Install dependencies
         run: npm ci
@@ -25,13 +25,39 @@ jobs:
       - name: Build app
         run: npm run build
 
+      - name: Verify dist directory exists
+        run: |
+          echo "=== Checking dist directory ==="
+          ls -la dist/ | head -10
+          echo "=== Checking dist/index.html ==="
+          head -5 dist/index.html
+
+      - name: Test vite preview server directly
+        run: |
+          # Use port 5174 to avoid conflict with Playwright's port 5173
+          echo "=== Starting vite preview on port 5174 ==="
+          npx vite preview --strictPort --port 5174 --host 127.0.0.1 &
+          SERVER_PID=$!
+          echo "Server PID: $SERVER_PID"
+          sleep 5
+          echo "=== Checking if server process is running ==="
+          ps aux | grep -E "vite|node" | grep -v grep | head -5 || echo "Process grep failed"
+          echo "=== Checking open ports ==="
+          ss -tlnp | grep 5174 || echo "ss command failed or port not found"
+          echo "=== Testing HTTP connection ==="
+          curl -v --connect-timeout 10 http://127.0.0.1:5174/ 2>&1 | head -30 || echo "Curl failed!"
+          echo "=== Cleanup ==="
+          kill $SERVER_PID 2>/dev/null || true
+          pkill -f "vite preview.*5174" 2>/dev/null || true
+          sleep 2
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Run Playwright tests (integration)
         env:
-          CI: '1'
-        run: npx playwright test --config=playwright-integration.config.ts --reporter=line
+          CI: "1"
+        run: npx playwright test --config=__tests__/playwright-integration.config.ts --reporter=line
 
       - name: Upload Playwright report
         if: always()
@@ -40,4 +66,3 @@ jobs:
           name: playwright-report
           path: playwright-report
           if-no-files-found: ignore
-

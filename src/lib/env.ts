@@ -2,7 +2,7 @@
  * Environment variable validation and type safety
  * Ensures all required env vars are present and valid
  */
-import { logger } from "./logger";
+import { logger } from "@/lib/logger";
 
 interface EnvConfig {
   VITE_CONVEX_URL: string;
@@ -44,12 +44,17 @@ function validateEnv(): EnvConfig {
     throw new Error(`Invalid VITE_CONVEX_URL format: ${env.VITE_CONVEX_URL}`);
   }
 
+  const mode = env.MODE;
+  if (mode !== "development" && mode !== "production" && mode !== "test") {
+    throw new Error(`Invalid MODE value: ${mode}`);
+  }
+
   return {
     VITE_CONVEX_URL: env.VITE_CONVEX_URL,
     VITE_AGENT_SIGNING_KEY: env.VITE_AGENT_SIGNING_KEY,
     DEV: env.DEV === true,
     PROD: env.PROD === true,
-    MODE: env.MODE as "development" | "production" | "test",
+    MODE: mode,
   };
 }
 
@@ -184,6 +189,6 @@ export function initializeEnv(): void {
       "Continuing with invalid environment configuration (local/dev mode)",
     );
   } else {
-    logger.info("✅ Environment configuration validated");
+    logger.info("[OK] Environment configuration validated");
   }
 }

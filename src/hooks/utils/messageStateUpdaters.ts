@@ -6,8 +6,8 @@
  */
 
 import type { Dispatch, SetStateAction } from "react";
-import type { ChatState } from "../useChatState";
-import type { UnifiedMessage } from "../../lib/types/unified";
+import type { ChatState } from "@/hooks/useChatState";
+import type { Message } from "@/lib/types/message";
 
 /**
  * Update the last assistant message in chat state.
@@ -33,7 +33,7 @@ import type { UnifiedMessage } from "../../lib/types/unified";
  */
 export function updateLastAssistantMessage(
   setState: Dispatch<SetStateAction<ChatState>>,
-  messageUpdates: Partial<UnifiedMessage>,
+  messageUpdates: Partial<Message>,
   stateUpdates?: Partial<Omit<ChatState, "messages">>,
 ): void {
   setState((prev) => ({

@@ -6,13 +6,18 @@
  * and optionally falls back to Playwright for JS-rendered pages.
  */
 
-import * as cheerio from "cheerio";
-import type { CheerioAPI } from "cheerio";
+import { load } from "cheerio";
 import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { CACHE_TTL } from "../lib/constants/cache";
 import { validateScrapeUrl } from "../lib/url";
 import { getErrorMessage } from "../lib/errors";
+import {
+  extractMainContent,
+  extractPageMetadata,
+  needsJsRendering,
+  normalizeScrapedText,
+} from "./scraper_content";
 // NOTE: Playwright removed - not compatible with Convex's deployment environment
 // (requires native browser binaries that aren't available in Convex runtime)
 
@@ -28,93 +33,20 @@ export type ScrapeResult = {
   errorCode?: string;
 };
 
-const cleanText = (text: string): string =>
-  text
-    .replace(/\s+/g, " ")
-    .replace(/\u00a0/g, " ")
-    .trim();
-
-const stripJunk = ($: CheerioAPI) => {
-  $("script, style, nav, footer, header, aside, noscript, iframe").remove();
-  $('[aria-hidden="true"]').remove();
-  $('[role="presentation"]').remove();
-  $(".ads, .ad, .advertisement, .promo, .sidebar").remove();
+type CacheEntry = {
+  exp: number;
+  val: ScrapeResult;
 };
 
-const extractPageMetadata = ($: CheerioAPI) => {
-  const fallbackTitle =
-    $("h1").first().text().trim() || $("h2").first().text().trim();
-  return {
-    title: $("title").text().trim() || fallbackTitle,
-    description: $('meta[name="description"]').attr("content"),
-    ogTitle: $('meta[property="og:title"]').attr("content"),
-    ogDescription: $('meta[property="og:description"]').attr("content"),
-    author: $('meta[name="author"]').attr("content"),
-    publishedDate: $('meta[property="article:published_time"]').attr("content"),
-    jsonLd: $('script[type="application/ld+json"]').first().html(),
-  };
-};
+declare global {
+  var __scrapeCache: Map<string, CacheEntry> | undefined;
+}
 
-const extractLargestTextBlock = ($: CheerioAPI): string => {
-  let bestNode: any = null;
-  let bestLen = 0;
-  $("p, article, section, div").each((_, el) => {
-    const text = cleanText($(el).text());
-    if (text.length > bestLen) {
-      bestLen = text.length;
-      bestNode = el;
-    }
-  });
-  if (bestNode) {
-    return cleanText($(bestNode).text());
+const getScrapeCache = (): Map<string, CacheEntry> => {
+  if (!globalThis.__scrapeCache) {
+    globalThis.__scrapeCache = new Map<string, CacheEntry>();
   }
-  return "";
-};
-
-const extractMainContent = ($: CheerioAPI): string => {
-  stripJunk($);
-  const main =
-    $("article").first().text() ||
-    $("main").first().text() ||
-    $('[role="main"]').first().text() ||
-    $(".content").first().text() ||
-    $(".post").first().text();
-
-  const cleaned = cleanText(main);
-  if (cleaned.length > 300) return cleaned;
-
-  const largest = extractLargestTextBlock($);
-  if (largest.length > 0) return largest;
-
-  return cleanText($("body").text());
-};
-
-/**
- * Detect if a page likely needs JavaScript rendering for full content.
- * Must be called BEFORE stripJunk() since it checks for noscript elements.
- */
-export const needsJsRendering = (
-  $: CheerioAPI,
-  textLength: number,
-): boolean => {
-  const hasReactRoot = $("#root, #__next, #app").length > 0;
-  const hasNoscript = $("noscript").text().toLowerCase().includes("javascript");
-  const minimalContent = textLength < 500;
-  return (hasReactRoot && minimalContent) || hasNoscript;
-};
-
-const getScrapeCache = () => {
-  type CacheEntry = {
-    exp: number;
-    val: ScrapeResult;
-  };
-  const globalWithCache = globalThis as typeof globalThis & {
-    __scrapeCache?: Map<string, CacheEntry>;
-  };
-  if (!globalWithCache.__scrapeCache) {
-    globalWithCache.__scrapeCache = new Map<string, CacheEntry>();
-  }
-  return globalWithCache.__scrapeCache;
+  return globalThis.__scrapeCache;
 };
 
 export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
@@ -147,7 +79,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     return cached.val;
   }
 
-  console.info("🌐 Scraping URL initiated:", {
+  console.info("Scraping URL initiated:", {
     url: validatedUrl,
     timestamp: new Date().toISOString(),
   });
@@ -174,7 +106,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       signal: AbortSignal.timeout(10000), // 10 second timeout
     });
 
-    console.info("📊 Scrape response received:", {
+    console.info("Scrape response received:", {
       url: validatedUrl,
       status: response.status,
       statusText: response.statusText,
@@ -188,12 +120,12 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
         statusText: response.statusText,
         timestamp: new Date().toISOString(),
       };
-      console.error("❌ HTTP error during scraping:", errorDetails);
+      console.error("[ERROR] HTTP error during scraping:", errorDetails);
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
     }
 
     const contentType = response.headers.get("content-type") || "";
-    console.info("📄 Content type check:", {
+    console.info("Content type check:", {
       url,
       contentType: contentType,
     });
@@ -204,21 +136,21 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
         contentType: contentType,
         timestamp: new Date().toISOString(),
       };
-      console.error("❌ Non-HTML content type:", errorDetails);
+      console.error("[ERROR] Non-HTML content type:", errorDetails);
       throw new Error(`Not an HTML page. Content-Type: ${contentType}`);
     }
 
     const html = await response.text();
-    console.info("✅ HTML content fetched:", {
+    console.info("[OK] HTML content fetched:", {
       url: validatedUrl,
       contentLength: html.length,
       timestamp: new Date().toISOString(),
     });
 
-    const $ = cheerio.load(html);
+    const $ = load(html);
     const metadata = extractPageMetadata($);
     // Check for JS rendering BEFORE stripJunk removes noscript elements
-    const bodyText = cleanText($("body").text());
+    const bodyText = normalizeScrapedText($("body").text());
     const needsRender = needsJsRendering($, bodyText.length);
     // Now extract content (which calls stripJunk and removes noscript)
     const extractedContent = extractMainContent($);
@@ -257,7 +189,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     // Trim whitespace after junk removal
     cleanedContent = cleanedContent.trim();
 
-    console.log("🗑️ Junk content removed:", {
+    console.log("Junk content removed:", {
       url: validatedUrl,
       removedCount: removedJunkCount,
       contentLengthBefore: content.length,
@@ -272,7 +204,10 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
         contentLengthAfter: cleanedContent.length,
         timestamp: new Date().toISOString(),
       };
-      console.error("❌ Content too short after junk removal:", errorDetails);
+      console.error(
+        "[ERROR] Content too short after junk removal:",
+        errorDetails,
+      );
       throw new Error(
         `Content too short after cleaning (${cleanedContent.length} characters)`,
       );
@@ -292,7 +227,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
 
     cache.set(validatedUrl, { exp: Date.now() + SCRAPE_TTL_MS, val: result });
     enforceCapacity();
-    console.info("✅ Scraping completed successfully:", {
+    console.info("[OK] Scraping completed successfully:", {
       url: validatedUrl,
       resultLength: cleanedContent.length,
       summaryLength: summary.length,
@@ -313,7 +248,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       errorCode = "CONTENT_TOO_SHORT";
     else if (errorMessage.includes("Not an HTML")) errorCode = "NOT_HTML";
 
-    console.error("💥 Scraping failed with exception:", {
+    console.error("[ERROR] Scraping failed with exception:", {
       url: validatedUrl,
       error: errorMessage,
       errorCode,

@@ -7,8 +7,18 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, action } from "../_generated/server";
+import { api } from "../_generated/api";
 import { buildContextSummary } from "./utils";
 import { hasUserAccess, hasSessionAccess } from "../lib/auth";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const getRollingSummary = (value: unknown): string | undefined => {
+  if (!isRecord(value)) return undefined;
+  const rollingSummary = value.rollingSummary;
+  return typeof rollingSummary === "string" ? rollingSummary : undefined;
+};
 
 /**
  * Summarize last N messages (cheap, server-side)
@@ -54,8 +64,7 @@ export const summarizeRecent = query({
     const ordered = buf.reverse();
     return buildContextSummary({
       messages: ordered,
-      rollingSummary: (chat as unknown as { rollingSummary?: string })
-        ?.rollingSummary,
+      rollingSummary: chat.rollingSummary,
       maxChars: 1600,
     });
   },
@@ -70,24 +79,17 @@ export const summarizeRecentAction = action({
   returns: v.string(),
   handler: async (ctx, args): Promise<string> => {
     const lim = Math.max(1, Math.min(args.limit ?? 14, 40));
-    // Load messages via query to respect auth and avoid using ctx.db in actions
-    // Import functions directly to avoid circular dependency
-    const { getChatMessages } = await import("./messages");
-    const { getChatById } = await import("./core");
-
-    const all = await ctx.runQuery(getChatMessages as any, {
+    // Load messages via query with limit to avoid fetching entire chat history
+    const ordered = await ctx.runQuery(api.chats.messages.getChatMessages, {
       chatId: args.chatId,
+      limit: lim,
     });
-    const ordered = all.slice(-lim);
-    // Break type circularity by annotating the query result as unknown
-    const chatResult: unknown = await ctx.runQuery(getChatById as any, {
+    const chatResult = await ctx.runQuery(api.chats.core.getChatById, {
       chatId: args.chatId,
     });
     return buildContextSummary({
       messages: ordered,
-      rollingSummary: (
-        chatResult as { rollingSummary?: string } | null | undefined
-      )?.rollingSummary,
+      rollingSummary: getRollingSummary(chatResult),
       maxChars: 1600,
     });
   },

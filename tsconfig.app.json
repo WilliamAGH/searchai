@@ -30,6 +30,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "convex/**/*"],
+  "include": ["src", "convex"],
   "exclude": ["node_modules"]
 }

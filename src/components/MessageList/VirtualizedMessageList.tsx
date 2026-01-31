@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo } from "react";
-import type { Message } from "../../lib/types/message";
+import type { Message } from "@/lib/types/message";
 import { resolveMessageKey } from "./messageKey";
 
 export interface VirtualizedMessageListProps {

@@ -1,0 +1,24 @@
+# [IM1d] No @/ Alias Imports in Convex
+# Convex's esbuild bundler doesn't read tsconfig paths.
+# @/ imports pass IDE typechecking but FAIL at bundle time.
+# Use relative imports: ../lib/foo, ./utils
+# See AGENTS.md [IM1d]
+
+id: convex-no-alias-imports
+language: typescript
+severity: error
+message: |
+  [IM1d] @/ alias import in Convex file. Use relative imports instead.
+  Convex's esbuild bundler doesn't read tsconfig paths - @/ imports
+  will pass typechecking but FAIL at bundle time.
+
+  Fix: import { foo } from "../lib/foo" (not "@/lib/foo")
+
+rule:
+  kind: import_statement
+  has:
+    kind: string
+    regex: '^[''"]@/'
+
+files:
+  - "convex/**/*.ts"

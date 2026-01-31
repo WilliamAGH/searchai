@@ -11,10 +11,12 @@
  * Prompts are extracted to prompts.ts per clean code guidelines [WRN1].
  */
 
+// NOTE: OpenAI Agents SDK requires Zod v3. Keep v3 confined to this integration
+// layer and validate tool outputs against v4 schemas in convex/agents/schema.ts.
 import { z } from "zod";
 import { Agent } from "@openai/agents";
 import { toolsList, conversationalToolsList } from "./tools";
-import { createOpenAIEnvironment, getModelName } from "../lib/providers/openai";
+import { getOpenAIEnvironment, getModelName } from "../lib/providers/openai";
 import { AGENT_LIMITS } from "../lib/constants/cache";
 import {
   QUERY_PLANNER_PROMPT,
@@ -24,8 +26,12 @@ import {
 } from "./prompts";
 
 // Initialize OpenAI environment once
-const env = createOpenAIEnvironment();
+const env = getOpenAIEnvironment();
 const defaultModel = getModelName();
+const agentTools = toolsList satisfies ReturnType<typeof Agent.create>["tools"];
+const conversationalAgentTools = conversationalToolsList satisfies ReturnType<
+  typeof Agent.create
+>["tools"];
 
 /**
  * Phase 1: Query Planning Agent
@@ -90,9 +96,7 @@ export const researchAgent: ReturnType<typeof Agent.create> = Agent.create({
   model: defaultModel,
   instructions: RESEARCH_AGENT_PROMPT,
 
-  // Known SDK limitation: Tool<unknown>[] doesn't satisfy FunctionTool<any>
-  // Type assertion is safe because toolsList contains valid FunctionTool instances
-  tools: toolsList as ReturnType<typeof Agent.create>["tools"],
+  tools: agentTools,
 
   outputType: z.object({
     researchSummary: z
@@ -252,9 +256,7 @@ export const conversationalAgent = Agent.create({
     maxScrapeUrls: AGENT_LIMITS.MAX_SCRAPE_URLS,
   }),
 
-  // Known SDK limitation: Tool<unknown>[] doesn't satisfy FunctionTool<any>
-  // Type assertion is safe because conversationalToolsList contains valid FunctionTool instances
-  tools: conversationalToolsList as ReturnType<typeof Agent.create>["tools"],
+  tools: conversationalAgentTools,
 
   // No structured output - we want natural conversation
   outputType: undefined,

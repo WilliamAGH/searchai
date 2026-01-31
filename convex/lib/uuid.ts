@@ -12,6 +12,7 @@
  */
 
 import { uuidv7 } from "uuidv7";
+import { isValidUuidV7 } from "./uuid_validation";
 
 /**
  * Generate a UUID v7 for share IDs
@@ -50,12 +51,7 @@ export function generateOpaqueId(): string {
  * UUID v7 format: xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx
  * where y is one of [8, 9, a, b]
  */
-export function isValidUuidV7(id: string): boolean {
-  // UUID v7 regex pattern
-  const uuidV7Pattern =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidV7Pattern.test(id);
-}
+export { isValidUuidV7 };
 
 /**
  * Extract timestamp from UUID v7

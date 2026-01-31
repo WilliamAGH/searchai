@@ -7,23 +7,13 @@
  */
 
 import React from "react";
-import type { SearchResult } from "../../lib/types/message";
+import type { ContextReference, SearchResult } from "@/lib/types/message";
 import {
   getDomainFromUrl,
   getFaviconUrl,
   getSafeHostname,
-} from "../../lib/utils/favicon";
-import { logger } from "../../lib/logger";
-
-type ContextReference = {
-  contextId: string;
-  type: "search_result" | "scraped_page" | "research_summary";
-  url?: string;
-  title?: string;
-  timestamp: number;
-  relevanceScore?: number;
-  metadata?: unknown;
-};
+} from "@/lib/utils/favicon";
+import { logger } from "@/lib/logger";
 
 interface MessageSourcesProps {
   id: string;
@@ -54,6 +44,11 @@ export function MessageSources({
   const hasContextRefs =
     Array.isArray(contextReferences) && contextReferences.length > 0;
 
+  const hasUrl = (
+    ref: ContextReference,
+  ): ref is ContextReference & { url: string } =>
+    typeof ref.url === "string" && ref.url.length > 0;
+
   // Convert contextReferences to display format
   const displaySources: Array<{
     url: string;
@@ -62,30 +57,28 @@ export function MessageSources({
     type?: "search_result" | "scraped_page" | "research_summary";
     relevanceScore?: number;
   }> = hasContextRefs
-    ? contextReferences
-        .filter((ref) => typeof ref.url === "string" && ref.url.length > 0)
-        .map((ref) => {
-          const safeUrl = ref.url as string;
-          let inferredTitle = ref.title;
-          if (!inferredTitle) {
-            try {
-              inferredTitle = new URL(safeUrl).hostname;
-            } catch (error) {
-              logger.warn("Failed to infer title from source URL", {
-                url: safeUrl,
-                error,
-              });
-              inferredTitle = safeUrl;
-            }
+    ? contextReferences.filter(hasUrl).map((ref) => {
+        const safeUrl = ref.url;
+        let inferredTitle = ref.title;
+        if (!inferredTitle) {
+          try {
+            inferredTitle = new URL(safeUrl).hostname;
+          } catch (error) {
+            logger.warn("Failed to infer title from source URL", {
+              url: safeUrl,
+              error,
+            });
+            inferredTitle = safeUrl;
           }
+        }
 
-          return {
-            url: safeUrl,
-            title: inferredTitle,
-            type: ref.type,
-            relevanceScore: ref.relevanceScore,
-          };
-        })
+        return {
+          url: safeUrl,
+          title: inferredTitle,
+          type: ref.type,
+          relevanceScore: ref.relevanceScore,
+        };
+      })
     : results.map((r) => ({
         url: r.url,
         title: r.title,

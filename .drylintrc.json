@@ -1,0 +1,25 @@
+{
+  "plugins": ["@dry-lint/typescript", "@dry-lint/zod"],
+  "threshold": 0.96,
+  "cache": false,
+  "ignore": [
+    "node_modules/**",
+    ".pnpm-store/**",
+    ".next/**",
+    "out/**",
+    "dist/**",
+    "build/**",
+    "coverage/**",
+    "public/**",
+    "storybook-static/**",
+    ".storybook/**",
+    "tmp/**",
+    "temp/**",
+    ".vercel/**",
+    "test-results/**",
+    "pnpm-lock.yaml",
+    "package-lock.json",
+    "yarn.lock",
+    "**/*.d.ts"
+  ]
+}

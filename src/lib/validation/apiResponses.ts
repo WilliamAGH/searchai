@@ -3,12 +3,16 @@
  *
  * Uses Zod schemas for runtime validation of external API responses.
  * Schemas are defined in ../schemas/apiResponses.ts (single source of truth).
+ * Validation utilities from convex/lib/validation/zodUtils.ts (canonical).
+ *
+ * Per [ZV1]: Uses logZodFailure for error surfacing - no silent failures.
+ * Per [VL1]: Frontend does NOT re-validate data already validated by Convex.
  *
  * @see {@link ../schemas/apiResponses.ts} - Zod schemas
+ * @see {@link ../../../convex/lib/validation/zodUtils.ts} - Validation utilities
  */
 
-import type { SearchResult } from "../types/message";
-import type { SerpEnrichment } from "../../../convex/lib/types/search";
+import type { SearchResult } from "@/lib/types/message";
 import {
   SearchResultSchema,
   SearchMethodSchema,
@@ -16,7 +20,14 @@ import {
   ShareResponseSchema,
   DEFAULT_AI_RESPONSE,
   type SearchMethod,
-} from "../schemas/apiResponses";
+  SerpEnrichmentSchema,
+  type SerpEnrichment,
+} from "@/lib/schemas/apiResponses";
+import {
+  logZodFailure,
+  isRecord,
+  parseArrayWithLogging,
+} from "../../../convex/lib/validation/zodUtils";
 
 /**
  * Default search response when validation fails.
@@ -36,6 +47,7 @@ const DEFAULT_SEARCH_RESPONSE_TYPED: {
 /**
  * Validate search API response.
  * Uses Zod schemas with custom transforms for length limits.
+ * Per [ZV1c]: Logs individual item failures with index.
  */
 export function validateSearchResponse(data: unknown): {
   results: SearchResult[];
@@ -44,49 +56,70 @@ export function validateSearchResponse(data: unknown): {
   enrichment?: SerpEnrichment;
 } {
   if (!data || typeof data !== "object") {
+    logZodFailure(
+      "validateSearchResponse",
+      new Error("Invalid data type"),
+      data,
+    );
     return DEFAULT_SEARCH_RESPONSE_TYPED;
   }
 
-  const response = data as Record<string, unknown>;
+  const response = isRecord(data) ? data : {};
 
   // Validate and sanitize results array with length limits
-  const results: SearchResult[] = [];
-  if (Array.isArray(response.results)) {
-    for (const item of response.results) {
-      const parsed = SearchResultSchema.safeParse(item);
-      if (parsed.success) {
-        results.push({
-          title: parsed.data.title.substring(0, 500),
-          url: parsed.data.url.substring(0, 2000),
-          snippet: parsed.data.snippet.substring(0, 1000),
-          // relevanceScore is guaranteed by schema default, clamp to 0-1
-          relevanceScore: Math.max(0, Math.min(1, parsed.data.relevanceScore)),
-        });
-      }
-    }
-  }
+  // Per [ZV1c]: parseArrayWithLogging logs each failure with index
+  const rawResults = Array.isArray(response.results) ? response.results : [];
+  const validatedResults = parseArrayWithLogging(
+    SearchResultSchema,
+    rawResults,
+    "validateSearchResponse.results",
+  );
+
+  // Apply length limits (schema validates structure, we enforce limits)
+  const results: SearchResult[] = validatedResults.map((r) => ({
+    title: r.title.substring(0, 500),
+    url: r.url.substring(0, 2000),
+    snippet: r.snippet.substring(0, 1000),
+    // relevanceScore is guaranteed by schema default, clamp to 0-1
+    relevanceScore: Math.max(0, Math.min(1, r.relevanceScore)),
+  }));
 
   // Validate search method
   const methodResult = SearchMethodSchema.safeParse(response.searchMethod);
+  if (!methodResult.success) {
+    logZodFailure(
+      "validateSearchResponse.searchMethod",
+      methodResult.error,
+      response.searchMethod,
+    );
+  }
   const searchMethod = methodResult.success ? methodResult.data : "fallback";
 
   // Validate boolean
   const hasRealResults = response.hasRealResults === true;
 
+  // Validate enrichment
+  const enrichmentResult = SerpEnrichmentSchema.safeParse(response.enrichment);
+  if (!enrichmentResult.success && response.enrichment !== undefined) {
+    logZodFailure(
+      "validateSearchResponse.enrichment",
+      enrichmentResult.error,
+      response.enrichment,
+    );
+  }
+
   return {
     results,
     searchMethod,
     hasRealResults,
-    enrichment:
-      response.enrichment && typeof response.enrichment === "object"
-        ? (response.enrichment as SerpEnrichment)
-        : undefined,
+    enrichment: enrichmentResult.success ? enrichmentResult.data : undefined,
   };
 }
 
 /**
  * Validate AI generation response.
  * Uses Zod schema for structure validation.
+ * Per [ZV1]: Logs failures before returning defaults.
  */
 export function validateAIResponse(data: unknown): {
   response: string;
@@ -97,14 +130,15 @@ export function validateAIResponse(data: unknown): {
     return result.data;
   }
 
+  logZodFailure("validateAIResponse", result.error, data);
+
   // Fallback: try to extract response field manually
-  if (data && typeof data === "object") {
-    const aiData = data as Record<string, unknown>;
-    if (typeof aiData.response === "string") {
+  if (isRecord(data)) {
+    if (typeof data.response === "string") {
       return {
-        response: aiData.response,
+        response: data.response,
         reasoning:
-          typeof aiData.reasoning === "string" ? aiData.reasoning : undefined,
+          typeof data.reasoning === "string" ? data.reasoning : undefined,
       };
     }
   }
@@ -115,6 +149,7 @@ export function validateAIResponse(data: unknown): {
 /**
  * Validate share response from publish endpoint.
  * Uses Zod schema for structure validation.
+ * Per [ZV1]: Logs failures before returning empty object.
  */
 export function validateShareResponse(data: unknown): {
   shareId?: string;
@@ -124,6 +159,7 @@ export function validateShareResponse(data: unknown): {
   if (result.success) {
     return result.data;
   }
+  logZodFailure("validateShareResponse", result.error, data);
   return {};
 }
 

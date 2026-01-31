@@ -1,41 +1,44 @@
 {
   "name": "searchai-io",
+  "version": "0.2.0",
   "private": true,
-  "version": "0.1.0",
   "description": "AI-powered search application",
-  "type": "module",
+  "keywords": [
+    "ai",
+    "convex",
+    "react",
+    "search"
+  ],
   "homepage": "https://search-ai.io",
+  "bugs": {
+    "url": "https://github.com/WilliamAGH/searchai-io/issues"
+  },
+  "license": "LICENSE.md",
+  "author": "William Callahan",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WilliamAGH/searchai-io.git"
   },
-  "bugs": {
-    "url": "https://github.com/WilliamAGH/searchai-io/issues"
-  },
-  "author": "William Callahan",
-  "license": "SEE LICENSE IN LICENSE.md",
-  "keywords": [
-    "search",
-    "ai",
-    "convex",
-    "react"
-  ],
+  "type": "module",
   "scripts": {
-    "validate:quick": "oxlint && tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false && npm run -s test",
+    "validate:quick": "npm run -s lint:ox && tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false && npm run -s test",
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "dev:frontend": "vite --open",
     "dev:backend": "convex dev",
     "build": "vite build",
     "preview": "vite preview --strictPort --port 4173",
-    "lint": "oxlint --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin",
-    "lint:fix": "oxlint --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin --fix",
+    "lint": "npm-run-all --sequential lint:ox lint:ox:typeaware lint:eslint",
+    "lint:ox": "oxlint -c .oxlintrc.json --import-plugin --nextjs-plugin --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin .",
+    "lint:ox:typeaware": "oxlint -c .oxlintrc.json --type-aware .",
+    "lint:eslint": "eslint .",
+    "lint:fix": "oxlint --fix && eslint --fix",
     "typecheck": "tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\"",
-    "validate": "npm-run-all --parallel lint typecheck format:check lint:convex-imports lint:convex-types --sequential test:single build",
-    "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo '✅ Cleaned build caches'",
-    "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo '✅ Cleaned everything - run npm install'",
-    "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo '✅ Cleaned VSCode caches - restart VSCode'",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "validate": "npm-run-all --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates lint:boundaries --sequential test:single build",
+    "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo 'Cleaned build caches'",
+    "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo 'Cleaned everything - run npm install'",
+    "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo 'Cleaned VSCode caches - restart VSCode'",
     "test": "vitest run --reporter=dot --pool=forks",
     "test:vmforks": "vitest run --reporter=dot --pool=vmForks --poolOptions.vmForks.singleFork --coverage.enabled=false",
     "test:single": "vitest run --reporter=dot --pool=forks --poolOptions.forks.singleFork --coverage.enabled=false",
@@ -43,18 +46,22 @@
     "test:watch": "vitest",
     "test:vitest": "vitest run",
     "postinstall": "npm run playwright:install",
-    "playwright:install": "npx playwright install chromium",
-    "playwright:update": "npm run playwright:install -- --with-deps",
+    "playwright:install": "npx playwright install --with-deps",
+    "playwright:update": "npm run playwright:install",
     "test:playwright": "playwright test",
     "test:all": "npm-run-all --sequential test:vitest test:playwright",
-    "test:chat": "vitest src/lib/utils/__tests__/chatValidation.test.ts",
-    "test:integration:chat": "playwright test tests/integration/chat-message-chaining.test.ts",
-    "test:integration": "playwright test --config=playwright-integration.config.ts",
+    "test:chat": "vitest __tests__/src/lib/utils/chatValidation.test.ts",
+    "test:integration:chat": "playwright test __tests__/integration/chat-message-chaining.test.ts",
+    "test:integration": "playwright test --config=__tests__/playwright-integration.config.ts",
     "test:smoke": "playwright test -g smoke --reporter=line",
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test -g smoke --reporter=line",
     "prepare": "husky",
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
-    "lint:convex-types": "node scripts/lint-convex-types.mjs"
+    "lint:loc": "node scripts/check-loc.mjs",
+    "lint:convex-types": "node scripts/lint-convex-types.mjs",
+    "lint:duplicates": "DRY_T=$(node -p \"require('./.drylintrc.json').threshold\") && dry --no-cache --threshold $DRY_T && dry --no-cache --threshold $DRY_T --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
+    "lint:duplicates:near": "dry --no-cache --threshold $(node -p \"require('./.drylintrc.json').threshold\")",
+    "lint:boundaries": "ast-grep scan && echo 'No boundary violations found'"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
@@ -81,30 +88,39 @@
     "sonner": "^2.0.3",
     "tailwind-merge": "3.3.0",
     "terser": "5.40.0",
-    "zod": "^3.25.76",
-    "uuidv7": "^1.0.2"
+    "uuidv7": "^1.0.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@ast-grep/cli": "^0.40.5",
+    "@dry-lint/cli": "^3.0.0",
+    "@dry-lint/typescript": "^3.0.0",
+    "@dry-lint/zod": "^3.0.0",
     "@playwright/test": "1.56.1",
     "@testing-library/react": "^16.0.0",
     "@types/node": "24.2.1",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.5",
+    "@typescript-eslint/eslint-plugin": "8.40.0",
+    "@typescript-eslint/parser": "8.40.0",
     "@vitejs/plugin-react": "4.4.1",
     "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "~10",
+    "cli-progress": "^3.12.0",
     "convex-test": "^0.0.38",
     "dotenv": "16.5.0",
     "esbuild": "0.25.4",
+    "eslint": "9.33.0",
     "glob": "^11.1.0",
     "globals": "^15.15.0",
     "husky": "^9.0.11",
     "jsdom": "^24.1.0",
     "lint-staged": "15.5.2",
     "npm-run-all": "^4.1.5",
-    "oxlint": "1.11.1",
+    "oxfmt": "^0.27.0",
+    "oxlint": "1.42.0",
+    "oxlint-tsgolint": "^0.11.2",
     "postcss": "~8",
-    "prettier": "^3.5.3",
     "tailwindcss": "~3",
     "tsx": "^4.20.3",
     "typescript": "5.9.2",
@@ -112,17 +128,21 @@
     "vitest": "^3.2.4"
   },
   "overrides": {
-    "undici": "^7.19.0",
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "hono": "^4.11.7",
     "qs": "^6.14.1",
-    "@modelcontextprotocol/sdk": "^1.25.3"
+    "undici": "^7.19.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}": [
-      "oxlint --fix",
-      "prettier --write"
+      "oxlint -c .oxlintrc.json --type-aware",
+      "oxfmt --write"
     ],
     "*.{css,md,json}": [
-      "prettier --write"
+      "oxfmt --write"
     ]
+  },
+  "engines": {
+    "node": "22.17.0"
   }
 }

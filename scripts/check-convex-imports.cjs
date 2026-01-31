@@ -35,6 +35,7 @@ function main() {
   const bad = [];
   const duplication = [];
   const reexports = [];
+  const pathAliasViolations = []; // [IM1d] @/ imports in convex files
 
   for (const file of files) {
     const content = fs.readFileSync(file, "utf8");
@@ -89,6 +90,14 @@ function main() {
           "Manual interface with _id and _creationTime fields in convex/*",
       });
     }
+    // [IM1d] Check for @/ path aliases in convex files - these will fail at bundle time
+    // Convex's esbuild bundler does NOT resolve tsconfig paths
+    if (/from\s+["']@\//.test(content)) {
+      pathAliasViolations.push({
+        file,
+        reason: "@/ path alias import (Convex bundler cannot resolve)",
+      });
+    }
   }
 
   if (bad.length) {
@@ -104,12 +113,34 @@ function main() {
       console.error(" -", path.relative(process.cwd(), r.file), "=>", r.reason);
     for (const d of duplication)
       console.error(" -", path.relative(process.cwd(), d.file), "=>", d.reason);
-  } else {
-    console.log("✅ Convex import/type duplication checks passed");
+  }
+
+  // [IM1d] Report @/ path alias violations in convex files
+  if (pathAliasViolations.length) {
+    console.error(
+      "✖ [IM1d] @/ path alias imports in convex/ files (WILL FAIL AT BUNDLE TIME):",
+    );
+    console.error(
+      "  Convex's esbuild bundler does NOT resolve tsconfig paths.",
+    );
+    console.error("  Use relative imports (../lib/foo) within convex/.");
+    console.error("  See AGENTS.md [IM1d] for details.");
+    for (const v of pathAliasViolations)
+      console.error(" -", path.relative(process.cwd(), v.file), "=>", v.reason);
+  }
+
+  const allPassed =
+    !bad.length &&
+    !reexports.length &&
+    !duplication.length &&
+    !pathAliasViolations.length;
+
+  if (allPassed) {
+    console.log("[OK] Convex import/type/path-alias checks passed");
   }
 
   // Non-fatal to avoid blocking local dev as per policy; CI can enforce via wrapper
-  process.exit(bad.length || reexports.length || duplication.length ? 1 : 0);
+  process.exit(allPassed ? 0 : 1);
 }
 
 try {

@@ -1,6 +1,6 @@
 /**
- * Legacy compatibility: OpenRouter message format
- * Used for backward compatibility with existing streaming.ts
+ * OpenRouter message format
+ * Kept for compatibility with existing OpenRouter request/response shapes.
  */
 export interface OpenRouterMessage {
   role: string;
@@ -9,7 +9,7 @@ export interface OpenRouterMessage {
 }
 
 /**
- * Legacy compatibility: OpenRouter request body
+ * OpenRouter request body
  */
 export interface OpenRouterBody {
   model: string;

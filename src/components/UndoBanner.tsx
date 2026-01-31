@@ -1,6 +1,9 @@
-// UndoBanner - shows undo option after deletion
+/**
+ * UndoBanner - shows deletion confirmation with an undo action
+ */
 interface UndoBannerProps {
   type: "chat" | "message";
+  /** Undo action handler */
   onUndo: () => void;
 }
 

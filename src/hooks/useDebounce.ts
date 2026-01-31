@@ -19,10 +19,10 @@ import { useEffect, useRef, useCallback } from "react";
  * @param {number} delay - Delay in milliseconds
  * @returns {T} Debounced version of the callback
  */
-export function useDebounce<T extends (...args: unknown[]) => void>(
-  callback: T,
+export function useDebounce<Args extends unknown[]>(
+  callback: (...args: Args) => void,
   delay: number,
-): T {
+): (...args: Args) => void {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const callbackRef = useRef(callback);
 
@@ -32,7 +32,7 @@ export function useDebounce<T extends (...args: unknown[]) => void>(
   }, [callback]);
 
   const debouncedCallback = useCallback(
-    (...args: Parameters<T>) => {
+    (...args: Args) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -42,7 +42,7 @@ export function useDebounce<T extends (...args: unknown[]) => void>(
       }, delay);
     },
     [delay],
-  ) as T;
+  );
 
   // Cleanup on unmount
   useEffect(() => {
@@ -83,7 +83,7 @@ export function useThrottle<T extends (...args: unknown[]) => void>(
     callbackRef.current = callback;
   }, [callback]);
 
-  const throttledCallback = useCallback(
+  const throttledCallback = useCallback<T>(
     (...args: Parameters<T>) => {
       const now = Date.now();
       const timeSinceLastRun = now - lastRunRef.current;
@@ -104,7 +104,7 @@ export function useThrottle<T extends (...args: unknown[]) => void>(
       }
     },
     [delay],
-  ) as T;
+  );
 
   // Cleanup on unmount
   useEffect(() => {

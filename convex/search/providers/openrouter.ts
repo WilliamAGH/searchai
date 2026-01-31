@@ -1,30 +1,23 @@
+"use node";
+
 /**
  * OpenRouter Search Provider
  * Uses Perplexity Sonar model for AI-powered web search
  */
 
-import type {
-  SearchResult,
-  SearchProviderResult,
-} from "../../lib/types/search";
+import type { SearchResult, SearchProviderResult } from "../../schemas/search";
+import { OpenRouterResponseSchema } from "../../schemas/search";
+import { safeParseWithLog } from "../../lib/validation/zodUtils";
+import { collectOpenRouterChatCompletionText } from "../../lib/providers/openai_streaming";
 
-interface OpenRouterResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-      annotations?: Array<{
-        type: string;
-        url_citation?: {
-          title?: string;
-          url: string;
-          content?: string;
-          start_index?: number;
-          end_index?: number;
-        };
-      }>;
-    };
-  }>;
-}
+// Provider-specific relevance scores
+// OpenRouter with Perplexity Sonar provides AI-curated results
+const OPENROUTER_SCORES = {
+  /** Annotated citations from Perplexity - high confidence, directly cited */
+  ANNOTATED_CITATION: 0.85,
+  /** URLs extracted via regex fallback - lower confidence, no verification */
+  REGEX_EXTRACTED: 0.75,
+} as const;
 
 /**
  * Search via OpenRouter model
@@ -40,39 +33,36 @@ export async function searchWithOpenRouter(
   query: string,
   maxResults: number,
 ): Promise<SearchProviderResult> {
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
+  const { text, completion } = await collectOpenRouterChatCompletionText({
+    model: "perplexity/llama-3.1-sonar-small-128k-online",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a web search assistant. Provide factual information with sources. Always cite your sources with URLs.",
       },
-      body: JSON.stringify({
-        model: "perplexity/llama-3.1-sonar-small-128k-online",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a web search assistant. Provide factual information with sources. Always cite your sources with URLs.",
-          },
-          {
-            role: "user",
-            content: `Search for: ${query}. Provide key information with source URLs.`,
-          },
-        ],
-        max_tokens: 1000,
-        temperature: 0.1,
-      }),
-    },
+      {
+        role: "user",
+        content: `Search for: ${query}. Provide key information with source URLs.`,
+      },
+    ],
+    max_tokens: 1000,
+    temperature: 0.1,
+  });
+
+  const parseResult = safeParseWithLog(
+    OpenRouterResponseSchema,
+    completion,
+    `OpenRouter [query=${query.substring(0, 50)}]`,
   );
-
-  if (!response.ok) {
-    throw new Error(`OpenRouter API error: ${response.status}`);
+  if (!parseResult.success) {
+    // Per [EH1b]: Surface failures, don't swallow - throw with context
+    throw new Error(
+      `OpenRouter response validation failed for query "${query.substring(0, 50)}": ${parseResult.error.message}`,
+    );
   }
-
-  const data: OpenRouterResponse = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
+  const data = parseResult.data;
+  const content = text || data.choices?.[0]?.message?.content || "";
   const annotations = data.choices?.[0]?.message?.annotations || [];
 
   // Extract URLs from annotations if available
@@ -91,7 +81,7 @@ export async function searchWithOpenRouter(
               citation.start_index || 0,
               citation.end_index || 200,
             ),
-          relevanceScore: 0.85,
+          relevanceScore: OPENROUTER_SCORES.ANNOTATED_CITATION,
         });
       }
     });
@@ -107,7 +97,7 @@ export async function searchWithOpenRouter(
         title: `Search Result ${index + 1} for: ${query}`,
         url: url,
         snippet: `${content.substring(0, 200)}...`,
-        relevanceScore: 0.75,
+        relevanceScore: OPENROUTER_SCORES.REGEX_EXTRACTED,
       });
     });
   }

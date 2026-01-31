@@ -11,16 +11,46 @@ import { normalizeWhitespace } from "../lib/text";
  */
 export function serializeError(error: unknown) {
   if (error instanceof Error) {
-    // Safely extract cause as string to avoid circular references in JSON.stringify
+    // Safely extract cause - handle both Error and primitive causes
     const cause = (error as Error & { cause?: unknown }).cause;
+    let causeStr: string | undefined;
+    if (cause instanceof Error) {
+      causeStr = cause.message;
+    } else if (typeof cause === "string") {
+      causeStr = cause;
+    } else if (cause !== undefined) {
+      // For non-string, non-Error causes, try JSON or skip
+      try {
+        causeStr = JSON.stringify(cause);
+      } catch {
+        causeStr = "[unserializable cause]";
+      }
+    }
     return {
       name: error.name,
       message: error.message,
       stack: error.stack,
-      cause: cause ? String(cause) : undefined,
+      cause: causeStr,
     };
   }
-  return { message: String(error) };
+  // Handle string errors
+  if (typeof error === "string") {
+    return { message: error };
+  }
+  // For other types, try to extract a message or stringify
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return { message: error.message };
+  }
+  try {
+    return { message: JSON.stringify(error) };
+  } catch {
+    return { message: "[unserializable error]" };
+  }
 }
 
 // Gate verbose logs in production
@@ -28,6 +58,13 @@ export const DEBUG_HTTP = process.env.DEBUG_HTTP === "1";
 export const dlog = (...args: unknown[]) => {
   if (DEBUG_HTTP) console.info(...args);
 };
+
+/**
+ * Format a Server-Sent Event line for JSON payloads.
+ */
+export function formatSseEvent(data: unknown): string {
+  return `data: ${JSON.stringify(data)}\n\n`;
+}
 
 /**
  * Helper function to add CORS headers to responses

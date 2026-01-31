@@ -8,7 +8,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import type { Doc } from "../_generated/dataModel";
 
 /**
  * Subscribe to chat updates
@@ -29,7 +28,7 @@ export const subscribeToChatUpdates = query({
     if (!chat) return null;
 
     // Check access permissions
-    const privacy = (chat as Doc<"chats">).privacy;
+    const privacy = chat.privacy;
     const isSharedOrPublic = privacy === "shared" || privacy === "public";
 
     // Allow access to:
@@ -52,9 +51,7 @@ export const subscribeToChatUpdates = query({
       .collect();
 
     // Find any streaming message
-    const streamingMessage = messages.find(
-      (m: Doc<"messages">) => m.isStreaming === true,
-    );
+    const streamingMessage = messages.find((m) => m.isStreaming === true);
 
     return {
       chat,
