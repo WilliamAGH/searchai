@@ -1,6 +1,6 @@
 "use node";
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { internalAction } from "./_generated/server";
 import { getErrorMessage } from "./lib/errors";
 import { escapeHtml } from "./http/utils";
 
@@ -79,7 +79,7 @@ async function sendEmailToMailPit(args: {
 }
 
 // Public action for sending emails (exposed to API)
-export const sendEmail = action({
+export const sendEmail = internalAction({
   args: {
     to: v.string(),
     subject: v.string(),
@@ -94,7 +94,7 @@ export const sendEmail = action({
   },
 });
 
-export const sendWelcomeEmail = action({
+export const sendWelcomeEmail = internalAction({
   args: {
     userEmail: v.string(),
     userName: v.optional(v.string()),
@@ -103,6 +103,7 @@ export const sendWelcomeEmail = action({
     _ctx,
     args,
   ): Promise<{ success: boolean; messageId?: string; message?: string }> => {
+    const siteUrl = process.env.SITE_URL || "https://search-ai.io";
     const welcomeHtml = `
       <!DOCTYPE html>
       <html>
@@ -128,7 +129,7 @@ export const sendWelcomeEmail = action({
               <li><strong>Share conversations</strong> - Share interesting findings with others</li>
             </ul>
             
-            <p>Ready to get started? <a href="https://search-ai.io" style="color: #10b981; text-decoration: none; font-weight: bold;">Start searching now →</a></p>
+            <p>Ready to get started? <a href="${siteUrl}" style="color: #10b981; text-decoration: none; font-weight: bold;">Start searching now →</a></p>
             
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
             

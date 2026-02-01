@@ -145,7 +145,9 @@ export function corsResponse(
     });
   }
 
-  return new Response(body, {
+  const responseBody =
+    status === 204 || status === 205 || status === 304 ? null : body;
+  return new Response(responseBody, {
     status,
     headers: {
       "Content-Type": "application/json",
