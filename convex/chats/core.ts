@@ -37,6 +37,10 @@ export const createChat = mutation({
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
 
+    if (!userId && !args.sessionId) {
+      throw new Error("sessionId is required for anonymous chats");
+    }
+
     // Generate UUID v7 IDs for time-sortable, collision-resistant identifiers
     const shareId = generateShareId();
     const publicId = generatePublicId();
@@ -84,11 +88,12 @@ export const getUserChats = query({
 
     // Anonymous users - return session chats
     if (args.sessionId) {
-      return await ctx.db
+      const chats = await ctx.db
         .query("chats")
         .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
         .order("desc")
         .collect();
+      return chats.filter((chat) => !chat.userId);
     }
 
     // No userId or sessionId - return empty
@@ -125,7 +130,7 @@ async function validateChatAccess(
 
   // For sessionId-based access: HTTP endpoints or anonymous users
   // Note: HTTP actions don't have auth context, so they rely on sessionId
-  if (hasSessionAccess(chat, sessionId)) {
+  if (!chat.userId && hasSessionAccess(chat, sessionId)) {
     return chat;
   }
 
@@ -205,7 +210,8 @@ export const getChatByIdDirect = query({
     const isSharedOrPublic =
       chat.privacy === "shared" || chat.privacy === "public";
     const isUserOwner = hasUserAccess(chat, userId);
-    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
+    const isSessionOwner =
+      !chat.userId && hasSessionAccess(chat, args.sessionId);
 
     if (isSharedOrPublic || isUserOwner || isSessionOwner) {
       return chat;

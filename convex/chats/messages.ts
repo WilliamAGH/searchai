@@ -54,7 +54,8 @@ export const getChatMessages = query({
     const isSharedOrPublic =
       chat.privacy === "shared" || chat.privacy === "public";
     const isUserOwner = hasUserAccess(chat, userId);
-    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
+    const isSessionOwner =
+      !chat.userId && hasSessionAccess(chat, args.sessionId);
 
     if (!isSharedOrPublic && !isUserOwner && !isSessionOwner) {
       return [];

@@ -76,7 +76,10 @@ export function isAuthorized(
   userId: Id<"users"> | null,
   sessionId?: string,
 ): boolean {
-  return hasUserAccess(chat, userId) || hasSessionAccess(chat, sessionId);
+  if (chat.userId) {
+    return hasUserAccess(chat, userId);
+  }
+  return hasSessionAccess(chat, sessionId);
 }
 
 /**

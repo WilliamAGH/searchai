@@ -11,7 +11,6 @@ import { query } from "../_generated/server";
 import {
   hasSessionAccess,
   hasUserAccess,
-  isUnownedChat,
   isSharedOrPublicChat,
 } from "../lib/auth";
 import { vContextReference, vSearchResult } from "../lib/validators";
@@ -80,10 +79,10 @@ export const getChatMessagesPaginated = query({
 
     const isSharedOrPublic = isSharedOrPublicChat(chat);
     const isUserOwner = hasUserAccess(chat, userId);
-    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
-    const isUnowned = isUnownedChat(chat);
+    const isSessionOwner =
+      !chat.userId && hasSessionAccess(chat, args.sessionId);
 
-    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner && !isUnowned) {
+    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner) {
       return {
         messages: [],
         nextCursor: undefined,
@@ -173,10 +172,10 @@ export const getRecentChatMessages = query({
 
     const isSharedOrPublic = isSharedOrPublicChat(chat);
     const isUserOwner = hasUserAccess(chat, userId);
-    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
-    const isUnowned = isUnownedChat(chat);
+    const isSessionOwner =
+      !chat.userId && hasSessionAccess(chat, args.sessionId);
 
-    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner && !isUnowned) {
+    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner) {
       return [];
     }
 
