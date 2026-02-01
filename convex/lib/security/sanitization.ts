@@ -9,6 +9,7 @@
  */
 
 import { RELEVANCE_SCORES } from "../constants/cache";
+import { safeParseUrl } from "../url";
 
 /**
  * Main sanitization function that applies all security measures
@@ -100,15 +101,15 @@ export function robustSanitize(input: string): string {
 
   // 6. Remove HTML/Script tags
   clean = clean.replace(
-    /<script[^>]*>[\s\S]*?<\/script>/gi,
+    /<script\b[^>]*>[\s\S]*?(?:<\/script\s*>|$)/gi,
     "[SCRIPT_BLOCKED]",
   );
   clean = clean.replace(
-    /<iframe[^>]*>[\s\S]*?<\/iframe>/gi,
+    /<iframe\b[^>]*>[\s\S]*?(?:<\/iframe\s*>|$)/gi,
     "[IFRAME_BLOCKED]",
   );
   clean = clean.replace(
-    /<object[^>]*>[\s\S]*?<\/object>/gi,
+    /<object\b[^>]*>[\s\S]*?(?:<\/object\s*>|$)/gi,
     "[OBJECT_BLOCKED]",
   );
   clean = clean.replace(/<embed[^>]*>/gi, "[EMBED_BLOCKED]");
@@ -198,7 +199,7 @@ export function sanitizeHtmlContent(html: string): string {
   clean = clean.replace(/<meta[^>]*http-equiv[^>]*>/gi, "");
 
   // Remove all event handlers
-  clean = clean.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, "");
+  clean = clean.replace(/\s*on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
 
   // Apply standard sanitization
   clean = robustSanitize(clean);
@@ -285,10 +286,16 @@ export function normalizeSearchResult(result: unknown): {
   const titleValue = typeof r.title === "string" ? r.title : "Untitled";
   const urlValue = typeof r.url === "string" ? r.url : "";
   const snippetValue = typeof r.snippet === "string" ? r.snippet : "";
+  const parsedUrl = safeParseUrl(urlValue);
+  const safeUrl =
+    parsedUrl &&
+    (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:")
+      ? parsedUrl.toString()
+      : "";
 
   return {
     title: robustSanitize(titleValue),
-    url: urlValue, // Don't sanitize URLs - might break them
+    url: safeUrl,
     snippet: robustSanitize(snippetValue),
     relevanceScore,
   };
