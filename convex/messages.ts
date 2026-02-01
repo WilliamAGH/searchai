@@ -23,10 +23,8 @@ export const addMessage = internalMutation({
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
-    // New: provenance tracking and workflow linkage
     contextReferences: v.optional(v.array(vContextReference)),
     workflowId: v.optional(v.string()),
-    // CRITICAL: Add sessionId for HTTP action auth (when userId not available)
     sessionId: v.optional(v.string()),
   },
   returns: v.id("messages"),
@@ -36,7 +34,6 @@ export const addMessage = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
-    // Authorization: require ownership; shared/public chats are read-only.
     const authorized =
       isAuthorized(chat, userId, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
@@ -45,23 +42,19 @@ export const addMessage = internalMutation({
       throw new Error("Unauthorized");
     }
 
-    // Generate UUID v7 for message tracking.
     const messageId = generateMessageId();
 
-    // Get or create thread ID from chat.
     let threadId = chat.threadId;
     if (!threadId) {
       threadId = generateThreadId();
-      // Update chat with threadId if not present.
       await ctx.db.patch(args.chatId, { threadId });
     }
 
-    // Destructure sessionId out - validation only, not storage.
     const { chatId, sessionId: _sessionId, ...rest } = args;
     return await ctx.db.insert("messages", {
       chatId: chatId,
-      messageId, // UUID v7 for unique message tracking
-      threadId, // UUID v7 for conversation thread continuity
+      messageId,
+      threadId,
       ...rest,
       timestamp: Date.now(),
     });
@@ -83,16 +76,25 @@ export const addMessageHttp = internalMutation({
     hasRealResults: v.optional(v.boolean()),
     contextReferences: v.optional(v.array(vContextReference)),
     workflowId: v.optional(v.string()),
+    workflowTokenId: v.optional(v.id("workflowTokens")),
     sessionId: v.optional(v.string()),
   },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
     const chat = await ctx.db.get(args.chatId);
-
     if (!chat) throw new Error("Chat not found");
 
-    // Authorization: require ownership; shared/public chats are read-only.
+    const workflowToken = args.workflowTokenId
+      ? await ctx.db.get(args.workflowTokenId)
+      : null;
+    const hasValidWorkflowToken =
+      !!workflowToken &&
+      workflowToken.chatId === args.chatId &&
+      workflowToken.status === "active" &&
+      workflowToken.expiresAt > Date.now();
+
     const authorized =
+      hasValidWorkflowToken ||
       hasSessionAccess(chat, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
 
@@ -205,7 +207,6 @@ export const updateMessage = internalMutation({
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
-    // New
     contextReferences: v.optional(v.array(vContextReference)),
     workflowId: v.optional(v.string()),
   },

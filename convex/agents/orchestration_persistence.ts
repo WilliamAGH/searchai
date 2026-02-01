@@ -66,6 +66,8 @@ export interface PersistAssistantMessageParams {
   content: string;
   /** Workflow ID for tracing */
   workflowId: string;
+  /** Optional workflow token for session-rotated workflows */
+  workflowTokenId?: Id<"workflowTokens"> | null;
   /** Optional session ID for HTTP action auth */
   sessionId?: string;
   /** Search results with relevance scores for citation UI */
@@ -128,13 +130,29 @@ export async function persistAssistantMessage(
     chatId,
     content,
     workflowId,
+    workflowTokenId,
     sessionId,
     searchResults = [],
     sources = [],
     contextReferences = [],
   } = params;
 
-  const messageId = await ctx.runMutation(internal.messages.addMessageHttp, {
+  if (sessionId) {
+    return await ctx.runMutation(internal.messages.addMessageHttp, {
+      chatId,
+      role: "assistant",
+      content,
+      searchResults,
+      sources,
+      contextReferences,
+      workflowId,
+      isStreaming: false,
+      sessionId,
+      ...(workflowTokenId ? { workflowTokenId } : {}),
+    });
+  }
+
+  return await ctx.runMutation(internal.messages.addMessage, {
     chatId,
     role: "assistant",
     content,
@@ -145,8 +163,6 @@ export async function persistAssistantMessage(
     isStreaming: false,
     sessionId,
   });
-
-  return messageId;
 }
 
 /**

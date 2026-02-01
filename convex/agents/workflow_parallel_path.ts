@@ -284,6 +284,7 @@ export async function* executeParallelPath({
     chatId: args.chatId,
     content: finalAnswerText,
     workflowId,
+    workflowTokenId,
     sessionId: args.sessionId,
     searchResults,
     sources: parsedAnswer.sourcesUsed || [],
