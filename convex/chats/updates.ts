@@ -8,6 +8,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, internalMutation } from "../_generated/server";
+import { isAuthorized } from "../lib/auth";
 import { generateShareId, generatePublicId } from "../lib/uuid";
 
 /**
@@ -21,6 +22,7 @@ export const updateChatTitle = mutation({
   args: {
     chatId: v.id("chats"),
     title: v.string(),
+    sessionId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -28,7 +30,9 @@ export const updateChatTitle = mutation({
     const chat = await ctx.db.get(args.chatId);
 
     if (!chat) throw new Error("Chat not found");
-    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+    if (!isAuthorized(chat, userId, args.sessionId)) {
+      throw new Error("Unauthorized");
+    }
 
     await ctx.db.patch(args.chatId, {
       title: args.title,
@@ -95,6 +99,7 @@ export const updateChatPrivacy = mutation({
       v.literal("shared"),
       v.literal("public"),
     ),
+    sessionId: v.optional(v.string()),
   },
   returns: v.object({
     shareId: v.union(v.string(), v.null()),
@@ -105,7 +110,9 @@ export const updateChatPrivacy = mutation({
     const chat = await ctx.db.get(args.chatId);
 
     if (!chat) throw new Error("Chat not found");
-    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
+    if (!isAuthorized(chat, userId, args.sessionId)) {
+      throw new Error("Unauthorized");
+    }
 
     // Ensure share/public IDs exist when moving to shared/public for legacy rows
     let shareId = chat.shareId;

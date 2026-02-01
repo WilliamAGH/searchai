@@ -76,6 +76,7 @@ export class ChatOperations {
       await this.client.mutation(api.chats.updateChatTitle, {
         chatId: IdUtils.toConvexChatId(id),
         title: TitleUtils.sanitize(title),
+        sessionId: this.getSessionId(),
       });
     } catch (error) {
       logger.error("Failed to update chat title in Convex:", {
@@ -94,6 +95,7 @@ export class ChatOperations {
       await this.client.mutation(api.chats.updateChatPrivacy, {
         chatId: IdUtils.toConvexChatId(id),
         privacy,
+        sessionId: this.getSessionId(),
       });
     } catch (error) {
       logger.error("Failed to update chat privacy in Convex:", {
