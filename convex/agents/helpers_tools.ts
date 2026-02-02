@@ -3,7 +3,7 @@ import {
   safeParseScrapeToolOutput,
   safeParseSearchToolOutput,
 } from "../schemas/agents";
-import { isRecord } from "../lib/validation/zodUtils";
+import { isRecord } from "../lib/validators";
 import { isUuidV7, normalizeUrl } from "./helpers_utils";
 import type { RunToolCallItem, RunToolCallOutputItem } from "@openai/agents";
 

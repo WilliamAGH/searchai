@@ -1,7 +1,7 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { isValidUuidV7 } from "../../lib/uuid";
-import { isRecord } from "../../lib/validation/zodUtils";
+import { isRecord } from "../../lib/validators";
 import { serializeError } from "../utils";
 import { buildCorsJsonResponse, getAllowedOrigin } from "./publish_cors";
 
