@@ -17,7 +17,15 @@ import { logger } from "@/lib/logger";
 const MAX_CONTEXT_REFERENCES = 10;
 
 function synthesizeSearchResults(msg: Message): SearchResult[] | undefined {
-  if (Array.isArray(msg.searchResults)) return msg.searchResults;
+  // IMPORTANT:
+  // `searchResults` is UI-oriented and may be omitted (agent workflows persist
+  // structured `contextReferences`). Also, some persistence codepaths default
+  // `searchResults` to `[]`, which previously prevented contextReferences
+  // synthesis and regressed the Sources UI. Prefer non-empty searchResults,
+  // otherwise synthesize from contextReferences when available.
+  if (Array.isArray(msg.searchResults) && msg.searchResults.length > 0) {
+    return msg.searchResults;
+  }
   if (!Array.isArray(msg.contextReferences)) return undefined;
 
   try {

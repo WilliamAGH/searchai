@@ -46,6 +46,11 @@ export function MessageItem({
         (r) => r && typeof r.url === "string" && typeof r.title === "string",
       )
     : [];
+  const hasContextReferences =
+    Array.isArray(message.contextReferences) &&
+    message.contextReferences.some(
+      (ref) => ref && typeof ref.url === "string" && ref.url.length > 0,
+    );
   const messageId = message._id ? String(message._id) : "";
   const canDelete = messageId.length > 0;
 
@@ -99,19 +104,21 @@ export function MessageItem({
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         {/* 1) Sources (compact/collapsed) first */}
-        {message.role === "assistant" && safeResults.length > 0 && (
-          <div className="mb-4">
-            <MessageSources
-              id={messageId}
-              results={safeResults}
-              method={message.searchMethod}
-              collapsed={collapsedById[messageId] ?? false}
-              onToggle={onToggleCollapsed}
-              hoveredSourceUrl={hoveredSourceUrl}
-              onSourceHover={onSourceHover}
-            />
-          </div>
-        )}
+        {message.role === "assistant" &&
+          (safeResults.length > 0 || hasContextReferences) && (
+            <div className="mb-4">
+              <MessageSources
+                id={messageId}
+                results={safeResults}
+                method={message.searchMethod}
+                collapsed={collapsedById[messageId] ?? false}
+                onToggle={onToggleCollapsed}
+                hoveredSourceUrl={hoveredSourceUrl}
+                onSourceHover={onSourceHover}
+                contextReferences={message.contextReferences}
+              />
+            </div>
+          )}
 
         {/* 2) Thinking status - shows real-time AI processing */}
         {message.role === "assistant" &&
