@@ -7,6 +7,7 @@
 
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import {
   hasSessionAccess,
@@ -15,12 +16,24 @@ import {
 } from "../lib/auth";
 import { vWebResearchSource } from "../lib/validators";
 import { isValidUuidV7 } from "../lib/uuid";
-import { resolveWebResearchSourcesFromMessage } from "./webResearchSourcesResolver";
+import { projectMessage } from "./messageProjection";
 
 const assertValidSessionId = (sessionId?: string) => {
   if (sessionId && !isValidUuidV7(sessionId)) {
     throw new Error("Invalid sessionId format");
   }
+};
+
+type PaginatedMessagesResult = {
+  messages: ReturnType<typeof projectMessage>[];
+  nextCursor: Id<"messages"> | undefined;
+  hasMore: boolean;
+};
+
+const EMPTY_PAGE: PaginatedMessagesResult = {
+  messages: [],
+  nextCursor: undefined,
+  hasMore: false,
 };
 
 /**
@@ -69,11 +82,7 @@ export const getChatMessagesPaginated = query({
     const chat = await ctx.db.get(args.chatId);
 
     if (!chat) {
-      return {
-        messages: [],
-        nextCursor: undefined,
-        hasMore: false,
-      };
+      return EMPTY_PAGE;
     }
 
     const isSharedOrPublic = isSharedOrPublicChat(chat);
@@ -82,11 +91,7 @@ export const getChatMessagesPaginated = query({
       !chat.userId && hasSessionAccess(chat, args.sessionId);
 
     if (!isSharedOrPublic && !isUserOwner && !isSessionOwner) {
-      return {
-        messages: [],
-        nextCursor: undefined,
-        hasMore: false,
-      };
+      return EMPTY_PAGE;
     }
 
     const pageSize = Math.min(args.limit || 50, 100); // Max 100 messages per page
@@ -106,24 +111,7 @@ export const getChatMessagesPaginated = query({
         hasMorePage && pageDocs.length > 0
           ? pageDocs[pageDocs.length - 1]._id
           : undefined;
-      const formatted = [...pageDocs].reverse().map((m) => {
-        const webResearchSources = resolveWebResearchSourcesFromMessage(m);
-        return {
-          _id: m._id,
-          _creationTime: m._creationTime,
-          chatId: m.chatId,
-          role: m.role,
-          content: m.content,
-          timestamp: m.timestamp,
-          isStreaming: m.isStreaming,
-          streamedContent: m.streamedContent,
-          thinking: m.thinking,
-          reasoning: m.reasoning,
-          webResearchSources:
-            webResearchSources.length > 0 ? webResearchSources : undefined,
-          workflowId: m.workflowId,
-        };
-      });
+      const formatted = [...pageDocs].reverse().map(projectMessage);
       return {
         messages: formatted,
         nextCursor: nextCursorPage,
@@ -137,11 +125,7 @@ export const getChatMessagesPaginated = query({
       // SECURITY: Validate cursor belongs to the requested chat BEFORE any query execution
       // This prevents a malicious cursor from a different chat exposing unauthorized data
       if (!cursorMessage || cursorMessage.chatId !== args.chatId) {
-        return {
-          messages: [],
-          nextCursor: undefined,
-          hasMore: false,
-        };
+        return EMPTY_PAGE;
       }
 
       // Cursor is valid and belongs to this chat - continue from the cursor position
