@@ -15,6 +15,7 @@ import {
 } from "../lib/auth";
 import { vWebResearchSource } from "../lib/validators";
 import { isValidUuidV7 } from "../lib/uuid";
+import { resolveWebResearchSourcesFromMessage } from "./webResearchSourcesResolver";
 
 const assertValidSessionId = (sessionId?: string) => {
   if (sessionId && !isValidUuidV7(sessionId)) {
@@ -105,20 +106,24 @@ export const getChatMessagesPaginated = query({
         hasMorePage && pageDocs.length > 0
           ? pageDocs[pageDocs.length - 1]._id
           : undefined;
-      const formatted = [...pageDocs].reverse().map((m) => ({
-        _id: m._id,
-        _creationTime: m._creationTime,
-        chatId: m.chatId,
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp,
-        isStreaming: m.isStreaming,
-        streamedContent: m.streamedContent,
-        thinking: m.thinking,
-        reasoning: m.reasoning,
-        webResearchSources: m.webResearchSources,
-        workflowId: m.workflowId,
-      }));
+      const formatted = [...pageDocs].reverse().map((m) => {
+        const webResearchSources = resolveWebResearchSourcesFromMessage(m);
+        return {
+          _id: m._id,
+          _creationTime: m._creationTime,
+          chatId: m.chatId,
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+          isStreaming: m.isStreaming,
+          streamedContent: m.streamedContent,
+          thinking: m.thinking,
+          reasoning: m.reasoning,
+          webResearchSources:
+            webResearchSources.length > 0 ? webResearchSources : undefined,
+          workflowId: m.workflowId,
+        };
+      });
       return {
         messages: formatted,
         nextCursor: nextCursorPage,

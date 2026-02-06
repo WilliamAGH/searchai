@@ -8,6 +8,7 @@ import { v } from "convex/values";
 import { query } from "../_generated/server";
 import { vWebResearchSource } from "../lib/validators";
 import { hasUserAccess, hasSessionAccess } from "../lib/auth";
+import { resolveWebResearchSourcesFromMessage } from "./webResearchSourcesResolver";
 
 /**
  * Get chat messages
@@ -84,22 +85,24 @@ export const getChatMessages = query({
     }
 
     // Map to validated shape with _id for client identification
-    return docs.map((m) => ({
-      _id: m._id,
-      _creationTime: m._creationTime,
-      chatId: m.chatId,
-      role: m.role,
-      content: m.content,
-      timestamp: m.timestamp,
-      isStreaming: m.isStreaming,
-      streamedContent: m.streamedContent,
-      thinking: m.thinking,
-      reasoning: m.reasoning,
-      webResearchSources: Array.isArray(m.webResearchSources)
-        ? m.webResearchSources
-        : undefined,
-      workflowId: m.workflowId,
-    }));
+    return docs.map((m) => {
+      const webResearchSources = resolveWebResearchSourcesFromMessage(m);
+      return {
+        _id: m._id,
+        _creationTime: m._creationTime,
+        chatId: m.chatId,
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+        isStreaming: m.isStreaming,
+        streamedContent: m.streamedContent,
+        thinking: m.thinking,
+        reasoning: m.reasoning,
+        webResearchSources:
+          webResearchSources.length > 0 ? webResearchSources : undefined,
+        workflowId: m.workflowId,
+      };
+    });
   },
 });
 
@@ -167,21 +170,23 @@ export const getChatMessagesHttp = query({
         .collect();
     }
 
-    return docs.map((m) => ({
-      _id: m._id,
-      _creationTime: m._creationTime,
-      chatId: m.chatId,
-      role: m.role,
-      content: m.content,
-      timestamp: m.timestamp,
-      isStreaming: m.isStreaming,
-      streamedContent: m.streamedContent,
-      thinking: m.thinking,
-      reasoning: m.reasoning,
-      webResearchSources: Array.isArray(m.webResearchSources)
-        ? m.webResearchSources
-        : undefined,
-      workflowId: m.workflowId,
-    }));
+    return docs.map((m) => {
+      const webResearchSources = resolveWebResearchSourcesFromMessage(m);
+      return {
+        _id: m._id,
+        _creationTime: m._creationTime,
+        chatId: m.chatId,
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+        isStreaming: m.isStreaming,
+        streamedContent: m.streamedContent,
+        thinking: m.thinking,
+        reasoning: m.reasoning,
+        webResearchSources:
+          webResearchSources.length > 0 ? webResearchSources : undefined,
+        workflowId: m.workflowId,
+      };
+    });
   },
 });
