@@ -5,7 +5,8 @@ import { streamConversationalWorkflow } from "../../agents/orchestration";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { safeConvexId } from "../../lib/validators";
 import { isValidUuidV7 } from "../../lib/uuid";
-import { corsResponse, dlog, formatSseEvent, serializeError } from "../utils";
+import { dlog, formatSseEvent, serializeError } from "../utils";
+import { corsResponse } from "../cors";
 import {
   parseJsonPayload,
   rateLimitExceededResponse,

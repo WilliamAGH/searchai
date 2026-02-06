@@ -1,4 +1,5 @@
-import { corsResponse, serializeError } from "../utils";
+import { serializeError } from "../utils";
+import { corsResponse } from "../cors";
 import { isRecord, type WebResearchSource } from "../../lib/validators";
 
 /**

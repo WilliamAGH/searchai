@@ -1,7 +1,8 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { checkIpRateLimit } from "../../lib/rateLimit";
-import { corsResponse, dlog, serializeError } from "../utils";
+import { dlog, serializeError } from "../utils";
+import { corsResponse } from "../cors";
 import {
   parseJsonPayload,
   rateLimitExceededResponse,

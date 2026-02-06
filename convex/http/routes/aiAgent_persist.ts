@@ -3,7 +3,8 @@ import type { ActionCtx } from "../../_generated/server";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { safeConvexId } from "../../lib/validators";
 import { isValidUuidV7 } from "../../lib/uuid";
-import { corsResponse, serializeError } from "../utils";
+import { serializeError } from "../utils";
+import { corsResponse } from "../cors";
 import {
   parseJsonPayload,
   rateLimitExceededResponse,
