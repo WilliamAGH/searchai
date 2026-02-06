@@ -19,7 +19,7 @@ import {
   buildPlanningInput,
   buildResearchInstructions,
   buildSynthesisInstructions,
-  formatContextReferencesForPrompt,
+  formatWebResearchSourcesForPrompt,
   buildConversationBlock,
   processToolCalls,
   buildToolCallLog,
@@ -98,8 +98,8 @@ export const orchestrateResearchWorkflow = action({
     const plannedQueries = planningResult.finalOutput.searchQueries ?? [];
     const hasPlannedQueries = plannedQueries.length > 0;
     const conversationBlock = buildConversationBlock(args.conversationContext);
-    const referenceBlock = formatContextReferencesForPrompt(
-      args.contextReferences ?? [],
+    const referenceBlock = formatWebResearchSourcesForPrompt(
+      args.webResearchSources ?? [],
     );
 
     // Research

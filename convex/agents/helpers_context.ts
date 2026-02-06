@@ -2,7 +2,7 @@
 
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
 import { generateMessageId } from "../lib/id_generator";
-import type { ResearchContextReference } from "../schemas/agents";
+import type { WebResearchSource } from "../lib/validators";
 import { isUuidV7, normalizeUrl } from "./helpers_utils";
 
 export function normalizeSourceContextIds(
@@ -48,7 +48,7 @@ export function normalizeSourceContextIds(
   return { normalized, invalidCount: invalidSources.length };
 }
 
-export function buildContextReferencesFromHarvested(harvested: {
+export function buildWebResearchSourcesFromHarvested(harvested: {
   scrapedContent: Array<{
     contextId: string;
     url: string;
@@ -62,12 +62,12 @@ export function buildContextReferencesFromHarvested(harvested: {
     title: string;
     relevanceScore?: number;
   }>;
-}): ResearchContextReference[] {
-  const contextReferences: ResearchContextReference[] = [];
+}): WebResearchSource[] {
+  const webResearchSources: WebResearchSource[] = [];
   const now = Date.now();
 
   for (const scraped of harvested.scrapedContent) {
-    contextReferences.push({
+    webResearchSources.push({
       contextId: scraped.contextId,
       type: "scraped_page",
       url: scraped.url,
@@ -86,7 +86,7 @@ export function buildContextReferencesFromHarvested(harvested: {
   for (const result of harvested.searchResults) {
     const normalizedResultUrl = normalizeUrl(result.url) ?? result.url;
     if (!scrapedNormalizedUrls.has(normalizedResultUrl)) {
-      contextReferences.push({
+      webResearchSources.push({
         contextId: result.contextId ?? generateMessageId(),
         type: "search_result",
         url: result.url,
@@ -97,55 +97,23 @@ export function buildContextReferencesFromHarvested(harvested: {
     }
   }
 
-  const uniqueContextRefs = Array.from(
+  const uniqueSources = Array.from(
     new Map(
-      contextReferences.map((ref) => {
+      webResearchSources.map((ref) => {
         const rawUrl = ref.url || "";
         return [normalizeUrl(rawUrl) ?? rawUrl, ref];
       }),
     ).values(),
   );
 
-  return uniqueContextRefs;
-}
-
-export function buildSearchResultsFromContextRefs(
-  contextReferences: ResearchContextReference[],
-): Array<{
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-}> {
-  return contextReferences
-    .filter(
-      (ref): ref is ResearchContextReference & { url: string } =>
-        typeof ref.url === "string" && ref.url.length > 0,
-    )
-    .map((ref) => ({
-      title: ref.title || ref.url || "",
-      url: ref.url,
-      snippet: "",
-      relevanceScore: ref.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
-    }));
-}
-
-export function extractSourceUrls(
-  contextReferences: ResearchContextReference[],
-): string[] {
-  return contextReferences
-    .filter(
-      (ref): ref is ResearchContextReference & { url: string } =>
-        typeof ref.url === "string",
-    )
-    .map((ref) => ref.url);
+  return uniqueSources;
 }
 
 /**
- * Convert normalized sources to ResearchContextReference format.
+ * Convert normalized sources to WebResearchSource format.
  * Maps relevance labels to numeric scores for persistence.
  */
-export function convertToContextReferences(
+export function convertToWebResearchSources(
   sources: Array<{
     url: string;
     title: string;
@@ -153,7 +121,7 @@ export function convertToContextReferences(
     type: "search_result" | "scraped_page";
     relevance: "high" | "medium" | "low";
   }>,
-): ResearchContextReference[] {
+): WebResearchSource[] {
   const now = Date.now();
   const relevanceToScore: Record<"high" | "medium" | "low", number> = {
     high: RELEVANCE_SCORES.HIGH_LABEL,

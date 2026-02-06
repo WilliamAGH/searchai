@@ -4,21 +4,11 @@ import { isValidUuidV7 } from "../../lib/uuid";
 import { isRecord } from "../../lib/validators";
 import { serializeError } from "../utils";
 import { buildCorsJsonResponse, getAllowedOrigin } from "./publish_cors";
+import { sanitizeWebResearchSources } from "./aiAgent_utils";
 
 /**
  * Validate and normalize URL to safe http/https protocols only
  */
-function toSafeUrl(value: unknown): string {
-  if (typeof value !== "string") return "";
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
-    return url.toString().slice(0, 2048);
-  } catch {
-    return "";
-  }
-}
-
 export async function handlePublishChat(
   ctx: ActionCtx,
   request: Request,
@@ -85,32 +75,9 @@ export async function handlePublishChat(
             typeof msg.content === "string"
               ? msg.content.slice(0, 50000)
               : undefined,
-          searchResults: Array.isArray(msg.searchResults)
-            ? msg.searchResults.slice(0, 20).map((r: unknown) => {
-                const result = isRecord(r) ? r : {};
-                return {
-                  title: (typeof result.title === "string"
-                    ? result.title
-                    : ""
-                  ).slice(0, 200),
-                  url: toSafeUrl(result.url),
-                  snippet: (typeof result.snippet === "string"
-                    ? result.snippet
-                    : ""
-                  ).slice(0, 500),
-                  relevanceScore:
-                    typeof result.relevanceScore === "number"
-                      ? Math.max(0, Math.min(1, result.relevanceScore))
-                      : 0.5,
-                };
-              })
-            : undefined,
-          sources: Array.isArray(msg.sources)
-            ? msg.sources
-                .slice(0, 20)
-                .filter((s: unknown) => typeof s === "string")
-                .map((s: unknown) => (s as string).slice(0, 2048))
-            : undefined,
+          webResearchSources: sanitizeWebResearchSources(
+            msg.webResearchSources,
+          ),
           timestamp:
             typeof msg.timestamp === "number" && isFinite(msg.timestamp)
               ? Math.floor(msg.timestamp)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  convertToContextReferences,
+  convertToWebResearchSources,
   buildUrlContextMap,
   formatScrapedContentForPrompt,
   formatSerpEnrichmentForPrompt,
@@ -9,8 +9,8 @@ import {
 // Helper: simple extractContextId and normalize wrappers for test determinism
 const fixedNow = 1700000000000;
 
-describe("convertToContextReferences", () => {
-  it("maps sourcesUsed to context references with derived relevanceScore", () => {
+describe("convertToWebResearchSources", () => {
+  it("maps sourcesUsed to web research sources with derived relevanceScore", () => {
     const input = [
       {
         contextId: "019a122e-c507-7851-99f7-b8f5d7345b40",
@@ -28,7 +28,7 @@ describe("convertToContextReferences", () => {
       },
     ];
 
-    const out = convertToContextReferences(input);
+    const out = convertToWebResearchSources(input);
     expect(out).toHaveLength(2);
     expect(out[0]).toMatchObject({
       contextId: input[0].contextId,

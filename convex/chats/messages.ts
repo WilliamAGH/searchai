@@ -6,7 +6,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import { vContextReference, vSearchResult } from "../lib/validators";
+import { vWebResearchSource } from "../lib/validators";
 import { hasUserAccess, hasSessionAccess } from "../lib/auth";
 
 /**
@@ -38,10 +38,8 @@ export const getChatMessages = query({
       isStreaming: v.optional(v.boolean()),
       streamedContent: v.optional(v.string()),
       thinking: v.optional(v.string()),
-      searchResults: v.optional(v.array(vSearchResult)),
-      sources: v.optional(v.array(v.string())),
       reasoning: v.optional(v.string()),
-      contextReferences: v.optional(v.array(vContextReference)),
+      webResearchSources: v.optional(v.array(vWebResearchSource)),
       workflowId: v.optional(v.string()),
     }),
   ),
@@ -96,13 +94,9 @@ export const getChatMessages = query({
       isStreaming: m.isStreaming,
       streamedContent: m.streamedContent,
       thinking: m.thinking,
-      searchResults: Array.isArray(m.searchResults)
-        ? m.searchResults
-        : undefined,
-      sources: Array.isArray(m.sources) ? m.sources : undefined,
       reasoning: m.reasoning,
-      contextReferences: Array.isArray(m.contextReferences)
-        ? m.contextReferences
+      webResearchSources: Array.isArray(m.webResearchSources)
+        ? m.webResearchSources
         : undefined,
       workflowId: m.workflowId,
     }));
@@ -135,10 +129,8 @@ export const getChatMessagesHttp = query({
       isStreaming: v.optional(v.boolean()),
       streamedContent: v.optional(v.string()),
       thinking: v.optional(v.string()),
-      searchResults: v.optional(v.array(vSearchResult)),
-      sources: v.optional(v.array(v.string())),
       reasoning: v.optional(v.string()),
-      contextReferences: v.optional(v.array(vContextReference)),
+      webResearchSources: v.optional(v.array(vWebResearchSource)),
       workflowId: v.optional(v.string()),
     }),
   ),
@@ -185,13 +177,9 @@ export const getChatMessagesHttp = query({
       isStreaming: m.isStreaming,
       streamedContent: m.streamedContent,
       thinking: m.thinking,
-      searchResults: Array.isArray(m.searchResults)
-        ? m.searchResults
-        : undefined,
-      sources: Array.isArray(m.sources) ? m.sources : undefined,
       reasoning: m.reasoning,
-      contextReferences: Array.isArray(m.contextReferences)
-        ? m.contextReferences
+      webResearchSources: Array.isArray(m.webResearchSources)
+        ? m.webResearchSources
         : undefined,
       workflowId: m.workflowId,
     }));

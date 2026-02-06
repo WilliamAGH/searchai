@@ -16,11 +16,8 @@ import { CACHE_TTL, CONTENT_LIMITS } from "../lib/constants/cache";
 import { getErrorMessage } from "../lib/errors";
 import { buildConversationContext } from "./orchestration_helpers";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
-import type {
-  ChatQueryResult,
-  MessageQueryResult,
-  ResearchContextReference,
-} from "../schemas/agents";
+import type { ChatQueryResult, MessageQueryResult } from "../schemas/agents";
+import type { WebResearchSource } from "../lib/validators";
 
 // ============================================
 // Types
@@ -34,7 +31,7 @@ export interface StreamingWorkflowArgs {
   sessionId?: string;
   userQuery: string;
   conversationContext?: string;
-  contextReferences?: ResearchContextReference[];
+  webResearchSources?: WebResearchSource[];
 }
 
 /**

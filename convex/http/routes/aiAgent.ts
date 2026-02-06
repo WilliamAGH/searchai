@@ -12,8 +12,8 @@ import { handleAgentRequest } from "./aiAgent_nonstreaming";
 import { handleAgentStream } from "./aiAgent_stream";
 import { handleAgentPersist } from "./aiAgent_persist";
 
-// Re-export for backwards compatibility with tests
-export { sanitizeContextReferences } from "./aiAgent_utils";
+// Re-export for HTTP route tests
+export { sanitizeWebResearchSources } from "./aiAgent_utils";
 
 /**
  * Register agent-based AI routes on the HTTP router

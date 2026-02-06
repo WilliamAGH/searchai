@@ -1,13 +1,9 @@
 import { Dispatch, SetStateAction } from "react";
 import { ChatState } from "@/hooks/useChatState";
-import type {
-  Message,
-  MessageStreamChunk,
-  PersistedPayload,
-} from "@/lib/types/message";
+import type { Message, MessageStreamChunk } from "@/lib/types/message";
+import type { StreamingPersistPayload } from "../../../convex/schemas/agents";
 import { logger } from "@/lib/logger";
 import { updateLastAssistantMessage } from "@/hooks/utils/messageStateUpdaters";
-import { safeParseUrl } from "../../../convex/lib/url";
 
 /**
  * Handles processing of stream events for the chat UI.
@@ -16,7 +12,7 @@ import { safeParseUrl } from "../../../convex/lib/url";
 export class StreamEventHandler {
   private fullContent = "";
   private accumulatedReasoning = "";
-  private persistedDetails: PersistedPayload | null = null;
+  private persistedDetails: StreamingPersistPayload | null = null;
   private persistedConfirmed = false;
   private workflowId: string | null = null;
   private workflowNonce: string | null = null;
@@ -30,7 +26,7 @@ export class StreamEventHandler {
     return this.persistedConfirmed;
   }
 
-  public getPersistedDetails(): PersistedPayload | null {
+  public getPersistedDetails(): StreamingPersistPayload | null {
     return this.persistedDetails;
   }
 
@@ -157,25 +153,11 @@ export class StreamEventHandler {
     chunk: Extract<MessageStreamChunk, { type: "metadata" }>,
   ) {
     const metadata = chunk.metadata;
-    const contextRefs = metadata.contextReferences;
-    const metadataSources = metadata.sources;
-    const fallbackSearchResults = metadata.searchResults ?? [];
-    const searchResults = contextRefs
-      ? contextRefs.map((ref) => {
-          const parsedUrl = ref.url ? safeParseUrl(ref.url) : null;
-          return {
-            title: ref.title || parsedUrl?.hostname || "Unknown",
-            url: parsedUrl ? ref.url || "" : "",
-            snippet: "",
-            relevanceScore: ref.relevanceScore ?? 0.5,
-          };
-        })
-      : fallbackSearchResults;
+    const webResearchSources = metadata.webResearchSources;
 
     const messageUpdates: Partial<Message> = {
       isStreaming: true,
       thinking: undefined,
-      searchResults,
     };
     if (metadata.workflowId !== undefined) {
       messageUpdates.workflowId = metadata.workflowId;
@@ -183,11 +165,8 @@ export class StreamEventHandler {
     if (chunk.nonce !== undefined) {
       messageUpdates.workflowNonce = chunk.nonce;
     }
-    if (contextRefs !== undefined) {
-      messageUpdates.contextReferences = contextRefs;
-    }
-    if (metadataSources !== undefined) {
-      messageUpdates.sources = metadataSources;
+    if (webResearchSources !== undefined) {
+      messageUpdates.webResearchSources = webResearchSources;
     }
     updateLastAssistantMessage(this.setState, messageUpdates);
     logger.debug("Metadata received");
@@ -213,19 +192,9 @@ export class StreamEventHandler {
     this.persistedConfirmed = true;
     this.persistedDetails = chunk.payload;
 
-    const persistedSearchResults = chunk.payload.contextReferences
-      ?.filter((ref) => ref && typeof ref.url === "string")
-      .map((ref) => ({
-        title: ref.title || ref.url || "Unknown",
-        url: ref.url || "",
-        snippet: "",
-        relevanceScore: ref.relevanceScore ?? 0.5,
-      }));
-
     const messageUpdates: Partial<Message> = {
       workflowId: chunk.payload.workflowId,
-      sources: chunk.payload.sources,
-      contextReferences: chunk.payload.contextReferences,
+      webResearchSources: chunk.payload.webResearchSources,
       isStreaming: false,
       thinking: undefined,
       persisted: true,
@@ -237,10 +206,6 @@ export class StreamEventHandler {
     if (chunk.signature !== undefined) {
       messageUpdates.workflowSignature = chunk.signature;
     }
-    if (persistedSearchResults !== undefined) {
-      messageUpdates.searchResults = persistedSearchResults;
-    }
-
     updateLastAssistantMessage(this.setState, messageUpdates, {
       isGenerating: false,
       searchProgress: { stage: "idle" },

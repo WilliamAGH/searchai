@@ -12,9 +12,10 @@ import { MessageSources } from "./MessageSources";
 import { ToolProgressIndicator } from "./ToolProgressIndicator";
 import {
   extractPlainText,
-  formatConversationWithSources,
+  formatConversationWithWebResearchSources,
 } from "@/lib/clipboard";
 import type { Message, SearchProgress } from "@/lib/types/message";
+import { hasWebResearchSources } from "@/lib/domain/webResearchSources";
 
 interface MessageItemProps {
   message: Message;
@@ -41,16 +42,6 @@ export function MessageItem({
 }: MessageItemProps) {
   const safeTimestamp =
     typeof message.timestamp === "number" ? message.timestamp : Date.now();
-  const safeResults = Array.isArray(message.searchResults)
-    ? message.searchResults.filter(
-        (r) => r && typeof r.url === "string" && typeof r.title === "string",
-      )
-    : [];
-  const hasContextReferences =
-    Array.isArray(message.contextReferences) &&
-    message.contextReferences.some(
-      (ref) => ref && typeof ref.url === "string" && ref.url.length > 0,
-    );
   const messageId = message._id ? String(message._id) : "";
   const canDelete = messageId.length > 0;
 
@@ -105,17 +96,15 @@ export function MessageItem({
       <div className="flex-1 min-w-0 overflow-hidden">
         {/* 1) Sources (compact/collapsed) first */}
         {message.role === "assistant" &&
-          (safeResults.length > 0 || hasContextReferences) && (
+          hasWebResearchSources(message.webResearchSources) && (
             <div className="mb-4">
               <MessageSources
                 id={messageId}
-                results={safeResults}
-                method={message.searchMethod}
+                webResearchSources={message.webResearchSources}
                 collapsed={collapsedById[messageId] ?? false}
                 onToggle={onToggleCollapsed}
                 hoveredSourceUrl={hoveredSourceUrl}
                 onSourceHover={onSourceHover}
-                contextReferences={message.contextReferences}
               />
             </div>
           )}
@@ -196,7 +185,7 @@ export function MessageItem({
           {message.role === "assistant" ? (
             <ContentWithCitations
               content={message.content || ""}
-              searchResults={safeResults}
+              webResearchSources={message.webResearchSources}
               hoveredSourceUrl={hoveredSourceUrl}
               onCitationHover={onCitationHover}
             />
@@ -215,12 +204,11 @@ export function MessageItem({
             <CopyButton
               text={
                 message.role === "assistant"
-                  ? formatConversationWithSources([
+                  ? formatConversationWithWebResearchSources([
                       {
                         role: message.role,
                         content: message.content || "",
-                        searchResults: message.searchResults,
-                        sources: message.sources,
+                        webResearchSources: message.webResearchSources,
                       },
                     ])
                   : extractPlainText(message.content || "")

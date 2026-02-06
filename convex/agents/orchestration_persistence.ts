@@ -14,10 +14,8 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { generateChatTitle } from "../chats/utils";
-import type {
-  ResearchContextReference,
-  StreamingPersistPayload,
-} from "../schemas/agents";
+import type { StreamingPersistPayload } from "../schemas/agents";
+import type { WebResearchSource } from "../lib/validators";
 
 // ============================================
 // Types
@@ -70,17 +68,8 @@ export interface PersistAssistantMessageParams {
   workflowTokenId?: Id<"workflowTokens"> | null;
   /** Optional session ID for HTTP action auth */
   sessionId?: string;
-  /** Search results with relevance scores for citation UI */
-  searchResults?: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    relevanceScore: number;
-  }>;
-  /** Source URLs referenced in the response */
-  sources?: string[];
-  /** Structured context references for provenance tracking */
-  contextReferences?: ResearchContextReference[];
+  /** Canonical: structured web research sources used by the system */
+  webResearchSources?: WebResearchSource[];
 }
 
 /** Parameters for workflow completion */
@@ -132,9 +121,7 @@ export async function persistAssistantMessage(
     workflowId,
     workflowTokenId,
     sessionId,
-    searchResults = [],
-    sources = [],
-    contextReferences = [],
+    webResearchSources = [],
   } = params;
 
   if (sessionId) {
@@ -142,9 +129,7 @@ export async function persistAssistantMessage(
       chatId,
       role: "assistant",
       content,
-      searchResults,
-      sources,
-      contextReferences,
+      webResearchSources,
       workflowId,
       isStreaming: false,
       sessionId,
@@ -156,9 +141,7 @@ export async function persistAssistantMessage(
     chatId,
     role: "assistant",
     content,
-    searchResults,
-    sources,
-    contextReferences,
+    webResearchSources,
     workflowId,
     isStreaming: false,
     sessionId,
@@ -214,8 +197,7 @@ export async function persistAndCompleteWorkflow(
     assistantMessageId,
     workflowId: params.workflowId,
     answer: params.content,
-    sources: params.sources || [],
-    contextReferences: params.contextReferences || [],
+    webResearchSources: params.webResearchSources || [],
   };
 
   const signature = await completeWorkflowWithSignature({

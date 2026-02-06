@@ -2,11 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import {
-  vSearchResult,
-  vContextReference,
-  vSearchMethod,
-} from "./lib/validators";
+import { vWebResearchSource, vSearchMethod } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
 import { isAuthorized, isUnownedChat, hasSessionAccess } from "./lib/auth";
@@ -18,12 +14,10 @@ export const addMessage = internalMutation({
     isStreaming: v.optional(v.boolean()),
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
-    searchResults: v.optional(v.array(vSearchResult)),
-    sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
-    contextReferences: v.optional(v.array(vContextReference)),
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
     workflowId: v.optional(v.string()),
     sessionId: v.optional(v.string()),
   },
@@ -69,12 +63,10 @@ export const addMessageHttp = internalMutation({
     isStreaming: v.optional(v.boolean()),
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
-    searchResults: v.optional(v.array(vSearchResult)),
-    sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
-    contextReferences: v.optional(v.array(vContextReference)),
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
     workflowId: v.optional(v.string()),
     workflowTokenId: v.optional(v.id("workflowTokens")),
     sessionId: v.optional(v.string()),
@@ -161,10 +153,9 @@ export const internalUpdateMessageReasoning = internalMutation({
 export const updateMessageMetadata = mutation({
   args: {
     messageId: v.id("messages"),
-    searchResults: v.optional(v.array(vSearchResult)),
-    sources: v.optional(v.array(v.string())),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
     sessionId: v.optional(v.string()),
   },
   returns: v.null(),
@@ -202,12 +193,10 @@ export const updateMessage = internalMutation({
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
     isStreaming: v.optional(v.boolean()),
-    searchResults: v.optional(v.array(vSearchResult)),
-    sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
-    contextReferences: v.optional(v.array(vContextReference)),
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
     workflowId: v.optional(v.string()),
   },
   handler: async (ctx, { messageId, ...rest }) => {

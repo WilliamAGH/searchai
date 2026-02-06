@@ -90,7 +90,7 @@ export const vSerpEnrichment = v.object({
   relatedSearches: v.optional(v.array(v.string())),
 });
 
-export const vContextReference = v.object({
+export const vWebResearchSource = v.object({
   contextId: v.string(),
   type: v.union(
     v.literal("search_result"),
@@ -104,8 +104,12 @@ export const vContextReference = v.object({
   metadata: v.optional(v.any()),
 });
 
-/** TypeScript type for context references (derived from validator) */
-export interface ContextReference {
+/**
+ * TypeScript type for web research sources (derived from validator).
+ *
+ * Keep this aligned with `convex/schemas/webResearchSources.ts`.
+ */
+export interface WebResearchSource {
   contextId: string;
   type: "search_result" | "scraped_page" | "research_summary";
   url?: string;

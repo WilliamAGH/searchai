@@ -31,7 +31,6 @@ import { ChatLayout } from "@/components/ChatInterface/ChatLayout";
 import type { Chat } from "@/lib/types/chat";
 import { DRAFT_MIN_LENGTH } from "@/lib/constants/topicDetection";
 import { buildApiBase, resolveApiPath } from "@/lib/utils/httpUtils";
-import { mapMessagesToLocal } from "@/lib/utils/messageMapper";
 import { buildUserHistory } from "@/lib/utils/chatHistory";
 
 function ChatInterfaceComponent({
@@ -160,10 +159,7 @@ function ChatInterfaceComponent({
     currentChatId,
   });
 
-  const currentMessages = useMemo(
-    () => mapMessagesToLocal(effectiveMessages),
-    [effectiveMessages],
-  );
+  const currentMessages = effectiveMessages;
   const userHistory = useMemo(
     () => buildUserHistory(currentMessages),
     [currentMessages],

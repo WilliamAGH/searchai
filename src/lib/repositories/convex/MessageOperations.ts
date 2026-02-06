@@ -92,10 +92,9 @@ export class MessageOperations {
     updates: Partial<Doc<"messages">>,
   ): Promise<void> {
     const hasMetadataUpdates =
-      updates.searchResults !== undefined ||
-      updates.sources !== undefined ||
       updates.searchMethod !== undefined ||
-      updates.hasRealResults !== undefined;
+      updates.hasRealResults !== undefined ||
+      updates.webResearchSources !== undefined;
 
     const hasContentUpdates =
       updates.content !== undefined || updates.reasoning !== undefined;
@@ -109,16 +108,15 @@ export class MessageOperations {
     if (!hasMetadataUpdates) {
       throw new Error(
         `No valid update fields provided for message ${id}. ` +
-          "Supported fields: searchResults, sources, searchMethod, hasRealResults",
+          "Supported fields: webResearchSources, searchMethod, hasRealResults",
       );
     }
 
     await this.client.mutation(api.messages.updateMessageMetadata, {
       messageId: IdUtils.toConvexMessageId(id),
-      searchResults: updates.searchResults,
-      sources: updates.sources,
       searchMethod: updates.searchMethod,
       hasRealResults: updates.hasRealResults,
+      webResearchSources: updates.webResearchSources,
       sessionId: this.getSessionId(),
     });
   }

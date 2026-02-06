@@ -81,7 +81,7 @@ export function buildCompleteEvent(
     sourcesUsed = [],
     confidence = 1,
     answerCompleteness = "complete",
-    contextReferences = [],
+    webResearchSources = [],
     planningDuration,
     researchDuration,
     synthesisDuration,
@@ -100,7 +100,7 @@ export function buildCompleteEvent(
 
   const derivedSourcesUsed =
     research?.sourcesUsed ??
-    contextReferences
+    webResearchSources
       .filter(
         (ref) => ref.type === "search_result" || ref.type === "scraped_page",
       )
@@ -164,7 +164,7 @@ export function buildMetadataEvent(
   return {
     metadata: {
       workflowId: params.workflowId,
-      contextReferences: params.contextReferences,
+      webResearchSources: params.webResearchSources,
       hasLimitations: params.hasLimitations,
       confidence: params.confidence,
       answerLength: params.answerLength,
@@ -227,7 +227,7 @@ export function buildConversationalCompleteEvent(params: {
   userQuery: string;
   answer: string;
   startTime: number;
-  contextReferences: BuildCompleteEventParams["contextReferences"];
+  webResearchSources: BuildCompleteEventParams["webResearchSources"];
   searchResultCount: number;
   scrapedPageCount: number;
 }): WorkflowCompletePayload {
@@ -255,7 +255,7 @@ export function buildConversationalCompleteEvent(params: {
             ? "adequate"
             : "limited",
     },
-    contextReferences: params.contextReferences ?? [],
+    webResearchSources: params.webResearchSources ?? [],
     confidence: 1,
   });
 }

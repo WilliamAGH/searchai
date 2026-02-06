@@ -16,7 +16,7 @@ import {
 } from "@/lib/security/signature";
 import { env } from "@/lib/env";
 import { z } from "zod/v4";
-import type { StreamingPersistPayload } from "../../../../convex/agents/schema";
+import type { StreamingPersistPayload } from "../../../../convex/schemas/agents";
 import {
   ProgressEventSchema,
   ReasoningEventSchema,

@@ -58,7 +58,7 @@ export async function* executeInstantPath({
     "metadata",
     buildMetadataEvent({
       workflowId,
-      contextReferences: [],
+      webResearchSources: [],
       hasLimitations: false,
       confidence: 1,
       answerLength: instantResponse.length,
@@ -90,9 +90,7 @@ export async function* executeInstantPath({
       content: instantResponse,
       workflowId,
       sessionId: args.sessionId,
-      searchResults: [],
-      sources: [],
-      contextReferences: [],
+      webResearchSources: [],
       workflowTokenId,
       nonce,
     });

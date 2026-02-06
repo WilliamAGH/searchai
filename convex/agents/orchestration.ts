@@ -2,7 +2,7 @@
 
 import { v } from "convex/values";
 import { action } from "../_generated/server";
-import { vContextReference } from "../lib/validators";
+import { vWebResearchSource } from "../lib/validators";
 import { streamConversationalWorkflow } from "./workflow_conversational";
 import type { StreamingPersistPayload } from "../schemas/agents";
 import { ensureCustomEventPolyfill } from "./workflow_utils";
@@ -17,7 +17,7 @@ export { streamResearchWorkflow } from "./workflow_research";
 
 // Re-export types
 export type { StreamingWorkflowArgs } from "./orchestration_session";
-export type { ResearchContextReference } from "../schemas/agents";
+export type { WebResearchSource } from "../lib/validators";
 
 // --------------------------------------------
 // Non-streaming workflow with persistence
@@ -32,8 +32,7 @@ export const runAgentWorkflowAndPersist = action({
     assistantMessageId: v.string(),
     workflowId: v.string(),
     answer: v.string(),
-    sources: v.array(v.string()),
-    contextReferences: v.array(vContextReference),
+    webResearchSources: v.array(vWebResearchSource),
     signature: v.string(),
   }),
   // @ts-ignore TS2589 - Convex type instantiation is excessively deep with complex return validators
@@ -43,7 +42,7 @@ export const runAgentWorkflowAndPersist = action({
       sessionId: args.sessionId,
       userQuery: args.message,
       conversationContext: undefined,
-      contextReferences: undefined,
+      webResearchSources: undefined,
     });
 
     let persisted: {
@@ -74,8 +73,7 @@ export const runAgentWorkflowAndPersist = action({
       assistantMessageId: persisted.payload.assistantMessageId,
       workflowId: persisted.payload.workflowId,
       answer: persisted.payload.answer,
-      sources: persisted.payload.sources,
-      contextReferences: persisted.payload.contextReferences,
+      webResearchSources: persisted.payload.webResearchSources,
       signature: persisted.signature,
     };
   },

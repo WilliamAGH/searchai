@@ -5,21 +5,20 @@
  */
 
 import { z } from "zod/v4";
-import { ResearchContextReferenceSchema } from "../../../convex/schemas/agents";
-import { SearchResultSchema } from "@/lib/schemas/apiResponses";
+import { WebResearchSourceSchema } from "../../../convex/schemas/webResearchSources";
 
-export const ContextReferenceSchema = ResearchContextReferenceSchema.omit({
+export const WebResearchSourceClientSchema = WebResearchSourceSchema.omit({
   metadata: true,
 }).strip();
 
-export type ContextReference = z.infer<typeof ContextReferenceSchema>;
+export type WebResearchSourceClient = z.infer<
+  typeof WebResearchSourceClientSchema
+>;
 
 export const MessageMetadataSchema = z
   .object({
     workflowId: z.string().optional(),
-    contextReferences: z.array(ContextReferenceSchema).optional(),
-    sources: z.array(z.string()).optional(),
-    searchResults: z.array(SearchResultSchema).optional(),
+    webResearchSources: z.array(WebResearchSourceClientSchema).optional(),
   })
   .strip();
 

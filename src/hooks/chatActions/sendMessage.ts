@@ -48,8 +48,7 @@ export async function sendMessageWithStreaming({
     content: "",
     isStreaming: true,
     reasoning: "",
-    searchResults: [],
-    sources: [],
+    webResearchSources: [],
   });
 
   // Update state to show both user message and assistant placeholder

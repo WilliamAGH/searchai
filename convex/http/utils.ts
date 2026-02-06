@@ -3,6 +3,7 @@
  */
 
 import { normalizeWhitespace } from "../lib/text";
+import type { WebResearchSource } from "../lib/validators";
 
 /**
  * Serialize an error for JSON responses
@@ -103,15 +104,14 @@ export function extractPlainText(content: string): string {
 }
 
 /**
- * Utility: Format conversation as Markdown with sources
+ * Utility: Format conversation as Markdown with web research sources.
  */
 export function formatConversationMarkdown(params: {
   title?: string;
   messages: Array<{
     role: "user" | "assistant" | "system";
     content?: string;
-    searchResults?: Array<{ title?: string; url?: string }> | undefined;
-    sources?: string[] | undefined;
+    webResearchSources?: WebResearchSource[] | undefined;
   }>;
 }): string {
   const lines: string[] = [];
@@ -127,21 +127,13 @@ export function formatConversationMarkdown(params: {
     if (m.role === "assistant") {
       const src: string[] = [];
       const seen = new Set<string>();
-      if (Array.isArray(m.searchResults)) {
-        for (const r of m.searchResults) {
-          if (!r || !r.url) continue;
-          const key = r.url;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          if (r.title) src.push(`- ${r.title}: ${r.url}`);
-          else src.push(`- ${r.url}`);
-        }
-      }
-      if (Array.isArray(m.sources)) {
-        for (const u of m.sources) {
-          if (!u || seen.has(u)) continue;
-          seen.add(u);
-          src.push(`- ${u}`);
+      if (Array.isArray(m.webResearchSources)) {
+        for (const s of m.webResearchSources) {
+          if (!s || typeof s.url !== "string" || s.url.length === 0) continue;
+          if (seen.has(s.url)) continue;
+          seen.add(s.url);
+          if (s.title) src.push(`- ${s.title}: ${s.url}`);
+          else src.push(`- ${s.url}`);
         }
       }
       if (src.length) {

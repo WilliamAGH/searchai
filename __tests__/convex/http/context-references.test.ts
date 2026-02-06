@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { sanitizeContextReferences } from "../../../convex/http/routes/aiAgent";
+import { sanitizeWebResearchSources } from "../../../convex/http/routes/aiAgent";
 
-describe("sanitizeContextReferences", () => {
-  it("filters and normalizes valid context references", () => {
+describe("sanitizeWebResearchSources", () => {
+  it("filters and normalizes valid web research sources", () => {
     vi.useFakeTimers();
     const now = Date.now();
     vi.setSystemTime(now);
 
-    const result = sanitizeContextReferences([
+    const result = sanitizeWebResearchSources([
       {
         contextId: "019a122e-c507-7851-99f7-b8f5d7345b40",
         type: "search_result",
@@ -59,7 +59,7 @@ describe("sanitizeContextReferences", () => {
       url: oversizedUrl,
     }));
 
-    const result = sanitizeContextReferences(refs);
+    const result = sanitizeWebResearchSources(refs);
 
     expect(result).toBeDefined();
     expect(result).toHaveLength(12);
@@ -68,8 +68,8 @@ describe("sanitizeContextReferences", () => {
   });
 
   it("returns undefined for non-arrays", () => {
-    expect(sanitizeContextReferences(null)).toBeUndefined();
-    expect(sanitizeContextReferences({})).toBeUndefined();
-    expect(sanitizeContextReferences("invalid")).toBeUndefined();
+    expect(sanitizeWebResearchSources(null)).toBeUndefined();
+    expect(sanitizeWebResearchSources({})).toBeUndefined();
+    expect(sanitizeWebResearchSources("invalid")).toBeUndefined();
   });
 });

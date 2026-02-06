@@ -1,6 +1,5 @@
 import { corsResponse, serializeError } from "../utils";
-import type { ResearchContextReference } from "../../schemas/agents";
-import { isRecord } from "../../lib/validators";
+import { isRecord, type WebResearchSource } from "../../lib/validators";
 
 /**
  * Regex pattern to match ASCII control characters (except tab, newline, carriage return)
@@ -91,9 +90,9 @@ export function sanitizeTextInput(
   return value.replace(CONTROL_CHARS_PATTERN, "").slice(0, maxLength);
 }
 
-export function sanitizeContextReferences(
+export function sanitizeWebResearchSources(
   input: unknown,
-): ResearchContextReference[] | undefined {
+): WebResearchSource[] | undefined {
   if (!Array.isArray(input)) return undefined;
 
   return input
@@ -112,7 +111,7 @@ export function sanitizeContextReferences(
         return null;
       }
 
-      const sanitized: ResearchContextReference = {
+      const sanitized: WebResearchSource = {
         contextId,
         type,
         timestamp:
@@ -141,5 +140,5 @@ export function sanitizeContextReferences(
 
       return sanitized;
     })
-    .filter((ref): ref is ResearchContextReference => !!ref);
+    .filter((ref): ref is WebResearchSource => !!ref);
 }

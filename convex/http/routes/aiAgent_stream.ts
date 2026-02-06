@@ -9,7 +9,7 @@ import { corsResponse, dlog, formatSseEvent, serializeError } from "../utils";
 import {
   parseJsonPayload,
   rateLimitExceededResponse,
-  sanitizeContextReferences,
+  sanitizeWebResearchSources,
   sanitizeTextInput,
 } from "./aiAgent_utils";
 
@@ -75,8 +75,8 @@ export async function handleAgentStream(
     5000,
   );
 
-  const contextReferences = sanitizeContextReferences(
-    payload.contextReferences,
+  const webResearchSources = sanitizeWebResearchSources(
+    payload.webResearchSources,
   );
 
   const encoder = new TextEncoder();
@@ -96,7 +96,7 @@ export async function handleAgentStream(
           sessionId,
           userQuery: message,
           conversationContext,
-          contextReferences,
+          webResearchSources,
         });
 
         for await (const event of eventStream) {

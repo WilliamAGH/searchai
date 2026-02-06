@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import {
-  vContextReference,
+  vWebResearchSource,
   vScrapedContent,
   vSerpEnrichment,
 } from "../lib/validators";
@@ -8,7 +8,7 @@ import {
 export const orchestrateResearchWorkflowArgs = {
   userQuery: v.string(),
   conversationContext: v.optional(v.string()),
-  contextReferences: v.optional(v.array(vContextReference)),
+  webResearchSources: v.optional(v.array(vWebResearchSource)),
 };
 
 export const orchestrateResearchWorkflowReturns = v.object({

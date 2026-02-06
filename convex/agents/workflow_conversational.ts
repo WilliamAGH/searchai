@@ -27,9 +27,7 @@ import {
   type StreamingWorkflowArgs,
 } from "./orchestration_session";
 import {
-  buildContextReferencesFromHarvested,
-  buildSearchResultsFromContextRefs,
-  extractSourceUrls,
+  buildWebResearchSourcesFromHarvested,
   withTimeout,
 } from "./orchestration_helpers";
 import {
@@ -245,16 +243,12 @@ export async function* streamConversationalWorkflow(
       intent: args.userQuery,
     });
 
-    const uniqueContextRefs = buildContextReferencesFromHarvested(harvested);
+    const webResearchSources = buildWebResearchSourcesFromHarvested(harvested);
 
-    const searchResults = buildSearchResultsFromContextRefs(uniqueContextRefs);
-    const sources = extractSourceUrls(uniqueContextRefs);
-
-    logSourcesSummary(
-      uniqueContextRefs.length,
-      searchResults.length,
-      sources.length,
-    );
+    const urlCount = webResearchSources.filter(
+      (s) => typeof s.url === "string" && s.url.length > 0,
+    ).length;
+    logSourcesSummary(webResearchSources.length, urlCount);
 
     const { payload: persistedPayload, signature } = await withErrorContext(
       "Failed to persist and complete workflow",
@@ -265,9 +259,7 @@ export async function* streamConversationalWorkflow(
           content: finalOutput,
           workflowId,
           sessionId: args.sessionId,
-          searchResults,
-          sources,
-          contextReferences: uniqueContextRefs,
+          webResearchSources,
           workflowTokenId,
           nonce,
         }),
@@ -278,7 +270,7 @@ export async function* streamConversationalWorkflow(
       "metadata",
       buildMetadataEvent({
         workflowId,
-        contextReferences: uniqueContextRefs,
+        webResearchSources,
         hasLimitations: false,
         confidence: 1,
         answerLength: finalOutput.length,
@@ -293,7 +285,7 @@ export async function* streamConversationalWorkflow(
         userQuery: args.userQuery,
         answer: finalOutput,
         startTime,
-        contextReferences: uniqueContextRefs,
+        webResearchSources,
         searchResultCount: harvested.searchResults.length,
         scrapedPageCount: harvested.scrapedContent.length,
       }),

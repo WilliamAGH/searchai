@@ -5,9 +5,10 @@ import { corsResponse, dlog, serializeError } from "../utils";
 import {
   parseJsonPayload,
   rateLimitExceededResponse,
-  sanitizeContextReferences,
+  sanitizeWebResearchSources,
   sanitizeTextInput,
 } from "./aiAgent_utils";
+import { RELEVANCE_SCORES } from "../../lib/constants/cache";
 
 export async function handleAgentRequest(
   ctx: ActionCtx,
@@ -49,18 +50,15 @@ export async function handleAgentRequest(
     5000,
   );
 
-  const contextReferences = sanitizeContextReferences(
-    payload.contextReferences,
+  const webResearchSources = sanitizeWebResearchSources(
+    payload.webResearchSources,
   );
 
   dlog("AGENT AI ENDPOINT CALLED:");
   dlog("Message length:", message.length);
   dlog("Has context:", !!conversationContext);
   dlog("Context length:", conversationContext?.length || 0);
-  dlog(
-    "Context references provided:",
-    contextReferences ? contextReferences.length : 0,
-  );
+  dlog("Web research sources provided:", webResearchSources?.length ?? 0);
   dlog("Environment Variables Available:");
   dlog(
     "- OPENROUTER_API_KEY:",
@@ -76,7 +74,7 @@ export async function handleAgentRequest(
       {
         userQuery: message,
         conversationContext,
-        contextReferences,
+        webResearchSources,
       },
     );
 
@@ -93,13 +91,12 @@ export async function handleAgentRequest(
       answer: workflowResult.answer.answer,
       hasLimitations: workflowResult.answer.hasLimitations,
       limitations: workflowResult.answer.limitations,
-      sources: workflowResult.answer.sourcesUsed,
-      contextReferences: workflowResult.research.sourcesUsed.map(
+      webResearchSources: workflowResult.research.sourcesUsed.map(
         (src: {
           url: string;
           title: string;
           contextId: string;
-          type: "search_result" | "scraped_page";
+          type: "search_result" | "scraped_page" | "research_summary";
           relevance: "high" | "medium" | "low";
         }) => ({
           contextId: src.contextId,
@@ -107,7 +104,12 @@ export async function handleAgentRequest(
           url: src.url,
           title: src.title,
           timestamp: Date.now(),
-          relevance: src.relevance,
+          relevanceScore:
+            src.relevance === "high"
+              ? RELEVANCE_SCORES.HIGH_LABEL
+              : src.relevance === "medium"
+                ? RELEVANCE_SCORES.MEDIUM_LABEL
+                : RELEVANCE_SCORES.LOW_LABEL,
         }),
       ),
       workflow: {
@@ -164,8 +166,7 @@ export async function handleAgentRequest(
         "I apologize, but I encountered an error while processing your request. Please try again.",
       hasLimitations: true,
       limitations: "The AI processing system encountered an error.",
-      sources: [],
-      contextReferences: [],
+      webResearchSources: [],
       timestamp: new Date().toISOString(),
     };
 

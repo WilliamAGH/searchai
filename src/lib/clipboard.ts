@@ -3,6 +3,8 @@
  */
 
 import { logger } from "./logger";
+import { toWebSourceCards } from "@/lib/domain/webResearchSources";
+import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
 /**
  * Copy text to clipboard with fallback support
@@ -70,12 +72,11 @@ export function extractPlainText(content: string): string {
  * @param messages - Array of messages with potential sources
  * @returns Formatted text with sources between messages
  */
-export function formatConversationWithSources(
+export function formatConversationWithWebResearchSources(
   messages: Array<{
     role: "user" | "assistant" | "system";
     content: string;
-    searchResults?: Array<{ title: string; url: string }>;
-    sources?: string[];
+    webResearchSources?: WebResearchSourceClient[] | undefined;
   }>,
 ): string {
   const formatted: string[] = [];
@@ -87,29 +88,9 @@ export function formatConversationWithSources(
 
     // If this is an assistant message with sources, add them after
     if (message.role === "assistant") {
-      const sources: string[] = [];
-
-      // Collect sources from searchResults
-      if (message.searchResults && message.searchResults.length > 0) {
-        message.searchResults.forEach((result) => {
-          if (result.url && result.title) {
-            sources.push(`  • ${result.title}: ${result.url}`);
-          }
-        });
-      }
-
-      // Also collect from sources array if present
-      if (message.sources && message.sources.length > 0) {
-        // Only add if not already in searchResults
-        message.sources.forEach((sourceUrl) => {
-          const alreadyIncluded = message.searchResults?.some(
-            (r) => r.url === sourceUrl,
-          );
-          if (!alreadyIncluded) {
-            sources.push(`  • ${sourceUrl}`);
-          }
-        });
-      }
+      const sources = toWebSourceCards(message.webResearchSources).map(
+        (c) => `  • ${c.title}: ${c.url}`,
+      );
 
       // Add sources section if we have any
       if (sources.length > 0) {

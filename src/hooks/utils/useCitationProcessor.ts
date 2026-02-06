@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { getDomainFromUrl } from "@/lib/utils/favicon";
 import { logger } from "@/lib/logger";
+import { toWebSourceCards } from "@/lib/domain/webResearchSources";
+import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
 /**
  * Hook to process content and replace citations with interactive markers
@@ -8,10 +10,13 @@ import { logger } from "@/lib/logger";
  */
 export function useCitationProcessor(
   content: string,
-  searchResults: Array<{ url: string }> = [],
+  webResearchSources: WebResearchSourceClient[] | undefined,
   domainToUrlMap: Map<string, string>,
 ): string {
   return useMemo(() => {
+    const cards = toWebSourceCards(webResearchSources);
+    const urlSet = new Set(cards.map((c) => c.url));
+
     // Replace [domain.com] or [full URL] with custom markers that survive markdown processing
     // Updated regex to capture potential following (url) part of a markdown link
     // This handles cases where LLM outputs [domain.com](url) - we want to consume the whole thing
@@ -51,9 +56,8 @@ export function useCitationProcessor(
           try {
             domain = new URL(citedText).hostname.replace("www.", "");
             // Try to find exact URL match first
-            const exactMatch = searchResults?.find((r) => r.url === citedText);
-            if (exactMatch) {
-              url = exactMatch.url;
+            if (urlSet.has(citedText)) {
+              url = citedText;
             } else {
               // Fallback to domain matching
               url = domainToUrlMap.get(domain);
@@ -73,13 +77,13 @@ export function useCitationProcessor(
           url = domainToUrlMap.get(domain);
           // If not found, try to find a URL that contains this path
           if (!url) {
-            const matchingResult = searchResults?.find(
-              (r) =>
-                r.url.includes(citedText) ||
-                (r.url.includes(domain) && r.url.includes("/")),
+            const matchingCard = cards.find(
+              (c) =>
+                c.url.includes(citedText) ||
+                (c.url.includes(domain) && c.url.includes("/")),
             );
-            if (matchingResult) {
-              url = matchingResult.url;
+            if (matchingCard) {
+              url = matchingCard.url;
             }
           }
         } else {
@@ -99,9 +103,9 @@ export function useCitationProcessor(
         citedText,
         domain,
         mapSize: domainToUrlMap.size,
-        hasSearchResults: searchResults.length > 0,
+        cardCount: cards.length,
       });
       return match;
     });
-  }, [content, domainToUrlMap, searchResults]);
+  }, [content, domainToUrlMap, webResearchSources]);
 }

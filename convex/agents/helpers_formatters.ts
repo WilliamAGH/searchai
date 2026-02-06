@@ -100,7 +100,7 @@ export function formatSerpEnrichmentForPrompt(
   return lines.join("\n");
 }
 
-export function formatContextReferencesForPrompt(
+export function formatWebResearchSourcesForPrompt(
   references:
     | Array<{
         contextId: string;
@@ -120,7 +120,7 @@ export function formatContextReferencesForPrompt(
         try {
           label = new URL(ref.url).hostname;
         } catch (error) {
-          console.warn("Failed to parse context reference URL", {
+          console.warn("Failed to parse web research source URL", {
             url: ref.url,
             error,
           });
@@ -134,5 +134,5 @@ export function formatContextReferencesForPrompt(
       return `${idx + 1}. ${label}${ref.url ? ` — ${ref.url}` : ""}${relevance} [${ref.contextId}]`;
     })
     .join("\n");
-  return `PREVIOUS CONTEXT REFERENCES:\n${recent}`;
+  return `PREVIOUS WEB RESEARCH SOURCES:\n${recent}`;
 }

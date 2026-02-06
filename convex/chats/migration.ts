@@ -9,7 +9,7 @@ import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { generateShareId, generatePublicId } from "../lib/uuid";
-import { vSearchMethod } from "../lib/validators";
+import { vSearchMethod, vWebResearchSource } from "../lib/validators";
 
 /**
  * Import locally stored chats/messages into the authenticated account
@@ -40,8 +40,7 @@ export const importLocalChats = mutation({
             content: v.optional(v.string()),
             timestamp: v.optional(v.number()),
             // Optional metadata preserved when available
-            searchResults: v.optional(v.array(v.any())),
-            sources: v.optional(v.array(v.string())),
+            webResearchSources: v.optional(v.array(vWebResearchSource)),
             reasoning: v.optional(v.any()),
             searchMethod: v.optional(vSearchMethod),
             hasRealResults: v.optional(v.boolean()),
@@ -97,24 +96,7 @@ export const importLocalChats = mutation({
           role: m.role,
           content: m.content as string | undefined,
           timestamp: m.timestamp ?? Date.now(),
-          // Preserve optional metadata when present
-          searchResults: m.searchResults?.map((result: unknown) => {
-            const r = result as Record<string, unknown>;
-            return {
-              title: r.title as string,
-              url: r.url as string,
-              snippet: r.snippet as string,
-              relevanceScore: (r.relevanceScore as number) ?? 0.5, // Default to 0.5 if missing
-            };
-          }) as
-            | Array<{
-                title: string;
-                url: string;
-                snippet: string;
-                relevanceScore: number;
-              }>
-            | undefined,
-          sources: m.sources,
+          webResearchSources: m.webResearchSources,
           reasoning: m.reasoning as string | undefined,
           searchMethod: m.searchMethod,
           hasRealResults: m.hasRealResults,
@@ -145,8 +127,7 @@ export const publishAnonymousChat = mutation({
         role: v.union(v.literal("user"), v.literal("assistant")),
         content: v.optional(v.string()),
         timestamp: v.optional(v.number()),
-        searchResults: v.optional(v.array(v.any())),
-        sources: v.optional(v.array(v.string())),
+        webResearchSources: v.optional(v.array(vWebResearchSource)),
         reasoning: v.optional(v.any()),
         searchMethod: v.optional(vSearchMethod),
         hasRealResults: v.optional(v.boolean()),
@@ -198,8 +179,7 @@ export const publishAnonymousChat = mutation({
         role: m.role,
         content: m.content,
         timestamp: m.timestamp ?? Date.now(),
-        searchResults: m.searchResults,
-        sources: m.sources,
+        webResearchSources: m.webResearchSources,
         reasoning: m.reasoning as string | undefined,
         searchMethod: m.searchMethod,
         hasRealResults: m.hasRealResults,

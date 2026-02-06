@@ -13,7 +13,7 @@ import {
   hasUserAccess,
   isSharedOrPublicChat,
 } from "../lib/auth";
-import { vContextReference, vSearchResult } from "../lib/validators";
+import { vWebResearchSource } from "../lib/validators";
 import { isValidUuidV7 } from "../lib/uuid";
 
 const assertValidSessionId = (sessionId?: string) => {
@@ -54,10 +54,8 @@ export const getChatMessagesPaginated = query({
         isStreaming: v.optional(v.boolean()),
         streamedContent: v.optional(v.string()),
         thinking: v.optional(v.string()),
-        searchResults: v.optional(v.array(vSearchResult)),
-        sources: v.optional(v.array(v.string())),
         reasoning: v.optional(v.string()),
-        contextReferences: v.optional(v.array(vContextReference)),
+        webResearchSources: v.optional(v.array(vWebResearchSource)),
         workflowId: v.optional(v.string()),
       }),
     ),
@@ -117,10 +115,8 @@ export const getChatMessagesPaginated = query({
         isStreaming: m.isStreaming,
         streamedContent: m.streamedContent,
         thinking: m.thinking,
-        searchResults: m.searchResults || [],
-        sources: m.sources || [],
         reasoning: m.reasoning,
-        contextReferences: m.contextReferences,
+        webResearchSources: m.webResearchSources,
         workflowId: m.workflowId,
       }));
       return {

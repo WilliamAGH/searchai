@@ -3,6 +3,7 @@ import type { ActionCtx } from "../../_generated/server";
 import { formatConversationMarkdown } from "../utils";
 import { buildCorsJsonResponse } from "./publish_cors";
 import { isValidUuidV7 } from "../../lib/uuid";
+import type { WebResearchSource } from "../../lib/validators";
 
 type ExportedChat = {
   title: string;
@@ -17,8 +18,7 @@ type ExportedMessage = {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
-  searchResults?: Array<{ title?: string; url?: string }>;
-  sources?: string[];
+  webResearchSources?: WebResearchSource[];
 };
 
 export type ExportData = {
@@ -126,8 +126,7 @@ export async function loadExportData(
     role: m.role,
     content: m.content ?? "",
     timestamp: m.timestamp ?? 0,
-    searchResults: m.searchResults,
-    sources: m.sources,
+    webResearchSources: m.webResearchSources,
   }));
 
   const markdown = formatConversationMarkdown({

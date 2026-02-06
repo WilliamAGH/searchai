@@ -12,7 +12,7 @@ export {
 export {
   formatScrapedContentForPrompt,
   formatSerpEnrichmentForPrompt,
-  formatContextReferencesForPrompt,
+  formatWebResearchSourcesForPrompt,
 } from "./helpers_formatters";
 
 export {
@@ -33,8 +33,6 @@ export {
 
 export {
   normalizeSourceContextIds,
-  convertToContextReferences,
-  buildContextReferencesFromHarvested,
-  buildSearchResultsFromContextRefs,
-  extractSourceUrls,
+  convertToWebResearchSources,
+  buildWebResearchSourcesFromHarvested,
 } from "./helpers_context";
