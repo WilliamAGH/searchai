@@ -8,7 +8,7 @@ export function getAllowedOrigin(origin: string | null): string | null {
   return validateOrigin(origin);
 }
 
-function buildUnauthorizedOriginResponse(): Response {
+export function buildUnauthorizedOriginResponse(): Response {
   return new Response(JSON.stringify({ error: "Unauthorized origin" }), {
     status: 403,
     headers: {
