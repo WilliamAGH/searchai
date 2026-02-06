@@ -59,6 +59,11 @@ jobs:
           CI: "1"
         run: npx playwright test --config=__tests__/playwright-integration.config.ts --reporter=line
 
+      - name: Run Playwright smoke/share tests
+        env:
+          CI: "1"
+        run: npx playwright test -g "(smoke|share)" --reporter=line
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

@@ -8,10 +8,12 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
   page.on("console", (msg) => {
     if (msg.type() === "error") {
       const text = msg.text();
-      // Ignore 403 errors from message sending - expected without API keys
+      const expectedForbiddenSendError =
+        text.includes("Failed to send message") &&
+        (text.includes("HTTP 403") || text.includes("403 (Forbidden)"));
+      // Ignore expected 403 errors from message sending when API keys are absent
       if (
-        text.includes("HTTP 403") ||
-        text.includes("Failed to send message") ||
+        expectedForbiddenSendError ||
         text.includes("403 (Forbidden)") ||
         text.includes("Failed to load resource") ||
         text.includes(
