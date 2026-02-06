@@ -41,15 +41,21 @@ registerPublishRoutes(http);
 auth.addHttpRoutes(http);
 
 // Lightweight health check endpoint
+// Health probes (load balancers, uptime monitors) don't send Origin headers,
+// so this endpoint bypasses CORS validation when Origin is absent.
 http.route({
   path: "/health",
   method: "GET",
   handler: httpAction(async (_ctx, request) => {
-    return corsResponse(
-      JSON.stringify({ status: "ok", timestamp: Date.now() }),
-      200,
-      request.headers.get("Origin"),
-    );
+    const body = JSON.stringify({ status: "ok", timestamp: Date.now() });
+    const origin = request.headers.get("Origin");
+    if (!origin) {
+      return new Response(body, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return corsResponse(body, 200, origin);
   }),
 });
 
