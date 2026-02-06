@@ -18,20 +18,12 @@ export interface PersistableMessageArgs {
   workflowId?: string;
 }
 
-export interface MessageInsertDocument<TChatId extends string = string> {
+export interface MessageInsertDocument<
+  TChatId extends string = string,
+> extends PersistableMessageArgs {
   chatId: TChatId;
   messageId: string;
   threadId: string;
-  role: "user" | "assistant";
-  content?: string;
-  isStreaming?: boolean;
-  streamedContent?: string;
-  thinking?: string;
-  reasoning?: string;
-  searchMethod?: SearchMethod;
-  hasRealResults?: boolean;
-  webResearchSources?: WebResearchSource[];
-  workflowId?: string;
   timestamp: number;
 }
 
@@ -45,6 +37,40 @@ export interface BuildMessageInsertDocumentParams<
   timestamp?: number;
 }
 
+type OptionalField = keyof Omit<PersistableMessageArgs, "role">;
+
+/** Explicit allowlist of optional fields copied from args to the document. */
+const OPTIONAL_FIELDS: readonly OptionalField[] = [
+  "content",
+  "isStreaming",
+  "streamedContent",
+  "thinking",
+  "reasoning",
+  "searchMethod",
+  "hasRealResults",
+  "webResearchSources",
+  "workflowId",
+] as const;
+
+type OptionalFieldsPartial = Partial<Omit<PersistableMessageArgs, "role">>;
+
+/** Pick defined optional fields from args into a typed partial. */
+function pickDefinedFields(
+  args: PersistableMessageArgs,
+): OptionalFieldsPartial {
+  const partial = {} as OptionalFieldsPartial;
+  for (const key of OPTIONAL_FIELDS) {
+    if (args[key] !== undefined) {
+      // TS cannot narrow Partial<T>[K] writes when K is a union key type
+      // (resolves the LHS to `never`). This is a known TS limitation.
+      // SAFETY: key is from OPTIONAL_FIELDS, constrained to keys shared
+      // by both PersistableMessageArgs and OptionalFieldsPartial.
+      (partial[key] as PersistableMessageArgs[typeof key]) = args[key];
+    }
+  }
+  return partial;
+}
+
 /**
  * Build a messages insert payload using explicit field mapping.
  * This prevents accidental persistence of extra transport-only args.
@@ -54,41 +80,12 @@ export function buildMessageInsertDocument<TChatId extends string>(
 ): MessageInsertDocument<TChatId> {
   const { chatId, messageId, threadId, args, timestamp = Date.now() } = params;
 
-  const message: MessageInsertDocument<TChatId> = {
+  return {
     chatId,
     messageId,
     threadId,
     role: args.role,
     timestamp,
+    ...pickDefinedFields(args),
   };
-
-  if (args.content !== undefined) {
-    message.content = args.content;
-  }
-  if (args.isStreaming !== undefined) {
-    message.isStreaming = args.isStreaming;
-  }
-  if (args.streamedContent !== undefined) {
-    message.streamedContent = args.streamedContent;
-  }
-  if (args.thinking !== undefined) {
-    message.thinking = args.thinking;
-  }
-  if (args.reasoning !== undefined) {
-    message.reasoning = args.reasoning;
-  }
-  if (args.searchMethod !== undefined) {
-    message.searchMethod = args.searchMethod;
-  }
-  if (args.hasRealResults !== undefined) {
-    message.hasRealResults = args.hasRealResults;
-  }
-  if (args.webResearchSources !== undefined) {
-    message.webResearchSources = args.webResearchSources;
-  }
-  if (args.workflowId !== undefined) {
-    message.workflowId = args.workflowId;
-  }
-
-  return message;
 }
