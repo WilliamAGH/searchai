@@ -3,12 +3,14 @@ import type { ActionCtx } from "../../_generated/server";
 import { isValidUuidV7 } from "../../lib/uuid";
 import { isRecord } from "../../lib/validators";
 import { serializeError } from "../utils";
-import { buildCorsJsonResponse, getAllowedOrigin } from "./publish_cors";
+import {
+  buildCorsJsonResponse,
+  buildUnauthorizedOriginResponse,
+  getAllowedOrigin,
+} from "./publish_cors";
 import { sanitizeWebResearchSources } from "./aiAgent_utils";
 
-/**
- * Validate and normalize URL to safe http/https protocols only
- */
+/** Handle authenticated chat publication with CORS origin validation */
 export async function handlePublishChat(
   ctx: ActionCtx,
   request: Request,
@@ -16,11 +18,7 @@ export async function handlePublishChat(
   const origin = request.headers.get("Origin");
   const allowOrigin = getAllowedOrigin(origin);
   if (!allowOrigin) {
-    return buildCorsJsonResponse(
-      request,
-      { error: "Unauthorized origin" },
-      403,
-    );
+    return buildUnauthorizedOriginResponse();
   }
 
   let rawPayload: unknown;
