@@ -2,8 +2,10 @@
  * Utility functions for HTTP endpoints
  */
 
-import { normalizeWhitespace } from "../lib/text";
+import { extractPlainText } from "../lib/text";
 import type { WebResearchSource } from "../lib/validators";
+
+export { extractPlainText } from "../lib/text";
 
 /**
  * Serialize an error for JSON responses
@@ -83,24 +85,6 @@ export function escapeHtml(s: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
-}
-
-/**
- * Utility: Extract plain text from markdown-ish content
- */
-export function extractPlainText(content: string): string {
-  let text = content || "";
-  // [text](url) -> text
-  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-  // **bold**/*italic* markers
-  text = text.replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1");
-  // code blocks
-  text = text.replace(/```[\s\S]*?```/g, "");
-  // inline code
-  text = text.replace(/`([^`]+)`/g, "$1");
-  // HTML tags
-  text = text.replace(/<[^>]*>/g, "");
-  return normalizeWhitespace(text);
 }
 
 /**

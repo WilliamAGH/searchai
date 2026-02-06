@@ -10,10 +10,7 @@ import { ReasoningDisplay } from "../ReasoningDisplay";
 import { CopyButton } from "../CopyButton";
 import { MessageSources } from "./MessageSources";
 import { ToolProgressIndicator } from "./ToolProgressIndicator";
-import {
-  extractPlainText,
-  formatConversationWithWebResearchSources,
-} from "@/lib/clipboard";
+import { formatConversationWithWebResearchSources } from "@/lib/clipboard";
 import type { Message, SearchProgress } from "@/lib/types/message";
 import { hasWebResearchSources } from "@/lib/domain/webResearchSources";
 
@@ -211,7 +208,7 @@ export function MessageItem({
                         webResearchSources: message.webResearchSources,
                       },
                     ])
-                  : extractPlainText(message.content || "")
+                  : message.content || ""
               }
               size="sm"
               title="Copy message"

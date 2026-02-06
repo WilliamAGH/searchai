@@ -35,6 +35,9 @@ export type ExportDataResult =
 
 type ShareQueryMode = "auth" | "http";
 
+/** Max length for shareId/publicId query params (UUIDv7 is ~26 chars; generous cap) */
+const MAX_ID_PARAM_LENGTH = 100;
+
 export async function loadExportData(
   ctx: ActionCtx,
   request: Request,
@@ -46,10 +49,10 @@ export async function loadExportData(
   const publicIdParam = url.searchParams.get("publicId");
 
   const shareId = shareIdParam
-    ? String(shareIdParam).trim().slice(0, 100)
+    ? String(shareIdParam).trim().slice(0, MAX_ID_PARAM_LENGTH)
     : undefined;
   const publicId = publicIdParam
-    ? String(publicIdParam).trim().slice(0, 100)
+    ? String(publicIdParam).trim().slice(0, MAX_ID_PARAM_LENGTH)
     : undefined;
 
   // Validate UUIDv7 format before querying

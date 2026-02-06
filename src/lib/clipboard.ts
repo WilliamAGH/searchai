@@ -5,6 +5,7 @@
 import { logger } from "./logger";
 import { toWebSourceCards } from "@/lib/domain/webResearchSources";
 import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
+import { extractPlainText } from "../../convex/lib/text";
 
 /**
  * Copy text to clipboard with fallback support
@@ -38,33 +39,6 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     logger.error("Failed to copy text:", error);
     return false;
   }
-}
-
-/**
- * Extract plain text from message content
- * @param content - Message content (may contain markdown/HTML)
- * @returns Plain text content
- */
-export function extractPlainText(content: string): string {
-  // Remove markdown links [text](url) -> text
-  let text = content.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-
-  // Remove bold/italic markers
-  text = text.replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1");
-
-  // Remove code blocks
-  text = text.replace(/```[\s\S]*?```/g, "");
-
-  // Remove inline code markers
-  text = text.replace(/`([^`]+)`/g, "$1");
-
-  // Remove HTML tags if any
-  text = text.replace(/<[^>]*>/g, "");
-
-  // Normalize whitespace
-  text = text.replace(/\s+/g, " ").trim();
-
-  return text;
 }
 
 /**
