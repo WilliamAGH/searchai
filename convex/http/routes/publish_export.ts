@@ -37,12 +37,15 @@ function resolveFormat(request: Request): ExportFormat {
   return baseFormat;
 }
 
-function buildHtmlExportPage(
-  title: string,
-  privacy: string,
-  markdown: string,
-  robots: string,
-): string {
+type HtmlExportPageParams = {
+  title: string;
+  privacy: string;
+  markdown: string;
+  robots: string;
+};
+
+function buildHtmlExportPage(params: HtmlExportPageParams): string {
+  const { title, privacy, markdown, robots } = params;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -116,12 +119,12 @@ export async function handleExportChat(
   }
 
   return corsResponse({
-    body: buildHtmlExportPage(
-      chat.title || "Chat",
-      String(chat.privacy || "unknown"),
+    body: buildHtmlExportPage({
+      title: chat.title || "Chat",
+      privacy: String(chat.privacy || "unknown"),
       markdown,
       robots,
-    ),
+    }),
     status: 200,
     origin,
     contentType: "text/html; charset=utf-8",

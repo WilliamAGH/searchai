@@ -67,15 +67,19 @@ function parsePublishMessages(raw: unknown): ParsedPublishPayload["messages"] {
   });
 }
 
+type ShareUrlEnv = {
+  siteUrl: string;
+  convexSiteUrl: string;
+};
+
 function buildShareUrls(
   result: { shareId: string; publicId: string },
   allowOrigin: string,
+  env: ShareUrlEnv,
 ) {
   const baseUrl =
-    allowOrigin !== "*" && allowOrigin !== "null"
-      ? allowOrigin
-      : process.env.SITE_URL || "";
-  const convexBase = (process.env.CONVEX_SITE_URL || "").replace(/\/+$/, "");
+    allowOrigin !== "*" && allowOrigin !== "null" ? allowOrigin : env.siteUrl;
+  const convexBase = env.convexSiteUrl.replace(/\/+$/, "");
   const exportBase = convexBase
     ? `${convexBase}/api/exportChat`
     : `/api/exportChat`;
@@ -130,7 +134,10 @@ export async function handlePublishChat(
       api.chats.publishAnonymousChat,
       payload,
     );
-    const urls = buildShareUrls(result, allowOrigin);
+    const urls = buildShareUrls(result, allowOrigin, {
+      siteUrl: process.env.SITE_URL || "",
+      convexSiteUrl: process.env.CONVEX_SITE_URL || "",
+    });
     return corsResponse({
       body: JSON.stringify({ ...result, ...urls }),
       status: 200,
