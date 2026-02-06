@@ -292,6 +292,11 @@ export function normalizeSearchResult(result: unknown): {
     (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:")
       ? parsedUrl.toString()
       : "";
+  if (!safeUrl && urlValue) {
+    console.warn("normalizeSearchResult: dropped invalid url", {
+      url: urlValue,
+    });
+  }
 
   return {
     title: robustSanitize(titleValue),
