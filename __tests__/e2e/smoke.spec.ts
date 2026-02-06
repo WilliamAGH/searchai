@@ -14,7 +14,6 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
       // Ignore expected 403 errors from message sending when API keys are absent
       if (
         expectedForbiddenSendError ||
-        text.includes("403 (Forbidden)") ||
         text.includes("Failed to load resource") ||
         text.includes(
           'Viewport argument key "interactive-widget" not recognized',
