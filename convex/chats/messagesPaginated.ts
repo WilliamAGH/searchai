@@ -14,9 +14,8 @@ import {
   hasUserAccess,
   isSharedOrPublicChat,
 } from "../lib/auth";
-import { vWebResearchSource } from "../lib/validators";
 import { isValidUuidV7 } from "../lib/uuid";
-import { projectMessage } from "./messageProjection";
+import { projectMessage, vMessageProjection } from "./messageProjection";
 
 const assertValidSessionId = (sessionId?: string) => {
   if (sessionId && !isValidUuidV7(sessionId)) {
@@ -53,26 +52,7 @@ export const getChatMessagesPaginated = query({
     cursor: v.optional(v.id("messages")),
   },
   returns: v.object({
-    messages: v.array(
-      v.object({
-        _id: v.id("messages"),
-        _creationTime: v.number(),
-        chatId: v.id("chats"),
-        role: v.union(
-          v.literal("user"),
-          v.literal("assistant"),
-          v.literal("system"),
-        ),
-        content: v.optional(v.string()),
-        timestamp: v.optional(v.number()),
-        isStreaming: v.optional(v.boolean()),
-        streamedContent: v.optional(v.string()),
-        thinking: v.optional(v.string()),
-        reasoning: v.optional(v.string()),
-        webResearchSources: v.optional(v.array(vWebResearchSource)),
-        workflowId: v.optional(v.string()),
-      }),
-    ),
+    messages: v.array(vMessageProjection),
     nextCursor: v.optional(v.id("messages")),
     hasMore: v.boolean(),
   }),

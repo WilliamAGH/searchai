@@ -6,9 +6,30 @@
  * Single source of truth for the client-facing message contract.
  */
 
+import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { WebResearchSource } from "../lib/validators";
+import { vWebResearchSource } from "../lib/validators";
 import { resolveWebResearchSourcesFromMessage } from "./webResearchSourcesResolver";
+
+/**
+ * Convex return-type validator for the client-facing message shape.
+ * Single source of truth — used by getChatMessages, getChatMessagesHttp, etc.
+ */
+export const vMessageProjection = v.object({
+  _id: v.id("messages"),
+  _creationTime: v.number(),
+  chatId: v.id("chats"),
+  role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+  content: v.optional(v.string()),
+  timestamp: v.optional(v.number()),
+  isStreaming: v.optional(v.boolean()),
+  streamedContent: v.optional(v.string()),
+  thinking: v.optional(v.string()),
+  reasoning: v.optional(v.string()),
+  webResearchSources: v.optional(v.array(vWebResearchSource)),
+  workflowId: v.optional(v.string()),
+});
 
 export interface MessageProjection {
   _id: Id<"messages">;

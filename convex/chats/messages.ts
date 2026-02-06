@@ -6,9 +6,12 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import { vWebResearchSource } from "../lib/validators";
 import { hasUserAccess, hasSessionAccess } from "../lib/auth";
-import { assertPositiveLimit, projectMessage } from "./messageProjection";
+import {
+  assertPositiveLimit,
+  projectMessage,
+  vMessageProjection,
+} from "./messageProjection";
 
 /**
  * Get chat messages
@@ -24,26 +27,7 @@ export const getChatMessages = query({
     sessionId: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
-  returns: v.array(
-    v.object({
-      _id: v.id("messages"),
-      _creationTime: v.number(),
-      chatId: v.id("chats"),
-      role: v.union(
-        v.literal("user"),
-        v.literal("assistant"),
-        v.literal("system"),
-      ),
-      content: v.optional(v.string()),
-      timestamp: v.optional(v.number()),
-      isStreaming: v.optional(v.boolean()),
-      streamedContent: v.optional(v.string()),
-      thinking: v.optional(v.string()),
-      reasoning: v.optional(v.string()),
-      webResearchSources: v.optional(v.array(vWebResearchSource)),
-      workflowId: v.optional(v.string()),
-    }),
-  ),
+  returns: v.array(vMessageProjection),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
@@ -95,26 +79,7 @@ export const getChatMessagesHttp = query({
     sessionId: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
-  returns: v.array(
-    v.object({
-      _id: v.id("messages"),
-      _creationTime: v.number(),
-      chatId: v.id("chats"),
-      role: v.union(
-        v.literal("user"),
-        v.literal("assistant"),
-        v.literal("system"),
-      ),
-      content: v.optional(v.string()),
-      timestamp: v.optional(v.number()),
-      isStreaming: v.optional(v.boolean()),
-      streamedContent: v.optional(v.string()),
-      thinking: v.optional(v.string()),
-      reasoning: v.optional(v.string()),
-      webResearchSources: v.optional(v.array(vWebResearchSource)),
-      workflowId: v.optional(v.string()),
-    }),
-  ),
+  returns: v.array(vMessageProjection),
   handler: async (ctx, args) => {
     const chat = await ctx.db.get(args.chatId);
 
