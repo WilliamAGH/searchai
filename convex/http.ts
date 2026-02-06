@@ -55,7 +55,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     }
-    return corsResponse(body, 200, origin);
+    return corsResponse({ body, status: 200, origin });
   }),
 });
 

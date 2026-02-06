@@ -15,7 +15,11 @@ describe("corsResponse", () => {
   it("echoes origin when in allow-list", () => {
     process.env.CONVEX_ALLOWED_ORIGINS =
       "https://site-a.test, https://site-b.test";
-    const response = corsResponse("{}", 200, "https://site-b.test");
+    const response = corsResponse({
+      body: "{}",
+      status: 200,
+      origin: "https://site-b.test",
+    });
     expect(response.status).toBe(200);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
       "https://site-b.test",
@@ -24,14 +28,18 @@ describe("corsResponse", () => {
 
   it("rejects origin not in allow-list", () => {
     process.env.CONVEX_ALLOWED_ORIGINS = "https://site-a.test";
-    const response = corsResponse("{}", 200, "https://evil.test");
+    const response = corsResponse({
+      body: "{}",
+      status: 200,
+      origin: "https://evil.test",
+    });
     expect(response.status).toBe(403);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
   it("rejects null origin", () => {
     process.env.CONVEX_ALLOWED_ORIGINS = "https://site-a.test";
-    const response = corsResponse("{}", 200, "null");
+    const response = corsResponse({ body: "{}", status: 200, origin: "null" });
     expect(response.status).toBe(403);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });

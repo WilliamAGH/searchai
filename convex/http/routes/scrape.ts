@@ -31,21 +31,21 @@ export function registerScrapeRoutes(http: HttpRouter) {
     handler: httpAction(async (ctx, request) => {
       const origin = request.headers.get("Origin");
       // Enforce strict origin validation early
-      const probe = corsResponse("{}", 204, origin);
+      const probe = corsResponse({ body: "{}", status: 204, origin });
       if (probe.status === 403) return probe;
 
       // Rate limiting check
       const rateLimit = checkIpRateLimit(request, "/api/scrape");
       if (!rateLimit.allowed) {
-        return corsResponse(
-          JSON.stringify({
+        return corsResponse({
+          body: JSON.stringify({
             error: "Rate limit exceeded",
             message: "Too many scrape requests. Please try again later.",
             retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
           }),
-          429,
+          status: 429,
           origin,
-        );
+        });
       }
 
       let rawPayload: unknown;
@@ -56,14 +56,14 @@ export function registerScrapeRoutes(http: HttpRouter) {
           "[ERROR] SCRAPE API INVALID JSON:",
           serializeError(error),
         );
-        return corsResponse(
-          JSON.stringify({
+        return corsResponse({
+          body: JSON.stringify({
             error: "Invalid JSON body",
             errorDetails: serializeError(error),
           }),
-          400,
+          status: 400,
           origin,
-        );
+        });
       }
 
       // Validate and normalize input
@@ -72,11 +72,11 @@ export function registerScrapeRoutes(http: HttpRouter) {
           ? (rawPayload as Record<string, unknown>)
           : null;
       if (!payload) {
-        return corsResponse(
-          JSON.stringify({ error: "Invalid request payload" }),
-          400,
+        return corsResponse({
+          body: JSON.stringify({ error: "Invalid request payload" }),
+          status: 400,
           origin,
-        );
+        });
       }
       const urlInput = (
         typeof payload.url === "string" ? payload.url : ""
@@ -84,11 +84,11 @@ export function registerScrapeRoutes(http: HttpRouter) {
 
       const validation = validateScrapeUrl(urlInput);
       if (!validation.ok) {
-        return corsResponse(
-          JSON.stringify({ error: validation.error }),
-          400,
+        return corsResponse({
+          body: JSON.stringify({ error: validation.error }),
+          status: 400,
           origin,
-        );
+        });
       }
       const url = validation.url;
 
@@ -102,7 +102,11 @@ export function registerScrapeRoutes(http: HttpRouter) {
 
         dlog("SCRAPE RESULT:", JSON.stringify(result, null, 2));
 
-        return corsResponse(JSON.stringify(result), 200, origin);
+        return corsResponse({
+          body: JSON.stringify(result),
+          status: 200,
+          origin,
+        });
       } catch (error) {
         const errorInfo = serializeError(error);
         const errorMessage = errorInfo.message;
@@ -141,7 +145,11 @@ export function registerScrapeRoutes(http: HttpRouter) {
         dlog("SCRAPE ERROR RESPONSE:", JSON.stringify(errorResponse, null, 2));
 
         // Return 502 Bad Gateway - we're proxying external content that failed
-        return corsResponse(JSON.stringify(errorResponse), 502, origin);
+        return corsResponse({
+          body: JSON.stringify(errorResponse),
+          status: 502,
+          origin,
+        });
       }
     }),
   });

@@ -32,21 +32,21 @@ export function registerSearchRoutes(http: HttpRouter) {
     handler: httpAction(async (ctx, request) => {
       const origin = request.headers.get("Origin");
       // Enforce strict origin validation early
-      const probe = corsResponse("{}", 204, origin);
+      const probe = corsResponse({ body: "{}", status: 204, origin });
       if (probe.status === 403) return probe;
 
       // Rate limiting check
       const rateLimit = checkIpRateLimit(request, "/api/search");
       if (!rateLimit.allowed) {
-        return corsResponse(
-          JSON.stringify({
+        return corsResponse({
+          body: JSON.stringify({
             error: "Rate limit exceeded",
             message: "Too many search requests. Please try again later.",
             retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
           }),
-          429,
+          status: 429,
           origin,
-        );
+        });
       }
 
       let rawPayload: unknown;
@@ -57,14 +57,14 @@ export function registerSearchRoutes(http: HttpRouter) {
           "[ERROR] SEARCH API INVALID JSON:",
           serializeError(error),
         );
-        return corsResponse(
-          JSON.stringify({
+        return corsResponse({
+          body: JSON.stringify({
             error: "Invalid JSON body",
             errorDetails: serializeError(error),
           }),
-          400,
+          status: 400,
           origin,
-        );
+        });
       }
 
       // Validate and normalize input
@@ -73,11 +73,11 @@ export function registerSearchRoutes(http: HttpRouter) {
           ? (rawPayload as Record<string, unknown>)
           : null;
       if (!payload) {
-        return corsResponse(
-          JSON.stringify({ error: "Invalid request payload" }),
-          400,
+        return corsResponse({
+          body: JSON.stringify({ error: "Invalid request payload" }),
+          status: 400,
           origin,
-        );
+        });
       }
       const query = (
         typeof payload.query === "string" ? payload.query : ""
@@ -88,15 +88,15 @@ export function registerSearchRoutes(http: HttpRouter) {
           : 5;
 
       if (!query.trim()) {
-        return corsResponse(
-          JSON.stringify({
+        return corsResponse({
+          body: JSON.stringify({
             results: [],
             searchMethod: "fallback",
             hasRealResults: false,
           }),
-          200,
+          status: 200,
           origin,
-        );
+        });
       }
 
       dlog("[SEARCH] SEARCH ENDPOINT CALLED:");
@@ -180,7 +180,11 @@ export function registerSearchRoutes(http: HttpRouter) {
           JSON.stringify(enhancedResult, null, 2),
         );
 
-        return corsResponse(JSON.stringify(enhancedResult), 200, origin);
+        return corsResponse({
+          body: JSON.stringify(enhancedResult),
+          status: 200,
+          origin,
+        });
       } catch (error) {
         const errorInfo = serializeError(error);
         const errorMessage = errorInfo.message;
@@ -218,7 +222,11 @@ export function registerSearchRoutes(http: HttpRouter) {
         );
 
         // Return 500 to indicate server error - clients can still use fallback results
-        return corsResponse(JSON.stringify(errorResponse), 500, origin);
+        return corsResponse({
+          body: JSON.stringify(errorResponse),
+          status: 500,
+          origin,
+        });
       }
     }),
   });

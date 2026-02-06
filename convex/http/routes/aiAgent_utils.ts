@@ -31,15 +31,15 @@ export function rateLimitExceededResponse(
   resetAt: number,
   origin: string | null,
 ): Response {
-  return corsResponse(
-    JSON.stringify({
+  return corsResponse({
+    body: JSON.stringify({
       error: "Rate limit exceeded",
       message: "Too many requests. Please try again later.",
       retryAfter: Math.ceil((resetAt - Date.now()) / 1000),
     }),
-    429,
+    status: 429,
     origin,
-  );
+  });
 }
 
 export async function parseJsonPayload(
@@ -55,27 +55,27 @@ export async function parseJsonPayload(
     console.error(`[ERROR] ${logPrefix} INVALID JSON:`, errorInfo);
     return {
       ok: false,
-      response: corsResponse(
-        JSON.stringify({
+      response: corsResponse({
+        body: JSON.stringify({
           error: "Invalid JSON body",
           ...(process.env.NODE_ENV === "development"
             ? { errorDetails: errorInfo }
             : {}),
         }),
-        400,
+        status: 400,
         origin,
-      ),
+      }),
     };
   }
 
   if (!isRecord(rawPayload)) {
     return {
       ok: false,
-      response: corsResponse(
-        JSON.stringify({ error: "Invalid request payload" }),
-        400,
+      response: corsResponse({
+        body: JSON.stringify({ error: "Invalid request payload" }),
+        status: 400,
         origin,
-      ),
+      }),
     };
   }
 

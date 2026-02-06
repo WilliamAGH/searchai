@@ -140,7 +140,10 @@ function buildCorsHeaders(
   };
 }
 
-type CorsResponseOptions = {
+export type CorsResponseParams = {
+  body: string;
+  status?: number;
+  origin: string | null;
   contentType?: string;
   extraHeaders?: Record<string, string>;
 };
@@ -149,20 +152,10 @@ type CorsResponseOptions = {
  * Build a response with CORS headers after strict origin validation.
  * @returns Response with CORS headers, or 403 if origin not allowed
  */
-export function corsResponse(
-  body: string,
-  status = 200,
-  requestOrigin?: string | null,
-  options?: CorsResponseOptions,
-) {
-  if (requestOrigin === undefined) {
-    console.error(
-      "[WARN] corsResponse called without origin - update caller to pass request.headers.get('Origin')",
-    );
-    return buildUnauthorizedOriginResponse();
-  }
+export function corsResponse(params: CorsResponseParams) {
+  const { body, status = 200, origin, contentType, extraHeaders } = params;
 
-  const validOrigin = validateOrigin(requestOrigin);
+  const validOrigin = validateOrigin(origin);
   if (!validOrigin) {
     return buildUnauthorizedOriginResponse();
   }
@@ -172,9 +165,9 @@ export function corsResponse(
   return new Response(responseBody, {
     status,
     headers: {
-      "Content-Type": options?.contentType ?? "application/json",
+      "Content-Type": contentType ?? "application/json",
       ...buildCorsHeaders(validOrigin),
-      ...options?.extraHeaders,
+      ...extraHeaders,
     },
   });
 }

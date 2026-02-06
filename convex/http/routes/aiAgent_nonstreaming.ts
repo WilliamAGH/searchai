@@ -15,7 +15,7 @@ export async function handleAgentRequest(
   request: Request,
 ): Promise<Response> {
   const origin = request.headers.get("Origin");
-  const probe = corsResponse("{}", 204, origin);
+  const probe = corsResponse({ body: "{}", status: 204, origin });
   if (probe.status === 403) return probe;
 
   const rateLimit = checkIpRateLimit(request, "/api/ai/agent");
@@ -31,18 +31,18 @@ export async function handleAgentRequest(
 
   const message = sanitizeTextInput(payload.message, 10000);
   if (message === undefined) {
-    return corsResponse(
-      JSON.stringify({ error: "Message must be a string" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Message must be a string" }),
+      status: 400,
       origin,
-    );
+    });
   }
   if (!message.trim()) {
-    return corsResponse(
-      JSON.stringify({ error: "Message is required" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Message is required" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   const conversationContext = sanitizeTextInput(
@@ -147,7 +147,11 @@ export async function handleAgentRequest(
 
     dlog("AGENT RESPONSE:", JSON.stringify(response, null, 2));
 
-    return corsResponse(JSON.stringify(response), 200, origin);
+    return corsResponse({
+      body: JSON.stringify(response),
+      status: 200,
+      origin,
+    });
   } catch (error) {
     const errorInfo = serializeError(error);
     console.error("[ERROR] AGENT WORKFLOW FAILED:", {
@@ -175,6 +179,10 @@ export async function handleAgentRequest(
       JSON.stringify(errorResponse, null, 2),
     );
 
-    return corsResponse(JSON.stringify(errorResponse), 500, origin);
+    return corsResponse({
+      body: JSON.stringify(errorResponse),
+      status: 500,
+      origin,
+    });
   }
 }

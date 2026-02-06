@@ -18,7 +18,7 @@ export async function handleAgentStream(
   request: Request,
 ): Promise<Response> {
   const origin = request.headers.get("Origin");
-  const probe = corsResponse("{}", 204, origin);
+  const probe = corsResponse({ body: "{}", status: 204, origin });
   if (probe.status === 403) return probe;
   const allowedOrigin = probe.headers.get("Access-Control-Allow-Origin") || "*";
 
@@ -35,38 +35,38 @@ export async function handleAgentStream(
 
   const message = sanitizeTextInput(payload.message, 10000);
   if (!message) {
-    return corsResponse(
-      JSON.stringify({ error: "Message must be a string" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Message must be a string" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   if (!payload.chatId || typeof payload.chatId !== "string") {
-    return corsResponse(
-      JSON.stringify({ error: "chatId is required" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "chatId is required" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   const chatId = safeConvexId<"chats">(payload.chatId);
   if (!chatId) {
-    return corsResponse(
-      JSON.stringify({ error: "Invalid chatId" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Invalid chatId" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   const sessionIdRaw =
     typeof payload.sessionId === "string" ? payload.sessionId : undefined;
   if (sessionIdRaw && !isValidUuidV7(sessionIdRaw)) {
-    return corsResponse(
-      JSON.stringify({ error: "Invalid sessionId format" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Invalid sessionId format" }),
+      status: 400,
       origin,
-    );
+    });
   }
   const sessionId = sessionIdRaw;
 

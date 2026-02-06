@@ -1,7 +1,7 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { formatConversationMarkdown } from "../utils";
-import { buildCorsJsonResponse } from "./publish_cors";
+import { corsResponse } from "../cors";
 import { isValidUuidV7 } from "../../lib/uuid";
 import type { WebResearchSource } from "../../lib/validators";
 
@@ -41,6 +41,7 @@ export async function loadExportData(
   mode: ShareQueryMode,
 ): Promise<ExportDataResult> {
   const url = new URL(request.url);
+  const origin = request.headers.get("Origin");
   const shareIdParam = url.searchParams.get("shareId");
   const publicIdParam = url.searchParams.get("publicId");
 
@@ -55,32 +56,32 @@ export async function loadExportData(
   if (shareId && !isValidUuidV7(shareId)) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(
-        request,
-        { error: "Invalid shareId format" },
-        400,
-      ),
+      response: corsResponse({
+        body: JSON.stringify({ error: "Invalid shareId format" }),
+        status: 400,
+        origin,
+      }),
     };
   }
   if (publicId && !isValidUuidV7(publicId)) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(
-        request,
-        { error: "Invalid publicId format" },
-        400,
-      ),
+      response: corsResponse({
+        body: JSON.stringify({ error: "Invalid publicId format" }),
+        status: 400,
+        origin,
+      }),
     };
   }
 
   if (!shareId && !publicId) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(
-        request,
-        { error: "Missing shareId or publicId" },
-        400,
-      ),
+      response: corsResponse({
+        body: JSON.stringify({ error: "Missing shareId or publicId" }),
+        status: 400,
+        origin,
+      }),
     };
   }
 
@@ -96,11 +97,11 @@ export async function loadExportData(
   if (!chat) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(
-        request,
-        { error: "Chat not found or not accessible" },
-        404,
-      ),
+      response: corsResponse({
+        body: JSON.stringify({ error: "Chat not found or not accessible" }),
+        status: 404,
+        origin,
+      }),
     };
   }
 

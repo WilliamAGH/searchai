@@ -1,9 +1,9 @@
 import type { ActionCtx } from "../../_generated/server";
 import {
-  buildCorsTextResponse,
   buildUnauthorizedOriginResponse,
-  getAllowedOrigin,
-} from "./publish_cors";
+  corsResponse,
+  validateOrigin,
+} from "../cors";
 import { loadExportData } from "./publish_export_data";
 
 export async function handleChatTextMarkdown(
@@ -11,7 +11,7 @@ export async function handleChatTextMarkdown(
   request: Request,
 ): Promise<Response> {
   const origin = request.headers.get("Origin");
-  const allowOrigin = getAllowedOrigin(origin);
+  const allowOrigin = validateOrigin(origin);
   if (!allowOrigin) {
     return buildUnauthorizedOriginResponse();
   }
@@ -23,15 +23,15 @@ export async function handleChatTextMarkdown(
 
   const { markdown, robots, cacheControl } = exportResult.data;
 
-  return buildCorsTextResponse(
-    request,
-    markdown,
-    200,
-    "text/plain; charset=utf-8",
-    {
+  return corsResponse({
+    body: markdown,
+    status: 200,
+    origin,
+    contentType: "text/plain; charset=utf-8",
+    extraHeaders: {
       "X-Robots-Tag": robots,
       "Cache-Control": cacheControl,
       Vary: "Accept, Origin",
     },
-  );
+  });
 }

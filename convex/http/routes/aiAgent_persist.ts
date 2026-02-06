@@ -15,7 +15,7 @@ export async function handleAgentPersist(
   request: Request,
 ): Promise<Response> {
   const origin = request.headers.get("Origin");
-  const probe = corsResponse("{}", 204, origin);
+  const probe = corsResponse({ body: "{}", status: 204, origin });
   if (probe.status === 403) return probe;
 
   const rateLimit = checkIpRateLimit(request, "/api/ai/agent/persist");
@@ -43,20 +43,20 @@ export async function handleAgentPersist(
       : undefined;
   const sessionId = sessionIdRaw || undefined;
   if (sessionId && !isValidUuidV7(sessionId)) {
-    return corsResponse(
-      JSON.stringify({ error: "Invalid sessionId format" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Invalid sessionId format" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   const chatId = safeConvexId<"chats">(rawChatId);
   if (!message.trim() || !chatId) {
-    return corsResponse(
-      JSON.stringify({ error: "chatId and message required" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "chatId and message required" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   try {
@@ -69,17 +69,17 @@ export async function handleAgentPersist(
         sessionId,
       },
     );
-    return corsResponse(JSON.stringify(result), 200, origin);
+    return corsResponse({ body: JSON.stringify(result), status: 200, origin });
   } catch (error) {
     const errorInfo = serializeError(error);
-    return corsResponse(
-      JSON.stringify({
+    return corsResponse({
+      body: JSON.stringify({
         error: "Agent persistence failed",
         details: errorInfo.message,
         errorDetails: errorInfo,
       }),
-      500,
+      status: 500,
       origin,
-    );
+    });
   }
 }

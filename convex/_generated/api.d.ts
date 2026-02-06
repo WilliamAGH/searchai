@@ -84,7 +84,6 @@ import type * as http_routes_aiAgent_stream from "../http/routes/aiAgent_stream.
 import type * as http_routes_aiAgent_utils from "../http/routes/aiAgent_utils.js";
 import type * as http_routes_publish from "../http/routes/publish.js";
 import type * as http_routes_publish_chat from "../http/routes/publish_chat.js";
-import type * as http_routes_publish_cors from "../http/routes/publish_cors.js";
 import type * as http_routes_publish_export from "../http/routes/publish_export.js";
 import type * as http_routes_publish_export_data from "../http/routes/publish_export_data.js";
 import type * as http_routes_publish_text from "../http/routes/publish_text.js";
@@ -226,7 +225,6 @@ declare const fullApi: ApiFromModules<{
   "http/routes/aiAgent_utils": typeof http_routes_aiAgent_utils;
   "http/routes/publish": typeof http_routes_publish;
   "http/routes/publish_chat": typeof http_routes_publish_chat;
-  "http/routes/publish_cors": typeof http_routes_publish_cors;
   "http/routes/publish_export": typeof http_routes_publish_export;
   "http/routes/publish_export_data": typeof http_routes_publish_export_data;
   "http/routes/publish_text": typeof http_routes_publish_text;
