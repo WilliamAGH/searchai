@@ -1,7 +1,7 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { formatConversationMarkdown } from "../utils";
-import { corsResponse } from "../cors";
+import { publicCorsResponse } from "../cors";
 import { isValidUuidV7 } from "../../lib/uuid";
 import type { WebResearchSource } from "../../lib/validators";
 
@@ -59,7 +59,7 @@ export async function loadExportData(
   if (shareId && !isValidUuidV7(shareId)) {
     return {
       ok: false,
-      response: corsResponse({
+      response: publicCorsResponse({
         body: JSON.stringify({ error: "Invalid shareId format" }),
         status: 400,
         origin,
@@ -69,7 +69,7 @@ export async function loadExportData(
   if (publicId && !isValidUuidV7(publicId)) {
     return {
       ok: false,
-      response: corsResponse({
+      response: publicCorsResponse({
         body: JSON.stringify({ error: "Invalid publicId format" }),
         status: 400,
         origin,
@@ -80,7 +80,7 @@ export async function loadExportData(
   if (!shareId && !publicId) {
     return {
       ok: false,
-      response: corsResponse({
+      response: publicCorsResponse({
         body: JSON.stringify({ error: "Missing shareId or publicId" }),
         status: 400,
         origin,
@@ -100,7 +100,7 @@ export async function loadExportData(
   if (!chat) {
     return {
       ok: false,
-      response: corsResponse({
+      response: publicCorsResponse({
         body: JSON.stringify({ error: "Chat not found or not accessible" }),
         status: 404,
         origin,

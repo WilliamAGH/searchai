@@ -5,8 +5,6 @@
 import { extractPlainText } from "../lib/text";
 import type { WebResearchSource } from "../lib/validators";
 
-export { extractPlainText } from "../lib/text";
-
 /**
  * Serialize an error for JSON responses
  * - Extracts name, message, stack, and cause from Error objects
@@ -68,12 +66,6 @@ export const dlog = (...args: unknown[]) => {
 export function formatSseEvent(data: unknown): string {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
-
-/**
- * CORS response helper (strict origin validation).
- * Re-exported from the canonical implementation.
- */
-export { corsResponse } from "./cors";
 
 /**
  * Utility: Basic HTML escape for embedding text content safely

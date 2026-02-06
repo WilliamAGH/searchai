@@ -148,28 +148,62 @@ export type CorsResponseParams = {
   extraHeaders?: Record<string, string>;
 };
 
+/** HTTP status codes whose responses must not carry a body (RFC 9110) */
+const NO_BODY_STATUSES = new Set([204, 205, 304]);
+
+/** Return null when the status code forbids a body, otherwise the supplied body */
+function resolveBody(body: string, status: number): string | null {
+  return NO_BODY_STATUSES.has(status) ? null : body;
+}
+
+/** Build a Response with optional CORS headers (single response-construction path) */
+function buildContentResponse(
+  body: string,
+  status: number,
+  contentType: string | undefined,
+  extraHeaders: Record<string, string> | undefined,
+  corsHeaders?: Record<string, string>,
+): Response {
+  return new Response(resolveBody(body, status), {
+    status,
+    headers: {
+      "Content-Type": contentType ?? "application/json",
+      ...corsHeaders,
+      ...extraHeaders,
+    },
+  });
+}
+
 /**
  * Build a response with CORS headers after strict origin validation.
  * @returns Response with CORS headers, or 403 if origin not allowed
  */
 export function corsResponse(params: CorsResponseParams) {
   const { body, status = 200, origin, contentType, extraHeaders } = params;
-
   const validOrigin = validateOrigin(origin);
-  if (!validOrigin) {
-    return buildUnauthorizedOriginResponse();
-  }
-
-  const responseBody =
-    status === 204 || status === 205 || status === 304 ? null : body;
-  return new Response(responseBody, {
+  if (!validOrigin) return buildUnauthorizedOriginResponse();
+  return buildContentResponse(
+    body,
     status,
-    headers: {
-      "Content-Type": contentType ?? "application/json",
-      ...buildCorsHeaders(validOrigin),
-      ...extraHeaders,
-    },
-  });
+    contentType,
+    extraHeaders,
+    buildCorsHeaders(validOrigin),
+  );
+}
+
+/**
+ * Build a response that supports both CORS and direct (non-CORS) access.
+ * - Origin present + valid → response with CORS headers
+ * - Origin present + invalid → 403
+ * - Origin absent → plain response (direct browser navigation, crawlers, server-to-server)
+ *
+ * Use for public-facing endpoints (e.g., export/share) that serve content
+ * accessible via both XHR/fetch (CORS) and direct URL navigation (no Origin).
+ */
+export function publicCorsResponse(params: CorsResponseParams) {
+  if (params.origin) return corsResponse(params);
+  const { body, status = 200, contentType, extraHeaders } = params;
+  return buildContentResponse(body, status, contentType, extraHeaders);
 }
 
 /**

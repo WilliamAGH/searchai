@@ -1,10 +1,6 @@
 import type { ActionCtx } from "../../_generated/server";
 import { escapeHtml } from "../utils";
-import {
-  buildUnauthorizedOriginResponse,
-  corsResponse,
-  validateOrigin,
-} from "../cors";
+import { publicCorsResponse } from "../cors";
 import { loadExportData } from "./publish_export_data";
 
 type ExportFormat = "json" | "markdown" | "html" | "txt";
@@ -75,8 +71,6 @@ export async function handleExportChat(
   request: Request,
 ): Promise<Response> {
   const origin = request.headers.get("Origin");
-  const allowOrigin = validateOrigin(origin);
-  if (!allowOrigin) return buildUnauthorizedOriginResponse();
 
   const exportResult = await loadExportData(ctx, request, "http");
   if (!exportResult.ok) return exportResult.response;
@@ -90,7 +84,7 @@ export async function handleExportChat(
   };
 
   if (format === "json") {
-    return corsResponse({
+    return publicCorsResponse({
       body: JSON.stringify({ chat, messages }),
       status: 200,
       origin,
@@ -99,7 +93,7 @@ export async function handleExportChat(
   }
 
   if (format === "txt") {
-    return corsResponse({
+    return publicCorsResponse({
       body: markdown,
       status: 200,
       origin,
@@ -109,7 +103,7 @@ export async function handleExportChat(
   }
 
   if (format === "markdown") {
-    return corsResponse({
+    return publicCorsResponse({
       body: markdown,
       status: 200,
       origin,
@@ -118,7 +112,7 @@ export async function handleExportChat(
     });
   }
 
-  return corsResponse({
+  return publicCorsResponse({
     body: buildHtmlExportPage({
       title: chat.title || "Chat",
       privacy: String(chat.privacy || "unknown"),
