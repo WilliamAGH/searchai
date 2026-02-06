@@ -114,35 +114,57 @@ export function validateOrigin(requestOrigin: string | null): string | null {
   return null;
 }
 
+/** Canonical 403 response for unauthorized or missing origins */
+export function buildUnauthorizedOriginResponse(): Response {
+  return new Response(JSON.stringify({ error: "Unauthorized origin" }), {
+    status: 403,
+    headers: { "Content-Type": "application/json", Vary: "Origin" },
+  });
+}
+
+const CORS_MAX_AGE = "600";
+const DEFAULT_METHODS = "GET, POST, OPTIONS";
+
+/** Build the shared CORS header set for a validated origin */
+function buildCorsHeaders(
+  validOrigin: string,
+  options?: { methods?: string; allowHeaders?: string },
+): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": validOrigin,
+    "Access-Control-Allow-Methods": options?.methods ?? DEFAULT_METHODS,
+    "Access-Control-Allow-Headers": options?.allowHeaders ?? "Content-Type",
+    "Access-Control-Allow-Credentials": "false",
+    "Access-Control-Max-Age": CORS_MAX_AGE,
+    Vary: "Origin",
+  };
+}
+
+type CorsResponseOptions = {
+  contentType?: string;
+  extraHeaders?: Record<string, string>;
+};
+
 /**
- * Helper function to add CORS headers to responses with strict origin validation
- * @param body - JSON string response body
- * @param status - HTTP status code (default 200)
- * @param requestOrigin - Origin header from request
- * @returns Response with CORS headers or 403 if origin not allowed
+ * Build a response with CORS headers after strict origin validation.
+ * @returns Response with CORS headers, or 403 if origin not allowed
  */
 export function corsResponse(
   body: string,
   status = 200,
   requestOrigin?: string | null,
+  options?: CorsResponseOptions,
 ) {
-  // If no origin provided, reject (backward compatibility issue - caller must pass origin)
   if (requestOrigin === undefined) {
     console.error(
       "[WARN] corsResponse called without origin - update caller to pass request.headers.get('Origin')",
     );
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
+    return buildUnauthorizedOriginResponse();
   }
 
   const validOrigin = validateOrigin(requestOrigin);
   if (!validOrigin) {
-    return new Response(JSON.stringify({ error: "Unauthorized origin" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
+    return buildUnauthorizedOriginResponse();
   }
 
   const responseBody =
@@ -150,43 +172,31 @@ export function corsResponse(
   return new Response(responseBody, {
     status,
     headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": validOrigin,
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Allow-Credentials": "false",
-      "Access-Control-Max-Age": "600",
-      Vary: "Origin",
+      "Content-Type": options?.contentType ?? "application/json",
+      ...buildCorsHeaders(validOrigin),
+      ...options?.extraHeaders,
     },
   });
 }
 
 /**
- * CORS preflight response for OPTIONS requests with strict origin validation
- * @param request - HTTP request
- * @returns CORS preflight response or 403 if origin not allowed
+ * CORS preflight response for OPTIONS requests with strict origin validation.
+ * @returns CORS preflight response, or 403 if origin not allowed
  */
-export function corsPreflightResponse(request: Request) {
+export function corsPreflightResponse(request: Request, methods?: string) {
   const requestOrigin = request.headers.get("Origin");
   const validOrigin = validateOrigin(requestOrigin);
 
   if (!validOrigin) {
-    return new Response(JSON.stringify({ error: "Unauthorized origin" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
+    return buildUnauthorizedOriginResponse();
   }
 
   const requested = request.headers.get("Access-Control-Request-Headers");
   return new Response(null, {
     status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": validOrigin,
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": requested || "Content-Type",
-      "Access-Control-Allow-Credentials": "false",
-      "Access-Control-Max-Age": "600",
-      Vary: "Origin",
-    },
+    headers: buildCorsHeaders(validOrigin, {
+      methods,
+      allowHeaders: requested || "Content-Type",
+    }),
   });
 }
