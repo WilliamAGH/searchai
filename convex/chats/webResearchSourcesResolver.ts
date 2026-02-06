@@ -140,17 +140,26 @@ function fromLegacySourceUrl(
   };
 }
 
+/** Collect context shared across all collectParsed calls. */
+interface CollectContext {
+  items: unknown;
+  parser: SourceParser;
+  messageId: string;
+  fallbackTimestamp: number;
+}
+
 /** Parse each item in an optional array and push non-null results. */
 function collectParsed(
-  items: unknown,
-  parser: SourceParser,
-  messageId: string,
-  fallbackTimestamp: number,
+  ctx: CollectContext,
   candidates: WebResearchSource[],
 ): void {
-  if (!Array.isArray(items)) return;
-  for (let i = 0; i < items.length; i += 1) {
-    const parsed = parser(items[i], { messageId, fallbackTimestamp, index: i });
+  if (!Array.isArray(ctx.items)) return;
+  for (let i = 0; i < ctx.items.length; i += 1) {
+    const parsed = ctx.parser(ctx.items[i], {
+      messageId: ctx.messageId,
+      fallbackTimestamp: ctx.fallbackTimestamp,
+      index: i,
+    });
     if (parsed) candidates.push(parsed);
   }
 }
@@ -195,33 +204,30 @@ export function resolveWebResearchSourcesFromMessage(
   const fallbackTimestamp =
     typeof message.timestamp === "number" ? message.timestamp : Date.now();
   const candidates: WebResearchSource[] = [];
+  const shared = { messageId, fallbackTimestamp };
 
   collectParsed(
-    message.webResearchSources,
-    fromStructuredSource,
-    messageId,
-    fallbackTimestamp,
+    {
+      ...shared,
+      items: message.webResearchSources,
+      parser: fromStructuredSource,
+    },
     candidates,
   );
   collectParsed(
-    message.contextReferences,
-    fromStructuredSource,
-    messageId,
-    fallbackTimestamp,
+    {
+      ...shared,
+      items: message.contextReferences,
+      parser: fromStructuredSource,
+    },
     candidates,
   );
   collectParsed(
-    message.searchResults,
-    fromLegacySearchResult,
-    messageId,
-    fallbackTimestamp,
+    { ...shared, items: message.searchResults, parser: fromLegacySearchResult },
     candidates,
   );
   collectParsed(
-    message.sources,
-    fromLegacySourceUrl,
-    messageId,
-    fallbackTimestamp,
+    { ...shared, items: message.sources, parser: fromLegacySourceUrl },
     candidates,
   );
 
