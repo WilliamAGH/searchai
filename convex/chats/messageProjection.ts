@@ -8,6 +8,7 @@
 
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
+import type { DatabaseReader } from "../_generated/server";
 import type { WebResearchSource } from "../lib/validators";
 import { vWebResearchSource } from "../lib/validators";
 import { resolveWebResearchSourcesFromMessage } from "./webResearchSourcesResolver";
@@ -67,8 +68,34 @@ export function projectMessage(m: Doc<"messages">): MessageProjection {
 }
 
 /** Validate that an optional limit arg is positive. */
-export function assertPositiveLimit(limit: number | undefined): void {
+function assertPositiveLimit(limit: number | undefined): void {
   if (limit !== undefined && limit <= 0) {
     throw new Error("limit must be a positive number");
   }
+}
+
+/**
+ * Fetch messages for a chat in chronological order.
+ * When limit is specified, fetches the most recent N messages
+ * by querying desc and reversing to keep memory bounded.
+ */
+export async function fetchMessagesByChatId(
+  db: DatabaseReader,
+  chatId: Id<"chats">,
+  limit?: number,
+): Promise<Doc<"messages">[]> {
+  assertPositiveLimit(limit);
+  if (limit) {
+    const descDocs = await db
+      .query("messages")
+      .withIndex("by_chatId", (q) => q.eq("chatId", chatId))
+      .order("desc")
+      .take(limit);
+    return descDocs.reverse();
+  }
+  return db
+    .query("messages")
+    .withIndex("by_chatId", (q) => q.eq("chatId", chatId))
+    .order("asc")
+    .collect();
 }

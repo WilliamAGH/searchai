@@ -8,7 +8,7 @@ import { v } from "convex/values";
 import { query } from "../_generated/server";
 import { hasUserAccess, hasSessionAccess } from "../lib/auth";
 import {
-  assertPositiveLimit,
+  fetchMessagesByChatId,
   projectMessage,
   vMessageProjection,
 } from "./messageProjection";
@@ -44,26 +44,7 @@ export const getChatMessages = query({
       return [];
     }
 
-    assertPositiveLimit(args.limit);
-
-    // When limit is specified, fetch most recent N messages by querying desc and reversing
-    // This keeps memory bounded for large chats while preserving chronological order
-    let docs;
-    if (args.limit) {
-      const descDocs = await ctx.db
-        .query("messages")
-        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-        .order("desc")
-        .take(args.limit);
-      docs = descDocs.reverse();
-    } else {
-      docs = await ctx.db
-        .query("messages")
-        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-        .order("asc")
-        .collect();
-    }
-
+    const docs = await fetchMessagesByChatId(ctx.db, args.chatId, args.limit);
     return docs.map(projectMessage);
   },
 });
@@ -93,24 +74,7 @@ export const getChatMessagesHttp = query({
       return [];
     }
 
-    assertPositiveLimit(args.limit);
-
-    let docs;
-    if (args.limit) {
-      const descDocs = await ctx.db
-        .query("messages")
-        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-        .order("desc")
-        .take(args.limit);
-      docs = descDocs.reverse();
-    } else {
-      docs = await ctx.db
-        .query("messages")
-        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-        .order("asc")
-        .collect();
-    }
-
+    const docs = await fetchMessagesByChatId(ctx.db, args.chatId, args.limit);
     return docs.map(projectMessage);
   },
 });
