@@ -1,0 +1,17 @@
+# [VL1d]/[RC1c] No spread objects in messages inserts
+# Use explicit field mapping to prevent transport-only fields from being persisted.
+
+id: no-message-insert-spread
+language: typescript
+severity: error
+message: '[RC1c] Do not spread objects into ctx.db.insert("messages", ...). Use explicit field mapping (buildMessageInsertDocument) to avoid schema regressions.'
+
+rule:
+  pattern: $DB.insert("messages", { $$$PRE, ...$SPREAD, $$$POST })
+
+files:
+  - "convex/**/*.ts"
+
+ignores:
+  - "**/__tests__/**"
+  - "**/*.test.ts"

@@ -6,6 +6,7 @@ import { vWebResearchSource, vSearchMethod } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
 import { isAuthorized, isUnownedChat, hasSessionAccess } from "./lib/auth";
+import { buildMessageInsertDocument } from "./messages_insert_document";
 export const addMessage = internalMutation({
   args: {
     chatId: v.id("chats"),
@@ -44,14 +45,16 @@ export const addMessage = internalMutation({
       await ctx.db.patch(args.chatId, { threadId });
     }
 
-    const { chatId, sessionId: _sessionId, ...rest } = args;
-    return await ctx.db.insert("messages", {
-      chatId: chatId,
-      messageId,
-      threadId,
-      ...rest,
-      timestamp: Date.now(),
-    });
+    const { chatId, sessionId: _sessionId, ...persistableArgs } = args;
+    return await ctx.db.insert(
+      "messages",
+      buildMessageInsertDocument({
+        chatId,
+        messageId,
+        threadId,
+        args: persistableArgs,
+      }),
+    );
   },
 });
 // HTTP-only variant for actions without auth context.
@@ -102,14 +105,21 @@ export const addMessageHttp = internalMutation({
       await ctx.db.patch(args.chatId, { threadId });
     }
 
-    const { chatId, sessionId: _sessionId, ...rest } = args;
-    return await ctx.db.insert("messages", {
-      chatId: chatId,
-      messageId,
-      threadId,
-      ...rest,
-      timestamp: Date.now(),
-    });
+    const {
+      chatId,
+      sessionId: _sessionId,
+      workflowTokenId: _workflowTokenId,
+      ...persistableArgs
+    } = args;
+    return await ctx.db.insert(
+      "messages",
+      buildMessageInsertDocument({
+        chatId,
+        messageId,
+        threadId,
+        args: persistableArgs,
+      }),
+    );
   },
 });
 export const internalUpdateMessageContent = internalMutation({
