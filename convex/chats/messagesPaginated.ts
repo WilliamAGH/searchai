@@ -15,7 +15,14 @@ import {
   isSharedOrPublicChat,
 } from "../lib/auth";
 import { isValidUuidV7 } from "../lib/uuid";
-import { projectMessage, vMessageProjection } from "./messageProjection";
+import {
+  fetchMessagesByChatId,
+  projectMessage,
+  vMessageProjection,
+} from "./messageProjection";
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
 
 const assertValidSessionId = (sessionId?: string) => {
   if (sessionId && !isValidUuidV7(sessionId)) {
@@ -74,7 +81,7 @@ export const getChatMessagesPaginated = query({
       return EMPTY_PAGE;
     }
 
-    const pageSize = Math.min(args.limit || 50, 100); // Max 100 messages per page
+    const pageSize = Math.min(args.limit || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
     // Build the query
     let baseQuery = ctx.db
@@ -144,15 +151,10 @@ export const getRecentChatMessages = query({
       return [];
     }
 
-    // Get messages directly
-    const limit = args.limit || 50;
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-      .order("desc")
-      .take(limit);
-
-    // Reverse to get chronological order
-    return messages.reverse();
+    return fetchMessagesByChatId(
+      ctx.db,
+      args.chatId,
+      args.limit || DEFAULT_PAGE_SIZE,
+    );
   },
 });
