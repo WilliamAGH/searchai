@@ -45,39 +45,6 @@ export interface BuildMessageInsertDocumentParams<
   timestamp?: number;
 }
 
-type OptionalField = keyof Omit<PersistableMessageArgs, "role">;
-
-/** Explicit allowlist of optional fields copied from args to the document. */
-const OPTIONAL_FIELDS: readonly OptionalField[] = [
-  "content",
-  "isStreaming",
-  "streamedContent",
-  "thinking",
-  "reasoning",
-  "searchMethod",
-  "hasRealResults",
-  "webResearchSources",
-  "workflowId",
-] as const;
-
-/** Pick defined optional fields from args into a partial document. */
-function pickDefinedFields(
-  args: PersistableMessageArgs,
-): Partial<Omit<PersistableMessageArgs, "role">> {
-  const partial: Partial<Omit<PersistableMessageArgs, "role">> = {};
-  for (const key of OPTIONAL_FIELDS) {
-    if (args[key] !== undefined) {
-      // TypeScript needs help here: both sides share the same key type, but
-      // the generic index signature through Partial<Omit<...>> loses the
-      // per-key narrowing. The assignment is sound because OPTIONAL_FIELDS
-      // is constrained to keys present on both PersistableMessageArgs and
-      // the partial, and we only copy defined values.
-      Object.assign(partial, { [key]: args[key] });
-    }
-  }
-  return partial;
-}
-
 /**
  * Build a messages insert payload using explicit field mapping.
  * This prevents accidental persistence of extra transport-only args.
@@ -87,12 +54,41 @@ export function buildMessageInsertDocument<TChatId extends string>(
 ): MessageInsertDocument<TChatId> {
   const { chatId, messageId, threadId, args, timestamp = Date.now() } = params;
 
-  return {
+  const message: MessageInsertDocument<TChatId> = {
     chatId,
     messageId,
     threadId,
     role: args.role,
     timestamp,
-    ...pickDefinedFields(args),
   };
+
+  if (args.content !== undefined) {
+    message.content = args.content;
+  }
+  if (args.isStreaming !== undefined) {
+    message.isStreaming = args.isStreaming;
+  }
+  if (args.streamedContent !== undefined) {
+    message.streamedContent = args.streamedContent;
+  }
+  if (args.thinking !== undefined) {
+    message.thinking = args.thinking;
+  }
+  if (args.reasoning !== undefined) {
+    message.reasoning = args.reasoning;
+  }
+  if (args.searchMethod !== undefined) {
+    message.searchMethod = args.searchMethod;
+  }
+  if (args.hasRealResults !== undefined) {
+    message.hasRealResults = args.hasRealResults;
+  }
+  if (args.webResearchSources !== undefined) {
+    message.webResearchSources = args.webResearchSources;
+  }
+  if (args.workflowId !== undefined) {
+    message.workflowId = args.workflowId;
+  }
+
+  return message;
 }

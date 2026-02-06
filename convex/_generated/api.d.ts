@@ -117,6 +117,7 @@ import type * as lib_uuid_validation from "../lib/uuid_validation.js";
 import type * as lib_validation_zodUtils from "../lib/validation/zodUtils.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as messages from "../messages.js";
+import type * as messages_insert_document from "../messages_insert_document.js";
 import type * as migrations_remove_system_role from "../migrations/remove_system_role.js";
 import type * as preferences from "../preferences.js";
 import type * as schemas_agentOutput from "../schemas/agentOutput.js";
@@ -258,6 +259,7 @@ declare const fullApi: ApiFromModules<{
   "lib/validation/zodUtils": typeof lib_validation_zodUtils;
   "lib/validators": typeof lib_validators;
   messages: typeof messages;
+  messages_insert_document: typeof messages_insert_document;
   "migrations/remove_system_role": typeof migrations_remove_system_role;
   preferences: typeof preferences;
   "schemas/agentOutput": typeof schemas_agentOutput;
