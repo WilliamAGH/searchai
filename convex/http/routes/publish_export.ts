@@ -1,6 +1,9 @@
 import type { ActionCtx } from "../../_generated/server";
 import { escapeHtml } from "../utils";
-import { buildCorsJsonResponse, getAllowedOrigin } from "./publish_cors";
+import {
+  buildUnauthorizedOriginResponse,
+  getAllowedOrigin,
+} from "./publish_cors";
 import { loadExportData } from "./publish_export_data";
 
 type ExportFormat = "json" | "markdown" | "html" | "txt";
@@ -40,11 +43,7 @@ export async function handleExportChat(
   const origin = request.headers.get("Origin");
   const allowOrigin = getAllowedOrigin(origin);
   if (!allowOrigin) {
-    return buildCorsJsonResponse(
-      request,
-      { error: "Unauthorized origin" },
-      403,
-    );
+    return buildUnauthorizedOriginResponse();
   }
 
   const exportResult = await loadExportData(ctx, request, "http");
