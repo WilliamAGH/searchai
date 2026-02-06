@@ -8,9 +8,6 @@
  * - Template injections
  */
 
-import { RELEVANCE_SCORES } from "../constants/cache";
-import { safeParseUrl } from "../url";
-
 /**
  * Main sanitization function that applies all security measures
  * @param input - Raw user input to sanitize
@@ -240,87 +237,4 @@ export function sanitizeJson(jsonString: string): string | null {
     // Invalid JSON, return null
     return null;
   }
-}
-
-/**
- * Normalize a search result from external input
- * Ensures all required fields are present with valid values
- * Particularly important for HTTP endpoints that receive searchResults
- *
- * @param result - Raw search result from external source
- * @returns Normalized SearchResult with guaranteed fields
- */
-export function normalizeSearchResult(result: unknown): {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-} {
-  // Ensure we have an object
-  if (!result || typeof result !== "object") {
-    return {
-      title: "Untitled",
-      url: "",
-      snippet: "",
-      relevanceScore: 0.5,
-    };
-  }
-
-  // Type guard: we know result is a non-null object
-  const r = result as Record<string, unknown>;
-
-  // Normalize relevanceScore - must be a number between 0 and 1
-  let relevanceScore: number = RELEVANCE_SCORES.SEARCH_RESULT; // Default
-  if (typeof r.relevanceScore === "number") {
-    // Clamp to valid range [0, 1]
-    relevanceScore = Math.max(0, Math.min(1, r.relevanceScore));
-  } else if (typeof r.relevanceScore === "string") {
-    // Parse string numbers
-    const parsed = parseFloat(r.relevanceScore);
-    if (!isNaN(parsed)) {
-      relevanceScore = Math.max(0, Math.min(1, parsed));
-    }
-  }
-
-  // Extract string fields safely - only use string values, not objects
-  const titleValue = typeof r.title === "string" ? r.title : "Untitled";
-  const urlValue = typeof r.url === "string" ? r.url : "";
-  const snippetValue = typeof r.snippet === "string" ? r.snippet : "";
-  const parsedUrl = safeParseUrl(urlValue);
-  const safeUrl =
-    parsedUrl &&
-    (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:")
-      ? parsedUrl.toString()
-      : "";
-  if (!safeUrl && urlValue) {
-    console.warn("normalizeSearchResult: dropped invalid url", {
-      url: urlValue,
-    });
-  }
-
-  return {
-    title: robustSanitize(titleValue),
-    url: safeUrl,
-    snippet: robustSanitize(snippetValue),
-    relevanceScore,
-  };
-}
-
-/**
- * Normalize an array of search results
- *
- * @param results - Raw array of search results
- * @returns Array of normalized SearchResult objects
- */
-export function normalizeSearchResults(results: unknown): Array<{
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-}> {
-  if (!Array.isArray(results)) {
-    return [];
-  }
-
-  return results.map(normalizeSearchResult);
 }
