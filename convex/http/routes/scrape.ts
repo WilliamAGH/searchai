@@ -117,36 +117,20 @@ export function registerScrapeRoutes(http: HttpRouter) {
           timestamp: new Date().toISOString(),
         });
 
-        let hostname = "";
-        try {
-          hostname = new URL(url).hostname;
-        } catch (hostnameError) {
-          console.warn("Failed to parse hostname for scrape error", {
-            url,
-            error: hostnameError,
-          });
-          hostname = url.substring(0, 50);
-        }
+        // URL is already validated by validateScrapeUrl — safe to parse
+        const hostname = new URL(url).hostname;
 
-        const errorResponse = {
-          error: "Scrape service failed",
-          errorCode: "SCRAPE_FAILED",
-          errorDetails: {
-            ...errorInfo,
-            url: url.substring(0, 200),
-            timestamp: new Date().toISOString(),
-          },
-          // Include placeholder content for graceful degradation
-          title: hostname,
-          content: `Unable to fetch content from ${url}: ${errorMessage}`,
-          summary: `Content unavailable from ${hostname}`,
-        };
-
-        dlog("SCRAPE ERROR RESPONSE:", JSON.stringify(errorResponse, null, 2));
-
-        // Return 502 Bad Gateway - we're proxying external content that failed
         return corsResponse({
-          body: JSON.stringify(errorResponse),
+          body: JSON.stringify({
+            error: "Scrape service failed",
+            errorCode: "SCRAPE_FAILED",
+            errorDetails: {
+              ...errorInfo,
+              url: url.substring(0, 200),
+              hostname,
+              timestamp: new Date().toISOString(),
+            },
+          }),
           status: 502,
           origin,
         });

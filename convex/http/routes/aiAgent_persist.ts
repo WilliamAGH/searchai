@@ -61,7 +61,6 @@ export async function handleAgentPersist(
   }
 
   try {
-    // @ts-ignore - passing through to Convex action
     const result = await ctx.runAction(
       api.agents.orchestration.runAgentWorkflowAndPersist,
       {

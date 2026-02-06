@@ -195,35 +195,15 @@ export function registerSearchRoutes(http: HttpRouter) {
           timestamp: new Date().toISOString(),
         });
 
-        const errorResponse = {
-          error: "Search service temporarily unavailable",
-          errorCode: "SEARCH_FAILED",
-          errorDetails: {
-            ...errorInfo,
-            timestamp: new Date().toISOString(),
-          },
-          // Include fallback results for graceful degradation, but with 500 status
-          results: [
-            {
-              title: `Search for: ${query}`,
-              url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-              snippet:
-                "Search results temporarily unavailable. Click to search manually.",
-              relevanceScore: 0.3,
-            },
-          ],
-          searchMethod: "fallback",
-          hasRealResults: false,
-        };
-
-        dlog(
-          "[SEARCH] SEARCH ERROR RESPONSE:",
-          JSON.stringify(errorResponse, null, 2),
-        );
-
-        // Return 500 to indicate server error - clients can still use fallback results
         return corsResponse({
-          body: JSON.stringify(errorResponse),
+          body: JSON.stringify({
+            error: "Search service temporarily unavailable",
+            errorCode: "SEARCH_FAILED",
+            errorDetails: {
+              ...errorInfo,
+              timestamp: new Date().toISOString(),
+            },
+          }),
           status: 500,
           origin,
         });
