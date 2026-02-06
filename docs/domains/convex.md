@@ -167,13 +167,13 @@ export default http;
 
 ### Agent Streaming Endpoints
 
-- `POST /api/ai/agent` → Returns JSON `{ answer, sources, contextReferences, workflow }`
+- `POST /api/ai/agent` → Returns JSON `{ answer, webResearchSources, workflow }`
 - `POST /api/ai/agent/stream` → SSE frames with types:
   - `workflow_start` - Initial event with workflowId and nonce for verification
   - `progress` - Stage updates (thinking, searching, scraping, generating)
   - `reasoning` - Agent thinking/planning content
   - `content` - Streaming response text deltas
-  - `metadata` - Sources and context references
+  - `metadata` - Workflow metadata including `webResearchSources`
   - `complete` - Final event with full response
   - `persisted` - Persistence confirmation with signature for verification
   - `error` - Error information

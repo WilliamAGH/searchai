@@ -33,7 +33,7 @@ In production, the app calls `*.convex.site` directly. In local dev, `vite` prox
   - Body:
     - `message` (string, required)
     - `conversationContext` (string, optional)
-    - `contextReferences` (optional array; sanitized server-side)
+    - `webResearchSources` (optional array; sanitized server-side)
 
 ### Agent (authenticated, streaming)
 
@@ -43,7 +43,7 @@ In production, the app calls `*.convex.site` directly. In local dev, `vite` prox
     - `chatId` (string, required; Convex `chats` ID)
     - `sessionId` (string, optional; UUIDv7)
     - `conversationContext` (string, optional)
-    - `contextReferences` (optional array; sanitized server-side)
+    - `webResearchSources` (optional array; sanitized server-side)
   - Response: Server-Sent Events (SSE). Each frame is `data: { ... }\n\n` with a `type` field.
 
 Event types used by the client:
@@ -52,9 +52,9 @@ Event types used by the client:
 - `tool_result`: `{ toolName: string, result: string }`
 - `reasoning`: `{ content: string }`
 - `content`: `{ delta: string }`
-- `metadata`: `{ metadata: { workflowId, contextReferences?, hasLimitations?, confidence?, answerLength? }, nonce?: string }`
+- `metadata`: `{ metadata: { workflowId, webResearchSources?, hasLimitations?, confidence?, answerLength? }, nonce?: string }`
 - `complete`: marks the end of the stream (client treats this as done)
-- `persisted`: `{ payload: { assistantMessageId, workflowId, answer, sources, contextReferences }, nonce: string, signature: string }`
+- `persisted`: `{ payload: { assistantMessageId, workflowId, answer, webResearchSources }, nonce: string, signature: string }`
 - `error`: `{ error: string, ... }`
 
 ### Agent persist (unauthenticated)
