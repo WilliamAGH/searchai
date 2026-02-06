@@ -44,6 +44,7 @@ export { deleteChat } from "./chats/deletion";
 
 // Re-export migration operations
 export { importLocalChats, publishAnonymousChat } from "./chats/migration";
+export { migrateMessagesToWebResearchSources } from "./chats/webResearchSourcesMigration";
 
 // Re-export subscription operations
 export {
