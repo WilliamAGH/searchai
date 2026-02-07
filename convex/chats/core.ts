@@ -178,7 +178,7 @@ export const getChatByIdHttp = query({
       return chat;
     }
 
-    if (hasSessionAccess(chat, args.sessionId)) {
+    if (!chat.userId && hasSessionAccess(chat, args.sessionId)) {
       return chat;
     }
 
