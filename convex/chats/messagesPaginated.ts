@@ -123,7 +123,9 @@ export const getChatMessagesPaginated = query({
         return EMPTY_PAGE;
       }
 
-      // Cursor is valid and belongs to this chat - continue from the cursor position
+      // Cursor is valid and belongs to this chat - continue from the cursor position.
+      // NOTE: This assumes _creationTime is monotonically increasing within a chat.
+      // Messages restored from backup or cross-shard replication may violate this.
       baseQuery = baseQuery.filter((q) =>
         q.lt(q.field("_creationTime"), cursorMessage._creationTime),
       );

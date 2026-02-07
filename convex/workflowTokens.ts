@@ -32,10 +32,25 @@ export const completeToken = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const token = await ctx.db.get(args.tokenId);
+    if (!token) {
+      console.error("[workflowTokens] Token not found for completion", {
+        tokenId: args.tokenId,
+      });
+      return null;
+    }
+    if (token.status !== "active") {
+      console.warn("[workflowTokens] Token not in active state", {
+        tokenId: args.tokenId,
+        currentStatus: token.status,
+      });
+      return null;
+    }
     await ctx.db.patch(args.tokenId, {
       signature: args.signature,
       status: "completed",
     });
+    return null;
   },
 });
 
@@ -45,6 +60,17 @@ export const invalidateToken = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const token = await ctx.db.get(args.tokenId);
+    if (!token) {
+      console.error("[workflowTokens] Token not found for invalidation", {
+        tokenId: args.tokenId,
+      });
+      return null;
+    }
+    if (token.status !== "active") {
+      return null;
+    }
     await ctx.db.patch(args.tokenId, { status: "invalidated" });
+    return null;
   },
 });
