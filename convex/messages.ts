@@ -90,7 +90,7 @@ export const addMessageHttp = internalMutation({
 
     const authorized =
       hasValidWorkflowToken ||
-      hasSessionAccess(chat, args.sessionId) ||
+      (!chat.userId && hasSessionAccess(chat, args.sessionId)) ||
       (isUnownedChat(chat) && !!args.sessionId);
 
     if (!authorized) {

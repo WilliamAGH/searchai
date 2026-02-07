@@ -128,7 +128,6 @@ export function registerScrapeRoutes(http: HttpRouter) {
             error: "Scrape service failed",
             errorCode: "SCRAPE_FAILED",
             errorDetails: {
-              ...errorInfo,
               url: url.substring(0, 200),
               hostname,
               timestamp: new Date().toISOString(),

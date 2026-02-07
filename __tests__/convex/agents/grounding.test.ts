@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { WebResearchSourceSchema } from "../../../convex/schemas/webResearchSources";
 
 describe("Agent SSE Grounding Specifications", () => {
   it("documents canonical SSE event ordering", () => {
@@ -105,22 +106,22 @@ describe("Agent SSE Grounding Specifications", () => {
   });
 
   it("validates persisted event payload and signature fields", () => {
+    const webResearchSource = {
+      contextId: "019a122e-c507-7851-99f7-b8f5d7345b42",
+      type: "search_result",
+      url: "https://www.anthropic.com/",
+      title: "Anthropic",
+      relevanceScore: 0.95,
+      timestamp: Date.now(),
+    };
+
     const persistedEvent = {
       type: "persisted",
       payload: {
         assistantMessageId: "k17acj6k6we1r7d8q0gpb7m4d57n2x1v",
         workflowId: "019a122e-c507-7851-99f7-b8f5d7345b40",
         answer: "Anthropic is headquartered in San Francisco.",
-        webResearchSources: [
-          {
-            contextId: "019a122e-c507-7851-99f7-b8f5d7345b42",
-            type: "search_result",
-            url: "https://www.anthropic.com/",
-            title: "Anthropic",
-            relevanceScore: "high",
-            timestamp: Date.now(),
-          },
-        ],
+        webResearchSources: [webResearchSource],
       },
       nonce: "019a122e-c507-7851-99f7-b8f5d7345b41",
       signature: "deadbeef",
@@ -132,6 +133,9 @@ describe("Agent SSE Grounding Specifications", () => {
     expect(persistedEvent.payload.answer.length).toBeGreaterThan(0);
     expect(persistedEvent.nonce.length).toBeGreaterThan(0);
     expect(persistedEvent.signature.length).toBeGreaterThan(0);
+    expect(WebResearchSourceSchema.safeParse(webResearchSource).success).toBe(
+      true,
+    );
   });
 
   it("validates citation format in synthesized answers", () => {

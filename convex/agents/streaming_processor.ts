@@ -1,3 +1,5 @@
+"use node";
+
 /**
  * Unified Stream Processing for OpenAI Agents SDK
  *

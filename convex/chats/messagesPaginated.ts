@@ -144,6 +144,7 @@ export const getRecentChatMessages = query({
     sessionId: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
+  returns: v.array(vMessageProjection),
   handler: async (ctx, args) => {
     assertValidSessionId(args.sessionId);
     const userId = await getAuthUserId(ctx);
@@ -159,10 +160,11 @@ export const getRecentChatMessages = query({
       return [];
     }
 
-    return fetchMessagesByChatId(
+    const docs = await fetchMessagesByChatId(
       ctx.db,
       args.chatId,
-      args.limit || DEFAULT_PAGE_SIZE,
+      normalizePageSize(args.limit),
     );
+    return docs.map(projectMessage);
   },
 });

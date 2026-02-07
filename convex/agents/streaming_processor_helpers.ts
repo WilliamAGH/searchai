@@ -1,3 +1,5 @@
+"use node";
+
 import type { ToolCallArgs } from "./streaming_event_types";
 import type { AgentStreamResult } from "./streaming_processor_types";
 import { type HarvestedData } from "../schemas/agents";
