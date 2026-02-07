@@ -174,11 +174,7 @@ export const updateMessageMetadata = mutation({
     const { messageId, sessionId, ...metadata } = args;
     const message = await ctx.db.get(messageId);
     if (!message) {
-      // Silently fail
-      console.warn(
-        `Message not found: ${messageId}, could not update metadata.`,
-      );
-      return null;
+      throw new Error(`Message not found: ${messageId}`);
     }
 
     // Check authorization - only the chat owner can update message metadata

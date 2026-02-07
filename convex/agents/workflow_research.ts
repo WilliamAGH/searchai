@@ -193,7 +193,11 @@ export async function* streamResearchWorkflow(
   } catch (error) {
     const stage = detectErrorStage(error, instantResponse);
     await handleError(
-      error instanceof Error ? error : new Error("An unknown error occurred"),
+      error instanceof Error
+        ? error
+        : new Error(`Research workflow failed: ${String(error)}`, {
+            cause: error,
+          }),
       stage,
     );
   }

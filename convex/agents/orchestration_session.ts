@@ -60,6 +60,7 @@ export async function withErrorContext<T>(
   } catch (error) {
     throw new Error(
       `${operation}: ${getErrorMessage(error, "Unknown error occurred")}`,
+      { cause: error },
     );
   }
 }

@@ -300,7 +300,9 @@ export async function* streamConversationalWorkflow(
     await handleError(
       error instanceof Error
         ? error
-        : new Error("Conversational workflow failed"),
+        : new Error(`Conversational workflow failed: ${String(error)}`, {
+            cause: error,
+          }),
       "conversational",
     );
   }
