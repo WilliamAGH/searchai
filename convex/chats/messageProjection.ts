@@ -69,7 +69,10 @@ export function projectMessage(m: Doc<"messages">): MessageProjection {
 
 /** Validate that an optional limit arg is positive. */
 function assertPositiveLimit(limit: number | undefined): void {
-  if (limit !== undefined && limit <= 0) {
+  if (
+    limit !== undefined &&
+    (!Number.isFinite(limit) || !Number.isInteger(limit) || limit <= 0)
+  ) {
     throw new Error("limit must be a positive number");
   }
 }

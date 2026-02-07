@@ -24,6 +24,14 @@ import {
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 
+function normalizePageSize(limit: number | undefined): number {
+  const normalizedLimit =
+    limit !== undefined && Number.isFinite(limit)
+      ? Math.floor(limit)
+      : DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(normalizedLimit, 1), MAX_PAGE_SIZE);
+}
+
 const assertValidSessionId = (sessionId?: string) => {
   if (sessionId && !isValidUuidV7(sessionId)) {
     throw new Error("Invalid sessionId format");
@@ -81,7 +89,7 @@ export const getChatMessagesPaginated = query({
       return EMPTY_PAGE;
     }
 
-    const pageSize = Math.min(args.limit || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    const pageSize = normalizePageSize(args.limit);
 
     // Build the query
     let baseQuery = ctx.db
