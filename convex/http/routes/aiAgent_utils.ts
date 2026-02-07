@@ -8,6 +8,20 @@ import { isRecord, type WebResearchSource } from "../../lib/validators";
  */
 const CONTROL_CHARS_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
+/** Sanitization limits for user-provided web research source fields */
+const MAX_URL_LENGTH = 2000;
+const MAX_TITLE_LENGTH = 500;
+const MAX_SOURCES_PER_REQUEST = 12;
+
+/**
+ * Clamp a relevance score to the valid [0, 1] range.
+ */
+function clampRelevanceScore(score: number): number {
+  if (score < 0) return 0;
+  if (score > 1) return 1;
+  return score;
+}
+
 /**
  * Validate and normalize URL to safe http/https protocols only.
  * Returns undefined for invalid URLs or non-http(s) protocols - safe by design.
@@ -17,9 +31,12 @@ function safeParseUrl(value: unknown): string | undefined {
   try {
     const url = new URL(value);
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-    return url.toString().slice(0, 2000);
-  } catch {
-    // Invalid URL format - return undefined as intended
+    return url.toString().slice(0, MAX_URL_LENGTH);
+  } catch (error) {
+    console.warn("[sanitize] Rejected malformed URL in web research source", {
+      input: typeof value === "string" ? value.slice(0, 100) : typeof value,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return undefined;
   }
 }
@@ -97,7 +114,7 @@ export function sanitizeWebResearchSources(
   if (!Array.isArray(input)) return undefined;
 
   return input
-    .slice(0, 12)
+    .slice(0, MAX_SOURCES_PER_REQUEST)
     .map((refRaw) => {
       if (!isRecord(refRaw)) return null;
       const contextId =
@@ -124,17 +141,14 @@ export function sanitizeWebResearchSources(
         sanitized.url = safeUrl;
       }
       if (typeof refRaw.title === "string") {
-        sanitized.title = refRaw.title.slice(0, 500);
+        sanitized.title = refRaw.title.slice(0, MAX_TITLE_LENGTH);
       }
       if (
         refRaw.relevanceScore !== undefined &&
         typeof refRaw.relevanceScore === "number" &&
         !Number.isNaN(refRaw.relevanceScore)
       ) {
-        sanitized.relevanceScore = Math.max(
-          0,
-          Math.min(1, refRaw.relevanceScore),
-        );
+        sanitized.relevanceScore = clampRelevanceScore(refRaw.relevanceScore);
       }
       if (
         isRecord(refRaw.metadata) &&
