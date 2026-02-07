@@ -62,7 +62,9 @@ export function registerScrapeRoutes(http: HttpRouter) {
         return corsResponse({
           body: JSON.stringify({
             error: "Invalid JSON body",
-            errorDetails: serializeError(error),
+            ...(process.env.NODE_ENV === "development"
+              ? { errorDetails: serializeError(error) }
+              : {}),
           }),
           status: 400,
           origin,

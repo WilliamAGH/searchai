@@ -60,7 +60,9 @@ export function registerSearchRoutes(http: HttpRouter) {
         return corsResponse({
           body: JSON.stringify({
             error: "Invalid JSON body",
-            errorDetails: serializeError(error),
+            ...(process.env.NODE_ENV === "development"
+              ? { errorDetails: serializeError(error) }
+              : {}),
           }),
           status: 400,
           origin,
@@ -199,10 +201,14 @@ export function registerSearchRoutes(http: HttpRouter) {
           body: JSON.stringify({
             error: "Search service temporarily unavailable",
             errorCode: "SEARCH_FAILED",
-            errorDetails: {
-              ...errorInfo,
-              timestamp: new Date().toISOString(),
-            },
+            ...(process.env.NODE_ENV === "development"
+              ? {
+                  errorDetails: {
+                    ...errorInfo,
+                    timestamp: new Date().toISOString(),
+                  },
+                }
+              : {}),
           }),
           status: 500,
           origin,
