@@ -30,7 +30,7 @@ export function harvestToolOutput(
 ): void {
   if (!isRecord(output)) return;
 
-  if (toolName === "search_web" || "results" in output) {
+  if (toolName === "search_web") {
     harvestSearchResults(output, harvested);
   }
 

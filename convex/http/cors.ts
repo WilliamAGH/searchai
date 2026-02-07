@@ -97,13 +97,26 @@ export function validateOrigin(requestOrigin: string | null): string | null {
   // Check if request origin matches allowed patterns
   for (const allowed of allowList) {
     // Support wildcard subdomains: *.example.com
+    // Parse origin as URL to prevent bypass via non-http protocols or path injection
     if (allowed.startsWith("*.")) {
       const domain = allowed.slice(2);
-      if (
-        requestOrigin.endsWith(`.${domain}`) ||
-        requestOrigin === `https://${domain}`
-      ) {
-        return requestOrigin;
+      try {
+        const parsed = new URL(requestOrigin);
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+          continue;
+        }
+        if (
+          parsed.hostname.endsWith(`.${domain}`) ||
+          parsed.hostname === domain
+        ) {
+          return requestOrigin;
+        }
+      } catch (error) {
+        console.warn("[CORS] Malformed origin rejected during wildcard check", {
+          origin: requestOrigin,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
       }
     }
   }

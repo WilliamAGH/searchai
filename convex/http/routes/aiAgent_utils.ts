@@ -128,9 +128,13 @@ export function sanitizeWebResearchSources(
       }
       if (
         refRaw.relevanceScore !== undefined &&
-        typeof refRaw.relevanceScore === "number"
+        typeof refRaw.relevanceScore === "number" &&
+        !Number.isNaN(refRaw.relevanceScore)
       ) {
-        sanitized.relevanceScore = refRaw.relevanceScore;
+        sanitized.relevanceScore = Math.max(
+          0,
+          Math.min(1, refRaw.relevanceScore),
+        );
       }
       if (
         isRecord(refRaw.metadata) &&
