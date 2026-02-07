@@ -53,10 +53,13 @@ export function robustSanitize(input: string): string {
         return "[BASE64_BLOCKED]";
       }
     } catch (error) {
-      console.warn("Failed to decode base64 input during sanitization", {
+      // Safe to keep: atob() failure means the string is NOT valid base64,
+      // so it cannot contain a hidden decoded payload. Only successfully
+      // decoded strings can carry injection keywords.
+      console.warn("sanitizeBase64: decode failed, keeping original", {
+        length: match.length,
         error,
       });
-      // If decoding fails, it's not valid base64, keep original
     }
     return match;
   });

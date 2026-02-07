@@ -146,10 +146,9 @@ export async function handlePublishChat(
   } catch (error: unknown) {
     const errorInfo = serializeError(error);
     console.error("[ERROR] PUBLISH CHAT:", errorInfo);
-    const errorMessage = error instanceof Error ? error.message : String(error);
     return corsResponse({
       body: JSON.stringify({
-        error: errorMessage,
+        error: errorInfo.message,
         ...(process.env.NODE_ENV === "development"
           ? { errorDetails: errorInfo }
           : {}),

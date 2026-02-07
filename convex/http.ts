@@ -15,7 +15,7 @@ import { registerSearchRoutes } from "./http/routes/search";
 import { registerScrapeRoutes } from "./http/routes/scrape";
 import { registerAgentAIRoutes } from "./http/routes/aiAgent";
 import { registerPublishRoutes } from "./http/routes/publish";
-import { corsResponse } from "./http/cors";
+import { publicCorsResponse } from "./http/cors";
 
 /**
  * HTTP router for unauthenticated endpoints.
@@ -42,20 +42,14 @@ auth.addHttpRoutes(http);
 
 // Lightweight health check endpoint
 // Health probes (load balancers, uptime monitors) don't send Origin headers,
-// so this endpoint bypasses CORS validation when Origin is absent.
+// so publicCorsResponse serves a plain response when Origin is absent.
 http.route({
   path: "/health",
   method: "GET",
   handler: httpAction(async (_ctx, request) => {
     const body = JSON.stringify({ status: "ok", timestamp: Date.now() });
     const origin = request.headers.get("Origin");
-    if (!origin) {
-      return new Response(body, {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return corsResponse({ body, status: 200, origin });
+    return publicCorsResponse({ body, status: 200, origin });
   }),
 });
 
