@@ -20,6 +20,10 @@ interface UseEffectiveMessagesOptions {
   paginatedMessages: Message[];
   /** Current chat ID */
   currentChatId: string | null;
+  /** Whether pagination should be the primary source for this view */
+  preferPaginatedSource?: boolean;
+  /** Whether paginated messages are still loading */
+  isPaginatedLoading?: boolean;
 }
 
 /**
@@ -34,6 +38,8 @@ export function useEffectiveMessages({
   messages,
   paginatedMessages,
   currentChatId,
+  preferPaginatedSource = false,
+  isPaginatedLoading = false,
 }: UseEffectiveMessagesOptions): Message[] {
   return useMemo(() => {
     const safePaginatedMessages = currentChatId
@@ -78,6 +84,23 @@ export function useEffectiveMessages({
       return messages;
     }
 
+    if (preferPaginatedSource) {
+      if (safePaginatedMessages.length > 0) {
+        logger.debug("Using paginated messages - preferred source", {
+          count: safePaginatedMessages.length,
+          chatId: currentChatId,
+        });
+        return safePaginatedMessages;
+      }
+
+      if (isPaginatedLoading) {
+        logger.debug("Using paginated loading state", {
+          chatId: currentChatId,
+        });
+        return [];
+      }
+    }
+
     // Otherwise, use paginated messages if available
     if (currentChatId && safePaginatedMessages.length > 0) {
       logger.debug("Using paginated messages - no optimistic state", {
@@ -93,5 +116,11 @@ export function useEffectiveMessages({
       chatId: currentChatId,
     });
     return messages;
-  }, [currentChatId, paginatedMessages, messages]);
+  }, [
+    currentChatId,
+    isPaginatedLoading,
+    messages,
+    paginatedMessages,
+    preferPaginatedSource,
+  ]);
 }

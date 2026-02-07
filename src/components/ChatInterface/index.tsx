@@ -157,6 +157,8 @@ function ChatInterfaceComponent({
     messages,
     paginatedMessages,
     currentChatId,
+    preferPaginatedSource: usePagination,
+    isPaginatedLoading: isLoadingMessages,
   });
 
   const currentMessages = effectiveMessages;
