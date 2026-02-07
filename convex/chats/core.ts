@@ -11,7 +11,11 @@ import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { generateShareId, generatePublicId } from "../lib/uuid";
-import { hasUserAccess, hasSessionAccess } from "../lib/auth";
+import {
+  hasUserAccess,
+  hasSessionAccess,
+  isValidWorkflowToken,
+} from "../lib/auth";
 
 /**
  * Create new chat
@@ -162,12 +166,14 @@ export const getChatById = query({
 /**
  * Get chat by ID for HTTP routes (no auth context).
  * - Allows shared/public chats
- * - Allows sessionId ownership
+ * - Allows sessionId ownership (anonymous chats only)
+ * - Allows valid workflow token (for authenticated user streaming workflows)
  */
 export const getChatByIdHttp = query({
   args: {
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
+    workflowTokenId: v.optional(v.id("workflowTokens")),
   },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
@@ -179,6 +185,13 @@ export const getChatByIdHttp = query({
     }
 
     if (!chat.userId && hasSessionAccess(chat, args.sessionId)) {
+      return chat;
+    }
+
+    const token = args.workflowTokenId
+      ? await ctx.db.get(args.workflowTokenId)
+      : null;
+    if (isValidWorkflowToken(token, args.chatId)) {
       return chat;
     }
 

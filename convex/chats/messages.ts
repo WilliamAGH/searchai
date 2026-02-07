@@ -6,7 +6,11 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import { hasUserAccess, hasSessionAccess } from "../lib/auth";
+import {
+  hasUserAccess,
+  hasSessionAccess,
+  isValidWorkflowToken,
+} from "../lib/auth";
 import {
   fetchMessagesByChatId,
   projectMessage,
@@ -58,6 +62,7 @@ export const getChatMessagesHttp = query({
   args: {
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
+    workflowTokenId: v.optional(v.id("workflowTokens")),
     limit: v.optional(v.number()),
   },
   returns: v.array(vMessageProjection),
@@ -71,9 +76,16 @@ export const getChatMessagesHttp = query({
     const isSessionOwner =
       !chat.userId && hasSessionAccess(chat, args.sessionId);
 
-    if (!isSharedOrPublic && !isSessionOwner) {
-      return [];
+    let hasAccess = isSharedOrPublic || isSessionOwner;
+
+    if (!hasAccess) {
+      const token = args.workflowTokenId
+        ? await ctx.db.get(args.workflowTokenId)
+        : null;
+      hasAccess = isValidWorkflowToken(token, args.chatId);
     }
+
+    if (!hasAccess) return [];
 
     const docs = await fetchMessagesByChatId(ctx.db, args.chatId, args.limit);
     return docs.map(projectMessage);

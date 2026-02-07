@@ -5,7 +5,12 @@ import { internal } from "./_generated/api";
 import { vWebResearchSource, vSearchMethod } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
-import { isAuthorized, isUnownedChat, hasSessionAccess } from "./lib/auth";
+import {
+  isAuthorized,
+  isUnownedChat,
+  hasSessionAccess,
+  isValidWorkflowToken,
+} from "./lib/auth";
 import { buildMessageInsertDocument } from "./messages_insert_document";
 export const addMessage = internalMutation({
   args: {
@@ -82,14 +87,10 @@ export const addMessageHttp = internalMutation({
     const workflowToken = args.workflowTokenId
       ? await ctx.db.get(args.workflowTokenId)
       : null;
-    const hasValidWorkflowToken =
-      !!workflowToken &&
-      workflowToken.chatId === args.chatId &&
-      workflowToken.status === "active" &&
-      workflowToken.expiresAt > Date.now();
+    const hasValidToken = isValidWorkflowToken(workflowToken, args.chatId);
 
     const authorized =
-      hasValidWorkflowToken ||
+      hasValidToken ||
       (!chat.userId && hasSessionAccess(chat, args.sessionId)) ||
       (isUnownedChat(chat) && !!args.sessionId);
 
@@ -130,10 +131,10 @@ export const internalUpdateMessageContent = internalMutation({
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     if (!message) {
-      // Silently fail, to avoid crashing the stream
-      console.warn(
-        `Message not found: ${args.messageId}, could not append chunk.`,
-      );
+      console.error("[streaming] Message not found during content append", {
+        messageId: args.messageId,
+        chunkLength: args.contentChunk.length,
+      });
       return;
     }
     await ctx.db.patch(args.messageId, {
@@ -149,10 +150,10 @@ export const internalUpdateMessageReasoning = internalMutation({
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     if (!message) {
-      // Silently fail, to avoid crashing the stream
-      console.warn(
-        `Message not found: ${args.messageId}, could not append reasoning chunk.`,
-      );
+      console.error("[streaming] Message not found during reasoning append", {
+        messageId: args.messageId,
+        chunkLength: args.reasoningChunk.length,
+      });
       return;
     }
     await ctx.db.patch(args.messageId, {

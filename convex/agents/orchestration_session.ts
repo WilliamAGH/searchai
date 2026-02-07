@@ -142,7 +142,10 @@ export async function initializeWorkflowSession(
     );
   } else {
     chat = await withErrorContext("Failed to retrieve chat", () =>
-      ctx.runQuery(api.chats.getChatByIdHttp, getChatArgs),
+      ctx.runQuery(api.chats.getChatByIdHttp, {
+        ...getChatArgs,
+        workflowTokenId,
+      }),
     );
   }
   if (!chat) throw new Error("Chat not found or access denied");
@@ -167,7 +170,11 @@ export async function initializeWorkflowSession(
   } else {
     recentMessagesResult = await withErrorContext(
       "Failed to retrieve chat messages",
-      () => ctx.runQuery(api.chats.getChatMessagesHttp, getMessagesArgs),
+      () =>
+        ctx.runQuery(api.chats.getChatMessagesHttp, {
+          ...getMessagesArgs,
+          workflowTokenId,
+        }),
     );
   }
 
@@ -190,7 +197,10 @@ export async function initializeWorkflowSession(
     );
   } else {
     await withErrorContext("Failed to save user message", () =>
-      ctx.runMutation(internal.messages.addMessageHttp, addMessageArgs),
+      ctx.runMutation(internal.messages.addMessageHttp, {
+        ...addMessageArgs,
+        workflowTokenId,
+      }),
     );
   }
 

@@ -103,3 +103,26 @@ export function isUnownedChat(chat: ChatOwnership): boolean {
 export function isSharedOrPublicChat(chat: { privacy?: string }): boolean {
   return chat.privacy === "shared" || chat.privacy === "public";
 }
+
+/**
+ * Validate a workflow token for chat access.
+ * Checks: token exists, matches the target chat, is active, and not expired.
+ *
+ * Used by HTTP query/mutation variants that lack Convex auth context.
+ * The token proves the caller had legitimate access at token creation time.
+ *
+ * @param token - Workflow token document (or null if not provided)
+ * @param chatId - Target chat ID to validate against
+ * @returns true if the token grants access to the chat
+ */
+export function isValidWorkflowToken(
+  token: { chatId: Id<"chats">; status: string; expiresAt: number } | null,
+  chatId: Id<"chats">,
+): boolean {
+  return (
+    !!token &&
+    token.chatId === chatId &&
+    token.status === "active" &&
+    token.expiresAt > Date.now()
+  );
+}
