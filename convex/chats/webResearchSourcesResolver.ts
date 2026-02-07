@@ -14,6 +14,7 @@ const UNKNOWN_MESSAGE_ID = "unknown" as const;
 
 export interface WebResearchSourceMessageFields {
   _id?: string;
+  _creationTime?: number;
   timestamp?: number;
   webResearchSources?: unknown;
   contextReferences?: unknown;
@@ -202,7 +203,11 @@ export function resolveWebResearchSourcesFromMessage(
 ): WebResearchSource[] {
   const messageId = String(message._id ?? UNKNOWN_MESSAGE_ID);
   const fallbackTimestamp =
-    typeof message.timestamp === "number" ? message.timestamp : Date.now();
+    typeof message.timestamp === "number"
+      ? message.timestamp
+      : typeof message._creationTime === "number"
+        ? message._creationTime
+        : Date.now();
   const candidates: WebResearchSource[] = [];
   const shared = { messageId, fallbackTimestamp };
 

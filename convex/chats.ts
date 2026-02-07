@@ -45,6 +45,11 @@ export { deleteChat } from "./chats/deletion";
 // Re-export migration operations
 export { importLocalChats, publishAnonymousChat } from "./chats/migration";
 export { migrateMessagesToWebResearchSources } from "./chats/webResearchSourcesMigration";
+export {
+  normalizeChatMessagesSchema,
+  normalizeSessionHistorySchema,
+  normalizeAllChatsSchemaInternal,
+} from "./chats/schemaNormalization";
 
 // Re-export subscription operations
 export {
