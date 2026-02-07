@@ -27,15 +27,7 @@ In production, the app calls `*.convex.site` directly. In local dev, `vite` prox
   - Body: `{ "url": string }`
   - Returns `502` if the fetch/extract fails.
 
-### Agent (unauthenticated, non-streaming)
-
-- `POST /api/ai/agent`
-  - Body:
-    - `message` (string, required)
-    - `conversationContext` (string, optional)
-    - `webResearchSources` (optional array; sanitized server-side)
-
-### Agent (authenticated, streaming)
+### Agent (streaming)
 
 - `POST /api/ai/agent/stream`
   - Body:
@@ -49,18 +41,12 @@ In production, the app calls `*.convex.site` directly. In local dev, `vite` prox
 Event types used by the client:
 
 - `progress`: `{ stage: "thinking" | "planning" | "searching" | "scraping" | "analyzing" | "generating", message: string, urls?, currentUrl?, queries?, sourcesUsed?, toolReasoning?, toolQuery?, toolUrl? }`
-- `tool_result`: `{ toolName: string, result: string }`
 - `reasoning`: `{ content: string }`
 - `content`: `{ delta: string }`
 - `metadata`: `{ metadata: { workflowId, webResearchSources?, hasLimitations?, confidence?, answerLength? }, nonce?: string }`
-- `complete`: marks the end of the stream (client treats this as done)
+- `complete`: workflow completion event (may include workflow summary data)
 - `persisted`: `{ payload: { assistantMessageId, workflowId, answer, webResearchSources }, nonce: string, signature: string }`
 - `error`: `{ error: string, ... }`
-
-### Agent persist (unauthenticated)
-
-- `POST /api/ai/agent/persist`
-  - Similar to the streaming route but returns a single JSON response and persists to an existing chat.
 
 ### Publish / Export
 

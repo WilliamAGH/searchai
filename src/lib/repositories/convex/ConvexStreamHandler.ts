@@ -22,7 +22,8 @@ import {
   ReasoningEventSchema,
   ContentEventSchema,
   MetadataEventSchema,
-  ToolResultEventSchema,
+  WorkflowStartEventSchema,
+  CompleteEventSchema,
   ErrorEventSchema,
   PersistedEventSchema,
 } from "@/lib/schemas/chatEvents";
@@ -118,14 +119,14 @@ export class ConvexStreamHandler {
     if (evt.type === "metadata") {
       return this.parseStreamEvent(MetadataEventSchema, evt);
     }
-    if (evt.type === "tool_result") {
-      return this.parseStreamEvent(ToolResultEventSchema, evt);
+    if (evt.type === "workflow_start") {
+      return this.parseStreamEvent(WorkflowStartEventSchema, evt);
+    }
+    if (evt.type === "complete") {
+      return this.parseStreamEvent(CompleteEventSchema, evt);
     }
     if (evt.type === "error") {
       return this.parseStreamEvent(ErrorEventSchema, evt);
-    }
-    if (evt.type === "complete") {
-      return { type: "done" };
     }
     if (evt.type === "persisted") {
       return this.handlePersistedEvent(evt);

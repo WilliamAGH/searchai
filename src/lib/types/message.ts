@@ -87,11 +87,9 @@ export type MessageStreamChunk =
       toolUrl?: string;
     }
   | { type: "reasoning"; content: string } // Thinking/reasoning from agents
-  | { type: "tool_result"; toolName: string; result: string } // Tool execution results
   | { type: "metadata"; metadata: MessageMetadata; nonce?: string } // Final metadata (sources, etc.)
-  | { type: "complete" } // Workflow completion
+  | { type: "complete"; workflow?: unknown } // Workflow completion
   | { type: "error"; error: string } // Error events
-  | { type: "done" } // Stream completion
   | {
       type: "workflow_start";
       workflowId: string;

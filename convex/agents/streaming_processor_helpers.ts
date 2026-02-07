@@ -1,26 +1,16 @@
-import type { StreamingEventItem, ToolCallArgs } from "./streaming_event_types";
+import type { ToolCallArgs } from "./streaming_event_types";
 import type { AgentStreamResult } from "./streaming_processor_types";
-import type { HarvestedData } from "../schemas/agents";
-import { extractTextDelta } from "./streaming_tool_events";
+import { type HarvestedData } from "../schemas/agents";
+import {
+  extractReasoningContent,
+  extractTextDelta,
+  isReasoningEvent,
+} from "./streaming_tool_events";
 import {
   harvestSearchResults,
   harvestScrapedContent,
 } from "./streaming_harvest";
 import { isRecord } from "../lib/validators";
-
-export function extractReasoningContent(item: StreamingEventItem): string {
-  if (typeof item.content === "string") return item.content;
-  if (typeof item.text === "string") return item.text;
-  return "";
-}
-
-export function extractToolOutput(item: StreamingEventItem): unknown {
-  return item.output ?? item.rawItem?.output;
-}
-
-export function extractOutputToolName(item: StreamingEventItem): string {
-  return item.toolName || item.rawItem?.name || "";
-}
 
 export function isToolError(output: unknown): boolean {
   if (!isRecord(output)) return false;
@@ -57,16 +47,8 @@ export async function* processStreamForDeltas(
   let accumulated = "";
 
   for await (const event of result) {
-    if (event.type !== "run_item_stream_event") continue;
-
-    const item = event.item;
-    if (!item) continue;
-
-    const eventName = event.name;
-
-    if (eventName === "message_output_created") continue;
-
-    const delta = extractTextDelta(item, eventName);
+    if (event.type !== "raw_model_stream_event") continue;
+    const delta = extractTextDelta(event);
     if (delta) {
       accumulated += delta;
       yield { type: "content", delta };
@@ -81,17 +63,11 @@ export async function* processStreamForReasoning(
 ): AsyncGenerator<{ type: "reasoning"; content: string }, void, undefined> {
   for await (const event of result) {
     if (event.type !== "run_item_stream_event") continue;
+    if (!isReasoningEvent(event)) continue;
 
-    const item = event.item;
-    if (!item) continue;
-
-    const eventName = event.name;
-
-    if (eventName === "reasoning_item_created") {
-      const content = extractReasoningContent(item);
-      if (content) {
-        yield { type: "reasoning", content };
-      }
+    const content = extractReasoningContent(event.item);
+    if (content) {
+      yield { type: "reasoning", content };
     }
   }
 }

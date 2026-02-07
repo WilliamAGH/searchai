@@ -66,7 +66,7 @@ export class StreamEventHandler {
     if (chunk.type === "error") {
       throw new Error(chunk.error);
     }
-    if (chunk.type === "done" || chunk.type === "complete") {
+    if (chunk.type === "complete") {
       this.handleComplete();
       return;
     }
