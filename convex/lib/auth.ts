@@ -116,7 +116,11 @@ export function isSharedOrPublicChat(chat: { privacy?: string }): boolean {
  * @returns true if the token grants access to the chat
  */
 export function isValidWorkflowToken(
-  token: { chatId: Id<"chats">; status: string; expiresAt: number } | null,
+  token: {
+    chatId: Id<"chats">;
+    status: "active" | "completed" | "invalidated";
+    expiresAt: number;
+  } | null,
   chatId: Id<"chats">,
 ): boolean {
   return (

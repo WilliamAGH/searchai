@@ -47,6 +47,9 @@ export async function* executeParallelPath({
   const { agents } = require("./definitions");
   const writeEvent = (type: string, data: Record<string, unknown>) =>
     createWorkflowEvent(type, data);
+
+  yield writeEvent("workflow_start", { workflowId, nonce });
+
   const parallelResearchGenerator = executeParallelResearch({
     ctx,
     searchQueries: planningOutput.searchQueries,
