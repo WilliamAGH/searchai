@@ -12,7 +12,10 @@
 import { run } from "@openai/agents";
 import { applyEnhancements } from "../enhancements";
 import { parseAnswerText, stripTrailingSources } from "./answerParser";
-import { buildSynthesisInstructions } from "./orchestration_helpers";
+import {
+  buildSynthesisInstructions,
+  withTimeout,
+} from "./orchestration_helpers";
 import { AGENT_TIMEOUTS, AGENT_LIMITS } from "../lib/constants/cache";
 import { processStreamForDeltas } from "./streaming_processor_helpers";
 import type { AgentStreamResult } from "./streaming_processor_types";
@@ -107,36 +110,6 @@ export interface SynthesisResult {
 export type SynthesisEvent =
   | { type: "progress"; stage: "generating"; message: string }
   | { type: "content"; delta: string };
-
-// ============================================
-// Timeout Utility
-// ============================================
-
-/**
- * Wrap a promise with a timeout.
- * Extracted for reuse from orchestration.ts.
- */
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  stage: string,
-): Promise<T> {
-  let timerId: ReturnType<typeof setTimeout> | undefined;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timerId = setTimeout(() => {
-      reject(new Error(`${stage} timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timerId !== undefined) {
-      clearTimeout(timerId);
-    }
-  }
-}
 
 // ============================================
 // Synthesis Executor

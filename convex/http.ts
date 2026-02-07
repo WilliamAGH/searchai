@@ -2,7 +2,6 @@
  * HTTP endpoints for unauthenticated API access
  * - CORS-enabled for cross-origin requests
  * - SSE streaming for AI responses
- * - Fallback handling for missing APIs
  * - Routes: /api/chat, /api/search, /api/scrape, /api/ai
  *
  * This file now serves as a central router that delegates to modular route handlers
@@ -23,7 +22,6 @@ import { publicCorsResponse } from "./http/cors";
  * Routes:
  * - POST /api/search : web search for unauthenticated users
  * - POST /api/scrape : scrape URL and return cleaned content
- * - POST /api/ai/agent : Agent-based AI with multi-stage research workflow (non-streaming)
  * - POST /api/ai/agent/stream : Agent-based AI with SSE streaming (real-time UX)
  * - POST /api/publishChat : publish anonymous chat
  * - GET  /api/exportChat : export chat in various formats
@@ -34,7 +32,7 @@ const http = httpRouter();
 // Register modular route handlers
 registerSearchRoutes(http);
 registerScrapeRoutes(http);
-registerAgentAIRoutes(http); // Agent-based AI routes (streaming + non-streaming)
+registerAgentAIRoutes(http); // Agent-based AI routes (SSE streaming only)
 registerPublishRoutes(http);
 
 // Register auth routes
