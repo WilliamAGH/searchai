@@ -55,6 +55,9 @@ export function useUrlStateSync({
       propShareId && isShareRoute ? resolveChatId(chatByShareId) : null;
     const publicChatId =
       propPublicId && isPublicRoute ? resolveChatId(chatByPublicId) : null;
+    const isOpaquePending = Boolean(
+      propChatId && isChatRoute && chatByOpaqueId === undefined,
+    );
     const opaqueChatId =
       propChatId && isChatRoute ? resolveChatId(chatByOpaqueId) : null;
 
@@ -63,29 +66,30 @@ export function useUrlStateSync({
       propShareId && isShareRoute && chatByShareId === undefined;
     const isResolvingPublic =
       propPublicId && isPublicRoute && chatByPublicId === undefined;
-    // Note: opaqueId has a fallback to propChatId, so it's less critical, but good to track
     const isResolvingOpaque =
       propChatId && isChatRoute && chatByOpaqueId === undefined;
 
     const isResolving =
       isResolvingShare || isResolvingPublic || isResolvingOpaque;
 
+    // Use isOpaquePending (not just propChatId) for fallback so that when
+    // chatByOpaqueId resolves to null (missing chat), targetChatId becomes null
+    // and we correctly redirect home instead of looping on a stale propChatId.
     const targetChatId =
       shareChatId ??
       publicChatId ??
       opaqueChatId ??
-      (propChatId && isChatRoute ? String(propChatId) : null);
+      (isOpaquePending ? String(propChatId) : null);
 
     // 2. Sync State -> URL (Priority 1: State drives URL)
-    // Only enforce canonical URL if we are already synced (State == Target)
-    // This allows navigation (Target change) to proceed without interference.
+    // Only enforce canonical URL if we are already synced (State == Target).
+    // This prevents URL flicker: we never navigate to /chat/${currentChatId}
+    // while a transition to a different target is in-flight.
     if (currentChatId && isChatRoute && currentChatId === targetChatId) {
       const expectedPath = `/chat/${currentChatId}`;
       if (location.pathname !== expectedPath) {
-        // Prevent loop: if we are already at the target chat ID in state, just update URL
         isNavigatingRef.current = true;
         void navigate(expectedPath, { replace: true });
-        // Reset flag after microtask to allow nav to complete
         queueMicrotask(() => {
           isNavigatingRef.current = false;
         });
@@ -96,7 +100,6 @@ export function useUrlStateSync({
     // If URL implies a different chat (or no chat), update state.
     // Skip if we are still resolving the target ID from a query.
     if (currentChatId !== targetChatId && !isResolving) {
-      // Avoid re-selecting if we just did it or are navigating
       if (
         lastResolvedChatIdRef.current !== targetChatId &&
         !isNavigatingRef.current

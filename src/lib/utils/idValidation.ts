@@ -26,6 +26,10 @@ export function isLocalId(str: string | null | undefined): boolean {
   return LOCAL_ID_PREFIXES.some((prefix) => str.startsWith(prefix));
 }
 
+function extractRawIdentifier<TableName extends TableNames>(
+  str: Id<TableName>,
+): Id<TableName>;
+function extractRawIdentifier(str: string): string | null;
 function extractRawIdentifier(str: string): string | null {
   if (LOCAL_ID_PREFIXES.some((prefix) => str.startsWith(prefix))) {
     return null;
@@ -96,9 +100,6 @@ export function toConvexId<TableName extends TableNames>(
   }
 
   const raw = extractRawIdentifier(str);
-  if (!raw || !isConvexId<TableName>(raw)) {
-    return null;
-  }
   return raw;
 }
 

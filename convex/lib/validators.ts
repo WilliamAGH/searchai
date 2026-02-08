@@ -122,6 +122,10 @@ export interface WebResearchSource {
 const LOCAL_ID_PREFIXES = ["local_", "chat_", "msg_"];
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
+function extractRawIdentifier<TableName extends TableNames>(
+  str: Id<TableName>,
+): Id<TableName>;
+function extractRawIdentifier(str: string): string | null;
 function extractRawIdentifier(str: string): string | null {
   if (LOCAL_ID_PREFIXES.some((prefix) => str.startsWith(prefix))) {
     return null;
@@ -176,8 +180,5 @@ export function safeConvexId<TableName extends TableNames>(
   }
 
   const raw = extractRawIdentifier(str);
-  if (!raw || !isConvexId<TableName>(raw)) {
-    return null;
-  }
   return raw;
 }
