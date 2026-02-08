@@ -137,6 +137,7 @@ export function useComponentProps({
       onDraftChange: handleDraftChange,
       history: userHistory,
       onShare: isMobile ? () => setShowShareModal(true) : undefined,
+      onNewChat: handleNewChatButton,
     }),
     [
       currentChatId,
@@ -145,6 +146,7 @@ export function useComponentProps({
       userHistory,
       isMobile,
       setShowShareModal,
+      handleNewChatButton,
     ],
   );
 
