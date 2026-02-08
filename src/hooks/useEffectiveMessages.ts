@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import type { Message } from "@/lib/types/message";
 import { logger } from "@/lib/logger";
 
-interface UseEffectiveMessagesOptions {
+export interface UseEffectiveMessagesOptions {
   /** Messages from unified chat state (includes optimistic updates) */
   messages: Message[];
   /** Messages from paginated query (DB source of truth) */
@@ -24,6 +24,119 @@ interface UseEffectiveMessagesOptions {
   preferPaginatedSource?: boolean;
   /** Whether paginated messages are still loading */
   isPaginatedLoading?: boolean;
+}
+
+/** Whether unified messages should take priority due to optimistic state or sync gap */
+function hasUnifiedPriority(
+  unifiedMessages: Message[],
+  paginatedMessages: Message[],
+): boolean {
+  const hasOptimistic = unifiedMessages.some(
+    (m) => m.isStreaming === true || m.persisted === false,
+  );
+  if (hasOptimistic) return true;
+
+  // Check if a just-persisted assistant message hasn't synced to paginated yet
+  const lastAssistant = [...unifiedMessages]
+    .reverse()
+    .find((m) => m.role === "assistant");
+
+  if (!lastAssistant) return false;
+  if (lastAssistant.persisted !== true || lastAssistant.isStreaming)
+    return false;
+  if (
+    typeof lastAssistant.content !== "string" ||
+    lastAssistant.content.length === 0
+  )
+    return false;
+
+  const key = lastAssistant._id ?? null;
+  return key
+    ? !paginatedMessages.some((m) => m._id === key)
+    : !paginatedMessages.some(
+        (m) =>
+          m.role === "assistant" &&
+          typeof m.content === "string" &&
+          m.content === lastAssistant.content,
+      );
+}
+
+/** Resolve the preferred paginated source, considering loading state */
+function selectPaginatedSource(params: {
+  safeUnified: Message[];
+  safePaginated: Message[];
+  isPaginatedLoading: boolean;
+  chatId: string | null;
+}): Message[] | null {
+  if (params.safePaginated.length > 0) {
+    logger.debug("Using paginated messages - preferred source", {
+      count: params.safePaginated.length,
+      chatId: params.chatId,
+    });
+    return params.safePaginated;
+  }
+
+  if (params.isPaginatedLoading) {
+    if (params.safeUnified.length > 0) {
+      logger.debug("Using unified messages while paginated source is loading", {
+        count: params.safeUnified.length,
+        chatId: params.chatId,
+      });
+      return params.safeUnified;
+    }
+    logger.debug("Using paginated loading state", { chatId: params.chatId });
+    return [];
+  }
+
+  return null;
+}
+
+export function selectEffectiveMessages({
+  messages,
+  paginatedMessages,
+  currentChatId,
+  preferPaginatedSource = false,
+  isPaginatedLoading = false,
+}: UseEffectiveMessagesOptions): Message[] {
+  const safeUnified = currentChatId
+    ? messages.filter((m) => m.chatId === currentChatId)
+    : messages;
+
+  const safePaginated = currentChatId
+    ? paginatedMessages.filter((m) => m.chatId === currentChatId)
+    : paginatedMessages;
+
+  if (hasUnifiedPriority(safeUnified, safePaginated)) {
+    logger.debug("Using unified messages - optimistic state present", {
+      count: safeUnified.length,
+      chatId: currentChatId,
+    });
+    return safeUnified;
+  }
+
+  if (preferPaginatedSource) {
+    const result = selectPaginatedSource({
+      safeUnified,
+      safePaginated,
+      isPaginatedLoading,
+      chatId: currentChatId,
+    });
+    if (result !== null) return result;
+  }
+
+  if (currentChatId && safePaginated.length > 0) {
+    logger.debug("Using paginated messages - no optimistic state", {
+      count: safePaginated.length,
+      chatId: currentChatId,
+    });
+    return safePaginated;
+  }
+
+  logger.debug("Using unified messages - fallback", {
+    count: safeUnified.length,
+    chatId: currentChatId,
+  });
+  return safeUnified;
 }
 
 /**
@@ -41,86 +154,21 @@ export function useEffectiveMessages({
   preferPaginatedSource = false,
   isPaginatedLoading = false,
 }: UseEffectiveMessagesOptions): Message[] {
-  return useMemo(() => {
-    const safePaginatedMessages = currentChatId
-      ? paginatedMessages.filter((m) => m.chatId === currentChatId)
-      : paginatedMessages;
-
-    // Check if unified messages have optimistic state (isStreaming or unpersisted)
-    const hasOptimisticMessages = messages.some(
-      (m) => m.isStreaming === true || m.persisted === false,
-    );
-
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find((m) => m.role === "assistant");
-
-    // Extract stable ID from the last assistant message
-    const lastAssistantKey = lastAssistantMessage?._id ?? null;
-
-    const persistedAssistantMissingInPaginated =
-      !!lastAssistantMessage &&
-      lastAssistantMessage.persisted === true &&
-      !lastAssistantMessage.isStreaming &&
-      typeof lastAssistantMessage.content === "string" &&
-      lastAssistantMessage.content.length > 0 &&
-      // Use ID-based comparison when available, fall back to content comparison
-      (lastAssistantKey
-        ? !safePaginatedMessages.some((m) => m._id === lastAssistantKey)
-        : !safePaginatedMessages.some(
-            (m) =>
-              m.role === "assistant" &&
-              typeof m.content === "string" &&
-              m.content === lastAssistantMessage.content,
-          ));
-
-    // If we have optimistic messages (or a just-persisted message not yet in paginated),
-    // always use unified messages (source of truth during generation)
-    if (hasOptimisticMessages || persistedAssistantMissingInPaginated) {
-      logger.debug("Using unified messages - optimistic state present", {
-        count: messages.length,
-        chatId: currentChatId,
-      });
-      return messages;
-    }
-
-    if (preferPaginatedSource) {
-      if (safePaginatedMessages.length > 0) {
-        logger.debug("Using paginated messages - preferred source", {
-          count: safePaginatedMessages.length,
-          chatId: currentChatId,
-        });
-        return safePaginatedMessages;
-      }
-
-      if (isPaginatedLoading) {
-        logger.debug("Using paginated loading state", {
-          chatId: currentChatId,
-        });
-        return [];
-      }
-    }
-
-    // Otherwise, use paginated messages if available
-    if (currentChatId && safePaginatedMessages.length > 0) {
-      logger.debug("Using paginated messages - no optimistic state", {
-        count: safePaginatedMessages.length,
-        chatId: currentChatId,
-      });
-      return safePaginatedMessages;
-    }
-
-    // Fallback to unified messages
-    logger.debug("Using unified messages - fallback", {
-      count: messages.length,
-      chatId: currentChatId,
-    });
-    return messages;
-  }, [
-    currentChatId,
-    isPaginatedLoading,
-    messages,
-    paginatedMessages,
-    preferPaginatedSource,
-  ]);
+  return useMemo(
+    () =>
+      selectEffectiveMessages({
+        messages,
+        paginatedMessages,
+        currentChatId,
+        preferPaginatedSource,
+        isPaginatedLoading,
+      }),
+    [
+      currentChatId,
+      isPaginatedLoading,
+      messages,
+      paginatedMessages,
+      preferPaginatedSource,
+    ],
+  );
 }

@@ -71,13 +71,13 @@ jobs:
         run: npx playwright test -g "(smoke|share)" --reporter=line
 
   deploy:
-    name: Deploy to ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name == 'push' && github.ref_name == 'main') && 'Production' || 'Development' }}
+    name: Deploy to ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'production' && 'Production' || 'Development') || (github.ref_name == 'main' && 'Production' || 'Development') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
       - preflight_validate
       - preflight_playwright
-    environment: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name == 'push' && github.ref_name == 'main') && 'production' || 'development' }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || (github.ref_name == 'main' && 'production' || 'development') }}
 
     steps:
       - name: Checkout
@@ -99,8 +99,8 @@ jobs:
 
       - name: Deployment Summary
         env:
-          DEPLOYMENT_NAME: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name == 'push' && github.ref_name == 'main') && 'vivid-boar-858' || 'diligent-greyhound-240' }}
-          ENV_NAME: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name == 'push' && github.ref_name == 'main') && 'Production' || 'Development' }}
+          DEPLOYMENT_NAME: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name != 'workflow_dispatch' && github.ref_name == 'main')) && 'vivid-boar-858' || 'diligent-greyhound-240' }}
+          ENV_NAME: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name != 'workflow_dispatch' && github.ref_name == 'main')) && 'Production' || 'Development' }}
         run: |
           {
             echo "## Convex Deployment Complete"
