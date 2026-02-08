@@ -18,7 +18,7 @@ export function normalizeHttpUrl(
 
   const direct = safeParseUrl(trimmed);
   if (direct && (direct.protocol === "http:" || direct.protocol === "https:")) {
-    return toBoundedUrl(trimmed, maxLength);
+    return toBoundedUrl(direct.toString(), maxLength);
   }
 
   if (!URL_SCHEME_PATTERN.test(trimmed) && trimmed.includes(".")) {
