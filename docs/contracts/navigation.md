@@ -34,14 +34,14 @@ currentChatId updated in state
 These are the ONLY places that may set `currentChatId` directly:
 
 1. **`createChat()`** — Sets `currentChatId` immediately for optimistic UI.
-   `useUrlStateSync` step 4 then navigates to `/chat/${id}`.
+   `useUrlStateSync` step 5 then navigates to `/chat/${id}`.
 2. **`deleteChat()`** — Clears `currentChatId` when deleting the current
-   chat. `useUrlStateSync` step 5 then navigates to `/`.
+   chat. `useUrlStateSync` step 6 then navigates to `/`.
 3. **`useChatDataLoader`** — Auto-selects the first chat on initial load
-   when no chat is selected (returning-user UX). `useUrlStateSync` step 4
+   when no chat is selected (returning-user UX). `useUrlStateSync` step 5
    then navigates to `/chat/${autoSelectedId}`.
 
-All three cooperate with `useUrlStateSync` steps 4/5, which reconcile the
+All three cooperate with `useUrlStateSync` steps 5/6, which reconcile the
 URL after state changes. This is intentional and documented in each file.
 
 ## Navigation Helpers (useChatNavigation)
@@ -66,9 +66,9 @@ These patterns cause URL flicker and MUST NOT be introduced:
    conditional return allows the stale `currentChatId` to leak into the
    URL before `selectChat` completes (the "Bugbot flicker" regression).
 
-3. **Gating step 4 on `currentChatId === targetChatId`** — Breaks
+3. **Gating step 5 on `currentChatId === targetChatId`** — Breaks
    new-chat creation where `createChat` sets `currentChatId` but the URL
-   is still `/` (targetChatId is null). Step 4 must fire whenever
+   is still `/` (targetChatId is null). Step 5 must fire whenever
    `currentChatId` exists on a chat route, regardless of `targetChatId`.
 
 4. **Using `navigateWithVerification` for newly created chats** — The
@@ -76,8 +76,12 @@ These patterns cause URL flicker and MUST NOT be introduced:
    silent navigation failure. Use `navigateToChat` instead.
 
 5. **Calling `chatActions.selectChat(null)` to deselect** — Use
-   `navigateHome()` so the URL changes first and `useUrlStateSync`
-   drives the state update.
+   `navigateHome()` so the URL changes to `/` first; `useUrlStateSync`
+   step 4 detects the pathname change and calls `selectChat(null)`.
+
+6. **Removing the `prevPathname` guard from step 4** — Without it,
+   auto-selection by `useChatDataLoader` (which sets `currentChatId`
+   while the URL is already `/`) would be immediately undone.
 
 ## useUrlStateSync State Machine
 
@@ -87,9 +91,10 @@ Steps are evaluated top-to-bottom with early returns:
 | ---- | ------------------------------------------------ | ----------------------------- | ------------------------------ |
 | 1    | —                                                | Resolve `targetChatId`        | —                              |
 | 2    | `isResolving`                                    | Return early                  | Stale data during query load   |
-| 3    | `targetChatId && currentChatId !== targetChatId` | `selectChat()` + return       | URL flicker during transitions |
-| 4    | `currentChatId && isChatRoute`                   | `navigate(/chat/id)` + return | New chat, opaque→internal URL  |
-| 5    | `!currentChatId && !targetChatId && isChatRoute` | `navigate(/)`                 | Orphaned URL after delete      |
+| 3    | `targetChatId && currentChatId !== targetChatId` | `selectChat(id)` + return     | URL flicker during transitions |
+| 4    | pathname changed to `/` && `currentChatId`       | `selectChat(null)` + return   | Deselection blocked by step 5  |
+| 5    | `currentChatId && isChatRoute`                   | `navigate(/chat/id)` + return | New chat, opaque→internal URL  |
+| 6    | `!currentChatId && !targetChatId && isChatRoute` | `navigate(/)`                 | Orphaned URL after delete      |
 
 ## Regression Checklist
 
@@ -105,7 +110,9 @@ Before modifying ANY navigation code, verify these scenarios pass:
    to `/` after query resolves to null.
 5. **Delete current chat** — Delete the currently viewed chat. Must
    navigate to `/`.
-6. **Rapid switching** — Click multiple chats in quick succession. Must
+6. **Deselect (navigateHome)** — Click to deselect the current chat.
+   URL must change to `/` and `currentChatId` must clear to `null`.
+7. **Rapid switching** — Click multiple chats in quick succession. Must
    settle on the last clicked chat without oscillation.
 
 Run: `npx playwright test -g smoke --reporter=line`

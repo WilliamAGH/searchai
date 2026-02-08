@@ -65,10 +65,10 @@ export function useChatNavigation({
   /**
    * Navigate to the home route, deselecting the current chat.
    *
-   * `useUrlStateSync` will see `targetChatId = null` and call
-   * `selectChat(null)` to clear state. This replaces any direct
-   * `chatActions.selectChat(null)` call, which would bypass the URL
-   * and cause a state/URL mismatch.
+   * `useUrlStateSync` step 4 detects that the pathname changed to `/`
+   * and calls `selectChat(null)` to clear state. This replaces any
+   * direct `chatActions.selectChat(null)` call, which would bypass the
+   * URL and cause a state/URL mismatch.
    *
    * REGRESSION GUARD: `handleSelectChat(null)` and sidebar-delete flows
    * MUST use this — never `chatActions.selectChat(null)` directly.
