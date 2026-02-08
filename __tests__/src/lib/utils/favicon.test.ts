@@ -21,6 +21,21 @@ describe("favicon URL parsing", () => {
     expect(getDomainFromUrl(input)).toBe("ots.ca.gov");
   });
 
+  it("supports protocol-relative URLs", () => {
+    const input = "//docs.example.com/path";
+    expect(getSafeHostname(input)).toBe("docs.example.com");
+    expect(getDomainFromUrl(input)).toBe("docs.example.com");
+    expect(getFaviconUrl(input)).toBe(
+      "https://icons.duckduckgo.com/ip3/docs.example.com.ico",
+    );
+  });
+
+  it("rejects single-label scheme-less values", () => {
+    expect(getSafeHostname("localhost")).toBe("");
+    expect(getDomainFromUrl("localhost")).toBe("");
+    expect(getFaviconUrl("localhost")).toBeNull();
+  });
+
   it("returns empty hostname for invalid URL inputs", () => {
     expect(getSafeHostname("not a url!!!")).toBe("");
     expect(getDomainFromUrl("not a url!!!")).toBe("");
