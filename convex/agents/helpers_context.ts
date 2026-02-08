@@ -75,6 +75,12 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
 
   for (const scraped of harvested.scrapedContent) {
     const normalizedUrl = normalizeSourceUrl(scraped.url);
+    if (scraped.url && !normalizedUrl) {
+      console.warn("[agents] Rejected invalid scraped URL", {
+        contextId: scraped.contextId,
+        originalUrl: scraped.url,
+      });
+    }
     webResearchSources.push({
       contextId: scraped.contextId,
       type: "scraped_page",
@@ -96,6 +102,10 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
   for (const result of harvested.searchResults) {
     const normalizedUrl = normalizeSourceUrl(result.url);
     if (!normalizedUrl) {
+      console.warn("[agents] Rejected invalid search result URL", {
+        contextId: result.contextId,
+        originalUrl: result.url,
+      });
       webResearchSources.push({
         contextId: result.contextId ?? generateMessageId(),
         type: "search_result",
@@ -156,6 +166,12 @@ export function convertToWebResearchSources(
 
   return sources.map((source) => {
     const normalizedUrl = normalizeSourceUrl(source.url);
+    if (source.url && !normalizedUrl) {
+      console.warn("[agents] Rejected invalid source URL during conversion", {
+        contextId: source.contextId,
+        originalUrl: source.url,
+      });
+    }
     return {
       contextId: source.contextId,
       type: source.type,

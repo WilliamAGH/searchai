@@ -110,6 +110,7 @@ import type * as lib_security_webContent from "../lib/security/webContent.js";
 import type * as lib_security_webContent_text from "../lib/security/webContent_text.js";
 import type * as lib_text from "../lib/text.js";
 import type * as lib_url from "../lib/url.js";
+import type * as lib_urlHttp from "../lib/urlHttp.js";
 import type * as lib_uuid from "../lib/uuid.js";
 import type * as lib_uuid_validation from "../lib/uuid_validation.js";
 import type * as lib_validation_zodUtils from "../lib/validation/zodUtils.js";
@@ -250,6 +251,7 @@ declare const fullApi: ApiFromModules<{
   "lib/security/webContent_text": typeof lib_security_webContent_text;
   "lib/text": typeof lib_text;
   "lib/url": typeof lib_url;
+  "lib/urlHttp": typeof lib_urlHttp;
   "lib/uuid": typeof lib_uuid;
   "lib/uuid_validation": typeof lib_uuid_validation;
   "lib/validation/zodUtils": typeof lib_validation_zodUtils;
