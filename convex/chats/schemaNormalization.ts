@@ -22,6 +22,7 @@ import {
   hasLegacyWebResearchSourceFields,
   resolveWebResearchSourcesFromMessage,
 } from "./webResearchSourcesResolver";
+import { isRecord } from "../lib/validators";
 
 interface NormalizationCounts {
   processed: number;
@@ -49,10 +50,7 @@ interface MessageNormalizationDelta {
 
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 500;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const INVALID_NON_ARRAY_SOURCE_SENTINEL = "__INVALID_NON_ARRAY_SOURCE__";
 
 function canonicalizeForComparison(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -70,8 +68,9 @@ function canonicalizeForComparison(value: unknown): unknown {
 }
 
 function stableStringify(value: unknown): string {
-  if (!Array.isArray(value)) return "[]";
-  return JSON.stringify(canonicalizeForComparison(value));
+  if (value === undefined) return "[]";
+  if (!Array.isArray(value)) return INVALID_NON_ARRAY_SOURCE_SENTINEL;
+  return JSON.stringify(canonicalizeForComparison(value)) ?? "[]";
 }
 
 function hasCanonicalSourceDiff(
@@ -113,7 +112,8 @@ function buildNormalizationPatch(
   let updatedReasoning = false;
   let updatedSources = false;
 
-  if (message.timestamp === undefined) {
+  const timestamp = message.timestamp;
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) {
     patch.timestamp = resolveMessageTimestamp(message);
     updatedTimestamp = true;
   }
