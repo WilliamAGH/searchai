@@ -74,9 +74,6 @@ export function useUrlStateSync({
   const location = useLocation();
   const lastResolvedChatIdRef = useRef<string | null>(null);
 
-  /** Prevents re-entrant navigation from causing oscillation. */
-  const isNavigatingRef = useRef(false);
-
   /** Tracks the previous pathname to detect intentional home navigation. */
   const prevPathnameRef = useRef(location.pathname);
 
@@ -132,10 +129,7 @@ export function useUrlStateSync({
     // If this return is made conditional, the old currentChatId will
     // briefly appear in the URL before selectChat completes.
     if (targetChatId && currentChatId !== targetChatId) {
-      if (
-        lastResolvedChatIdRef.current !== targetChatId &&
-        !isNavigatingRef.current
-      ) {
+      if (lastResolvedChatIdRef.current !== targetChatId) {
         lastResolvedChatIdRef.current = targetChatId;
         void selectChat(targetChatId).catch((error) => {
           logger.error("Failed to sync chat selection:", error);
@@ -182,11 +176,7 @@ export function useUrlStateSync({
     if (currentChatId && isChatRoute) {
       const expectedPath = `/chat/${currentChatId}`;
       if (location.pathname !== expectedPath) {
-        isNavigatingRef.current = true;
         void navigate(expectedPath, { replace: true });
-        queueMicrotask(() => {
-          isNavigatingRef.current = false;
-        });
       }
       return;
     }
@@ -201,11 +191,7 @@ export function useUrlStateSync({
       isChatRoute &&
       location.pathname !== "/"
     ) {
-      isNavigatingRef.current = true;
       void navigate("/", { replace: true });
-      queueMicrotask(() => {
-        isNavigatingRef.current = false;
-      });
     }
   }, [
     currentChatId,

@@ -117,7 +117,7 @@ function ChatInterfaceComponent({
         navigateHome();
         return;
       }
-      void navHandleSelectChat(String(id));
+      navHandleSelectChat(String(id));
     },
     [navigateHome, navHandleSelectChat],
   );

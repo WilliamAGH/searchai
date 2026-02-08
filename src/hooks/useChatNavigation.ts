@@ -19,7 +19,11 @@
 
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { logger } from "@/lib/logger";
 import type { Chat } from "@/lib/types/chat";
+
+/** Pure path builder — no closures, no need for useCallback. */
+const buildChatPath = (chatId: string): string => `/chat/${chatId}`;
 
 interface UseChatNavigationProps {
   currentChatId: string | null;
@@ -31,18 +35,6 @@ export function useChatNavigation({
   allChats,
 }: UseChatNavigationProps) {
   const navigate = useNavigate();
-
-  const buildChatPath = useCallback((chatId: string) => {
-    return `/chat/${chatId}`;
-  }, []);
-
-  const resolveChatId = useCallback((chat: Chat): string => {
-    if (typeof chat._id === "string") {
-      return chat._id;
-    }
-
-    return "";
-  }, []);
 
   /**
    * Navigate directly to a chat without verifying existence in `allChats`.
@@ -57,9 +49,9 @@ export function useChatNavigation({
    */
   const navigateToChat = useCallback(
     (chatId: string) => {
-      void navigate(buildChatPath(String(chatId)));
+      void navigate(buildChatPath(chatId));
     },
-    [navigate, buildChatPath],
+    [navigate],
   );
 
   /**
@@ -77,29 +69,36 @@ export function useChatNavigation({
     void navigate("/", { replace: true });
   }, [navigate]);
 
+  /**
+   * Navigate to a chat after verifying it exists in `allChats`.
+   *
+   * Returns `true` if the chat was found and navigation occurred,
+   * `false` if the chat doesn't exist (logged as a warning).
+   *
+   * Do NOT use for newly created chats — `allChats` reactive query
+   * may not have updated yet. Use `navigateToChat` instead.
+   */
   const navigateWithVerification = useCallback(
-    async (chatId: string) => {
-      const normalizedChatId = String(chatId);
-      const chatExists = allChats.some(
-        (chat) => resolveChatId(chat) === normalizedChatId,
-      );
+    (chatId: string): boolean => {
+      const chatExists = allChats.some((chat) => String(chat._id) === chatId);
 
       if (!chatExists) {
+        logger.warn(
+          `navigateWithVerification: chat ${chatId} not found in allChats (${allChats.length} chats loaded)`,
+        );
         return false;
       }
 
-      // Only navigate; let useUrlStateSync handle the state update.
-      // This enforces URL as the single source of truth and prevents race conditions.
-      void navigate(buildChatPath(normalizedChatId));
+      void navigate(buildChatPath(chatId));
       return true;
     },
-    [allChats, navigate, buildChatPath, resolveChatId],
+    [allChats, navigate],
   );
 
   const handleSelectChat = useCallback(
-    async (chatId: string) => {
+    (chatId: string) => {
       if (chatId !== currentChatId) {
-        await navigateWithVerification(chatId);
+        navigateWithVerification(chatId);
       }
     },
     [currentChatId, navigateWithVerification],
@@ -109,7 +108,6 @@ export function useChatNavigation({
     navigateToChat,
     navigateHome,
     navigateWithVerification,
-    buildChatPath,
     handleSelectChat,
   };
 }
