@@ -94,7 +94,6 @@ function ChatInterfaceComponent({
     useChatNavigation({
       currentChatId,
       allChats,
-      onSelectChat: chatActions.selectChat,
     });
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
 

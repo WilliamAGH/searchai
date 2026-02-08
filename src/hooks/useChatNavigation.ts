@@ -11,13 +11,11 @@ import type { Chat } from "@/lib/types/chat";
 interface UseChatNavigationProps {
   currentChatId: string | null;
   allChats: Chat[];
-  onSelectChat: (chatId: string) => Promise<void>;
 }
 
 export function useChatNavigation({
   currentChatId,
   allChats,
-  onSelectChat,
 }: UseChatNavigationProps) {
   const navigate = useNavigate();
 
@@ -44,11 +42,12 @@ export function useChatNavigation({
         return false;
       }
 
-      await onSelectChat(normalizedChatId);
+      // Only navigate; let useUrlStateSync handle the state update.
+      // This enforces URL as the single source of truth and prevents race conditions.
       void navigate(buildChatPath(normalizedChatId));
       return true;
     },
-    [allChats, onSelectChat, navigate, buildChatPath, resolveChatId],
+    [allChats, navigate, buildChatPath, resolveChatId],
   );
 
   const handleSelectChat = useCallback(
