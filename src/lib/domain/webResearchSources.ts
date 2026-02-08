@@ -92,11 +92,9 @@ export function toDomainToUrlMap(
   for (const c of cards) {
     const hostname = getDomainFromUrl(c.url);
     if (!hostname) {
-      if (import.meta.env.DEV) {
-        logger.debug("Skipped invalid source URL for domain map", {
-          url: c.url,
-        });
-      }
+      logger.warn("Skipped source with unparseable URL in domain map", {
+        url: c.url,
+      });
       continue;
     }
     // Prefer first-seen URL per domain for stable mapping.

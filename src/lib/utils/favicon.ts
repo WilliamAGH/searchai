@@ -1,5 +1,3 @@
-import { logger } from "@/lib/logger";
-
 function safeParseUrl(url: string): URL | null {
   const trimmed = url.trim();
   if (!trimmed) return null;
@@ -16,10 +14,7 @@ function safeParseUrl(url: string): URL | null {
       return null;
     }
     return parsed;
-  } catch (error: unknown) {
-    if (import.meta.env.DEV) {
-      logger.debug("Failed to parse URL", { url, error });
-    }
+  } catch {
     return null;
   }
 }
@@ -43,9 +38,6 @@ export function getDomainFromUrl(url: string): string {
 export function getSafeHostname(url: string): string {
   const parsed = safeParseUrl(url);
   if (!parsed) {
-    if (import.meta.env.DEV) {
-      logger.debug("Unable to parse hostname from URL", { url });
-    }
     return "";
   }
   return parsed.hostname;
