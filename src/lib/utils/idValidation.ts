@@ -101,3 +101,13 @@ export function toConvexId<TableName extends TableNames>(
   }
   return raw;
 }
+
+/**
+ * Resolve a chat ID string from a chat object safely.
+ * Handles null/undefined objects and ensures string return.
+ */
+export function resolveChatId(
+  chat: { _id: string } | null | undefined,
+): string | null {
+  return chat?._id ? String(chat._id) : null;
+}
