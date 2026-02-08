@@ -57,7 +57,9 @@ test.describe("Critical User Paths", () => {
     }
   });
 
-  test("share functionality exists", async ({ page }) => {
+  test("share functionality opens modal with sharing options", async ({
+    page,
+  }) => {
     await page.goto("/");
 
     // Wait for message input to be ready
@@ -80,6 +82,19 @@ test.describe("Critical User Paths", () => {
     // Look for share button - it's in MessageInput with aria-label="Share chat"
     const shareBtn = page.locator('button[aria-label="Share chat"]').first();
     await expect(shareBtn).toBeVisible({ timeout: 10000 });
+    await shareBtn.click();
+
+    const modal = page.locator(
+      '[role="dialog"][aria-labelledby="share-modal-title"]',
+    );
+    await expect(modal).toBeVisible({ timeout: 10000 });
+    await expect(modal.getByText("Share this conversation")).toBeVisible();
+    await expect(
+      modal.locator('input[type="radio"][value="shared"]'),
+    ).toBeVisible();
+    await expect(
+      modal.locator('input[type="radio"][value="public"]'),
+    ).toBeVisible();
   });
 
   test("AI response generation works", async ({ page }) => {
