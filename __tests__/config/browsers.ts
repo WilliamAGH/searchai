@@ -8,11 +8,14 @@
  */
 
 const includeWebkitEnv = process.env.PLAYWRIGHT_INCLUDE_WEBKIT;
+const includeWebkitForced =
+  includeWebkitEnv === "1" || includeWebkitEnv === "true";
+const includeWebkitDisabled =
+  includeWebkitEnv === "0" || includeWebkitEnv === "false";
 
 export const includeWebkit =
-  includeWebkitEnv === "1" ||
-  includeWebkitEnv === "true" ||
-  (process.platform !== "darwin" && includeWebkitEnv !== "0");
+  includeWebkitForced ||
+  (!includeWebkitDisabled && process.platform !== "darwin");
 
 const includeFirefoxEnv = process.env.PLAYWRIGHT_INCLUDE_FIREFOX;
 
