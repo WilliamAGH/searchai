@@ -143,7 +143,7 @@ export function ChatLayout({
           visible whitespace between app content and browser chrome on iOS.
         */}
         <div className="flex-shrink-0 sticky bottom-0 bg-gradient-to-br bg-fixed from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 pb-[env(safe-area-inset-bottom)] w-full">
-          <div className="max-w-4xl mx-auto w-full">
+          <div className="relative max-w-4xl mx-auto w-full">
             <FollowUpPrompt
               isOpen={showFollowUpPrompt}
               onContinue={handleContinueChat}
