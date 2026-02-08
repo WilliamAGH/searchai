@@ -142,27 +142,32 @@ export function ChatLayout({
           This prevents the "floating gap" bug where double padding creates
           visible whitespace between app content and browser chrome on iOS.
         */}
-        <div className="flex-shrink-0 sticky bottom-0 relative bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 pb-[env(safe-area-inset-bottom)] max-w-4xl mx-auto w-full">
-          <FollowUpPrompt
-            isOpen={showFollowUpPrompt}
-            onContinue={handleContinueChat}
-            onNewChat={handleNewChatForFollowUp}
-            onNewChatWithSummary={handleNewChatWithSummary}
-            hintReason={plannerHint?.reason}
-            hintConfidence={plannerHint?.confidence}
-          />
-
-          {/* Remove share button - now using icon in MessageInput */}
-          {undoBanner && (
-            <UndoBanner
-              type={undoBanner.message.includes("Chat") ? "chat" : "message"}
-              onUndo={() => {
-                undoBanner.action?.();
-                setUndoBanner(null);
-              }}
+        <div className="flex-shrink-0 sticky bottom-0 bg-gradient-to-br bg-fixed from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 pb-[env(safe-area-inset-bottom)] w-full">
+          <div className="max-w-4xl mx-auto w-full">
+            <FollowUpPrompt
+              isOpen={showFollowUpPrompt}
+              onContinue={handleContinueChat}
+              onNewChat={handleNewChatForFollowUp}
+              onNewChatWithSummary={handleNewChatWithSummary}
+              hintReason={plannerHint?.reason}
+              hintConfidence={plannerHint?.confidence}
             />
-          )}
-          <MessageInput key={currentChatId || "root"} {...messageInputProps} />
+
+            {/* Remove share button - now using icon in MessageInput */}
+            {undoBanner && (
+              <UndoBanner
+                type={undoBanner.message.includes("Chat") ? "chat" : "message"}
+                onUndo={() => {
+                  undoBanner.action?.();
+                  setUndoBanner(null);
+                }}
+              />
+            )}
+            <MessageInput
+              key={currentChatId || "root"}
+              {...messageInputProps}
+            />
+          </div>
         </div>
       </div>
 
