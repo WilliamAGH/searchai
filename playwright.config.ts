@@ -10,6 +10,18 @@ const includeFirefox =
     includeFirefoxEnv !== "0" &&
     includeFirefoxEnv !== "false");
 
+/**
+ * WebKit on macOS crashes during _RegisterApplication (SIGABRT) when
+ * launched in headless terminal contexts. Each crash spawns a macOS crash
+ * dialog, so retries make it worse. Skip WebKit on local macOS; CI (Linux)
+ * runs it safely. Override with PLAYWRIGHT_INCLUDE_WEBKIT=1 if needed.
+ */
+const includeWebkitEnv = process.env.PLAYWRIGHT_INCLUDE_WEBKIT;
+const includeWebkit =
+  includeWebkitEnv === "1" ||
+  includeWebkitEnv === "true" ||
+  (process.platform !== "darwin" && includeWebkitEnv !== "0");
+
 const projects = [
   {
     name: "chromium",
@@ -23,10 +35,14 @@ const projects = [
         },
       ]
     : []),
-  {
-    name: "webkit",
-    use: { ...devices["Desktop Safari"], viewport: desktopViewport },
-  },
+  ...(includeWebkit
+    ? [
+        {
+          name: "webkit",
+          use: { ...devices["Desktop Safari"], viewport: desktopViewport },
+        },
+      ]
+    : []),
 ];
 
 export default defineConfig({

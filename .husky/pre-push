@@ -95,6 +95,7 @@ if npx --no-install playwright --version > /dev/null 2>&1; then
     echo "   Or install all browsers: npx playwright install --with-deps"
   else
     # Run only the smoke test for speed. Playwright config starts a preview server.
+    # WebKit is auto-skipped on macOS (crashes during _RegisterApplication).
     PW_LOG="$(mktemp -t playwright-smoke.XXXXXX.log)"
     if ! npx --no-install playwright test -g smoke --reporter=line > "$PW_LOG" 2>&1; then
       # Check if the failure is due to missing browser binaries
