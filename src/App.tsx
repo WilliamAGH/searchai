@@ -73,9 +73,6 @@ export default function App() {
   useEffect(() => {
     const syncSidebarToLayout = (isDesktop: boolean) => {
       setIsSidebarOpen((current) => {
-        if (isDesktop && !current) {
-          return true;
-        }
         if (!isDesktop && current) {
           return false;
         }

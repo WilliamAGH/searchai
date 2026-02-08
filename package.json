@@ -46,7 +46,7 @@
     "test:watch": "vitest",
     "test:vitest": "vitest run",
     "postinstall": "npm run playwright:install",
-    "playwright:install": "node -e \"const { execSync } = require('node:child_process'); const installAll = process.env.CI === 'true'; const command = installAll ? 'npx playwright install --with-deps' : 'npx playwright install --with-deps chromium webkit'; execSync(command, { stdio: 'inherit' });\"",
+    "playwright:install": "node scripts/install-playwright.mjs",
     "playwright:update": "npm run playwright:install",
     "test:playwright": "playwright test",
     "test:all": "npm-run-all --sequential test:vitest test:playwright",

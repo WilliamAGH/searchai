@@ -28,7 +28,7 @@ interface MessageItemProps {
 
 export function MessageItem({
   message,
-  index,
+  index: _index,
   collapsedById,
   hoveredSourceUrl,
   onToggleCollapsed,

@@ -136,15 +136,16 @@ export function useComponentProps({
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,
-      onShare: isMobile ? () => setShowShareModal(true) : undefined,
+      onShare: () => setShowShareModal(true),
+      onNewChat: handleNewChatButton,
     }),
     [
       currentChatId,
       handleSendMessage,
       handleDraftChange,
       userHistory,
-      isMobile,
       setShowShareModal,
+      handleNewChatButton,
     ],
   );
 

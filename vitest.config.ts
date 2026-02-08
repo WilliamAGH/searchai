@@ -10,6 +10,21 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
+const EXPECTED_TEST_LOG_PREFIXES = [
+  "[BLOCKED] Rejected request from unauthorized origin:",
+  "[CORS] Malformed origin rejected during wildcard check",
+  "[http] Excluded source with invalid URL",
+  "[agents] Excluded source with invalid URL",
+  "[messages] Excluded source with invalid URL",
+  "[url] normalizeUrlForKey: rejected invalid URL",
+  "[CONTENT] SCRAPED_CONTENT_SUMMARY:",
+  "Chat validation: missing ID but found in messages",
+  "Chat validation: ID mismatch",
+  "Using paginated messages - preferred source",
+  "Using unified messages while paginated source is loading",
+  "Using unified messages - optimistic state present",
+];
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -21,6 +36,10 @@ export default defineConfig({
     setupFiles: ["./__tests__/setup.ts"],
     environment: "node",
     silent: false, // Set to true to suppress console output during tests
+    // Suppress expected negative-path diagnostics to keep test output readable.
+    onConsoleLog(log) {
+      return !EXPECTED_TEST_LOG_PREFIXES.some((prefix) => log.includes(prefix));
+    },
     // Top-level __tests__/ with mirrored structure: __tests__/src/* and __tests__/convex/*
     include: [
       "__tests__/src/**/*.test.{ts,tsx}",
@@ -73,7 +92,7 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "html", "lcov"],
+      reporter: ["text-summary", "json", "html", "lcov"],
       reportsDirectory: "./coverage",
       include: ["src/**/*.{ts,tsx}", "convex/**/*.{ts,tsx}"],
       exclude: ["src/**/*.d.ts", "src/main.tsx", "convex/_generated/**"],

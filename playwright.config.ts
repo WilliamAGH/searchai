@@ -1,14 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { includeFirefox, includeWebkit } from "./__tests__/config/browsers";
 import { desktopViewport } from "./__tests__/config/viewports";
 
 const useProxyRuntime = process.env.PLAYWRIGHT_RUNTIME === "proxy";
-const includeFirefoxEnv = process.env.PLAYWRIGHT_INCLUDE_FIREFOX;
-const includeFirefox =
-  includeFirefoxEnv === "1" ||
-  includeFirefoxEnv === "true" ||
-  (process.env.CI === "true" &&
-    includeFirefoxEnv !== "0" &&
-    includeFirefoxEnv !== "false");
 
 const projects = [
   {
@@ -23,10 +17,14 @@ const projects = [
         },
       ]
     : []),
-  {
-    name: "webkit",
-    use: { ...devices["Desktop Safari"], viewport: desktopViewport },
-  },
+  ...(includeWebkit
+    ? [
+        {
+          name: "webkit",
+          use: { ...devices["Desktop Safari"], viewport: desktopViewport },
+        },
+      ]
+    : []),
 ];
 
 export default defineConfig({

@@ -11,11 +11,36 @@ import { useAutoResizeTextarea } from "@/hooks/useAutoResizeTextarea";
 import { useMessageInputFocus } from "@/hooks/useMessageInputFocus";
 import { useInputHistory } from "@/hooks/useInputHistory";
 
+const TEXTAREA_CLASSES = [
+  // layout
+  "w-full pl-3 sm:pl-4 pr-36 resize-none overflow-y-auto overflow-x-hidden",
+  // typography
+  "text-base tracking-tight font-ui slashed-zero lining-nums tabular-nums",
+  "break-words whitespace-pre-wrap",
+  // shape & border
+  "rounded-2xl border border-gray-200/80 dark:border-gray-700/60 outline-none",
+  // color
+  "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
+  "placeholder-gray-400 dark:placeholder-gray-500",
+  // shadow
+  "shadow-sm shadow-gray-200/50 dark:shadow-black/20",
+  // focus
+  "focus:border-emerald-500 dark:focus:border-emerald-400",
+  "focus:ring-1 focus:ring-emerald-500/30 dark:focus:ring-emerald-400/30",
+  "focus:shadow-md focus:shadow-emerald-500/5 dark:focus:shadow-emerald-400/5",
+  // transition
+  "transition-all duration-200",
+  // hooks for JS/CSS selectors
+  "message-input-textarea message-textarea",
+].join(" ");
+
 interface MessageInputProps {
   /** Callback when message is sent */
   onSendMessage: (message: string) => void | Promise<void>;
   /** Open share modal */
   onShare?: () => void;
+  /** Start a new chat */
+  onNewChat?: () => void;
   /** Disable input during generation */
   disabled?: boolean;
   /** Placeholder text */
@@ -35,6 +60,7 @@ interface MessageInputProps {
 export function MessageInput({
   onSendMessage,
   onShare,
+  onNewChat,
   disabled = false,
   placeholder = "Ask me anything...",
   onDraftChange,
@@ -130,8 +156,8 @@ export function MessageInput({
   );
 
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-      <div className="p-3 sm:p-4">
+    <div>
+      <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-1">
         <form onSubmit={handleSubmit}>
           <div className="relative flex items-center">
             <textarea
@@ -147,11 +173,31 @@ export function MessageInput({
               disabled={disabled}
               rows={1}
               autoComplete="off"
-              className={`w-full pl-3 sm:pl-4 pr-28 text-base tracking-tight font-ui slashed-zero lining-nums tabular-nums ${
-                message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"
-              } rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400 outline-none transition-colors resize-none overflow-y-auto overflow-x-hidden break-words whitespace-pre-wrap message-input-textarea message-textarea`}
+              className={`${TEXTAREA_CLASSES} ${message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"}`}
             />
             <div className="absolute right-11 sm:right-10 top-1/2 -translate-y-1/2 h-8 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onNewChat?.()}
+                aria-label="New chat"
+                title="New chat (⌘K)"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+              </button>
               <button
                 type="button"
                 onClick={() => onShare?.()}

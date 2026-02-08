@@ -49,7 +49,7 @@ export interface IChatRepository {
   updateChatPrivacy(
     id: string,
     privacy: "private" | "shared" | "public",
-  ): Promise<void>;
+  ): Promise<{ shareId?: string; publicId?: string }>;
   deleteChat(id: string): Promise<void>;
 
   // Message operations
@@ -110,7 +110,7 @@ export abstract class BaseRepository implements IChatRepository {
   abstract updateChatPrivacy(
     id: string,
     privacy: "private" | "shared" | "public",
-  ): Promise<void>;
+  ): Promise<{ shareId?: string; publicId?: string }>;
   abstract deleteChat(id: string): Promise<void>;
 
   abstract getMessages(chatId: string): Promise<Doc<"messages">[]>;

@@ -43,6 +43,12 @@ const DEV_VITE_ORIGINS = new Set([
 const DEV_VITE_PORTS = new Set(["5173", "5174", "4173"]);
 
 function isLocalDevOrigin(origin: string): boolean {
+  // Wildcard entries (for example "*.example.com") are valid allow-list
+  // patterns but not URL literals and should not be treated as malformed.
+  if (origin.startsWith("*.")) {
+    return false;
+  }
+
   try {
     const url = new URL(origin);
     const isLocalhost =

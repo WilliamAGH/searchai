@@ -9,6 +9,7 @@ try {
 } catch {
   // dotenv not available - this is fine, env vars may be set via other means
 }
+import { includeWebkit } from "./config/browsers";
 import { desktopViewport } from "./config/viewports";
 
 const ROOT_DIR = path.resolve(
@@ -53,10 +54,14 @@ export default defineConfig({
       name: "firefox",
       use: { ...devices["Desktop Firefox"], viewport: desktopViewport },
     },
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"], viewport: desktopViewport },
-    },
+    ...(includeWebkit
+      ? [
+          {
+            name: "webkit",
+            use: { ...devices["Desktop Safari"], viewport: desktopViewport },
+          },
+        ]
+      : []),
   ],
   webServer: [
     {
