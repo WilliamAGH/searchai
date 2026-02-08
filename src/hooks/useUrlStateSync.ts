@@ -65,6 +65,8 @@ export function useUrlStateSync({
           lastResolvedChatIdRef.current = null;
         });
       }
+      // Transition in-flight: don't sync URL to stale currentChatId below
+      return;
     }
 
     // Only sync if we're already on a chat route and the URL doesn't match

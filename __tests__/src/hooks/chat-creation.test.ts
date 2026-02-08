@@ -68,11 +68,7 @@ describe("Chat Creation Critical Path", () => {
 
   describe("createChat", () => {
     it("should create a new chat with default title", async () => {
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       const result = await actions.createChat();
 
@@ -85,11 +81,7 @@ describe("Chat Creation Critical Path", () => {
     });
 
     it("should create a new chat with custom title", async () => {
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       await actions.createChat("Custom Title");
 
@@ -97,11 +89,7 @@ describe("Chat Creation Critical Path", () => {
     });
 
     it("should update state after creating chat", async () => {
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       await actions.createChat();
 
@@ -117,17 +105,13 @@ describe("Chat Creation Critical Path", () => {
       const error = new Error("Creation failed");
       mockRepository.createChat = vi.fn().mockRejectedValue(error);
 
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       await expect(actions.createChat()).rejects.toThrow("Creation failed");
     });
 
     it("should throw error when repository is null", async () => {
-      const actions = createChatActions(null, mockState, mockSetState);
+      const actions = createChatActions(null, mockSetState);
 
       await expect(actions.createChat()).rejects.toThrow(
         "Repository not initialized",
@@ -152,11 +136,7 @@ describe("Chat Creation Critical Path", () => {
       mockState.chats = [existingChat];
       mockRepository.getChatById = vi.fn().mockResolvedValue(existingChat);
       mockRepository.getMessages = vi.fn().mockResolvedValue([]);
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
       await actions.selectChat("existing-chat");
       expect(mockRepository.getMessages).toHaveBeenCalledWith("existing-chat");
       expect(mockSetState).toHaveBeenCalled();
@@ -165,11 +145,7 @@ describe("Chat Creation Critical Path", () => {
     it("should deselect chat when null is passed", async () => {
       mockState.currentChatId = "some-chat";
 
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
       await actions.selectChat(null);
       const updateCall = mockSetState.mock.calls.find(
         (call) => typeof call[0] === "function",
@@ -188,11 +164,7 @@ describe("Chat Creation Critical Path", () => {
 
       mockRepository.getChatById = vi.fn().mockResolvedValue(canonicalChat);
       mockRepository.getMessages = vi.fn().mockResolvedValue([]);
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
       await actions.selectChat("chats|canonical-chat-id");
       expect(mockRepository.getMessages).toHaveBeenCalledWith(
         "canonical-chat-id",
@@ -201,11 +173,7 @@ describe("Chat Creation Critical Path", () => {
     });
 
     it("should handle non-existent chat gracefully", async () => {
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
       // Should not throw, just log warning
       await expect(actions.selectChat("non-existent")).resolves.not.toThrow();
     });
@@ -226,11 +194,7 @@ describe("Chat Creation Critical Path", () => {
       mockState.chats = [chatToDelete];
       mockRepository.deleteChat = vi.fn().mockResolvedValue(undefined);
 
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       await actions.deleteChat("chat-to-delete");
 
@@ -253,11 +217,7 @@ describe("Chat Creation Critical Path", () => {
       mockState.currentChatId = "chat-to-delete";
       mockRepository.deleteChat = vi.fn().mockResolvedValue(undefined);
 
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       await actions.deleteChat("chat-to-delete");
 
@@ -270,11 +230,7 @@ describe("Chat Creation Critical Path", () => {
       const error = new Error("Deletion failed");
       mockRepository.deleteChat = vi.fn().mockRejectedValue(error);
 
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       // The deleteChat method throws the error after updating state
       await expect(actions.deleteChat("chat-id")).rejects.toThrow(
@@ -301,11 +257,7 @@ describe("Chat Creation Critical Path", () => {
       mockState.chats = [chat];
       mockRepository.updateChatTitle = vi.fn().mockResolvedValue(undefined);
 
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       await actions.updateChatTitle("chat-id", "New Title");
 
@@ -330,11 +282,7 @@ describe("Chat Creation Critical Path", () => {
       mockState.chats = [chat];
       mockRepository.updateChatTitle = vi.fn().mockResolvedValue(undefined);
 
-      const actions = createChatActions(
-        mockRepository,
-        mockState,
-        mockSetState,
-      );
+      const actions = createChatActions(mockRepository, mockSetState);
 
       // Title is passed through without trimming in this layer
       await actions.updateChatTitle("chat-id", "  New Title  ");

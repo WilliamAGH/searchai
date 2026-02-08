@@ -4,6 +4,7 @@
  * Automatically handles repository selection and migration
  */
 
+import { useMemo } from "react";
 import { useConvexAuth } from "convex/react";
 import { useChatState } from "./useChatState";
 import { useChatRepository } from "./useChatRepository";
@@ -23,8 +24,12 @@ export function useUnifiedChat() {
   // Get the appropriate repository
   const repository = useChatRepository();
 
-  // Create actions
-  const actions = createChatActions(repository, state, setState);
+  // Create actions — memoized so function identities are stable across renders.
+  // Both deps are referentially stable (setState from useState; repository from context).
+  const actions = useMemo(
+    () => createChatActions(repository, setState),
+    [repository, setState],
+  );
 
   // Handle data loading
   useChatDataLoader(repository, setState);
