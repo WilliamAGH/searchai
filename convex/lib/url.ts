@@ -45,7 +45,16 @@ export function normalizeUrlForKey(rawUrl: string): string | null {
   }
 
   const u = safeParseUrl(normalized);
-  if (!u) return normalized;
+  if (!u) {
+    console.warn(
+      "[url] normalizeUrlForKey: re-parse failed after normalizeUrl",
+      {
+        rawUrl,
+        normalized,
+      },
+    );
+    return null;
+  }
 
   u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
 

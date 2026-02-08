@@ -74,7 +74,7 @@ function fromStructuredSource(
   const relevanceScore = sanitizeRelevanceScore(input.relevanceScore);
 
   if (!url && !title) {
-    console.warn("[resolver] Dropped source with no URL and no title", {
+    console.warn("[resolver] Dropped source: no URL and no title", {
       messageId: ctx.messageId,
       index: ctx.index,
     });

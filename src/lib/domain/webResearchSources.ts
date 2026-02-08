@@ -26,22 +26,23 @@ function normalizeUrlKey(rawUrl: string): string | null {
       ? trimmed
       : `https://${trimmed}`;
 
+  let u: URL;
   try {
-    const u = new URL(normalized);
-    u.hash = "";
-    // Lightweight normalization: remove common www and trailing slash.
-    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
-    if (u.pathname !== "/" && u.pathname.endsWith("/")) {
-      u.pathname = u.pathname.slice(0, -1);
-    }
-    return u.toString();
+    u = new URL(normalized);
   } catch (error) {
-    logger.warn("normalizeUrlKey: rejected unparseable URL", {
+    logger.warn("normalizeUrlKey: URL unparseable after normalization", {
       url: trimmed,
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
   }
+
+  u.hash = "";
+  u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
+  if (u.pathname !== "/" && u.pathname.endsWith("/")) {
+    u.pathname = u.pathname.slice(0, -1);
+  }
+  return u.toString();
 }
 
 export function hasWebResearchSources(

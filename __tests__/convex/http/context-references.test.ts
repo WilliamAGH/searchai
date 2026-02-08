@@ -69,11 +69,6 @@ describe("sanitizeWebResearchSources", () => {
         timestamp: expect.any(Number),
         url: "https://chp.ca.gov/programs-services/programs/child-safety-seats/",
       },
-      {
-        contextId: "019a122e-c507-7851-99f7-b8f5d7345b51",
-        type: "search_result",
-        timestamp: expect.any(Number),
-      },
     ]);
   });
 
