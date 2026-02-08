@@ -61,6 +61,8 @@ export async function* streamResearchWorkflow(
     workflowTokenId = session.workflowTokenId;
     const { chat, conversationContext: conversationSource } = session;
 
+    yield writeEvent("workflow_start", { workflowId, nonce });
+
     instantResponse = detectInstantResponse(args.userQuery);
 
     if (instantResponse) {
