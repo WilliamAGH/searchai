@@ -187,7 +187,7 @@ function ChatInterfaceComponent({
         const chat = await chatActions.createChat("New Chat");
         if (chat?._id) {
           // Navigate to the new chat
-          await navigateWithVerification(`/chat/${chat._id}`);
+          await navigateWithVerification(String(chat._id));
           setIsCreatingChat(false);
           return chat._id;
         }
