@@ -124,7 +124,7 @@ const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
 function extractRawIdentifier<TableName extends TableNames>(
   str: Id<TableName>,
-): Id<TableName>;
+): Id<TableName> | null;
 function extractRawIdentifier(str: string): string | null;
 function extractRawIdentifier(str: string): string | null {
   if (LOCAL_ID_PREFIXES.some((prefix) => str.startsWith(prefix))) {
