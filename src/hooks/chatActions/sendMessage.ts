@@ -51,7 +51,9 @@ export async function sendMessageWithStreaming({
     webResearchSources: [],
   });
 
-  // Update state to show both user message and assistant placeholder
+  // Update state to show both user message and assistant placeholder.
+  // NOTE: Do not set currentChatId/currentChat here — URL sync is the
+  // single source of truth for chat selection (see docs/contracts/navigation.md).
   setState((prev) => ({
     ...prev,
     isGenerating: true,
@@ -61,9 +63,6 @@ export async function sendMessageWithStreaming({
       stage: "planning",
       message: "Analyzing your question and planning research...",
     },
-    // Ensure currentChatId and currentChat match the chat we're sending to
-    currentChatId: chatId,
-    currentChat: prev.chats.find((c) => c._id === chatId) || prev.currentChat,
     messages: [...prev.messages, userMessage, assistantPlaceholder],
   }));
 
