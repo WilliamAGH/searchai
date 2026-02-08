@@ -215,6 +215,7 @@ export function ShareModalContent({
               <div className="flex gap-2">
                 <input
                   id="share-url-input"
+                  name="shareUrl"
                   type="text"
                   value={displayUrl}
                   placeholder={
@@ -284,6 +285,8 @@ export function ShareModalContent({
                 </div>
                 <div className="flex gap-2">
                   <input
+                    id="share-markdown-output"
+                    name="shareMarkdownOutput"
                     type="text"
                     value={markdownContent}
                     readOnly
