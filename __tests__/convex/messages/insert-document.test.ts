@@ -19,7 +19,7 @@ describe("buildMessageInsertDocument", () => {
         {
           contextId: "ctx_1",
           type: "search_result",
-          url: "https://example.com",
+          url: "https://example.com/",
           title: "Example",
           timestamp: 1700000000000,
           relevanceScore: 0.95,
@@ -52,7 +52,7 @@ describe("buildMessageInsertDocument", () => {
         {
           contextId: "ctx_1",
           type: "search_result",
-          url: "https://example.com",
+          url: "https://example.com/",
           title: "Example",
           timestamp: 1700000000000,
           relevanceScore: 0.95,
@@ -115,5 +115,48 @@ describe("buildMessageInsertDocument", () => {
 
     expect("workflowTokenId" in result).toBe(false);
     expect("sessionId" in result).toBe(false);
+  });
+
+  it("normalizes persisted webResearchSources URLs", () => {
+    const result = buildMessageInsertDocument({
+      chatId: "chat_4",
+      messageId: "msg_4",
+      threadId: "thread_4",
+      args: {
+        role: "assistant",
+        webResearchSources: [
+          {
+            contextId: "ctx_2",
+            type: "search_result",
+            url: "chp.ca.gov/programs-services/programs/child-safety-seats/",
+            title: "CHP",
+            timestamp: 1700000000004,
+          },
+          {
+            contextId: "ctx_3",
+            type: "search_result",
+            url: "javascript:alert(1)",
+            title: "Bad",
+            timestamp: 1700000000005,
+          },
+        ],
+      },
+    });
+
+    expect(result.webResearchSources).toEqual([
+      {
+        contextId: "ctx_2",
+        type: "search_result",
+        url: "https://chp.ca.gov/programs-services/programs/child-safety-seats/",
+        title: "CHP",
+        timestamp: 1700000000004,
+      },
+      {
+        contextId: "ctx_3",
+        type: "search_result",
+        title: "Bad",
+        timestamp: 1700000000005,
+      },
+    ]);
   });
 });

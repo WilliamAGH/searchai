@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useQuery, useAction, useMutation } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Message } from "@/lib/types/message";
@@ -45,16 +45,12 @@ export function usePaginatedMessages({
   const [retryCount, setRetryCount] = useState(0);
   const loadingRef = useRef(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const normalizedChatKeysRef = useRef(new Set<string>());
   const sessionRef = useRef(0);
   const resolvedChatId = toConvexId<"chats">(chatId);
 
   const loadMoreAction = useAction<typeof api.chats.loadMore.loadMoreMessages>(
     api.chats.loadMore.loadMoreMessages,
   );
-  const normalizeChatSchema = useMutation<
-    typeof api.chats.normalizeChatMessagesSchema
-  >(api.chats.normalizeChatMessagesSchema);
 
   const initialMessages = useQuery<
     typeof api.chats.messagesPaginated.getChatMessagesPaginated
@@ -82,43 +78,6 @@ export function usePaginatedMessages({
     const convexMessages = initialMessages.messages || [];
     return convexMessages.map((msg) => mapPaginatedMessage(msg, chatId));
   }, [initialMessages, chatId]);
-
-  useEffect(() => {
-    if (!enabled || !resolvedChatId) {
-      return;
-    }
-
-    const sessionKey = sessionId || "no-session";
-    const normalizationKey = `${resolvedChatId}:${sessionKey}`;
-    if (normalizedChatKeysRef.current.has(normalizationKey)) {
-      return;
-    }
-
-    normalizedChatKeysRef.current.add(normalizationKey);
-    void normalizeChatSchema({
-      chatId: resolvedChatId,
-      sessionId: sessionId || undefined,
-    })
-      .then((result) => {
-        logger.info("Normalized chat history to current schema", {
-          chatId,
-          normalized: result.normalized,
-          processed: result.processed,
-        });
-      })
-      .catch((normalizationError: unknown) => {
-        normalizedChatKeysRef.current.delete(normalizationKey);
-        const surfacedError =
-          normalizationError instanceof Error
-            ? normalizationError
-            : new Error(String(normalizationError));
-        logger.error("Failed to normalize chat history schema", {
-          chatId,
-          error: surfacedError.message,
-        });
-        setError(surfacedError);
-      });
-  }, [chatId, enabled, normalizeChatSchema, resolvedChatId, sessionId]);
 
   useEffect(() => {
     if (initialMessages) {

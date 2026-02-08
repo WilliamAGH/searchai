@@ -78,6 +78,8 @@ jobs:
       - preflight_validate
       - preflight_playwright
     environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || (github.ref_name == 'main' && 'production' || 'development') }}
+    env:
+      TARGET_CONVEX_DEPLOYMENT: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name != 'workflow_dispatch' && github.ref_name == 'main')) && 'prod:vivid-boar-858' || 'dev:diligent-greyhound-240' }}
 
     steps:
       - name: Checkout
@@ -95,10 +97,12 @@ jobs:
       - name: Deploy to Convex
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-        run: npx convex deploy
+          CONVEX_DEPLOYMENT: ${{ env.TARGET_CONVEX_DEPLOYMENT }}
+        run: npx convex deploy --yes
 
       - name: Deployment Summary
         env:
+          CONVEX_DEPLOYMENT: ${{ env.TARGET_CONVEX_DEPLOYMENT }}
           DEPLOYMENT_NAME: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name != 'workflow_dispatch' && github.ref_name == 'main')) && 'vivid-boar-858' || 'diligent-greyhound-240' }}
           ENV_NAME: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') || (github.event_name != 'workflow_dispatch' && github.ref_name == 'main')) && 'Production' || 'Development' }}
         run: |
@@ -106,6 +110,8 @@ jobs:
             echo "## Convex Deployment Complete"
             echo ""
             echo "**Environment:** $ENV_NAME"
+            echo ""
+            echo "**Target (CONVEX_DEPLOYMENT):** \`$CONVEX_DEPLOYMENT\`"
             echo ""
             echo "**Deployment:** \`$DEPLOYMENT_NAME\`"
             echo ""

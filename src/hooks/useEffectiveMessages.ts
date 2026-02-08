@@ -12,6 +12,7 @@
 import { useMemo } from "react";
 import type { Message } from "@/lib/types/message";
 import { logger } from "@/lib/logger";
+import { normalizeIdForComparison } from "@/lib/utils/idValidation";
 
 export interface UseEffectiveMessagesOptions {
   /** Messages from unified chat state (includes optimistic updates) */
@@ -98,12 +99,18 @@ export function selectEffectiveMessages({
   preferPaginatedSource = false,
   isPaginatedLoading = false,
 }: UseEffectiveMessagesOptions): Message[] {
-  const safeUnified = currentChatId
-    ? messages.filter((m) => m.chatId === currentChatId)
+  const normalizedCurrentChatId = normalizeIdForComparison(currentChatId);
+
+  const safeUnified = normalizedCurrentChatId
+    ? messages.filter(
+        (m) => normalizeIdForComparison(m.chatId) === normalizedCurrentChatId,
+      )
     : messages;
 
-  const safePaginated = currentChatId
-    ? paginatedMessages.filter((m) => m.chatId === currentChatId)
+  const safePaginated = normalizedCurrentChatId
+    ? paginatedMessages.filter(
+        (m) => normalizeIdForComparison(m.chatId) === normalizedCurrentChatId,
+      )
     : paginatedMessages;
 
   if (hasUnifiedPriority(safeUnified, safePaginated)) {
@@ -119,22 +126,22 @@ export function selectEffectiveMessages({
       safeUnified,
       safePaginated,
       isPaginatedLoading,
-      chatId: currentChatId,
+      chatId: normalizedCurrentChatId,
     });
     if (result !== null) return result;
   }
 
-  if (currentChatId && safePaginated.length > 0) {
+  if (normalizedCurrentChatId && safePaginated.length > 0) {
     logger.debug("Using paginated messages - no optimistic state", {
       count: safePaginated.length,
-      chatId: currentChatId,
+      chatId: normalizedCurrentChatId,
     });
     return safePaginated;
   }
 
   logger.debug("Using unified messages - fallback", {
     count: safeUnified.length,
-    chatId: currentChatId,
+    chatId: normalizedCurrentChatId,
   });
   return safeUnified;
 }

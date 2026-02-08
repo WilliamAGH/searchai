@@ -175,5 +175,9 @@ export function safeConvexId<TableName extends TableNames>(
     return null;
   }
 
-  return str;
+  const raw = extractRawIdentifier(str);
+  if (!raw || !isConvexId<TableName>(raw)) {
+    return null;
+  }
+  return raw;
 }

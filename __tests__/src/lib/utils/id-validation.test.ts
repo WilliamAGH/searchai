@@ -44,7 +44,7 @@ describe("Frontend ID Validation", () => {
     it("should return typed ID for valid Convex ID", () => {
       const validId = "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z";
       const result = toConvexId<"chats">(validId);
-      expect(result).toBe(validId);
+      expect(result).toBe("kg24lrv8sq2j9xf0v2q8k6z5sw6z");
     });
 
     it("should return null for local identifiers", () => {
@@ -90,7 +90,7 @@ describe("Backend ID Validation", () => {
     it("should return typed ID for valid format", () => {
       const validId = "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z";
       const result = safeConvexId<"chats">(validId);
-      expect(result).toBe(validId);
+      expect(result).toBe("kg24lrv8sq2j9xf0v2q8k6z5sw6z");
     });
 
     it("should return null for local identifiers", () => {
@@ -139,8 +139,8 @@ describe("Type Safety", () => {
     const chatId = toConvexId<"chats">(validChatId);
     const messageId = toConvexId<"messages">(validMessageId);
 
-    expect(chatId).toBe(validChatId);
-    expect(messageId).toBe(validMessageId);
+    expect(chatId).toBe("kg24lrv8sq2j9xf0v2q8k6z5sw6z");
+    expect(messageId).toBe("abc123xyz456def789ghi012");
   });
 
   it("should handle null safely in conditional flows", () => {
@@ -153,6 +153,6 @@ describe("Type Safety", () => {
     const validId = "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z";
     const validResult = toConvexId<"chats">(validId);
     expect(validResult).toBeTruthy();
-    expect(validResult).toBe(validId);
+    expect(validResult).toBe("kg24lrv8sq2j9xf0v2q8k6z5sw6z");
   });
 });

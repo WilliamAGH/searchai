@@ -138,6 +138,8 @@ describe("Chat Creation Critical Path", () => {
   describe("selectChat", () => {
     it("should select an existing chat", async () => {
       const existingChat: UnifiedChat = {
+        _id: "existing-chat",
+        _creationTime: Date.now(),
         id: "existing-chat",
         title: "Existing Chat",
         messages: [],
@@ -150,15 +152,12 @@ describe("Chat Creation Critical Path", () => {
       mockState.chats = [existingChat];
       mockRepository.getChatById = vi.fn().mockResolvedValue(existingChat);
       mockRepository.getMessages = vi.fn().mockResolvedValue([]);
-
       const actions = createChatActions(
         mockRepository,
         mockState,
         mockSetState,
       );
-
       await actions.selectChat("existing-chat");
-
       expect(mockRepository.getMessages).toHaveBeenCalledWith("existing-chat");
       expect(mockSetState).toHaveBeenCalled();
     });
@@ -171,13 +170,34 @@ describe("Chat Creation Critical Path", () => {
         mockState,
         mockSetState,
       );
-
       await actions.selectChat(null);
-
       const updateCall = mockSetState.mock.calls.find(
         (call) => typeof call[0] === "function",
       );
       expect(updateCall).toBeDefined();
+    });
+
+    it("should store canonical chat ID returned by repository", async () => {
+      const canonicalChat = {
+        _id: "canonical-chat-id",
+        _creationTime: Date.now(),
+        title: "Canonical Chat",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      } as unknown as UnifiedChat;
+
+      mockRepository.getChatById = vi.fn().mockResolvedValue(canonicalChat);
+      mockRepository.getMessages = vi.fn().mockResolvedValue([]);
+      const actions = createChatActions(
+        mockRepository,
+        mockState,
+        mockSetState,
+      );
+      await actions.selectChat("chats|canonical-chat-id");
+      expect(mockRepository.getMessages).toHaveBeenCalledWith(
+        "canonical-chat-id",
+      );
+      expect(mockState.currentChatId).toBe("canonical-chat-id");
     });
 
     it("should handle non-existent chat gracefully", async () => {
@@ -186,7 +206,6 @@ describe("Chat Creation Critical Path", () => {
         mockState,
         mockSetState,
       );
-
       // Should not throw, just log warning
       await expect(actions.selectChat("non-existent")).resolves.not.toThrow();
     });
