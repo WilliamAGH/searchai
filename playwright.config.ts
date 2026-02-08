@@ -1,26 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { includeFirefox, includeWebkit } from "./__tests__/config/browsers";
 import { desktopViewport } from "./__tests__/config/viewports";
 
 const useProxyRuntime = process.env.PLAYWRIGHT_RUNTIME === "proxy";
-const includeFirefoxEnv = process.env.PLAYWRIGHT_INCLUDE_FIREFOX;
-const includeFirefox =
-  includeFirefoxEnv === "1" ||
-  includeFirefoxEnv === "true" ||
-  (process.env.CI === "true" &&
-    includeFirefoxEnv !== "0" &&
-    includeFirefoxEnv !== "false");
-
-/**
- * WebKit on macOS crashes during _RegisterApplication (SIGABRT) when
- * launched in headless terminal contexts. Each crash spawns a macOS crash
- * dialog, so retries make it worse. Skip WebKit on local macOS; CI (Linux)
- * runs it safely. Override with PLAYWRIGHT_INCLUDE_WEBKIT=1 if needed.
- */
-const includeWebkitEnv = process.env.PLAYWRIGHT_INCLUDE_WEBKIT;
-const includeWebkit =
-  includeWebkitEnv === "1" ||
-  includeWebkitEnv === "true" ||
-  (process.platform !== "darwin" && includeWebkitEnv !== "0");
 
 const projects = [
   {

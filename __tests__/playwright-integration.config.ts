@@ -9,18 +9,8 @@ try {
 } catch {
   // dotenv not available - this is fine, env vars may be set via other means
 }
+import { includeWebkit } from "./config/browsers";
 import { desktopViewport } from "./config/viewports";
-
-/**
- * WebKit on macOS crashes during _RegisterApplication (SIGABRT) in headless
- * terminal contexts. Skip on macOS; CI (Linux) runs it safely.
- * Override with PLAYWRIGHT_INCLUDE_WEBKIT=1.
- */
-const includeWebkitEnv = process.env.PLAYWRIGHT_INCLUDE_WEBKIT;
-const includeWebkit =
-  includeWebkitEnv === "1" ||
-  includeWebkitEnv === "true" ||
-  (process.platform !== "darwin" && includeWebkitEnv !== "0");
 
 const ROOT_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
