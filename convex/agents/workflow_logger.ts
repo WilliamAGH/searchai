@@ -307,14 +307,10 @@ export function logContextPipeline(status: {
 /**
  * Log sources summary for conversational workflow.
  */
-export function logSourcesSummary(
-  refCount: number,
-  resultCount: number,
-  urlCount: number,
-): void {
+export function logSourcesSummary(sourceCount: number, urlCount: number): void {
   logWorkflow(
     "SOURCES_SUMMARY",
-    `CONVERSATIONAL SOURCES: ${refCount} refs, ${resultCount} results, ${urlCount} URLs`,
+    `WEB RESEARCH SOURCES: ${sourceCount} sources, ${urlCount} URLs`,
   );
 }
 

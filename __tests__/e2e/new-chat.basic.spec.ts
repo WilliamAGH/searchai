@@ -53,7 +53,7 @@ test.describe("New Chat Basics", () => {
     const newChatButton = await getNewChatButton(page);
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
-    const clickPromises = [];
+    const clickPromises: Promise<void>[] = [];
     for (let i = 0; i < 5; i++) {
       clickPromises.push(
         newChatButton.click({ force: true, noWaitAfter: true }),
@@ -95,13 +95,7 @@ test.describe("New Chat Basics", () => {
 
   test("should create local chat for unauthenticated users", async ({
     page,
-    browserName,
   }) => {
-    test.skip(
-      browserName === "firefox",
-      "Unauth chat creation flaky on Firefox",
-    );
-
     await page.evaluate(() => {
       localStorage.clear();
       sessionStorage.clear();

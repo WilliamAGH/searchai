@@ -9,7 +9,11 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { vSearchMethod } from "./lib/validators";
+import {
+  vSearchMethod,
+  vSearchResult,
+  vWebResearchSource,
+} from "./lib/validators";
 
 const applicationTables = {
   /**
@@ -58,20 +62,20 @@ const applicationTables = {
       v.literal("system"),
     ),
     content: v.optional(v.string()),
-    searchResults: v.optional(
-      v.array(
-        v.object({
-          title: v.string(),
-          url: v.string(),
-          snippet: v.string(),
-          relevanceScore: v.number(), // Required, not optional - consistent with most definitions
-          // Optional fields from search results
-          content: v.optional(v.string()),
-          fullTitle: v.optional(v.string()),
-          summary: v.optional(v.string()),
-        }),
-      ),
-    ),
+    /**
+     * @deprecated UI projection only. The canonical, persisted source-of-truth
+     * for web research is `webResearchSources`.
+     *
+     * Kept temporarily for migration/cutover.
+     */
+    searchResults: v.optional(v.array(vSearchResult)),
+    /**
+     * @deprecated Not canonical web research. This is (historically) a list of
+     * bracket-citations extracted from the assistant text, and may contain
+     * domains rather than URLs.
+     *
+     * Kept temporarily for migration/cutover.
+     */
     sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.any()),
     searchMethod: v.optional(vSearchMethod),
@@ -80,24 +84,17 @@ const applicationTables = {
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
     timestamp: v.optional(v.number()),
-    // Context provenance tracking with UUIDv7
-    contextReferences: v.optional(
-      v.array(
-        v.object({
-          contextId: v.string(), // UUIDv7 unique identifier
-          type: v.union(
-            v.literal("search_result"),
-            v.literal("scraped_page"),
-            v.literal("research_summary"),
-          ),
-          url: v.optional(v.string()),
-          title: v.optional(v.string()),
-          timestamp: v.number(),
-          relevanceScore: v.optional(v.number()),
-          metadata: v.optional(v.any()), // Additional context metadata
-        }),
-      ),
-    ),
+    /**
+     * Canonical: structured web research sources used by the system.
+     *
+     * This is the single persisted research source contract for the app.
+     */
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
+    /**
+     * @deprecated Old name for web research sources.
+     * Kept temporarily for migration/cutover.
+     */
+    contextReferences: v.optional(v.array(vWebResearchSource)),
     // Agent workflow tracking
     workflowId: v.optional(v.string()), // Links to agent orchestration workflow
   })

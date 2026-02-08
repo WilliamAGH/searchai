@@ -125,6 +125,7 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
         title: hostname,
         content: `Unable to fetch content from ${input.url}`,
         summary: `Content unavailable from ${hostname}`,
+        contentLength: 0,
         scrapedAt: Date.now(),
         _toolCallMetadata: {
           toolName: "scrape_webpage",

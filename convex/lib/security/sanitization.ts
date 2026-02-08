@@ -8,8 +8,6 @@
  * - Template injections
  */
 
-import { RELEVANCE_SCORES } from "../constants/cache";
-
 /**
  * Main sanitization function that applies all security measures
  * @param input - Raw user input to sanitize
@@ -55,10 +53,13 @@ export function robustSanitize(input: string): string {
         return "[BASE64_BLOCKED]";
       }
     } catch (error) {
-      console.warn("Failed to decode base64 input during sanitization", {
+      // Safe to keep: atob() failure means the string is NOT valid base64,
+      // so it cannot contain a hidden decoded payload. Only successfully
+      // decoded strings can carry injection keywords.
+      console.warn("sanitizeBase64: decode failed, keeping original", {
+        length: match.length,
         error,
       });
-      // If decoding fails, it's not valid base64, keep original
     }
     return match;
   });
@@ -99,9 +100,18 @@ export function robustSanitize(input: string): string {
   }
 
   // 6. Remove HTML/Script tags
-  clean = clean.replace(/<script[^>]*>.*?<\/script>/gi, "[SCRIPT_BLOCKED]");
-  clean = clean.replace(/<iframe[^>]*>.*?<\/iframe>/gi, "[IFRAME_BLOCKED]");
-  clean = clean.replace(/<object[^>]*>.*?<\/object>/gi, "[OBJECT_BLOCKED]");
+  clean = clean.replace(
+    /<script\b[^>]*>[\s\S]*?(?:<\/script\s*>|$)/gi,
+    "[SCRIPT_BLOCKED]",
+  );
+  clean = clean.replace(
+    /<iframe\b[^>]*>[\s\S]*?(?:<\/iframe\s*>|$)/gi,
+    "[IFRAME_BLOCKED]",
+  );
+  clean = clean.replace(
+    /<object\b[^>]*>[\s\S]*?(?:<\/object\s*>|$)/gi,
+    "[OBJECT_BLOCKED]",
+  );
   clean = clean.replace(/<embed[^>]*>/gi, "[EMBED_BLOCKED]");
 
   // 7. Remove javascript: and data: URLs
@@ -189,7 +199,7 @@ export function sanitizeHtmlContent(html: string): string {
   clean = clean.replace(/<meta[^>]*http-equiv[^>]*>/gi, "");
 
   // Remove all event handlers
-  clean = clean.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, "");
+  clean = clean.replace(/\s*on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
 
   // Apply standard sanitization
   clean = robustSanitize(clean);
@@ -230,76 +240,4 @@ export function sanitizeJson(jsonString: string): string | null {
     // Invalid JSON, return null
     return null;
   }
-}
-
-/**
- * Normalize a search result from external input
- * Ensures all required fields are present with valid values
- * Particularly important for HTTP endpoints that receive searchResults
- *
- * @param result - Raw search result from external source
- * @returns Normalized SearchResult with guaranteed fields
- */
-export function normalizeSearchResult(result: unknown): {
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-} {
-  // Ensure we have an object
-  if (!result || typeof result !== "object") {
-    return {
-      title: "Untitled",
-      url: "",
-      snippet: "",
-      relevanceScore: 0.5,
-    };
-  }
-
-  // Type guard: we know result is a non-null object
-  const r = result as Record<string, unknown>;
-
-  // Normalize relevanceScore - must be a number between 0 and 1
-  let relevanceScore: number = RELEVANCE_SCORES.SEARCH_RESULT; // Default
-  if (typeof r.relevanceScore === "number") {
-    // Clamp to valid range [0, 1]
-    relevanceScore = Math.max(0, Math.min(1, r.relevanceScore));
-  } else if (typeof r.relevanceScore === "string") {
-    // Parse string numbers
-    const parsed = parseFloat(r.relevanceScore);
-    if (!isNaN(parsed)) {
-      relevanceScore = Math.max(0, Math.min(1, parsed));
-    }
-  }
-
-  // Extract string fields safely - only use string values, not objects
-  const titleValue = typeof r.title === "string" ? r.title : "Untitled";
-  const urlValue = typeof r.url === "string" ? r.url : "";
-  const snippetValue = typeof r.snippet === "string" ? r.snippet : "";
-
-  return {
-    title: robustSanitize(titleValue),
-    url: urlValue, // Don't sanitize URLs - might break them
-    snippet: robustSanitize(snippetValue),
-    relevanceScore,
-  };
-}
-
-/**
- * Normalize an array of search results
- *
- * @param results - Raw array of search results
- * @returns Array of normalized SearchResult objects
- */
-export function normalizeSearchResults(results: unknown): Array<{
-  title: string;
-  url: string;
-  snippet: string;
-  relevanceScore: number;
-}> {
-  if (!Array.isArray(results)) {
-    return [];
-  }
-
-  return results.map(normalizeSearchResult);
 }

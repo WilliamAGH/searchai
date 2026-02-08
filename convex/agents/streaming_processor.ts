@@ -1,3 +1,5 @@
+"use node";
+
 /**
  * Unified Stream Processing for OpenAI Agents SDK
  *
@@ -11,11 +13,15 @@
 import type { AgentStreamResult } from "./streaming_processor_types";
 import type { ToolCallArgs } from "./streaming_event_types";
 import {
+  extractReasoningContent,
   isToolCallEvent,
   isToolOutputEvent,
+  isReasoningEvent,
   extractToolName,
   extractToolArgs,
   extractTextDelta,
+  extractToolOutput,
+  extractOutputToolName,
 } from "./streaming_tool_events";
 import {
   getProgressStageForTool,
@@ -24,9 +30,6 @@ import {
 } from "./streaming_progress";
 import type { HarvestedData } from "../schemas/agents";
 import {
-  extractReasoningContent,
-  extractToolOutput,
-  extractOutputToolName,
   hasToolContext,
   isToolError,
   harvestToolOutput,
@@ -164,17 +167,31 @@ export async function* processAgentStream(
   };
 
   for await (const event of result) {
+    if (event.type === "raw_model_stream_event") {
+      const delta = extractTextDelta(event);
+      if (!delta) continue;
+
+      if (!stats.hasStartedStreaming) {
+        stats.hasStartedStreaming = true;
+        yield {
+          type: "progress",
+          stage: "generating",
+          message: getProgressMessage("generating"),
+        };
+      }
+
+      stats.accumulatedResponse += delta;
+      callbacks.onTextDelta?.(delta);
+      yield { type: "content", delta };
+      continue;
+    }
+
     if (event.type !== "run_item_stream_event") {
       continue;
     }
 
-    const item = event.item;
-    if (!item) continue;
-
-    const eventName = event.name;
-
-    if (eventName === "reasoning_item_created") {
-      const reasoningContent = extractReasoningContent(item);
+    if (isReasoningEvent(event)) {
+      const reasoningContent = extractReasoningContent(event.item);
       if (reasoningContent) {
         callbacks.onReasoning?.(reasoningContent);
         yield { type: "reasoning", content: reasoningContent };
@@ -182,10 +199,10 @@ export async function* processAgentStream(
       continue;
     }
 
-    if (isToolCallEvent(item, eventName)) {
+    if (isToolCallEvent(event)) {
       stats.toolCallCount++;
-      const toolName = extractToolName(item);
-      const toolArgs = extractToolArgs(item);
+      const toolName = extractToolName(event.item);
+      const toolArgs = extractToolArgs(event.item);
 
       const newStage = callbacks.onToolCall?.(
         toolName,
@@ -208,9 +225,9 @@ export async function* processAgentStream(
       continue;
     }
 
-    if (isToolOutputEvent(item, eventName)) {
-      const output = extractToolOutput(item);
-      const outputToolName = extractOutputToolName(item);
+    if (isToolOutputEvent(event)) {
+      const output = extractToolOutput(event.item);
+      const outputToolName = extractOutputToolName(event.item);
 
       if (!output || typeof output !== "object") continue;
 
@@ -233,26 +250,6 @@ export async function* processAgentStream(
         harvestToolOutput(output, outputToolName, harvested);
       }
       continue;
-    }
-
-    if (eventName === "message_output_created") {
-      continue;
-    }
-
-    const delta = extractTextDelta(item, eventName);
-    if (delta) {
-      if (!stats.hasStartedStreaming) {
-        stats.hasStartedStreaming = true;
-        yield {
-          type: "progress",
-          stage: "generating",
-          message: getProgressMessage("generating"),
-        };
-      }
-
-      stats.accumulatedResponse += delta;
-      callbacks.onTextDelta?.(delta);
-      yield { type: "content", delta };
     }
   }
 

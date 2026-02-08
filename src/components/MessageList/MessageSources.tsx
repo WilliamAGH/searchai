@@ -1,94 +1,40 @@
 /**
- * Compact sources component for messages
- * Shows collapsed summary by default
- * Expands to show all sources on click
+ * Message Sources (Web Research Sources)
  *
- * Supports both legacy searchResults and new contextReferences from agent workflow
+ * Renders the canonical `webResearchSources` domain object.
+ * UI cards are derived-only via a single adapter.
  */
 
 import React from "react";
-import type { ContextReference, SearchResult } from "@/lib/types/message";
+import {
+  hasWebResearchSources,
+  toWebSourceCards,
+} from "@/lib/domain/webResearchSources";
+import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 import {
   getDomainFromUrl,
   getFaviconUrl,
   getSafeHostname,
 } from "@/lib/utils/favicon";
-import { logger } from "@/lib/logger";
 
 interface MessageSourcesProps {
   id: string;
-  results: SearchResult[];
-  method?: string;
+  webResearchSources: WebResearchSourceClient[] | undefined;
   collapsed: boolean;
   onToggle: (id: string) => void;
   hoveredSourceUrl: string | null;
   onSourceHover: (url: string | null) => void;
-  // New: Support contextReferences from agent workflow
-  contextReferences?: ContextReference[];
 }
 
 export function MessageSources({
   id,
-  results,
-  method,
+  webResearchSources,
   collapsed,
   onToggle,
   hoveredSourceUrl,
   onSourceHover,
-  contextReferences,
 }: MessageSourcesProps) {
-  // Ensure id is always defined to prevent React key warnings
   const messageId = id || "unknown";
-
-  // Prefer contextReferences from agent workflow, fallback to legacy results
-  const hasContextRefs =
-    Array.isArray(contextReferences) && contextReferences.length > 0;
-
-  const hasUrl = (
-    ref: ContextReference,
-  ): ref is ContextReference & { url: string } =>
-    typeof ref.url === "string" && ref.url.length > 0;
-
-  // Convert contextReferences to display format
-  const displaySources: Array<{
-    url: string;
-    title: string;
-    snippet?: string;
-    type?: "search_result" | "scraped_page" | "research_summary";
-    relevanceScore?: number;
-  }> = hasContextRefs
-    ? contextReferences.filter(hasUrl).map((ref) => {
-        const safeUrl = ref.url;
-        let inferredTitle = ref.title;
-        if (!inferredTitle) {
-          try {
-            inferredTitle = new URL(safeUrl).hostname;
-          } catch (error) {
-            logger.warn("Failed to infer title from source URL", {
-              url: safeUrl,
-              error,
-            });
-            inferredTitle = safeUrl;
-          }
-        }
-
-        return {
-          url: safeUrl,
-          title: inferredTitle,
-          type: ref.type,
-          relevanceScore: ref.relevanceScore,
-        };
-      })
-    : results.map((r) => ({
-        url: r.url,
-        title: r.title,
-        snippet: r.snippet,
-        relevanceScore: r.relevanceScore,
-      }));
-
-  // Keep track of sources for pills (first 3)
-  const previewSources = displaySources.slice(0, 3);
-
   const handleToggleClick = React.useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
@@ -96,6 +42,10 @@ export function MessageSources({
     },
     [messageId, onToggle],
   );
+  if (!hasWebResearchSources(webResearchSources)) return null;
+
+  const displaySources = toWebSourceCards(webResearchSources);
+  const previewSources = displaySources.slice(0, 3);
 
   return (
     <div className="mt-3 max-w-full min-w-0 overflow-hidden">
@@ -126,16 +76,9 @@ export function MessageSources({
             <span className="text-gray-500 dark:text-gray-400">
               ({displaySources.length})
             </span>
-            {hasContextRefs && (
-              <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400 truncate">
-                via agent research
-              </span>
-            )}
-            {!hasContextRefs && method && (
-              <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400 truncate">
-                via web search
-              </span>
-            )}
+            <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400 truncate">
+              via web research
+            </span>
           </div>
           <svg
             className={`w-3 h-3 sm:w-4 sm:h-4 text-gray-500 dark:text-gray-400 transition-transform flex-shrink-0 ${collapsed ? "" : "rotate-180"}`}
@@ -152,6 +95,7 @@ export function MessageSources({
             />
           </svg>
         </div>
+
         {collapsed && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             {previewSources.map((source, i) => {
@@ -194,7 +138,6 @@ export function MessageSources({
               getDomainFromUrl(source.url) || getSafeHostname(source.url);
             const isHovered = hoveredSourceUrl === source.url;
 
-            // Determine relevance badge color
             const relevanceBadge =
               source.relevanceScore !== undefined &&
               source.relevanceScore >= 0.8
@@ -270,14 +213,9 @@ export function MessageSources({
                         </span>
                       )}
                     </div>
-                    <div className="text-[13px] sm:text-sm text-gray-500 dark:text-gray-400 truncate">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
                       {hostname}
                     </div>
-                    {source.snippet && (
-                      <div className="mt-1 text-[13px] sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
-                        {source.snippet}
-                      </div>
-                    )}
                   </div>
                 </div>
               </a>

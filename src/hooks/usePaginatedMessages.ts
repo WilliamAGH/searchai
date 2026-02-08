@@ -1,36 +1,16 @@
-/**
- * Hook for loading messages with pagination support
- * Provides efficient message loading with cursor-based pagination
- */
-
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Message } from "@/lib/types/message";
 import { logger } from "@/lib/logger";
+import {
+  computeBackoffDelay,
+  mapPaginatedMessage,
+  mergeInitialPageWithLoadedMessages,
+  prependOlderMessages,
+} from "@/hooks/utils/paginatedMessages";
 import { toConvexId } from "@/lib/utils/idValidation";
-
-/** Map a Convex message to the local Message type */
-function mapConvexMessage(
-  msg: Message,
-  fallbackChatId: string | null,
-): Message {
-  return {
-    ...msg,
-    _id: String(msg._id),
-    chatId: String(msg.chatId ?? fallbackChatId ?? ""),
-    _creationTime: msg._creationTime ?? msg.timestamp ?? Date.now(),
-    timestamp: msg.timestamp ?? msg._creationTime ?? Date.now(),
-    content: msg.content ?? "",
-  };
-}
-
-/** Compute exponential backoff delay (ms) capped at 5s */
-function computeBackoffDelay(attempt: number): number {
-  const base = Math.pow(2, Math.max(0, attempt - 1));
-  return Math.min(1000 * base, 5000);
-}
 
 interface UsePaginatedMessagesOptions {
   chatId: string | null;
@@ -51,10 +31,6 @@ interface PaginatedMessagesState {
   clearError: () => void;
 }
 
-/**
- * Hook for paginated message loading
- * Manages message pagination state and provides load more functionality
- */
 export function usePaginatedMessages({
   chatId,
   initialLimit = 50,
@@ -69,16 +45,17 @@ export function usePaginatedMessages({
   const [retryCount, setRetryCount] = useState(0);
   const loadingRef = useRef(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // Session guard to avoid applying stale results after chat/navigation changes
+  const normalizedChatKeysRef = useRef(new Set<string>());
   const sessionRef = useRef(0);
   const resolvedChatId = toConvexId<"chats">(chatId);
 
-  // Get the load more action
   const loadMoreAction = useAction<typeof api.chats.loadMore.loadMoreMessages>(
     api.chats.loadMore.loadMoreMessages,
   );
+  const normalizeChatSchema = useMutation<
+    typeof api.chats.normalizeChatMessagesSchema
+  >(api.chats.normalizeChatMessagesSchema);
 
-  // Query for initial messages
   const initialMessages = useQuery<
     typeof api.chats.messagesPaginated.getChatMessagesPaginated
   >(
@@ -92,7 +69,6 @@ export function usePaginatedMessages({
       : "skip",
   );
 
-  // Track initial load time
   const initialLoadStartRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -101,19 +77,53 @@ export function usePaginatedMessages({
     }
   }, [enabled, chatId]);
 
-  // Pre-map initial messages for immediate render to avoid UI flicker in tests/SSR
   const initialUIMessages = useMemo<Message[]>(() => {
     if (!initialMessages) return [];
     const convexMessages = initialMessages.messages || [];
-    return convexMessages.map((msg) => mapConvexMessage(msg, chatId));
+    return convexMessages.map((msg) => mapPaginatedMessage(msg, chatId));
   }, [initialMessages, chatId]);
 
-  // Load initial messages when they arrive (stateful for subsequent appends)
+  useEffect(() => {
+    if (!enabled || !resolvedChatId) {
+      return;
+    }
+
+    const sessionKey = sessionId || "no-session";
+    const normalizationKey = `${resolvedChatId}:${sessionKey}`;
+    if (normalizedChatKeysRef.current.has(normalizationKey)) {
+      return;
+    }
+
+    normalizedChatKeysRef.current.add(normalizationKey);
+    void normalizeChatSchema({
+      chatId: resolvedChatId,
+      sessionId: sessionId || undefined,
+    })
+      .then((result) => {
+        logger.info("Normalized chat history to current schema", {
+          chatId,
+          normalized: result.normalized,
+          processed: result.processed,
+        });
+      })
+      .catch((normalizationError: unknown) => {
+        normalizedChatKeysRef.current.delete(normalizationKey);
+        const surfacedError =
+          normalizationError instanceof Error
+            ? normalizationError
+            : new Error(String(normalizationError));
+        logger.error("Failed to normalize chat history schema", {
+          chatId,
+          error: surfacedError.message,
+        });
+        setError(surfacedError);
+      });
+  }, [chatId, enabled, normalizeChatSchema, resolvedChatId, sessionId]);
+
   useEffect(() => {
     if (initialMessages) {
       const unifiedMessages = initialUIMessages;
 
-      // Log initial load performance
       if (initialLoadStartRef.current) {
         const loadTime = performance.now() - initialLoadStartRef.current;
         logger.info("Initial messages loaded", {
@@ -125,9 +135,6 @@ export function usePaginatedMessages({
         initialLoadStartRef.current = null;
       }
 
-      // CRITICAL FIX: Don't replace messages if we have optimistic state
-      // Check if we currently have messages with isStreaming=true or persisted=false
-      // These are optimistic messages that shouldn't be replaced by DB fetch
       setMessages((prev) => {
         const hasOptimisticMessages = prev.some(
           (m) => m.isStreaming === true || m.persisted === false,
@@ -142,11 +149,10 @@ export function usePaginatedMessages({
               dbCount: unifiedMessages.length,
             },
           );
-          return prev; // Keep optimistic state
+          return prev;
         }
 
-        // No optimistic state - safe to load from DB
-        return unifiedMessages;
+        return mergeInitialPageWithLoadedMessages(prev, unifiedMessages);
       });
       setCursor(initialMessages.nextCursor ?? null);
       setHasMore(initialMessages.hasMore);
@@ -154,7 +160,6 @@ export function usePaginatedMessages({
     }
   }, [initialMessages, chatId, initialUIMessages]);
 
-  // Load more messages with retry logic
   const loadMore = useCallback(async () => {
     if (!resolvedChatId || !cursor || !hasMore || loadingRef.current) return;
 
@@ -164,6 +169,8 @@ export function usePaginatedMessages({
 
     const currentSession = sessionRef.current;
     const loadStartTime = performance.now();
+
+    let didSucceed = false;
 
     const attemptLoad = async (attempt = 1): Promise<void> => {
       const attemptStartTime = performance.now();
@@ -178,7 +185,6 @@ export function usePaginatedMessages({
           sessionId: sessionId || undefined,
         });
 
-        // Track performance metrics
         const loadTime = performance.now() - attemptStartTime;
         logger.info("Pagination load completed", {
           chatId,
@@ -190,20 +196,20 @@ export function usePaginatedMessages({
 
         if (moreMessages) {
           const mappedMessages = moreMessages.messages.map((msg: Message) =>
-            mapConvexMessage(msg, chatId),
+            mapPaginatedMessage(msg, chatId),
           );
 
-          // Stale-guard: if session changed during async call, ignore results
           if (sessionRef.current !== currentSession) {
             logger.info(
               "Discarding stale loadMore results due to session change",
             );
             return;
           }
-          setMessages((prev) => [...prev, ...mappedMessages]);
+          setMessages((prev) => prependOlderMessages(prev, mappedMessages));
           setCursor(moreMessages.nextCursor ?? null);
           setHasMore(moreMessages.hasMore);
-          setRetryCount(0); // Reset retry count on success
+          setRetryCount(0);
+          didSucceed = true;
         }
       } catch (err) {
         const errorMessage =
@@ -222,7 +228,6 @@ export function usePaginatedMessages({
           failTime: Math.round(failTime),
         });
 
-        // Retry logic with exponential backoff
         const maxRetries = 3;
         if (attempt < maxRetries) {
           const delay = computeBackoffDelay(attempt);
@@ -234,18 +239,15 @@ export function usePaginatedMessages({
 
           setRetryCount(attempt);
 
-          // Clear any existing timeout
           if (retryTimeoutRef.current) {
             clearTimeout(retryTimeoutRef.current);
           }
 
           retryTimeoutRef.current = setTimeout(() => {
-            // If session changed while waiting, do not retry
             if (sessionRef.current !== currentSession) return;
             void attemptLoad(attempt + 1);
           }, delay);
         } else {
-          // Max retries reached
           const totalTime = performance.now() - loadStartTime;
           logger.error("All pagination retries exhausted", {
             chatId,
@@ -256,20 +258,18 @@ export function usePaginatedMessages({
 
           setError(error);
           setRetryCount(0);
-          setIsLoadingMore(false);
-          loadingRef.current = false;
         }
       }
     };
 
-    await attemptLoad();
-
-    if (!error) {
+    try {
+      await attemptLoad();
+    } finally {
       const totalTime = performance.now() - loadStartTime;
       logger.info("Pagination operation completed", {
         chatId,
         totalTime: Math.round(totalTime),
-        success: true,
+        success: didSucceed,
       });
 
       setIsLoadingMore(false);
@@ -281,12 +281,10 @@ export function usePaginatedMessages({
     hasMore,
     initialLimit,
     loadMoreAction,
-    error,
     sessionId,
     resolvedChatId,
   ]);
 
-  // Refresh messages (reload from beginning)
   const refresh = useCallback(async () => {
     if (!chatId) return;
 
@@ -294,19 +292,14 @@ export function usePaginatedMessages({
     setHasMore(false);
     setMessages([]);
     setError(null);
-
-    // The query will automatically re-run
   }, [chatId]);
 
-  // Clear error manually
   const clearError = useCallback(() => {
     setError(null);
     setRetryCount(0);
   }, []);
 
-  // Reset when chat changes
   useEffect(() => {
-    // Bump session to invalidate any in-flight async operations
     sessionRef.current++;
     setMessages([]);
     setCursor(null);
@@ -314,13 +307,11 @@ export function usePaginatedMessages({
     setError(null);
     setRetryCount(0);
 
-    // Clear any pending retry timeouts
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
     }
   }, [chatId]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (retryTimeoutRef.current) {

@@ -34,9 +34,6 @@ export async function* executeFastPath({
 
   logWorkflow("FAST_PATH", "Skipping research stage for simple message");
 
-  // Emit workflow_start event for SSE spec compliance (clients expect this early)
-  yield writeEvent("workflow_start", { workflowId, nonce });
-
   const fastSynthesisGenerator = executeFastSynthesis({
     ctx,
     synthesisAgent: agents.answerSynthesis,
@@ -56,7 +53,7 @@ export async function* executeFastPath({
     "metadata",
     buildMetadataEvent({
       workflowId,
-      contextReferences: [],
+      webResearchSources: [],
       hasLimitations: fastParsedAnswer.hasLimitations,
       confidence: fastParsedAnswer.confidence,
       answerLength: fastFinalAnswerText.length,
@@ -103,9 +100,7 @@ export async function* executeFastPath({
       content: fastFinalAnswerText,
       workflowId,
       sessionId: args.sessionId,
-      searchResults: [],
-      sources: fastParsedAnswer.sourcesUsed || [],
-      contextReferences: [],
+      webResearchSources: [],
       workflowTokenId,
       nonce,
     });

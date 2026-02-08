@@ -10,11 +10,9 @@ import { ReasoningDisplay } from "../ReasoningDisplay";
 import { CopyButton } from "../CopyButton";
 import { MessageSources } from "./MessageSources";
 import { ToolProgressIndicator } from "./ToolProgressIndicator";
-import {
-  extractPlainText,
-  formatConversationWithSources,
-} from "@/lib/clipboard";
+import { formatConversationWithWebResearchSources } from "@/lib/clipboard";
 import type { Message, SearchProgress } from "@/lib/types/message";
+import { hasWebResearchSources } from "@/lib/domain/webResearchSources";
 
 interface MessageItemProps {
   message: Message;
@@ -41,11 +39,6 @@ export function MessageItem({
 }: MessageItemProps) {
   const safeTimestamp =
     typeof message.timestamp === "number" ? message.timestamp : Date.now();
-  const safeResults = Array.isArray(message.searchResults)
-    ? message.searchResults.filter(
-        (r) => r && typeof r.url === "string" && typeof r.title === "string",
-      )
-    : [];
   const messageId = message._id ? String(message._id) : "";
   const canDelete = messageId.length > 0;
 
@@ -99,19 +92,19 @@ export function MessageItem({
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         {/* 1) Sources (compact/collapsed) first */}
-        {message.role === "assistant" && safeResults.length > 0 && (
-          <div className="mb-4">
-            <MessageSources
-              id={messageId}
-              results={safeResults}
-              method={message.searchMethod}
-              collapsed={collapsedById[messageId] ?? false}
-              onToggle={onToggleCollapsed}
-              hoveredSourceUrl={hoveredSourceUrl}
-              onSourceHover={onSourceHover}
-            />
-          </div>
-        )}
+        {message.role === "assistant" &&
+          hasWebResearchSources(message.webResearchSources) && (
+            <div className="mb-4">
+              <MessageSources
+                id={messageId}
+                webResearchSources={message.webResearchSources}
+                collapsed={collapsedById[messageId] ?? false}
+                onToggle={onToggleCollapsed}
+                hoveredSourceUrl={hoveredSourceUrl}
+                onSourceHover={onSourceHover}
+              />
+            </div>
+          )}
 
         {/* 2) Thinking status - shows real-time AI processing */}
         {message.role === "assistant" &&
@@ -189,7 +182,7 @@ export function MessageItem({
           {message.role === "assistant" ? (
             <ContentWithCitations
               content={message.content || ""}
-              searchResults={safeResults}
+              webResearchSources={message.webResearchSources}
               hoveredSourceUrl={hoveredSourceUrl}
               onCitationHover={onCitationHover}
             />
@@ -208,15 +201,14 @@ export function MessageItem({
             <CopyButton
               text={
                 message.role === "assistant"
-                  ? formatConversationWithSources([
+                  ? formatConversationWithWebResearchSources([
                       {
                         role: message.role,
                         content: message.content || "",
-                        searchResults: message.searchResults,
-                        sources: message.sources,
+                        webResearchSources: message.webResearchSources,
                       },
                     ])
-                  : extractPlainText(message.content || "")
+                  : message.content || ""
               }
               size="sm"
               title="Copy message"

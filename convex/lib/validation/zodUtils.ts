@@ -27,18 +27,6 @@ export type ValidationResult<T> =
   | { success: false; error: z.ZodError };
 
 // ============================================
-// Type Guards
-// ============================================
-
-/**
- * Type guard for Record<string, unknown>.
- * Use at boundaries before accessing object properties.
- */
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-// ============================================
 // Error Logging
 // ============================================
 

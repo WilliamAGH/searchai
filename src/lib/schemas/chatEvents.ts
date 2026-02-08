@@ -39,10 +39,15 @@ export const MetadataEventSchema = z.object({
   nonce: z.string().optional(),
 });
 
-export const ToolResultEventSchema = z.object({
-  type: z.literal("tool_result"),
-  toolName: z.string(),
-  result: z.string(),
+export const WorkflowStartEventSchema = z.object({
+  type: z.literal("workflow_start"),
+  workflowId: z.string(),
+  nonce: z.string(),
+});
+
+export const CompleteEventSchema = z.object({
+  type: z.literal("complete"),
+  workflow: z.unknown().optional(),
 });
 
 export const ErrorEventSchema = z.object({

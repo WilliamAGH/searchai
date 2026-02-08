@@ -1,7 +1,10 @@
 import type { Page } from "@playwright/test";
 
 export async function setupNewChatPage(page: Page): Promise<void> {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const response = await page.goto("/", { waitUntil: "domcontentloaded" });
+  if (response && response.status() === 404) {
+    await page.goto("/index.html", { waitUntil: "domcontentloaded" });
+  }
   await page.waitForSelector(
     '[data-testid="message-input"], textarea, [role="textbox"]',
     {

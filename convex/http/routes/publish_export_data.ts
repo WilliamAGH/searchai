@@ -1,8 +1,9 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { formatConversationMarkdown } from "../utils";
-import { buildCorsJsonResponse } from "./publish_cors";
+import { publicCorsResponse } from "../cors";
 import { isValidUuidV7 } from "../../lib/uuid";
+import type { WebResearchSource } from "../../lib/validators";
 
 type ExportedChat = {
   title: string;
@@ -17,8 +18,7 @@ type ExportedMessage = {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
-  searchResults?: Array<{ title?: string; url?: string }>;
-  sources?: string[];
+  webResearchSources?: WebResearchSource[];
 };
 
 export type ExportData = {
@@ -35,52 +35,56 @@ export type ExportDataResult =
 
 type ShareQueryMode = "auth" | "http";
 
+/** Max length for shareId/publicId query params (UUIDv7 is ~26 chars; generous cap) */
+const MAX_ID_PARAM_LENGTH = 100;
+
 export async function loadExportData(
   ctx: ActionCtx,
   request: Request,
   mode: ShareQueryMode,
 ): Promise<ExportDataResult> {
   const url = new URL(request.url);
+  const origin = request.headers.get("Origin");
   const shareIdParam = url.searchParams.get("shareId");
   const publicIdParam = url.searchParams.get("publicId");
 
   const shareId = shareIdParam
-    ? String(shareIdParam).trim().slice(0, 100)
+    ? String(shareIdParam).trim().slice(0, MAX_ID_PARAM_LENGTH)
     : undefined;
   const publicId = publicIdParam
-    ? String(publicIdParam).trim().slice(0, 100)
+    ? String(publicIdParam).trim().slice(0, MAX_ID_PARAM_LENGTH)
     : undefined;
 
   // Validate UUIDv7 format before querying
   if (shareId && !isValidUuidV7(shareId)) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(
-        request,
-        { error: "Invalid shareId format" },
-        400,
-      ),
+      response: publicCorsResponse({
+        body: JSON.stringify({ error: "Invalid shareId format" }),
+        status: 400,
+        origin,
+      }),
     };
   }
   if (publicId && !isValidUuidV7(publicId)) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(
-        request,
-        { error: "Invalid publicId format" },
-        400,
-      ),
+      response: publicCorsResponse({
+        body: JSON.stringify({ error: "Invalid publicId format" }),
+        status: 400,
+        origin,
+      }),
     };
   }
 
   if (!shareId && !publicId) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(
-        request,
-        { error: "Missing shareId or publicId" },
-        400,
-      ),
+      response: publicCorsResponse({
+        body: JSON.stringify({ error: "Missing shareId or publicId" }),
+        status: 400,
+        origin,
+      }),
     };
   }
 
@@ -96,11 +100,11 @@ export async function loadExportData(
   if (!chat) {
     return {
       ok: false,
-      response: buildCorsJsonResponse(
-        request,
-        { error: "Chat not found or not accessible" },
-        404,
-      ),
+      response: publicCorsResponse({
+        body: JSON.stringify({ error: "Chat not found or not accessible" }),
+        status: 404,
+        origin,
+      }),
     };
   }
 
@@ -126,8 +130,7 @@ export async function loadExportData(
     role: m.role,
     content: m.content ?? "",
     timestamp: m.timestamp ?? 0,
-    searchResults: m.searchResults,
-    sources: m.sources,
+    webResearchSources: m.webResearchSources,
   }));
 
   const markdown = formatConversationMarkdown({

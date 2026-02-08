@@ -5,6 +5,14 @@ import type { Id, TableNames } from "../_generated/dataModel";
 // Note: Do not re-export Convex-generated types from _generated/*
 
 /**
+ * Type guard to check if a value is a plain record (object).
+ * Shared utility to avoid duplicate implementations across modules.
+ */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
  * Search method validator.
  * Values must match SEARCH_METHODS const in constants/search.ts (source of truth).
  * @see {@link ./constants/search.ts} SEARCH_METHODS - canonical list
@@ -82,7 +90,7 @@ export const vSerpEnrichment = v.object({
   relatedSearches: v.optional(v.array(v.string())),
 });
 
-export const vContextReference = v.object({
+export const vWebResearchSource = v.object({
   contextId: v.string(),
   type: v.union(
     v.literal("search_result"),
@@ -96,8 +104,12 @@ export const vContextReference = v.object({
   metadata: v.optional(v.any()),
 });
 
-/** TypeScript type for context references (derived from validator) */
-export interface ContextReference {
+/**
+ * TypeScript type for web research sources (derived from validator).
+ *
+ * Keep this aligned with `convex/schemas/webResearchSources.ts`.
+ */
+export interface WebResearchSource {
   contextId: string;
   type: "search_result" | "scraped_page" | "research_summary";
   url?: string;

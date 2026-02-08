@@ -7,10 +7,7 @@ import {
 import { executeParallelResearch } from "./parallel_research";
 import { executeSynthesis } from "./synthesis_executor";
 import { RELEVANCE_SCORES, CONTENT_LIMITS } from "../lib/constants/cache";
-import {
-  convertToContextReferences,
-  buildSearchResultsFromContextRefs,
-} from "./orchestration_helpers";
+import { convertToWebResearchSources } from "./orchestration_helpers";
 import {
   buildCompleteEvent,
   buildMetadataEvent,
@@ -50,6 +47,7 @@ export async function* executeParallelPath({
   const { agents } = require("./definitions");
   const writeEvent = (type: string, data: Record<string, unknown>) =>
     createWorkflowEvent(type, data);
+
   const parallelResearchGenerator = executeParallelResearch({
     ctx,
     searchQueries: planningOutput.searchQueries,
@@ -231,14 +229,14 @@ export async function* executeParallelPath({
       relevance,
     };
   });
-  const contextReferences = convertToContextReferences(normalizedSources);
+  const webResearchSources = convertToWebResearchSources(normalizedSources);
 
   // Emit metadata before complete per SSE spec (complete is terminal for some clients)
   yield writeEvent(
     "metadata",
     buildMetadataEvent({
       workflowId,
-      contextReferences,
+      webResearchSources,
       hasLimitations: parsedAnswer.hasLimitations,
       confidence: parsedAnswer.confidence,
       answerLength: finalAnswerText.length,
@@ -277,24 +275,20 @@ export async function* executeParallelPath({
     intent: planningOutput?.userIntent || args.userQuery,
   });
 
-  const searchResults = buildSearchResultsFromContextRefs(contextReferences);
-
   const assistantMessageId = await persistAssistantMessage({
     ctx,
     chatId: args.chatId,
     content: finalAnswerText,
     workflowId,
+    workflowTokenId,
     sessionId: args.sessionId,
-    searchResults,
-    sources: parsedAnswer.sourcesUsed || [],
-    contextReferences,
+    webResearchSources,
   });
   const persistedPayload: StreamingPersistPayload = {
     assistantMessageId,
     workflowId,
     answer: finalAnswerText,
-    sources: parsedAnswer.sourcesUsed || [],
-    contextReferences,
+    webResearchSources,
   };
   const signature = await completeWorkflowWithSignature({
     ctx,

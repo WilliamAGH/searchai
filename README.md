@@ -1,10 +1,10 @@
-# search-ai.io
+# [searchAI](https://search-ai.io)
 
-AI-powered search chat built with React + Vite and Convex.
+AI-powered search chat built with Convex, Vite, & React.
 
 ![search-ai.io](public/images/opengraph/searchai-io-og.png)
 
-- Live: [search-ai.io](https://search-ai.io)
+- Use It Now: [search-ai.io](https://search-ai.io)
 - Docs: [docs/README.md](docs/README.md)
 
 ## Features
@@ -14,7 +14,7 @@ AI-powered search chat built with React + Vite and Convex.
 - Chat sharing + export (markdown/html/json/txt)
 - Local-only mode and Convex-backed mode
 
-## Quick start
+## Development
 
 ```bash
 npm install
@@ -55,8 +55,14 @@ npm run dev
 
 See `CONTRIBUTING.md`.
 
+## Other Projects
+
+- [Composer](https://composerai.app) — AI-assisted email application ([GitHub](https://github.com/WilliamAGH/ComposerAI))
+- [TUI4J](https://github.com/WilliamAGH/tui4j) — Modern terminal user interface library for Java
+- [Brief](https://williamcallahan.com/projects/brief) — Beautiful terminal AI chat with tool calling ([GitHub](https://github.com/WilliamAGH/brief))
+
 ## License
 
-Copyright © 2026 William Callahan.
+Copyright © 2026 [William Callahan](https://williamcallahan.com).
 
 See `LICENSE.md`.

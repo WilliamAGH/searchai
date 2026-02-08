@@ -6,7 +6,6 @@
 
 import React from "react";
 import ReactMarkdown from "react-markdown";
-import { useDomainToUrlMap } from "@/hooks/utils/useDomainToUrlMap";
 import { useCitationProcessor } from "@/hooks/utils/useCitationProcessor";
 import { createCitationAnchorRenderer } from "@/lib/utils/citationAnchorRenderer";
 import {
@@ -14,31 +13,32 @@ import {
   REHYPE_PLUGINS,
   CodeRenderer,
 } from "@/lib/utils/markdownConfig";
+import { toDomainToUrlMap } from "@/lib/domain/webResearchSources";
+import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
 interface ContentWithCitationsProps {
   content: string;
-  searchResults?: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-  }>;
+  webResearchSources?: WebResearchSourceClient[] | undefined;
   hoveredSourceUrl?: string | null;
   onCitationHover?: (url: string | null) => void;
 }
 
 export function ContentWithCitations({
   content,
-  searchResults = [],
+  webResearchSources,
   hoveredSourceUrl,
   onCitationHover,
 }: ContentWithCitationsProps) {
   // Create a map of domains to URLs for quick lookup
-  const domainToUrlMap = useDomainToUrlMap(searchResults);
+  const domainToUrlMap = React.useMemo(
+    () => toDomainToUrlMap(webResearchSources),
+    [webResearchSources],
+  );
 
   // Convert [domain] or [URL] to markdown links where domain is known
   const processedContent = useCitationProcessor(
     content,
-    searchResults,
+    webResearchSources,
     domainToUrlMap,
   );
 

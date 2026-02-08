@@ -14,33 +14,23 @@ import {
   SerpEnrichmentSchema,
 } from "./search";
 import { safeParseOrNull } from "../lib/validation/zodUtils";
+import {
+  WebResearchSourceSchema,
+  WebResearchSourcesSchema,
+} from "./webResearchSources";
 
 // Re-export canonical types for consumers (no aliasing)
 export { SerpEnrichmentSchema, type SerpEnrichment } from "./search";
+export { WebResearchSourceSchema, WebResearchSourcesSchema };
 
 // ============================================
-// Context Reference Schema
+// Web Research Sources (Canonical)
 // ============================================
 
 /**
- * Context reference metadata for research sources.
- * Node-agnostic per [CX1] - no node: imports allowed.
- *
- * @see {@link ../lib/validators.ts} - Convex validators mirror this schema
+ * Deprecated name retained in comments only.
+ * The canonical domain concept is WebResearchSource.
  */
-export const ResearchContextReferenceSchema = z.object({
-  contextId: z.string(),
-  type: z.enum(["search_result", "scraped_page", "research_summary"]),
-  url: z.string().optional(),
-  title: z.string().optional(),
-  timestamp: z.number(),
-  relevanceScore: z.number().optional(),
-  metadata: z.unknown().optional(),
-});
-
-export type ResearchContextReference = z.infer<
-  typeof ResearchContextReferenceSchema
->;
 
 // ============================================
 // Streaming Persist Payload
@@ -50,8 +40,7 @@ export const StreamingPersistPayloadSchema = z.object({
   assistantMessageId: z.string(),
   workflowId: z.string(),
   answer: z.string(),
-  sources: z.array(z.string()),
-  contextReferences: z.array(ResearchContextReferenceSchema),
+  webResearchSources: z.array(WebResearchSourceSchema),
 });
 
 export type StreamingPersistPayload = z.infer<
@@ -124,8 +113,8 @@ export const ScrapeToolOutputSchema = z.object({
   title: z.string(),
   content: z.string(),
   summary: z.string(),
-  contentLength: z.number().optional(),
-  scrapedAt: z.number().optional(),
+  contentLength: z.number(),
+  scrapedAt: z.number(),
   error: z.string().optional(),
   errorMessage: z.string().optional(),
   _toolCallMetadata: ToolCallMetadataSchema.optional(),

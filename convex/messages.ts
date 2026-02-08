@@ -2,15 +2,16 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import {
-  vSearchResult,
-  vContextReference,
-  vSearchMethod,
-} from "./lib/validators";
+import { vWebResearchSource, vSearchMethod } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
-import { isAuthorized, isUnownedChat, hasSessionAccess } from "./lib/auth";
-
+import {
+  isAuthorized,
+  isUnownedChat,
+  hasSessionAccess,
+  isValidWorkflowToken,
+} from "./lib/auth";
+import { buildMessageInsertDocument } from "./messages_insert_document";
 export const addMessage = internalMutation({
   args: {
     chatId: v.id("chats"),
@@ -19,15 +20,11 @@ export const addMessage = internalMutation({
     isStreaming: v.optional(v.boolean()),
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
-    searchResults: v.optional(v.array(vSearchResult)),
-    sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
-    // New: provenance tracking and workflow linkage
-    contextReferences: v.optional(v.array(vContextReference)),
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
     workflowId: v.optional(v.string()),
-    // CRITICAL: Add sessionId for HTTP action auth (when userId not available)
     sessionId: v.optional(v.string()),
   },
   returns: v.id("messages"),
@@ -37,7 +34,6 @@ export const addMessage = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
-    // Authorization: require ownership; shared/public chats are read-only.
     const authorized =
       isAuthorized(chat, userId, args.sessionId) ||
       (isUnownedChat(chat) && !!args.sessionId);
@@ -46,29 +42,26 @@ export const addMessage = internalMutation({
       throw new Error("Unauthorized");
     }
 
-    // Generate UUID v7 for message tracking.
     const messageId = generateMessageId();
 
-    // Get or create thread ID from chat.
     let threadId = chat.threadId;
     if (!threadId) {
       threadId = generateThreadId();
-      // Update chat with threadId if not present.
       await ctx.db.patch(args.chatId, { threadId });
     }
 
-    // Destructure sessionId out - validation only, not storage.
-    const { chatId, sessionId: _sessionId, ...rest } = args;
-    return await ctx.db.insert("messages", {
-      chatId: chatId,
-      messageId, // UUID v7 for unique message tracking
-      threadId, // UUID v7 for conversation thread continuity
-      ...rest,
-      timestamp: Date.now(),
-    });
+    const { chatId, sessionId: _sessionId, ...persistableArgs } = args;
+    return await ctx.db.insert(
+      "messages",
+      buildMessageInsertDocument({
+        chatId,
+        messageId,
+        threadId,
+        args: persistableArgs,
+      }),
+    );
   },
 });
-
 // HTTP-only variant for actions without auth context.
 export const addMessageHttp = internalMutation({
   args: {
@@ -78,24 +71,27 @@ export const addMessageHttp = internalMutation({
     isStreaming: v.optional(v.boolean()),
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
-    searchResults: v.optional(v.array(vSearchResult)),
-    sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
-    contextReferences: v.optional(v.array(vContextReference)),
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
     workflowId: v.optional(v.string()),
+    workflowTokenId: v.optional(v.id("workflowTokens")),
     sessionId: v.optional(v.string()),
   },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
     const chat = await ctx.db.get(args.chatId);
-
     if (!chat) throw new Error("Chat not found");
 
-    // Authorization: require ownership; shared/public chats are read-only.
+    const workflowToken = args.workflowTokenId
+      ? await ctx.db.get(args.workflowTokenId)
+      : null;
+    const hasValidToken = isValidWorkflowToken(workflowToken, args.chatId);
+
     const authorized =
-      hasSessionAccess(chat, args.sessionId) ||
+      hasValidToken ||
+      (!chat.userId && hasSessionAccess(chat, args.sessionId)) ||
       (isUnownedChat(chat) && !!args.sessionId);
 
     if (!authorized) {
@@ -110,17 +106,23 @@ export const addMessageHttp = internalMutation({
       await ctx.db.patch(args.chatId, { threadId });
     }
 
-    const { chatId, sessionId: _sessionId, ...rest } = args;
-    return await ctx.db.insert("messages", {
-      chatId: chatId,
-      messageId,
-      threadId,
-      ...rest,
-      timestamp: Date.now(),
-    });
+    const {
+      chatId,
+      sessionId: _sessionId,
+      workflowTokenId: _workflowTokenId,
+      ...persistableArgs
+    } = args;
+    return await ctx.db.insert(
+      "messages",
+      buildMessageInsertDocument({
+        chatId,
+        messageId,
+        threadId,
+        args: persistableArgs,
+      }),
+    );
   },
 });
-
 export const internalUpdateMessageContent = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -129,10 +131,10 @@ export const internalUpdateMessageContent = internalMutation({
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     if (!message) {
-      // Silently fail, to avoid crashing the stream
-      console.warn(
-        `Message not found: ${args.messageId}, could not append chunk.`,
-      );
+      console.error("[streaming] Message not found during content append", {
+        messageId: args.messageId,
+        chunkLength: args.contentChunk.length,
+      });
       return;
     }
     await ctx.db.patch(args.messageId, {
@@ -140,7 +142,6 @@ export const internalUpdateMessageContent = internalMutation({
     });
   },
 });
-
 export const internalUpdateMessageReasoning = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -149,10 +150,10 @@ export const internalUpdateMessageReasoning = internalMutation({
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     if (!message) {
-      // Silently fail, to avoid crashing the stream
-      console.warn(
-        `Message not found: ${args.messageId}, could not append reasoning chunk.`,
-      );
+      console.error("[streaming] Message not found during reasoning append", {
+        messageId: args.messageId,
+        chunkLength: args.reasoningChunk.length,
+      });
       return;
     }
     await ctx.db.patch(args.messageId, {
@@ -160,14 +161,12 @@ export const internalUpdateMessageReasoning = internalMutation({
     });
   },
 });
-
 export const updateMessageMetadata = mutation({
   args: {
     messageId: v.id("messages"),
-    searchResults: v.optional(v.array(vSearchResult)),
-    sources: v.optional(v.array(v.string())),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
     sessionId: v.optional(v.string()),
   },
   returns: v.null(),
@@ -175,11 +174,7 @@ export const updateMessageMetadata = mutation({
     const { messageId, sessionId, ...metadata } = args;
     const message = await ctx.db.get(messageId);
     if (!message) {
-      // Silently fail
-      console.warn(
-        `Message not found: ${messageId}, could not update metadata.`,
-      );
-      return null;
+      throw new Error(`Message not found: ${messageId}`);
     }
 
     // Check authorization - only the chat owner can update message metadata
@@ -198,7 +193,6 @@ export const updateMessageMetadata = mutation({
     return null;
   },
 });
-
 export const updateMessage = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -206,20 +200,16 @@ export const updateMessage = internalMutation({
     streamedContent: v.optional(v.string()),
     thinking: v.optional(v.string()),
     isStreaming: v.optional(v.boolean()),
-    searchResults: v.optional(v.array(vSearchResult)),
-    sources: v.optional(v.array(v.string())),
     reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
-    // New
-    contextReferences: v.optional(v.array(vContextReference)),
+    webResearchSources: v.optional(v.array(vWebResearchSource)),
     workflowId: v.optional(v.string()),
   },
   handler: async (ctx, { messageId, ...rest }) => {
     await ctx.db.patch(messageId, { ...rest });
   },
 });
-
 /** Count user messages for a chat. */
 export const countMessages = internalMutation({
   args: { chatId: v.id("chats") },
@@ -233,7 +223,6 @@ export const countMessages = internalMutation({
     return messages.length;
   },
 });
-
 export const deleteMessage = mutation({
   args: {
     messageId: v.id("messages"),
@@ -282,7 +271,6 @@ export const deleteMessage = mutation({
     return null;
   },
 });
-
 export const addMessageWithTransaction = internalMutation({
   args: {
     chatId: v.id("chats"),
@@ -301,6 +289,12 @@ export const addMessageWithTransaction = internalMutation({
         return { success: false, error: "Chat not found" };
       }
 
+      let threadId = chat.threadId;
+      if (!threadId) {
+        threadId = generateThreadId();
+        await ctx.db.patch(args.chatId, { threadId });
+      }
+
       const messages = await ctx.db
         .query("messages")
         .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
@@ -313,6 +307,8 @@ export const addMessageWithTransaction = internalMutation({
         chatId: args.chatId,
         role: "user",
         content: args.userMessage,
+        messageId: generateMessageId(),
+        threadId,
         timestamp: Date.now(),
       });
 
@@ -334,6 +330,8 @@ export const addMessageWithTransaction = internalMutation({
         role: "assistant",
         content: "",
         isStreaming: true,
+        messageId: generateMessageId(),
+        threadId,
         timestamp: Date.now(),
       });
 

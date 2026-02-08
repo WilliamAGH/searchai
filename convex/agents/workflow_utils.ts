@@ -217,14 +217,21 @@ export async function* mapAsyncGenerator<TYieldIn, TYieldOut, TReturn>(
   source: AsyncGenerator<TYieldIn, TReturn, undefined>,
   mapper: (value: TYieldIn) => TYieldOut | null,
 ): AsyncGenerator<TYieldOut, TReturn, undefined> {
-  while (true) {
-    const { value, done } = await source.next();
-    if (done) {
-      return value;
+  try {
+    while (true) {
+      const { value, done } = await source.next();
+      if (done) {
+        return value;
+      }
+      const mapped = mapper(value);
+      if (mapped !== null) {
+        yield mapped;
+      }
     }
-    const mapped = mapper(value);
-    if (mapped !== null) {
-      yield mapped;
+  } finally {
+    if (source.return) {
+      // @ts-expect-error - AsyncGenerator return accepts optional values at runtime.
+      await source.return();
     }
   }
 }

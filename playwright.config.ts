@@ -2,6 +2,32 @@ import { defineConfig, devices } from "@playwright/test";
 import { desktopViewport } from "./__tests__/config/viewports";
 
 const useProxyRuntime = process.env.PLAYWRIGHT_RUNTIME === "proxy";
+const includeFirefoxEnv = process.env.PLAYWRIGHT_INCLUDE_FIREFOX;
+const includeFirefox =
+  includeFirefoxEnv === "1" ||
+  includeFirefoxEnv === "true" ||
+  (process.env.CI === "true" &&
+    includeFirefoxEnv !== "0" &&
+    includeFirefoxEnv !== "false");
+
+const projects = [
+  {
+    name: "chromium",
+    use: { ...devices["Desktop Chrome"], viewport: desktopViewport },
+  },
+  ...(includeFirefox
+    ? [
+        {
+          name: "firefox",
+          use: { ...devices["Desktop Firefox"], viewport: desktopViewport },
+        },
+      ]
+    : []),
+  {
+    name: "webkit",
+    use: { ...devices["Desktop Safari"], viewport: desktopViewport },
+  },
+];
 
 export default defineConfig({
   testDir: "./__tests__/e2e",
@@ -14,20 +40,7 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"], viewport: desktopViewport },
-    },
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"], viewport: desktopViewport },
-    },
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"], viewport: desktopViewport },
-    },
-  ],
+  projects,
   webServer: {
     // CRITICAL: DO NOT REMOVE "npx" from "npx vite preview" - CI/CD WILL BREAK!
     // Inside bash -c, node_modules/.bin is NOT in PATH. Without npx, vite is not

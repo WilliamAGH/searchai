@@ -11,7 +11,11 @@ import { query, mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { generateShareId, generatePublicId } from "../lib/uuid";
-import { hasUserAccess, hasSessionAccess } from "../lib/auth";
+import {
+  hasUserAccess,
+  hasSessionAccess,
+  isValidWorkflowToken,
+} from "../lib/auth";
 
 /**
  * Create new chat
@@ -36,6 +40,10 @@ export const createChat = mutation({
 
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
+
+    if (!userId && !args.sessionId) {
+      throw new Error("sessionId is required for anonymous chats");
+    }
 
     // Generate UUID v7 IDs for time-sortable, collision-resistant identifiers
     const shareId = generateShareId();
@@ -84,11 +92,12 @@ export const getUserChats = query({
 
     // Anonymous users - return session chats
     if (args.sessionId) {
-      return await ctx.db
+      const chats = await ctx.db
         .query("chats")
         .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
         .order("desc")
         .collect();
+      return chats.filter((chat) => !chat.userId);
     }
 
     // No userId or sessionId - return empty
@@ -125,7 +134,7 @@ async function validateChatAccess(
 
   // For sessionId-based access: HTTP endpoints or anonymous users
   // Note: HTTP actions don't have auth context, so they rely on sessionId
-  if (hasSessionAccess(chat, sessionId)) {
+  if (!chat.userId && hasSessionAccess(chat, sessionId)) {
     return chat;
   }
 
@@ -157,12 +166,14 @@ export const getChatById = query({
 /**
  * Get chat by ID for HTTP routes (no auth context).
  * - Allows shared/public chats
- * - Allows sessionId ownership
+ * - Allows sessionId ownership (anonymous chats only)
+ * - Allows valid workflow token (for authenticated user streaming workflows)
  */
 export const getChatByIdHttp = query({
   args: {
     chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
+    workflowTokenId: v.optional(v.id("workflowTokens")),
   },
   returns: v.union(v.any(), v.null()),
   handler: async (ctx, args) => {
@@ -173,7 +184,14 @@ export const getChatByIdHttp = query({
       return chat;
     }
 
-    if (hasSessionAccess(chat, args.sessionId)) {
+    if (!chat.userId && hasSessionAccess(chat, args.sessionId)) {
+      return chat;
+    }
+
+    const token = args.workflowTokenId
+      ? await ctx.db.get(args.workflowTokenId)
+      : null;
+    if (isValidWorkflowToken(token, args.chatId)) {
       return chat;
     }
 
@@ -205,7 +223,8 @@ export const getChatByIdDirect = query({
     const isSharedOrPublic =
       chat.privacy === "shared" || chat.privacy === "public";
     const isUserOwner = hasUserAccess(chat, userId);
-    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
+    const isSessionOwner =
+      !chat.userId && hasSessionAccess(chat, args.sessionId);
 
     if (isSharedOrPublic || isUserOwner || isSessionOwner) {
       return chat;

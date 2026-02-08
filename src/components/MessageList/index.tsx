@@ -20,6 +20,7 @@ import type { Message, SearchProgress } from "@/lib/types/message";
 import { useMessageListScroll } from "@/hooks/useMessageListScroll";
 import { resolveMessageKey } from "./messageKey";
 import { ReasoningDisplay } from "./ReasoningDisplay";
+import { hasWebResearchSources } from "@/lib/domain/webResearchSources";
 
 /** Virtualize message list when exceeding this count for performance */
 const VIRTUALIZATION_THRESHOLD = 100;
@@ -82,7 +83,7 @@ export function MessageList({
     {},
   );
   const [hoveredSourceUrl, setHoveredSourceUrl] = useState<string | null>(null);
-  // Citation hover callback - wired to CitationRenderer for hover highlighting
+  // Citation hover callback
   // Currently no-op at this level; could sync with hoveredSourceUrl for cross-component highlighting
   const handleCitationHover = useCallback((_url: string | null) => {
     // Placeholder for future citation highlight synchronization
@@ -128,7 +129,7 @@ export function MessageList({
 
         // Sources should NOT be collapsed initially - let users see search results
         // Only collapse after content has been generated
-        if (m.searchResults && m.searchResults.length > 0) {
+        if (hasWebResearchSources(m.webResearchSources)) {
           const sourceId = id;
           if (prev[sourceId] === undefined) {
             // Don't collapse sources initially - only after content is complete

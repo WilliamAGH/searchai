@@ -1,137 +1,161 @@
 "use node";
 
-import { RunToolCallItem, RunToolCallOutputItem } from "@openai/agents";
-import type { StreamingEventItem, ToolCallArgs } from "./streaming_event_types";
+import {
+  RunReasoningItem,
+  RunToolCallItem,
+  RunToolCallOutputItem,
+  type RunItemStreamEvent,
+  type RunRawModelStreamEvent,
+} from "@openai/agents";
+import type { ToolCallArgs } from "./streaming_event_types";
+import { isRecord } from "../lib/validators";
+
+type ToolCallStreamEvent = RunItemStreamEvent & {
+  name: "tool_called";
+  item: RunToolCallItem;
+};
+
+type ToolOutputStreamEvent = RunItemStreamEvent & {
+  name: "tool_output";
+  item: RunToolCallOutputItem;
+};
+
+type ReasoningStreamEvent = RunItemStreamEvent & {
+  name: "reasoning_item_created";
+  item: RunReasoningItem;
+};
 
 /**
  * Detect if a streaming event represents a tool call.
- * Handles multiple patterns from OpenAI Agents SDK for compatibility.
+ * Uses SDK-native event name + typed item contract.
  */
 export function isToolCallEvent(
-  item: StreamingEventItem | undefined,
-  eventName: string | undefined,
-): boolean {
-  if (!item) return false;
-
-  return (
-    item instanceof RunToolCallItem ||
-    item.rawItem?.type === "function_call" ||
-    item.type === "tool_call" ||
-    item.type === "function_call" ||
-    eventName === "tool_called" ||
-    eventName === "tool_call_created" ||
-    eventName === "function_call_item_created"
-  );
-}
-
-/**
- * Extract tool name from a streaming event item.
- * Handles various SDK patterns for tool name location.
- */
-export function extractToolName(item: StreamingEventItem): string {
-  return (
-    item.name ||
-    item.rawItem?.name ||
-    item.tool?.name ||
-    item.function?.name ||
-    "tool"
-  );
-}
-
-/**
- * Extract a string field from an object.
- * Returns undefined if field is not present.
- * Logs warning and returns undefined if field is present but not a string
- * (indicates schema mismatch worth investigating).
- */
-function extractString(obj: unknown, key: string): string | undefined {
-  if (!obj || typeof obj !== "object" || !(key in obj)) {
-    return undefined; // Field not present - normal case
-  }
-
-  const value = (obj as Record<string, unknown>)[key];
-  if (typeof value === "string") {
-    return value;
-  }
-
-  // Field present but wrong type - log for observability
-  console.warn(
-    `Tool argument "${key}" present but not a string:`,
-    typeof value,
-  );
-  return undefined;
-}
-
-/**
- * Extract tool arguments from a streaming event item.
- * The SDK provides arguments as a JSON string - we parse and extract relevant fields.
- * This is model-agnostic since tools enforce the reasoning parameter via Zod schema.
- *
- * Returns empty object if no arguments present or if parsing fails.
- * Parse failures are logged for observability but don't propagate errors since
- * missing tool args are non-fatal (the tool will still execute).
- */
-export function extractToolArgs(item: StreamingEventItem): ToolCallArgs {
-  // Try multiple locations where arguments might be stored
-  const argsString =
-    (item as { arguments?: string }).arguments ||
-    (item.rawItem as { arguments?: string } | undefined)?.arguments;
-
-  if (!argsString || typeof argsString !== "string") {
-    return {};
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(argsString);
-  } catch {
-    // Non-fatal: log for observability but don't block streaming
-    console.warn("Tool arguments not valid JSON, skipping extraction");
-    return {};
-  }
-
-  return {
-    query: extractString(parsed, "query"),
-    url: extractString(parsed, "url"),
-    reasoning: extractString(parsed, "reasoning"),
-  };
+  event: RunItemStreamEvent,
+): event is ToolCallStreamEvent {
+  return event.name === "tool_called" && event.item instanceof RunToolCallItem;
 }
 
 /**
  * Detect if a streaming event represents a tool output.
+ * Uses SDK-native event name + typed item contract.
  */
 export function isToolOutputEvent(
-  item: StreamingEventItem | undefined,
-  eventName: string | undefined,
-): boolean {
-  if (!item) return false;
-
+  event: RunItemStreamEvent,
+): event is ToolOutputStreamEvent {
   return (
-    item instanceof RunToolCallOutputItem ||
-    item.type === "tool_call_output" ||
-    item.type === "function_call_output" ||
-    eventName === "tool_output" ||
-    eventName === "tool_call_output_created" ||
-    eventName === "function_call_output_item_created"
+    event.name === "tool_output" && event.item instanceof RunToolCallOutputItem
   );
 }
 
 /**
- * Extract text delta from a streaming event item.
- * Returns the delta string or null if not a text event.
+ * Detect if a streaming event represents reasoning content.
+ * Uses SDK-native event name + typed item contract.
  */
-export function extractTextDelta(
-  item: StreamingEventItem,
-  eventName: string | undefined,
-): string | null {
-  const delta =
-    item.delta?.content ||
-    item.content_delta ||
-    item.text_delta ||
-    (eventName?.includes("delta") ? item.content : undefined);
+export function isReasoningEvent(
+  event: RunItemStreamEvent,
+): event is ReasoningStreamEvent {
+  return (
+    event.name === "reasoning_item_created" &&
+    event.item instanceof RunReasoningItem
+  );
+}
 
-  if (delta && typeof delta === "string" && delta.length > 0) {
-    return delta;
+/**
+ * Extract tool name from a typed tool call item.
+ */
+export function extractToolName(item: RunToolCallItem): string {
+  if ("name" in item.rawItem && typeof item.rawItem.name === "string") {
+    return item.rawItem.name;
+  }
+  return "tool";
+}
+
+/**
+ * Extract tool name from a typed tool output item.
+ */
+export function extractOutputToolName(item: RunToolCallOutputItem): string {
+  if ("name" in item.rawItem && typeof item.rawItem.name === "string") {
+    return item.rawItem.name;
+  }
+  return "tool";
+}
+
+/**
+ * Extract tool output payload from a typed tool output item.
+ */
+export function extractToolOutput(item: RunToolCallOutputItem): unknown {
+  return item.output;
+}
+
+/**
+ * Extract and parse tool arguments from a typed tool call item.
+ * Arguments are JSON strings in SDK protocol items.
+ */
+export function extractToolArgs(item: RunToolCallItem): ToolCallArgs {
+  const argsString =
+    "arguments" in item.rawItem ? item.rawItem.arguments : undefined;
+  if (typeof argsString !== "string" || argsString.length === 0) {
+    return {};
+  }
+
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(argsString);
+  } catch {
+    console.warn("Tool arguments are not valid JSON; skipping extraction");
+    return {};
+  }
+
+  if (!isRecord(parsed)) {
+    return {};
+  }
+
+  const query = parsed.query;
+  const url = parsed.url;
+  const reasoning = parsed.reasoning;
+
+  return {
+    query: typeof query === "string" ? query : undefined,
+    url: typeof url === "string" ? url : undefined,
+    reasoning: typeof reasoning === "string" ? reasoning : undefined,
+  };
+}
+
+/**
+ * Extract reasoning text from a typed reasoning item.
+ */
+export function extractReasoningContent(item: RunReasoningItem): string {
+  if (item.rawItem.type !== "reasoning") {
+    return "";
+  }
+
+  const primaryText = item.rawItem.content
+    .map((part) => part.text)
+    .filter((text) => typeof text === "string" && text.length > 0)
+    .join("");
+
+  if (primaryText.length > 0) {
+    return primaryText;
+  }
+
+  const rawContent = item.rawItem.rawContent ?? [];
+  return rawContent
+    .map((part) => part.text)
+    .filter((text) => typeof text === "string" && text.length > 0)
+    .join("");
+}
+
+/**
+ * Extract text deltas from SDK raw-model events.
+ * StreamedRunResult.toTextStream() uses this same event contract internally.
+ */
+export function extractTextDelta(event: RunRawModelStreamEvent): string | null {
+  if (
+    event.data.type === "output_text_delta" &&
+    typeof event.data.delta === "string" &&
+    event.data.delta.length > 0
+  ) {
+    return event.data.delta;
   }
   return null;
 }

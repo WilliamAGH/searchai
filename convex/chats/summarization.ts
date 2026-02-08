@@ -41,7 +41,8 @@ export const summarizeRecent = query({
     // Shared and public chats are accessible regardless of owner or session
     if (chat.privacy !== "shared" && chat.privacy !== "public") {
       const isUserOwner = hasUserAccess(chat, userId);
-      const isSessionOwner = hasSessionAccess(chat, args.sessionId);
+      const isSessionOwner =
+        !chat.userId && hasSessionAccess(chat, args.sessionId);
 
       if (!isUserOwner && !isSessionOwner) {
         return "";

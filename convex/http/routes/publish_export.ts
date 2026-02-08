@@ -1,6 +1,6 @@
 import type { ActionCtx } from "../../_generated/server";
 import { escapeHtml } from "../utils";
-import { getAllowedOrigin } from "./publish_cors";
+import { publicCorsResponse } from "../cors";
 import { loadExportData } from "./publish_export_data";
 
 type ExportFormat = "json" | "markdown" | "html" | "txt";
@@ -33,66 +33,21 @@ function resolveFormat(request: Request): ExportFormat {
   return baseFormat;
 }
 
-export async function handleExportChat(
-  ctx: ActionCtx,
-  request: Request,
-): Promise<Response> {
-  const exportResult = await loadExportData(ctx, request, "http");
-  if (!exportResult.ok) {
-    return exportResult.response;
-  }
+type HtmlExportPageParams = {
+  title: string;
+  privacy: string;
+  markdown: string;
+  robots: string;
+};
 
-  const { chat, messages, markdown, robots, cacheControl } = exportResult.data;
-  const format = resolveFormat(request);
-  const origin = request.headers.get("Origin");
-  const allowOrigin = getAllowedOrigin(origin);
-
-  if (format === "json") {
-    const body = JSON.stringify({ chat, messages });
-    return new Response(body, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": allowOrigin,
-        "X-Robots-Tag": robots,
-        Vary: "Accept, Origin",
-        "Cache-Control": cacheControl,
-      },
-    });
-  }
-
-  if (format === "txt") {
-    return new Response(markdown, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Access-Control-Allow-Origin": allowOrigin,
-        "X-Robots-Tag": robots,
-        Vary: "Accept, Origin",
-        "Cache-Control": cacheControl,
-      },
-    });
-  }
-
-  if (format === "markdown") {
-    return new Response(markdown, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Access-Control-Allow-Origin": allowOrigin,
-        "X-Robots-Tag": robots,
-        Vary: "Accept, Origin",
-        "Cache-Control": cacheControl,
-      },
-    });
-  }
-
-  const html = `<!doctype html>
+function buildHtmlExportPage(params: HtmlExportPageParams): string {
+  const { title, privacy, markdown, robots } = params;
+  return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(chat.title || "Chat")}</title>
+    <title>${escapeHtml(title)}</title>
     <meta name="robots" content="${robots}" />
     <style>
       body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,Cantarell,Noto Sans,sans-serif;line-height:1.5;margin:1.5rem;color:#111}
@@ -103,21 +58,70 @@ export async function handleExportChat(
   </head>
   <body>
     <div class="container">
-      <h1>${escapeHtml(chat.title || "Chat")}</h1>
-      <div class="meta">Privacy: ${escapeHtml(String(chat.privacy || "unknown"))}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <div class="meta">Privacy: ${escapeHtml(privacy)}</div>
       <pre>${escapeHtml(markdown)}</pre>
     </div>
   </body>
 </html>`;
+}
 
-  return new Response(html, {
+export async function handleExportChat(
+  ctx: ActionCtx,
+  request: Request,
+): Promise<Response> {
+  const origin = request.headers.get("Origin");
+
+  const exportResult = await loadExportData(ctx, request, "http");
+  if (!exportResult.ok) return exportResult.response;
+
+  const { chat, messages, markdown, robots, cacheControl } = exportResult.data;
+  const format = resolveFormat(request);
+  const sharedHeaders = {
+    "X-Robots-Tag": robots,
+    Vary: "Accept, Origin",
+    "Cache-Control": cacheControl,
+  };
+
+  if (format === "json") {
+    return publicCorsResponse({
+      body: JSON.stringify({ chat, messages }),
+      status: 200,
+      origin,
+      extraHeaders: sharedHeaders,
+    });
+  }
+
+  if (format === "txt") {
+    return publicCorsResponse({
+      body: markdown,
+      status: 200,
+      origin,
+      contentType: "text/plain; charset=utf-8",
+      extraHeaders: sharedHeaders,
+    });
+  }
+
+  if (format === "markdown") {
+    return publicCorsResponse({
+      body: markdown,
+      status: 200,
+      origin,
+      contentType: "text/markdown; charset=utf-8",
+      extraHeaders: sharedHeaders,
+    });
+  }
+
+  return publicCorsResponse({
+    body: buildHtmlExportPage({
+      title: chat.title || "Chat",
+      privacy: String(chat.privacy || "unknown"),
+      markdown,
+      robots,
+    }),
     status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Access-Control-Allow-Origin": allowOrigin,
-      "X-Robots-Tag": robots,
-      Vary: "Accept, Origin",
-      "Cache-Control": cacheControl,
-    },
+    origin,
+    contentType: "text/html; charset=utf-8",
+    extraHeaders: sharedHeaders,
   });
 }

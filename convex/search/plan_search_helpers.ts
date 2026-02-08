@@ -68,7 +68,7 @@ export function computeHeuristics(
       .find((m: ChatMessageView) => m.role === "user");
 
   const jaccardScore = jaccard(
-    tokSet(serialize(prevUser?.content)),
+    tokSet(serialize(prevUser?.content ?? "")),
     tokSet(newContent),
   );
   const lastTs = prevUser?.timestamp as number | undefined;
@@ -86,7 +86,7 @@ export function buildPlanContextSummary(
   return buildContextSummary({
     messages: recentMessages.map((m: ChatMessageView) => ({
       role: m.role,
-      content: serialize(m.content),
+      content: serialize(m.content ?? ""),
       timestamp: m.timestamp,
     })),
     rollingSummary,

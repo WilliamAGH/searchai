@@ -12,6 +12,7 @@
  */
 import { useMemo } from "react";
 import { ShareModal } from "@/components/ShareModal";
+import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
 type ChatPrivacy = "private" | "shared" | "public";
 
@@ -44,8 +45,7 @@ interface ShareModalContainerProps {
     messages?: Array<{
       role: "user" | "assistant" | "system";
       content?: string;
-      searchResults?: Array<{ title?: string; url?: string }> | undefined;
-      sources?: string[] | undefined;
+      webResearchSources?: WebResearchSourceClient[] | undefined;
     }>;
   } | null;
   chatActions?: ShareChatActions;

@@ -7,20 +7,47 @@
 
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import {
   hasSessionAccess,
   hasUserAccess,
-  isUnownedChat,
   isSharedOrPublicChat,
 } from "../lib/auth";
-import { vContextReference, vSearchResult } from "../lib/validators";
 import { isValidUuidV7 } from "../lib/uuid";
+import {
+  fetchMessagesByChatId,
+  projectMessage,
+  vMessageProjection,
+} from "./messageProjection";
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
+
+function normalizePageSize(limit: number | undefined): number {
+  const normalizedLimit =
+    limit !== undefined && Number.isFinite(limit)
+      ? Math.floor(limit)
+      : DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(normalizedLimit, 1), MAX_PAGE_SIZE);
+}
 
 const assertValidSessionId = (sessionId?: string) => {
   if (sessionId && !isValidUuidV7(sessionId)) {
     throw new Error("Invalid sessionId format");
   }
+};
+
+type PaginatedMessagesResult = {
+  messages: ReturnType<typeof projectMessage>[];
+  nextCursor: Id<"messages"> | undefined;
+  hasMore: boolean;
+};
+
+const EMPTY_PAGE: PaginatedMessagesResult = {
+  messages: [],
+  nextCursor: undefined,
+  hasMore: false,
 };
 
 /**
@@ -40,28 +67,7 @@ export const getChatMessagesPaginated = query({
     cursor: v.optional(v.id("messages")),
   },
   returns: v.object({
-    messages: v.array(
-      v.object({
-        _id: v.id("messages"),
-        _creationTime: v.number(),
-        chatId: v.id("chats"),
-        role: v.union(
-          v.literal("user"),
-          v.literal("assistant"),
-          v.literal("system"),
-        ),
-        content: v.optional(v.string()),
-        timestamp: v.optional(v.number()),
-        isStreaming: v.optional(v.boolean()),
-        streamedContent: v.optional(v.string()),
-        thinking: v.optional(v.string()),
-        searchResults: v.optional(v.array(vSearchResult)),
-        sources: v.optional(v.array(v.string())),
-        reasoning: v.optional(v.string()),
-        contextReferences: v.optional(v.array(vContextReference)),
-        workflowId: v.optional(v.string()),
-      }),
-    ),
+    messages: v.array(vMessageProjection),
     nextCursor: v.optional(v.id("messages")),
     hasMore: v.boolean(),
   }),
@@ -71,27 +77,19 @@ export const getChatMessagesPaginated = query({
     const chat = await ctx.db.get(args.chatId);
 
     if (!chat) {
-      return {
-        messages: [],
-        nextCursor: undefined,
-        hasMore: false,
-      };
+      return EMPTY_PAGE;
     }
 
     const isSharedOrPublic = isSharedOrPublicChat(chat);
     const isUserOwner = hasUserAccess(chat, userId);
-    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
-    const isUnowned = isUnownedChat(chat);
+    const isSessionOwner =
+      !chat.userId && hasSessionAccess(chat, args.sessionId);
 
-    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner && !isUnowned) {
-      return {
-        messages: [],
-        nextCursor: undefined,
-        hasMore: false,
-      };
+    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner) {
+      return EMPTY_PAGE;
     }
 
-    const pageSize = Math.min(args.limit || 50, 100); // Max 100 messages per page
+    const pageSize = normalizePageSize(args.limit);
 
     // Build the query
     let baseQuery = ctx.db
@@ -108,22 +106,7 @@ export const getChatMessagesPaginated = query({
         hasMorePage && pageDocs.length > 0
           ? pageDocs[pageDocs.length - 1]._id
           : undefined;
-      const formatted = [...pageDocs].reverse().map((m) => ({
-        _id: m._id,
-        _creationTime: m._creationTime,
-        chatId: m.chatId,
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp,
-        isStreaming: m.isStreaming,
-        streamedContent: m.streamedContent,
-        thinking: m.thinking,
-        searchResults: m.searchResults || [],
-        sources: m.sources || [],
-        reasoning: m.reasoning,
-        contextReferences: m.contextReferences,
-        workflowId: m.workflowId,
-      }));
+      const formatted = [...pageDocs].reverse().map(projectMessage);
       return {
         messages: formatted,
         nextCursor: nextCursorPage,
@@ -137,14 +120,12 @@ export const getChatMessagesPaginated = query({
       // SECURITY: Validate cursor belongs to the requested chat BEFORE any query execution
       // This prevents a malicious cursor from a different chat exposing unauthorized data
       if (!cursorMessage || cursorMessage.chatId !== args.chatId) {
-        return {
-          messages: [],
-          nextCursor: undefined,
-          hasMore: false,
-        };
+        return EMPTY_PAGE;
       }
 
-      // Cursor is valid and belongs to this chat - continue from the cursor position
+      // Cursor is valid and belongs to this chat - continue from the cursor position.
+      // NOTE: This assumes _creationTime is monotonically increasing within a chat.
+      // Messages restored from backup or cross-shard replication may violate this.
       baseQuery = baseQuery.filter((q) =>
         q.lt(q.field("_creationTime"), cursorMessage._creationTime),
       );
@@ -165,6 +146,7 @@ export const getRecentChatMessages = query({
     sessionId: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
+  returns: v.array(vMessageProjection),
   handler: async (ctx, args) => {
     assertValidSessionId(args.sessionId);
     const userId = await getAuthUserId(ctx);
@@ -173,22 +155,18 @@ export const getRecentChatMessages = query({
 
     const isSharedOrPublic = isSharedOrPublicChat(chat);
     const isUserOwner = hasUserAccess(chat, userId);
-    const isSessionOwner = hasSessionAccess(chat, args.sessionId);
-    const isUnowned = isUnownedChat(chat);
+    const isSessionOwner =
+      !chat.userId && hasSessionAccess(chat, args.sessionId);
 
-    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner && !isUnowned) {
+    if (!isSharedOrPublic && !isUserOwner && !isSessionOwner) {
       return [];
     }
 
-    // Get messages directly
-    const limit = args.limit || 50;
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-      .order("desc")
-      .take(limit);
-
-    // Reverse to get chronological order
-    return messages.reverse();
+    const docs = await fetchMessagesByChatId(
+      ctx.db,
+      args.chatId,
+      normalizePageSize(args.limit),
+    );
+    return docs.map(projectMessage);
   },
 });

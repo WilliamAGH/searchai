@@ -5,11 +5,16 @@ import { streamConversationalWorkflow } from "../../agents/orchestration";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { safeConvexId } from "../../lib/validators";
 import { isValidUuidV7 } from "../../lib/uuid";
-import { corsResponse, dlog, formatSseEvent, serializeError } from "../utils";
+import { dlog, formatSseEvent, serializeError } from "../utils";
+import {
+  buildUnauthorizedOriginResponse,
+  corsResponse,
+  validateOrigin,
+} from "../cors";
 import {
   parseJsonPayload,
   rateLimitExceededResponse,
-  sanitizeContextReferences,
+  sanitizeWebResearchSources,
   sanitizeTextInput,
 } from "./aiAgent_utils";
 
@@ -17,10 +22,8 @@ export async function handleAgentStream(
   ctx: ActionCtx,
   request: Request,
 ): Promise<Response> {
-  const origin = request.headers.get("Origin");
-  const probe = corsResponse("{}", 204, origin);
-  if (probe.status === 403) return probe;
-  const allowedOrigin = probe.headers.get("Access-Control-Allow-Origin") || "*";
+  const origin = validateOrigin(request.headers.get("Origin"));
+  if (!origin) return buildUnauthorizedOriginResponse();
 
   const rateLimit = checkIpRateLimit(request, "/api/ai/agent/stream");
   if (!rateLimit.allowed) {
@@ -35,38 +38,38 @@ export async function handleAgentStream(
 
   const message = sanitizeTextInput(payload.message, 10000);
   if (!message) {
-    return corsResponse(
-      JSON.stringify({ error: "Message must be a string" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Message must be a string" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   if (!payload.chatId || typeof payload.chatId !== "string") {
-    return corsResponse(
-      JSON.stringify({ error: "chatId is required" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "chatId is required" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   const chatId = safeConvexId<"chats">(payload.chatId);
   if (!chatId) {
-    return corsResponse(
-      JSON.stringify({ error: "Invalid chatId" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Invalid chatId" }),
+      status: 400,
       origin,
-    );
+    });
   }
 
   const sessionIdRaw =
     typeof payload.sessionId === "string" ? payload.sessionId : undefined;
   if (sessionIdRaw && !isValidUuidV7(sessionIdRaw)) {
-    return corsResponse(
-      JSON.stringify({ error: "Invalid sessionId format" }),
-      400,
+    return corsResponse({
+      body: JSON.stringify({ error: "Invalid sessionId format" }),
+      status: 400,
       origin,
-    );
+    });
   }
   const sessionId = sessionIdRaw;
 
@@ -75,8 +78,8 @@ export async function handleAgentStream(
     5000,
   );
 
-  const contextReferences = sanitizeContextReferences(
-    payload.contextReferences,
+  const webResearchSources = sanitizeWebResearchSources(
+    payload.webResearchSources,
   );
 
   const encoder = new TextEncoder();
@@ -96,7 +99,7 @@ export async function handleAgentStream(
           sessionId,
           userQuery: message,
           conversationContext,
-          contextReferences,
+          webResearchSources,
         });
 
         for await (const event of eventStream) {
@@ -105,14 +108,13 @@ export async function handleAgentStream(
 
         dlog("[OK] STREAMING CONVERSATIONAL WORKFLOW COMPLETE");
       } catch (error) {
-        console.error(
-          "[ERROR] STREAMING WORKFLOW ERROR:",
-          serializeError(error),
-        );
+        const errorInfo = serializeError(error);
+        console.error("[ERROR] STREAMING WORKFLOW ERROR:", errorInfo);
         sendEvent({
           type: "error",
-          error: serializeError(error).message,
-          errorDetails: serializeError(error),
+          error: errorInfo.message,
+          errorDetails:
+            process.env.NODE_ENV === "development" ? errorInfo : undefined,
           timestamp: Date.now(),
         });
       } finally {
@@ -133,7 +135,7 @@ export async function handleAgentStream(
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
-      "Access-Control-Allow-Origin": allowedOrigin,
+      "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Headers": "Content-Type",
       Vary: "Origin",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",

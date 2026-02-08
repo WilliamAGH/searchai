@@ -1,11 +1,26 @@
-import { corsResponse, serializeError } from "../utils";
-import type { ResearchContextReference } from "../../schemas/agents";
+import { serializeError } from "../utils";
+import { corsResponse } from "../cors";
+import { isRecord, type WebResearchSource } from "../../lib/validators";
 
 /**
  * Regex pattern to match ASCII control characters (except tab, newline, carriage return)
  * Uses Unicode escapes to avoid Biome lint errors for literal control characters
  */
 const CONTROL_CHARS_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+/** Sanitization limits for user-provided web research source fields */
+const MAX_URL_LENGTH = 2000;
+const MAX_TITLE_LENGTH = 500;
+const MAX_SOURCES_PER_REQUEST = 12;
+
+/**
+ * Clamp a relevance score to the valid [0, 1] range.
+ */
+function clampRelevanceScore(score: number): number {
+  if (score < 0) return 0;
+  if (score > 1) return 1;
+  return score;
+}
 
 /**
  * Validate and normalize URL to safe http/https protocols only.
@@ -16,9 +31,12 @@ function safeParseUrl(value: unknown): string | undefined {
   try {
     const url = new URL(value);
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-    return url.toString().slice(0, 2000);
-  } catch {
-    // Invalid URL format - return undefined as intended
+    return url.toString().slice(0, MAX_URL_LENGTH);
+  } catch (error) {
+    console.warn("[sanitize] Rejected malformed URL in web research source", {
+      input: typeof value === "string" ? value.slice(0, 100) : typeof value,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return undefined;
   }
 }
@@ -31,19 +49,15 @@ export function rateLimitExceededResponse(
   resetAt: number,
   origin: string | null,
 ): Response {
-  return corsResponse(
-    JSON.stringify({
+  return corsResponse({
+    body: JSON.stringify({
       error: "Rate limit exceeded",
       message: "Too many requests. Please try again later.",
       retryAfter: Math.ceil((resetAt - Date.now()) / 1000),
     }),
-    429,
+    status: 429,
     origin,
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  });
 }
 
 export async function parseJsonPayload(
@@ -59,27 +73,27 @@ export async function parseJsonPayload(
     console.error(`[ERROR] ${logPrefix} INVALID JSON:`, errorInfo);
     return {
       ok: false,
-      response: corsResponse(
-        JSON.stringify({
+      response: corsResponse({
+        body: JSON.stringify({
           error: "Invalid JSON body",
           ...(process.env.NODE_ENV === "development"
             ? { errorDetails: errorInfo }
             : {}),
         }),
-        400,
+        status: 400,
         origin,
-      ),
+      }),
     };
   }
 
   if (!isRecord(rawPayload)) {
     return {
       ok: false,
-      response: corsResponse(
-        JSON.stringify({ error: "Invalid request payload" }),
-        400,
+      response: corsResponse({
+        body: JSON.stringify({ error: "Invalid request payload" }),
+        status: 400,
         origin,
-      ),
+      }),
     };
   }
 
@@ -94,13 +108,13 @@ export function sanitizeTextInput(
   return value.replace(CONTROL_CHARS_PATTERN, "").slice(0, maxLength);
 }
 
-export function sanitizeContextReferences(
+export function sanitizeWebResearchSources(
   input: unknown,
-): ResearchContextReference[] | undefined {
+): WebResearchSource[] | undefined {
   if (!Array.isArray(input)) return undefined;
 
   return input
-    .slice(0, 12)
+    .slice(0, MAX_SOURCES_PER_REQUEST)
     .map((refRaw) => {
       if (!isRecord(refRaw)) return null;
       const contextId =
@@ -115,7 +129,7 @@ export function sanitizeContextReferences(
         return null;
       }
 
-      const sanitized: ResearchContextReference = {
+      const sanitized: WebResearchSource = {
         contextId,
         type,
         timestamp:
@@ -127,23 +141,23 @@ export function sanitizeContextReferences(
         sanitized.url = safeUrl;
       }
       if (typeof refRaw.title === "string") {
-        sanitized.title = refRaw.title.slice(0, 500);
-      }
-      if (typeof refRaw.relevanceScore === "number") {
-        sanitized.relevanceScore = refRaw.relevanceScore;
+        sanitized.title = refRaw.title.slice(0, MAX_TITLE_LENGTH);
       }
       if (
-        refRaw.metadata !== null &&
-        refRaw.metadata !== undefined &&
-        !(
-          typeof refRaw.metadata === "object" &&
-          Object.keys(refRaw.metadata).length === 0
-        )
+        refRaw.relevanceScore !== undefined &&
+        typeof refRaw.relevanceScore === "number" &&
+        !Number.isNaN(refRaw.relevanceScore)
+      ) {
+        sanitized.relevanceScore = clampRelevanceScore(refRaw.relevanceScore);
+      }
+      if (
+        isRecord(refRaw.metadata) &&
+        Object.keys(refRaw.metadata).length > 0
       ) {
         sanitized.metadata = refRaw.metadata;
       }
 
       return sanitized;
     })
-    .filter((ref): ref is ResearchContextReference => !!ref);
+    .filter((ref): ref is WebResearchSource => !!ref);
 }

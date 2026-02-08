@@ -5,6 +5,7 @@ import { searchWithOpenRouter } from "./providers/openrouter";
 import { searchWithSerpApiDuckDuckGo } from "./providers/serpapi";
 import { searchWithDuckDuckGo } from "./providers/duckduckgo";
 import { getCachedSearchResults, setCachedSearchResults } from "./cache";
+import { hasOpenRouterStreamingConfig } from "../lib/providers/openai_streaming";
 
 export async function runSearchWeb(args: {
   query: string;
@@ -62,7 +63,7 @@ export async function runSearchWeb(args: {
   }
 
   // Try OpenRouter web search as fallback
-  if (process.env.OPENROUTER_API_KEY) {
+  if (hasOpenRouterStreamingConfig()) {
     try {
       const openRouterResults = await searchWithOpenRouter(
         args.query,

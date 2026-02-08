@@ -36,8 +36,16 @@ describe("verifyPersistedPayload", () => {
     assistantMessageId: "msg_1",
     workflowId: "019a122e-c507-7851-99f7-b8f5d7345b40",
     answer: "Example",
-    sources: ["anthropic.com"],
-    contextReferences: [],
+    webResearchSources: [
+      {
+        contextId: "019a122e-c507-7851-99f7-b8f5d7345b42",
+        type: "scraped_page",
+        url: "https://anthropic.com",
+        title: "Anthropic",
+        timestamp: 1700000000000,
+        relevanceScore: 0.9,
+      },
+    ],
   };
   const nonce = "019a122e-c507-7851-99f7-b8f5d7345b41";
   const signingKey = "test-signing-key";

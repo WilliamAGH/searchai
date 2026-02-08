@@ -83,6 +83,9 @@ test.describe("New Chat Stress Tests", () => {
 
     await page.waitForURL(/\/(chat)\/.+/, { timeout: 10000 });
 
-    await expect(page.locator('text="Initial message"')).not.toBeVisible();
+    const priorMessage = page
+      .locator('[data-testid="message-user"]')
+      .filter({ hasText: "Initial message" });
+    await expect(priorMessage).toHaveCount(0);
   });
 });

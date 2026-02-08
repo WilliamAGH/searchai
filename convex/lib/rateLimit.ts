@@ -13,7 +13,6 @@
  * Rate limit configuration per endpoint
  */
 const RATE_LIMITS: Record<string, { requests: number; windowMs: number }> = {
-  "/api/ai/agent": { requests: 10, windowMs: 60_000 }, // 10 req/min for AI generation
   "/api/ai/agent/stream": { requests: 10, windowMs: 60_000 }, // 10 req/min for streaming
   "/api/search": { requests: 30, windowMs: 60_000 }, // 30 req/min for search
   "/api/scrape": { requests: 20, windowMs: 60_000 }, // 20 req/min for scraping
@@ -64,7 +63,7 @@ export function extractClientIp(request: Request): string {
  * Check if request should be rate limited
  *
  * @param request - HTTP request object
- * @param endpoint - API endpoint path (e.g., "/api/ai/agent")
+ * @param endpoint - API endpoint path (e.g., "/api/ai/agent/stream")
  * @param customLimit - Optional override for request limit
  * @param customWindowMs - Optional override for time window
  * @returns Object with allowed status and remaining requests

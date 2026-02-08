@@ -1,11 +1,11 @@
 import type {
-  ResearchContextReference,
   StreamingPersistPayload,
   PlanningOutput,
 } from "../schemas/agents";
 import type { Id } from "../_generated/dataModel";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
 import type { StreamingWorkflowArgs } from "./orchestration_session";
+import type { WebResearchSource } from "../lib/validators";
 
 /**
  * Shared args for workflow path executors (fast path, parallel path).
@@ -100,7 +100,7 @@ export interface WorkflowCompletePayload {
 export interface WorkflowMetadataPayload {
   metadata: {
     workflowId: string;
-    contextReferences: ResearchContextReference[];
+    webResearchSources: WebResearchSource[];
     hasLimitations: boolean;
     confidence: number;
     answerLength: number;
@@ -147,8 +147,8 @@ export interface BuildCompleteEventParams {
   confidence?: number;
   answerCompleteness?: "complete" | "partial" | "insufficient";
 
-  /** Context references for building sourcesUsed */
-  contextReferences?: ResearchContextReference[];
+  /** Web research sources used during the workflow */
+  webResearchSources?: WebResearchSource[];
 
   /** Duration metrics */
   planningDuration?: number;
@@ -161,7 +161,7 @@ export interface BuildCompleteEventParams {
  */
 export interface BuildMetadataEventParams {
   workflowId: string;
-  contextReferences: ResearchContextReference[];
+  webResearchSources: WebResearchSource[];
   hasLimitations: boolean;
   confidence: number;
   answerLength: number;

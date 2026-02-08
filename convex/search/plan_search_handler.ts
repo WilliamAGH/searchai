@@ -16,7 +16,10 @@ import {
   DEFAULT_MAX_TOKENS,
 } from "./prompts";
 import { applyEnhancements } from "../enhancements";
-import { collectOpenRouterChatCompletionText } from "../lib/providers/openai_streaming";
+import {
+  collectOpenRouterChatCompletionText,
+  hasOpenRouterStreamingConfig,
+} from "../lib/providers/openai_streaming";
 import { serialize, diversifyQueries } from "./utils";
 import {
   type PlanResult,
@@ -149,11 +152,16 @@ export async function runPlanSearch(
     { chatId: args.chatId, sessionId: args.sessionId, limit: 25 },
   );
 
+  let lastCreationTime = 0;
+  for (const msg of recentMessages) {
+    lastCreationTime = Math.max(lastCreationTime, msg._creationTime ?? 0);
+  }
+
   const cacheKey = buildCacheKey(
     args.chatId,
     normMsg,
     recentMessages.length,
-    recentMessages.at(-1)?._creationTime ?? 0,
+    lastCreationTime,
   );
 
   // Check cache first
@@ -197,8 +205,8 @@ export async function runPlanSearch(
     timeSuggestNew,
   );
 
-  // Skip LLM if no API key
-  if (!process.env.OPENROUTER_API_KEY) {
+  // Skip LLM planning when OpenRouter-compatible streaming config is unavailable
+  if (!hasOpenRouterStreamingConfig()) {
     setCachedPlan(cacheKey, defaultPlan);
     return defaultPlan;
   }

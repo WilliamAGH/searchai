@@ -16,11 +16,8 @@ import { CACHE_TTL, CONTENT_LIMITS } from "../lib/constants/cache";
 import { getErrorMessage } from "../lib/errors";
 import { buildConversationContext } from "./orchestration_helpers";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
-import type {
-  ChatQueryResult,
-  MessageQueryResult,
-  ResearchContextReference,
-} from "../schemas/agents";
+import type { ChatQueryResult, MessageQueryResult } from "../schemas/agents";
+import type { WebResearchSource } from "../lib/validators";
 
 // ============================================
 // Types
@@ -34,7 +31,7 @@ export interface StreamingWorkflowArgs {
   sessionId?: string;
   userQuery: string;
   conversationContext?: string;
-  contextReferences?: ResearchContextReference[];
+  webResearchSources?: WebResearchSource[];
 }
 
 /**
@@ -63,6 +60,7 @@ export async function withErrorContext<T>(
   } catch (error) {
     throw new Error(
       `${operation}: ${getErrorMessage(error, "Unknown error occurred")}`,
+      { cause: error },
     );
   }
 }
@@ -145,7 +143,10 @@ export async function initializeWorkflowSession(
     );
   } else {
     chat = await withErrorContext("Failed to retrieve chat", () =>
-      ctx.runQuery(api.chats.getChatByIdHttp, getChatArgs),
+      ctx.runQuery(api.chats.getChatByIdHttp, {
+        ...getChatArgs,
+        workflowTokenId,
+      }),
     );
   }
   if (!chat) throw new Error("Chat not found or access denied");
@@ -170,7 +171,11 @@ export async function initializeWorkflowSession(
   } else {
     recentMessagesResult = await withErrorContext(
       "Failed to retrieve chat messages",
-      () => ctx.runQuery(api.chats.getChatMessagesHttp, getMessagesArgs),
+      () =>
+        ctx.runQuery(api.chats.getChatMessagesHttp, {
+          ...getMessagesArgs,
+          workflowTokenId,
+        }),
     );
   }
 
@@ -193,7 +198,10 @@ export async function initializeWorkflowSession(
     );
   } else {
     await withErrorContext("Failed to save user message", () =>
-      ctx.runMutation(internal.messages.addMessageHttp, addMessageArgs),
+      ctx.runMutation(internal.messages.addMessageHttp, {
+        ...addMessageArgs,
+        workflowTokenId,
+      }),
     );
   }
 

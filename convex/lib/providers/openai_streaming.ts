@@ -13,8 +13,7 @@
 import OpenAI from "openai";
 import { createInstrumentedFetch } from "./fetch_instrumentation";
 import { getOpenAIEnvironment } from "./openai";
-
-const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+import { resolveOpenRouterClientConfig } from "./openai_resolver";
 
 type OpenAIResponsesStreamParams = Parameters<OpenAI["responses"]["stream"]>[0];
 
@@ -36,26 +35,22 @@ type ChatCompletionsFinal = Awaited<
 
 let openRouterClient: OpenAI | null = null;
 
-const getOpenRouterBaseUrl = (): string => {
-  const base = process.env.OPENROUTER_BASE_URL || DEFAULT_OPENROUTER_BASE_URL;
-  return base.replace(/\/+$/, "");
-};
-
-const getOpenRouterApiKey = (): string => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY is required for OpenRouter requests");
-  }
-  return apiKey;
-};
+export const hasOpenRouterStreamingConfig = (): boolean =>
+  resolveOpenRouterClientConfig() !== null;
 
 const getOpenRouterClient = (): OpenAI => {
   if (openRouterClient) return openRouterClient;
+  const config = resolveOpenRouterClientConfig();
+  if (!config) {
+    throw new Error(
+      "No API key configured for OpenRouter streaming. Set LLM_API_KEY, OPENROUTER_API_KEY, or OPENAI_API_KEY.",
+    );
+  }
 
   const debugLogging = process.env.LLM_DEBUG_FETCH === "1";
   openRouterClient = new OpenAI({
-    apiKey: getOpenRouterApiKey(),
-    baseURL: getOpenRouterBaseUrl(),
+    apiKey: config.apiKey,
+    baseURL: config.baseURL,
     fetch: createInstrumentedFetch(debugLogging),
   });
 

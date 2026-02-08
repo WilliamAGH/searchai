@@ -7,7 +7,7 @@ import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { vContextReference, type ContextReference } from "../lib/validators";
+import { vWebResearchSource, type WebResearchSource } from "../lib/validators";
 import { getErrorMessage } from "../lib/errors";
 
 /**
@@ -25,15 +25,8 @@ interface PaginatedMessagesResult {
     isStreaming?: boolean;
     streamedContent?: string;
     thinking?: string;
-    searchResults?: Array<{
-      title: string;
-      url: string;
-      snippet: string;
-      relevanceScore: number;
-    }>;
-    sources?: string[];
     reasoning?: string;
-    contextReferences?: ContextReference[];
+    webResearchSources?: WebResearchSource[];
     workflowId?: string;
   }>;
   nextCursor?: Id<"messages">;
@@ -74,19 +67,8 @@ export const loadMoreMessages = action({
         isStreaming: v.optional(v.boolean()),
         streamedContent: v.optional(v.string()),
         thinking: v.optional(v.string()),
-        searchResults: v.optional(
-          v.array(
-            v.object({
-              title: v.string(),
-              url: v.string(),
-              snippet: v.string(),
-              relevanceScore: v.number(),
-            }),
-          ),
-        ),
-        sources: v.optional(v.array(v.string())),
         reasoning: v.optional(v.string()),
-        contextReferences: v.optional(v.array(vContextReference)),
+        webResearchSources: v.optional(v.array(vWebResearchSource)),
         workflowId: v.optional(v.string()),
       }),
     ),

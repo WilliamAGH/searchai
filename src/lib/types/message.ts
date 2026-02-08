@@ -8,13 +8,9 @@
 import type { Doc } from "../../../convex/_generated/dataModel";
 // Import from the dedicated types module (not orchestration_helpers) so we don't pull
 // any Node-only helpers into browser bundles.
-import type { StreamingPersistPayload } from "../../../convex/schemas/agentOutput";
-import type { SearchResult } from "../../../convex/schemas/search";
-
-// Re-export types from canonical sources
-export type { SearchResult } from "../../../convex/schemas/search";
+import type { StreamingPersistPayload } from "../../../convex/schemas/agents";
 export type {
-  ContextReference,
+  WebResearchSourceClient,
   MessageMetadata,
 } from "@/lib/schemas/messageStream";
 
@@ -60,24 +56,18 @@ export interface UIMessageFields {
  */
 export type Message = Omit<
   Doc<"messages">,
-  "_id" | "chatId" | "contextReferences" | "reasoning"
+  | "_id"
+  | "chatId"
+  | "reasoning"
+  | "contextReferences"
+  | "searchResults"
+  | "sources"
 > & {
   _id: string;
   chatId: string;
-  contextReferences?: ContextReference[];
+  webResearchSources?: WebResearchSourceClient[];
   reasoning?: string;
 } & UIMessageFields;
-
-/**
- * Message stream chunk for real-time updates
- * Extended to support agent workflow streaming events
- */
-export type PersistedPayload = Omit<
-  StreamingPersistPayload,
-  "contextReferences"
-> & {
-  contextReferences: ContextReference[];
-};
 
 export type MessageStreamChunk =
   | { type: "content"; content?: string; delta?: string } // Answer content (with optional delta)
@@ -97,11 +87,9 @@ export type MessageStreamChunk =
       toolUrl?: string;
     }
   | { type: "reasoning"; content: string } // Thinking/reasoning from agents
-  | { type: "tool_result"; toolName: string; result: string } // Tool execution results
   | { type: "metadata"; metadata: MessageMetadata; nonce?: string } // Final metadata (sources, etc.)
-  | { type: "complete" } // Workflow completion
+  | { type: "complete"; workflow?: unknown } // Workflow completion
   | { type: "error"; error: string } // Error events
-  | { type: "done" } // Stream completion
   | {
       type: "workflow_start";
       workflowId: string;
@@ -109,7 +97,7 @@ export type MessageStreamChunk =
     } // Workflow initialization event
   | {
       type: "persisted";
-      payload: PersistedPayload;
+      payload: StreamingPersistPayload;
       nonce: string;
       signature: string;
     }; // Database persistence confirmation with security metadata
@@ -144,8 +132,7 @@ export function createLocalUIMessage(params: {
   content: string;
   isStreaming?: boolean;
   reasoning?: string;
-  searchResults?: SearchResult[];
-  sources?: string[];
+  webResearchSources?: WebResearchSourceClient[];
 }): Message {
   const now = Date.now();
   return {
@@ -158,8 +145,7 @@ export function createLocalUIMessage(params: {
     // Optional fields
     isStreaming: params.isStreaming,
     reasoning: params.reasoning,
-    searchResults: params.searchResults ?? [],
-    sources: params.sources ?? [],
+    webResearchSources: params.webResearchSources ?? [],
   };
 }
 

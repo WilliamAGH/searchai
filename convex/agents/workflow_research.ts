@@ -61,6 +61,8 @@ export async function* streamResearchWorkflow(
     workflowTokenId = session.workflowTokenId;
     const { chat, conversationContext: conversationSource } = session;
 
+    yield writeEvent("workflow_start", { workflowId, nonce });
+
     instantResponse = detectInstantResponse(args.userQuery);
 
     if (instantResponse) {
@@ -193,7 +195,11 @@ export async function* streamResearchWorkflow(
   } catch (error) {
     const stage = detectErrorStage(error, instantResponse);
     await handleError(
-      error instanceof Error ? error : new Error("An unknown error occurred"),
+      error instanceof Error
+        ? error
+        : new Error(`Research workflow failed: ${String(error)}`, {
+            cause: error,
+          }),
       stage,
     );
   }

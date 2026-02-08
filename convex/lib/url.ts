@@ -199,6 +199,18 @@ function isIpv6Private(hostname: string): boolean {
   // Unspecified (::) or loopback (::1)
   if (value === 0n || value === 1n) return true;
 
+  // IPv4-compatible IPv6 addresses (::/96)
+  if (value > 1n && value <= 0xffffffffn) {
+    const v4 = Number(value & 0xffffffffn);
+    const parts = [
+      (v4 >>> 24) & 0xff,
+      (v4 >>> 16) & 0xff,
+      (v4 >>> 8) & 0xff,
+      v4 & 0xff,
+    ];
+    return isIpv4PrivateParts(parts);
+  }
+
   // Unique local addresses (fc00::/7)
   if (value >= IPV6_UNIQUE_LOCAL_START && value <= IPV6_UNIQUE_LOCAL_END)
     return true;

@@ -2,7 +2,6 @@
  * HTTP endpoints for unauthenticated API access
  * - CORS-enabled for cross-origin requests
  * - SSE streaming for AI responses
- * - Fallback handling for missing APIs
  * - Routes: /api/chat, /api/search, /api/scrape, /api/ai
  *
  * This file now serves as a central router that delegates to modular route handlers
@@ -15,7 +14,7 @@ import { registerSearchRoutes } from "./http/routes/search";
 import { registerScrapeRoutes } from "./http/routes/scrape";
 import { registerAgentAIRoutes } from "./http/routes/aiAgent";
 import { registerPublishRoutes } from "./http/routes/publish";
-import { corsJsonResponseForRequest } from "./http/utils";
+import { publicCorsResponse } from "./http/cors";
 
 /**
  * HTTP router for unauthenticated endpoints.
@@ -23,7 +22,6 @@ import { corsJsonResponseForRequest } from "./http/utils";
  * Routes:
  * - POST /api/search : web search for unauthenticated users
  * - POST /api/scrape : scrape URL and return cleaned content
- * - POST /api/ai/agent : Agent-based AI with multi-stage research workflow (non-streaming)
  * - POST /api/ai/agent/stream : Agent-based AI with SSE streaming (real-time UX)
  * - POST /api/publishChat : publish anonymous chat
  * - GET  /api/exportChat : export chat in various formats
@@ -34,23 +32,22 @@ const http = httpRouter();
 // Register modular route handlers
 registerSearchRoutes(http);
 registerScrapeRoutes(http);
-registerAgentAIRoutes(http); // Agent-based AI routes (streaming + non-streaming)
+registerAgentAIRoutes(http); // Agent-based AI routes (SSE streaming only)
 registerPublishRoutes(http);
 
 // Register auth routes
 auth.addHttpRoutes(http);
 
 // Lightweight health check endpoint
+// Health probes (load balancers, uptime monitors) don't send Origin headers,
+// so publicCorsResponse serves a plain response when Origin is absent.
 http.route({
   path: "/health",
   method: "GET",
   handler: httpAction(async (_ctx, request) => {
-    return corsJsonResponseForRequest(
-      request,
-      JSON.stringify({ status: "ok", timestamp: Date.now() }),
-      200,
-      "GET, OPTIONS",
-    );
+    const body = JSON.stringify({ status: "ok", timestamp: Date.now() });
+    const origin = request.headers.get("Origin");
+    return publicCorsResponse({ body, status: 200, origin });
   }),
 });
 

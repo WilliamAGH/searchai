@@ -6,7 +6,7 @@
 
 import { httpAction } from "../../_generated/server";
 import type { HttpRouter } from "convex/server";
-import { buildCorsPreflightResponse } from "./publish_cors";
+import { corsPreflightResponse } from "../cors";
 import { handlePublishChat } from "./publish_chat";
 import { handleExportChat } from "./publish_export";
 import { handleChatTextMarkdown } from "./publish_text";
@@ -20,7 +20,7 @@ export function registerPublishRoutes(http: HttpRouter) {
     path: "/api/publishChat",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
-      return buildCorsPreflightResponse(request, "POST, OPTIONS");
+      return corsPreflightResponse(request, "POST, OPTIONS");
     }),
   });
 
@@ -38,7 +38,7 @@ export function registerPublishRoutes(http: HttpRouter) {
     path: "/api/exportChat",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
-      return buildCorsPreflightResponse(request, "GET, OPTIONS");
+      return corsPreflightResponse(request, "GET, OPTIONS");
     }),
   });
 
@@ -56,7 +56,7 @@ export function registerPublishRoutes(http: HttpRouter) {
     path: "/api/chatTextMarkdown",
     method: "OPTIONS",
     handler: httpAction(async (_ctx, request): Promise<Response> => {
-      return buildCorsPreflightResponse(request, "GET, OPTIONS");
+      return corsPreflightResponse(request, "GET, OPTIONS");
     }),
   });
 

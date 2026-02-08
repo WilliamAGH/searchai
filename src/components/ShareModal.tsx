@@ -128,8 +128,7 @@ export function ShareModal({
       messages: messagesToFormat.map((m) => ({
         role: m.role,
         content: m.content || "",
-        searchResults: m.searchResults,
-        sources: m.sources,
+        webResearchSources: m.webResearchSources,
       })),
     });
   }, [messages]);
