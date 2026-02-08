@@ -116,11 +116,12 @@ export function formatWebResearchSourcesForPrompt(
   const recent = references
     .slice(-8)
     .map((ref, idx) => {
-      let label = ref.title || ref.url || ref.contextId;
+      let label = ref.title;
       if (!label && ref.url) {
         const normalized = normalizeHttpUrl(ref.url);
         label = normalized ? new URL(normalized).hostname : ref.url;
       }
+      if (!label) label = ref.contextId;
       const relevance =
         typeof ref.relevanceScore === "number"
           ? ` (relevance ${ref.relevanceScore.toFixed(2)})`

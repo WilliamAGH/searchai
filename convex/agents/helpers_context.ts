@@ -75,7 +75,7 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
 
   for (const scraped of harvested.scrapedContent) {
     const normalizedUrl = normalizeSourceUrl(scraped.url);
-    if (scraped.url && !normalizedUrl) {
+    if (!normalizedUrl) {
       console.error("[agents] Excluded scraped source with invalid URL", {
         contextId: scraped.contextId,
         originalUrl: scraped.url,
@@ -85,7 +85,7 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
     webResearchSources.push({
       contextId: scraped.contextId,
       type: "scraped_page",
-      ...(normalizedUrl ? { url: normalizedUrl } : {}),
+      url: normalizedUrl,
       title: scraped.title,
       timestamp: scraped.scrapedAt ?? now,
       relevanceScore: scraped.relevanceScore ?? RELEVANCE_SCORES.SCRAPED_PAGE,
@@ -161,7 +161,7 @@ export function convertToWebResearchSources(
   const converted: WebResearchSource[] = [];
   for (const source of sources) {
     const normalizedUrl = normalizeSourceUrl(source.url);
-    if (source.url && !normalizedUrl) {
+    if (!normalizedUrl) {
       console.error("[agents] Excluded source with invalid URL", {
         contextId: source.contextId,
         originalUrl: source.url,
@@ -171,7 +171,7 @@ export function convertToWebResearchSources(
     converted.push({
       contextId: source.contextId,
       type: source.type,
-      ...(normalizedUrl ? { url: normalizedUrl } : {}),
+      url: normalizedUrl,
       title: source.title,
       timestamp: now,
       relevanceScore: relevanceToScore[source.relevance],
