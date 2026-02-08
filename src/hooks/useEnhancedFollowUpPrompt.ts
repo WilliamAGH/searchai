@@ -19,7 +19,7 @@ interface UseEnhancedFollowUpPromptProps {
 interface FollowUpCheckResult {
   shouldShow: boolean;
   suggestions: string[];
-  pendingMessage: string | null;
+  followUpMessage: string | null;
 }
 
 /** Check if follow-up prompt should be shown based on message history */
@@ -32,7 +32,7 @@ function checkFollowUpConditions(
 
   // Require at least 4 user messages before ever showing the prompt
   if (userMessages.length < 4 || assistantMessages.length === 0) {
-    return { shouldShow: false, suggestions: [], pendingMessage: null };
+    return { shouldShow: false, suggestions: [], followUpMessage: null };
   }
 
   const lastMessage = messages[messages.length - 1];
@@ -47,7 +47,7 @@ function checkFollowUpConditions(
     !lastUserMessage?.content ||
     !previousUserMessage?.content
   ) {
-    return { shouldShow: false, suggestions: [], pendingMessage: null };
+    return { shouldShow: false, suggestions: [], followUpMessage: null };
   }
 
   // Only show if there's a topic change
@@ -61,11 +61,11 @@ function checkFollowUpConditions(
     return {
       shouldShow: suggestions.length > 0 && !isGenerating,
       suggestions,
-      pendingMessage: lastUserMessage.content,
+      followUpMessage: lastUserMessage.content,
     };
   }
 
-  return { shouldShow: false, suggestions: [], pendingMessage: null };
+  return { shouldShow: false, suggestions: [], followUpMessage: null };
 }
 
 function generateFollowUpSuggestions(content: string): string[] {
@@ -101,7 +101,10 @@ export function useEnhancedFollowUpPrompt({
   chatState,
 }: UseEnhancedFollowUpPromptProps) {
   const [showFollowUpPrompt, setShowFollowUpPrompt] = useState(false);
+  // Queue used only when user explicitly chooses "Start New Chat" flow.
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  // Candidate message detected from topic shift; never auto-sent by itself.
+  const [followUpMessage, setFollowUpMessage] = useState<string | null>(null);
   const [plannerHint, setPlannerHint] = useState<{
     reason?: string;
     confidence?: number;
@@ -116,10 +119,11 @@ export function useEnhancedFollowUpPrompt({
 
     if (result.shouldShow) {
       setFollowUpSuggestions(result.suggestions);
-      setPendingMessage(result.pendingMessage);
+      setFollowUpMessage(result.followUpMessage);
       setShowFollowUpPrompt(true);
     } else {
       setShowFollowUpPrompt(false);
+      setFollowUpMessage(null);
     }
   }, [chatState?.messages, chatState?.isGenerating]);
 
@@ -127,6 +131,7 @@ export function useEnhancedFollowUpPrompt({
     setShowFollowUpPrompt(false);
     setFollowUpSuggestions([]);
     setPendingMessage(null);
+    setFollowUpMessage(null);
     setPlannerHint(null);
     setSummaryError(null);
   }, []);
@@ -136,7 +141,7 @@ export function useEnhancedFollowUpPrompt({
     const result = checkFollowUpConditions(messages, chatState?.isGenerating);
 
     if (result.shouldShow) {
-      setPendingMessage(result.pendingMessage);
+      setFollowUpMessage(result.followUpMessage);
       setShowFollowUpPrompt(true);
     }
   }, [chatState?.messages, chatState?.isGenerating]);
@@ -146,16 +151,16 @@ export function useEnhancedFollowUpPrompt({
   }, [resetFollowUp]);
 
   const handleNewChatForFollowUp = useCallback(async () => {
-    const messageToSend = pendingMessage;
+    const messageToSend = followUpMessage;
     resetFollowUp();
     if (messageToSend) {
       setPendingMessage(messageToSend);
     }
     await handleNewChat({ userInitiated: true });
-  }, [handleNewChat, pendingMessage, resetFollowUp]);
+  }, [followUpMessage, handleNewChat, resetFollowUp]);
 
   const handleNewChatWithSummary = useCallback(async () => {
-    const messageToSend = pendingMessage;
+    const messageToSend = followUpMessage;
     resetFollowUp();
     if (messageToSend) {
       setPendingMessage(messageToSend);
@@ -183,8 +188,8 @@ export function useEnhancedFollowUpPrompt({
     await handleNewChat({ userInitiated: true });
   }, [
     currentChatId,
+    followUpMessage,
     handleNewChat,
-    pendingMessage,
     resetFollowUp,
     summarizeRecentAction,
   ]);
