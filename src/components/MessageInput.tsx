@@ -11,6 +11,29 @@ import { useAutoResizeTextarea } from "@/hooks/useAutoResizeTextarea";
 import { useMessageInputFocus } from "@/hooks/useMessageInputFocus";
 import { useInputHistory } from "@/hooks/useInputHistory";
 
+const TEXTAREA_CLASSES = [
+  // layout
+  "w-full pl-3 sm:pl-4 pr-36 resize-none overflow-y-auto overflow-x-hidden",
+  // typography
+  "text-base tracking-tight font-ui slashed-zero lining-nums tabular-nums",
+  "break-words whitespace-pre-wrap",
+  // shape & border
+  "rounded-2xl border border-gray-200/80 dark:border-gray-700/60 outline-none",
+  // color
+  "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
+  "placeholder-gray-400 dark:placeholder-gray-500",
+  // shadow
+  "shadow-sm shadow-gray-200/50 dark:shadow-black/20",
+  // focus
+  "focus:border-emerald-500 dark:focus:border-emerald-400",
+  "focus:ring-1 focus:ring-emerald-500/30 dark:focus:ring-emerald-400/30",
+  "focus:shadow-md focus:shadow-emerald-500/5 dark:focus:shadow-emerald-400/5",
+  // transition
+  "transition-all duration-200",
+  // hooks for JS/CSS selectors
+  "message-input-textarea message-textarea",
+].join(" ");
+
 interface MessageInputProps {
   /** Callback when message is sent */
   onSendMessage: (message: string) => void | Promise<void>;
@@ -150,9 +173,7 @@ export function MessageInput({
               disabled={disabled}
               rows={1}
               autoComplete="off"
-              className={`w-full pl-3 sm:pl-4 pr-36 text-base tracking-tight font-ui slashed-zero lining-nums tabular-nums ${
-                message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"
-              } rounded-2xl border border-gray-200/80 dark:border-gray-700/60 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm shadow-gray-200/50 dark:shadow-black/20 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500/30 dark:focus:ring-emerald-400/30 focus:shadow-md focus:shadow-emerald-500/5 dark:focus:shadow-emerald-400/5 outline-none transition-all duration-200 resize-none overflow-y-auto overflow-x-hidden break-words whitespace-pre-wrap message-input-textarea message-textarea`}
+              className={`${TEXTAREA_CLASSES} ${message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"}`}
             />
             <div className="absolute right-11 sm:right-10 top-1/2 -translate-y-1/2 h-8 flex items-center gap-1">
               <button
