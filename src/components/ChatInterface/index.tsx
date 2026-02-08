@@ -110,6 +110,21 @@ function ChatInterfaceComponent({
     deleteMessage,
     sessionId: sessionId || undefined,
   });
+  // Stable wrappers that convert async deletion handlers (Promise<void>)
+  // to synchronous void, matching the useComponentProps interface.
+  // These MUST be useCallback — inline arrows would break useMemo memoization.
+  const handleDeleteChat = useCallback(
+    (id: Id<"chats"> | string) => {
+      void requestDeleteChat(id);
+    },
+    [requestDeleteChat],
+  );
+  const handleDeleteMessage = useCallback(
+    (id: Id<"messages"> | string) => {
+      void requestDeleteMessage(id);
+    },
+    [requestDeleteMessage],
+  );
   const handleSelectChat = useCallback(
     (id: Id<"chats"> | string | null) => {
       userSelectedChatAtRef.current = Date.now();
@@ -293,10 +308,8 @@ function ChatInterfaceComponent({
     handleSelectChat,
     handleToggleSidebar,
     handleNewChatButton,
-    handleRequestDeleteChat: (id: Id<"chats"> | string) =>
-      void requestDeleteChat(id),
-    handleRequestDeleteMessage: (id: Id<"messages"> | string) =>
-      void requestDeleteMessage(id),
+    handleRequestDeleteChat: handleDeleteChat,
+    handleRequestDeleteMessage: handleDeleteMessage,
     handleMobileSidebarClose,
     handleSendMessage,
     handleDraftChange,
