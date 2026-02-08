@@ -36,6 +36,7 @@ export function useUrlStateSync({
   const navigate = useNavigate();
   const location = useLocation();
   const lastResolvedChatIdRef = useRef<string | null>(null);
+  const pendingOriginChatIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const isShareRoute = location.pathname.startsWith("/s/");
@@ -49,6 +50,9 @@ export function useUrlStateSync({
       propShareId && isShareRoute ? resolveChatId(chatByShareId) : null;
     const publicChatId =
       propPublicId && isPublicRoute ? resolveChatId(chatByPublicId) : null;
+    const isOpaquePending = Boolean(
+      propChatId && isChatRoute && chatByOpaqueId === undefined,
+    );
     const opaqueChatId =
       propChatId && isChatRoute ? resolveChatId(chatByOpaqueId) : null;
 
@@ -56,17 +60,25 @@ export function useUrlStateSync({
       shareChatId ??
       publicChatId ??
       opaqueChatId ??
-      (propChatId && isChatRoute ? String(propChatId) : null);
+      (isOpaquePending ? String(propChatId) : null);
 
     if (targetChatId && currentChatId !== targetChatId) {
+      let dispatchedSelect = false;
       if (lastResolvedChatIdRef.current !== targetChatId) {
         lastResolvedChatIdRef.current = targetChatId;
+        pendingOriginChatIdRef.current = currentChatId;
+        dispatchedSelect = true;
         void selectChat(targetChatId).catch(() => {
           lastResolvedChatIdRef.current = null;
+          pendingOriginChatIdRef.current = null;
         });
       }
-      // Transition in-flight: don't sync URL to stale currentChatId below
-      return;
+      const isOriginUnchanged =
+        pendingOriginChatIdRef.current === currentChatId;
+      if (dispatchedSelect || (isOpaquePending && isOriginUnchanged)) {
+        // Transition in-flight: don't sync URL to stale currentChatId below
+        return;
+      }
     }
 
     // Only sync if we're already on a chat route and the URL doesn't match
@@ -80,12 +92,7 @@ export function useUrlStateSync({
 
     // If no chat ID but we're on a chat route, go home
     // Only redirect if we don't have a target chat ID we're trying to resolve
-    if (
-      !currentChatId &&
-      !targetChatId &&
-      isChatRoute &&
-      location.pathname !== "/"
-    ) {
+    if (!currentChatId && !targetChatId && isChatRoute && location.pathname !== "/") {
       void navigate("/", { replace: true });
     }
   }, [
