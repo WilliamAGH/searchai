@@ -1,17 +1,36 @@
 import { logger } from "@/lib/logger";
 
+function safeParseUrl(url: string): URL | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  const normalized = trimmed.startsWith("//")
+    ? `https:${trimmed}`
+    : /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Extract domain from URL, stripping www. prefix
  * - Used for citation display and matching
  */
 export function getDomainFromUrl(url: string): string {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.replace("www.", "");
-  } catch (error) {
-    logger.warn("Failed to parse URL for domain", { url, error });
+  const parsed = safeParseUrl(url);
+  if (!parsed) {
     return "";
   }
+  return parsed.hostname.replace(/^www\./, "");
 }
 
 /**
@@ -19,20 +38,14 @@ export function getDomainFromUrl(url: string): string {
  * - Handles malformed URLs and bare hostnames
  */
 export function getSafeHostname(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch (error) {
-    logger.warn("Failed to parse URL for hostname", { url, error });
-    try {
-      return new URL(`https://${url}`).hostname;
-    } catch (fallbackError) {
-      logger.warn("Failed to parse hostname with https:// fallback", {
-        url,
-        error: fallbackError,
-      });
-      return "";
+  const parsed = safeParseUrl(url);
+  if (!parsed) {
+    if (import.meta.env.DEV) {
+      logger.debug("Unable to parse hostname from URL", { url });
     }
+    return "";
   }
+  return parsed.hostname;
 }
 
 /**

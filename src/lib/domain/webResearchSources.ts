@@ -7,7 +7,7 @@
  * This module is the single mapping path between the two.
  */
 
-import { getSafeHostname } from "@/lib/utils/favicon";
+import { getDomainFromUrl, getSafeHostname } from "@/lib/utils/favicon";
 import { logger } from "@/lib/logger";
 import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
@@ -19,8 +19,15 @@ export type WebSourceCard = {
 };
 
 function normalizeUrlKey(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  const normalized = trimmed.startsWith("//")
+    ? `https:${trimmed}`
+    : /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+
   try {
-    const u = new URL(rawUrl);
+    const u = new URL(normalized);
     u.hash = "";
     // Lightweight normalization: remove common www and trailing slash.
     u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
@@ -29,7 +36,7 @@ function normalizeUrlKey(rawUrl: string): string {
     }
     return u.toString();
   } catch {
-    return rawUrl.trim();
+    return trimmed;
   }
 }
 
@@ -78,18 +85,18 @@ export function toDomainToUrlMap(
   const map = new Map<string, string>();
 
   for (const c of cards) {
-    try {
-      const hostname = new URL(c.url).hostname.replace(/^www\./, "");
-      if (!hostname) continue;
-      // Prefer first-seen URL per domain for stable mapping.
-      if (!map.has(hostname)) {
-        map.set(hostname, c.url);
+    const hostname = getDomainFromUrl(c.url);
+    if (!hostname) {
+      if (import.meta.env.DEV) {
+        logger.debug("Skipped invalid source URL for domain map", {
+          url: c.url,
+        });
       }
-    } catch (error) {
-      logger.warn("Failed to parse web research source URL for domain map", {
-        url: c.url,
-        error,
-      });
+      continue;
+    }
+    // Prefer first-seen URL per domain for stable mapping.
+    if (!map.has(hostname)) {
+      map.set(hostname, c.url);
     }
   }
 

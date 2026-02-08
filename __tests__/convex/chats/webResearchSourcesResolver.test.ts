@@ -72,6 +72,31 @@ describe("webResearchSourcesResolver", () => {
     });
   });
 
+  it("normalizes scheme-less canonical webResearchSources URLs", () => {
+    const sources = resolveWebResearchSourcesFromMessage({
+      _id: "msg_3b",
+      timestamp: 310,
+      webResearchSources: [
+        {
+          contextId: "ctx_3b",
+          type: "search_result",
+          url: "ots.ca.gov/child-passenger-safety/",
+          title: "OTS",
+          timestamp: 311,
+        },
+      ],
+    });
+
+    expect(sources).toHaveLength(1);
+    expect(sources[0]).toMatchObject({
+      contextId: "ctx_3b",
+      type: "search_result",
+      url: "https://ots.ca.gov/child-passenger-safety/",
+      title: "OTS",
+      timestamp: 311,
+    });
+  });
+
   it("deduplicates matching urls across canonical and legacy fields", () => {
     const sources = resolveWebResearchSourcesFromMessage({
       _id: "msg_4",

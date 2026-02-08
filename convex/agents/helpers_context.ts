@@ -2,8 +2,15 @@
 
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
 import { generateMessageId } from "../lib/id_generator";
+import { normalizeHttpUrl } from "../lib/urlHttp";
 import type { WebResearchSource } from "../lib/validators";
 import { isUuidV7, normalizeUrl } from "./helpers_utils";
+
+const MAX_SOURCE_URL_LENGTH = 2048;
+
+function normalizeSourceUrl(url: string | undefined): string | undefined {
+  return normalizeHttpUrl(url, MAX_SOURCE_URL_LENGTH);
+}
 
 export function normalizeSourceContextIds(
   sourcesUsed: Array<{
@@ -67,10 +74,11 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
   const now = Date.now();
 
   for (const scraped of harvested.scrapedContent) {
+    const normalizedUrl = normalizeSourceUrl(scraped.url);
     webResearchSources.push({
       contextId: scraped.contextId,
       type: "scraped_page",
-      url: scraped.url,
+      ...(normalizedUrl ? { url: normalizedUrl } : {}),
       title: scraped.title,
       timestamp: scraped.scrapedAt ?? now,
       relevanceScore: scraped.relevanceScore ?? RELEVANCE_SCORES.SCRAPED_PAGE,
@@ -79,17 +87,31 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
 
   const scrapedNormalizedUrls = new Set(
     harvested.scrapedContent
-      .map((s) => normalizeUrl(s.url))
+      .map((s) => normalizeSourceUrl(s.url))
+      .filter((url): url is string => typeof url === "string")
+      .map((url) => normalizeUrl(url))
       .filter((url): url is string => url !== null),
   );
 
   for (const result of harvested.searchResults) {
-    const normalizedResultUrl = normalizeUrl(result.url) ?? result.url;
+    const normalizedUrl = normalizeSourceUrl(result.url);
+    if (!normalizedUrl) {
+      webResearchSources.push({
+        contextId: result.contextId ?? generateMessageId(),
+        type: "search_result",
+        title: result.title,
+        timestamp: now,
+        relevanceScore: result.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
+      });
+      continue;
+    }
+
+    const normalizedResultUrl = normalizeUrl(normalizedUrl) ?? normalizedUrl;
     if (!scrapedNormalizedUrls.has(normalizedResultUrl)) {
       webResearchSources.push({
         contextId: result.contextId ?? generateMessageId(),
         type: "search_result",
-        url: result.url,
+        url: normalizedUrl,
         title: result.title,
         timestamp: now,
         relevanceScore: result.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
@@ -100,8 +122,11 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
   const uniqueSources = Array.from(
     new Map(
       webResearchSources.map((ref) => {
-        const rawUrl = ref.url || "";
-        return [normalizeUrl(rawUrl) ?? rawUrl, ref];
+        const rawUrl = ref.url;
+        if (rawUrl) {
+          return [normalizeUrl(rawUrl) ?? rawUrl, ref] as const;
+        }
+        return [`${ref.type}:${ref.contextId}`, ref] as const;
       }),
     ).values(),
   );
@@ -129,12 +154,15 @@ export function convertToWebResearchSources(
     low: RELEVANCE_SCORES.LOW_LABEL,
   };
 
-  return sources.map((source) => ({
-    contextId: source.contextId,
-    type: source.type,
-    url: source.url,
-    title: source.title,
-    timestamp: now,
-    relevanceScore: relevanceToScore[source.relevance],
-  }));
+  return sources.map((source) => {
+    const normalizedUrl = normalizeSourceUrl(source.url);
+    return {
+      contextId: source.contextId,
+      type: source.type,
+      ...(normalizedUrl ? { url: normalizedUrl } : {}),
+      title: source.title,
+      timestamp: now,
+      relevanceScore: relevanceToScore[source.relevance],
+    };
+  });
 }
