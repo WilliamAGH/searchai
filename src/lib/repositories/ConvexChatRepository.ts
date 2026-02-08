@@ -84,7 +84,7 @@ export class ConvexChatRepository extends BaseRepository {
   async updateChatPrivacy(
     id: string,
     privacy: "private" | "shared" | "public",
-  ): Promise<void> {
+  ): Promise<{ shareId?: string; publicId?: string }> {
     return this.chatOps.updateChatPrivacy(id, privacy);
   }
 

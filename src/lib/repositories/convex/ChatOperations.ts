@@ -90,13 +90,18 @@ export class ChatOperations {
   async updateChatPrivacy(
     id: string,
     privacy: "private" | "shared" | "public",
-  ): Promise<void> {
+  ): Promise<{ shareId?: string; publicId?: string }> {
     try {
-      await this.client.mutation(api.chats.updateChatPrivacy, {
+      const result = await this.client.mutation(api.chats.updateChatPrivacy, {
         chatId: IdUtils.toConvexChatId(id),
         privacy,
         sessionId: this.getSessionId(),
       });
+
+      return {
+        shareId: result.shareId ?? undefined,
+        publicId: result.publicId ?? undefined,
+      };
     } catch (error) {
       logger.error("Failed to update chat privacy in Convex:", {
         error: getErrorMessage(error),
@@ -127,13 +132,7 @@ export class ChatOperations {
     privacy: "shared" | "public",
   ): Promise<{ shareId?: string; publicId?: string }> {
     try {
-      await this.updateChatPrivacy(id, privacy);
-      const chat = await this.getChatById(id);
-
-      return {
-        shareId: chat?.shareId,
-        publicId: chat?.publicId,
-      };
+      return await this.updateChatPrivacy(id, privacy);
     } catch (error) {
       logger.error("Failed to share chat:", {
         error: getErrorMessage(error),
