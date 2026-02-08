@@ -12,6 +12,7 @@ import { TitleUtils } from "@/lib/types/unified";
 import { getErrorMessage } from "@/lib/utils/errorUtils";
 import { logger } from "@/lib/logger";
 import { sendMessageWithStreaming } from "@/hooks/chatActions/sendMessage";
+import { isLocalId } from "@/lib/utils/idValidation";
 
 export interface ChatActions {
   // Chat management
@@ -117,7 +118,30 @@ export function createChatActions(
             ...prev,
             currentChatId: canonicalChatId,
             currentChat: chat,
-            messages,
+            // Preserve in-flight optimistic messages for this chat so URL-driven
+            // selection does not wipe local streaming placeholders mid-send.
+            messages: (() => {
+              const optimisticForChat = prev.messages.filter(
+                (message) =>
+                  String(message.chatId) === canonicalChatId &&
+                  (message.isStreaming === true ||
+                    isLocalId(String(message._id))),
+              );
+              if (optimisticForChat.length === 0) {
+                return messages;
+              }
+
+              const persistedIds = new Set(messages.map((m) => String(m._id)));
+              const optimisticOnly = optimisticForChat.filter(
+                (message) => !persistedIds.has(String(message._id)),
+              );
+
+              return [...messages, ...optimisticOnly].sort((a, b) => {
+                const aTime = a._creationTime ?? a.timestamp ?? 0;
+                const bTime = b._creationTime ?? b.timestamp ?? 0;
+                return aTime - bTime;
+              });
+            })(),
             error: null,
           }));
         }
