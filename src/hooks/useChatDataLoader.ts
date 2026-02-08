@@ -1,6 +1,15 @@
 /**
  * Chat Data Loader Hook
- * Handles initial data loading and sync with reactive Convex subscriptions
+ *
+ * Handles initial data loading and sync with reactive Convex subscriptions.
+ *
+ * ## Navigation interaction
+ *
+ * The auto-select effect (below) sets `currentChatId` directly via setState
+ * when no chat is selected and chats are available (returning-user UX).
+ * This is one of three permitted direct-state exceptions documented in
+ * `docs/contracts/navigation.md`. After auto-selection, `useUrlStateSync`
+ * step 4 navigates to `/chat/${autoSelectedId}` to keep the URL in sync.
  */
 
 import { useEffect } from "react";
@@ -56,8 +65,9 @@ export function useChatDataLoader(
     }
   }, [convexChats, repository, setState]);
 
-  // Auto-select first chat if none selected
-  // Only runs when chats list changes AND no chat is currently selected
+  // Auto-select first chat if none selected (returning-user UX).
+  // This is a permitted direct-state exception (see docs/contracts/navigation.md).
+  // useUrlStateSync step 4 will navigate to /chat/${id} after this sets state.
   useEffect(() => {
     if (!repository) return;
 
@@ -96,42 +106,34 @@ export function useChatDataLoader(
       };
     }
 
+    const matchesPendingId = (chat: ChatState["chats"][number]) =>
+      String(chat._id ?? "") === String(pendingChatId);
+
+    const applyAutoSelect = (messages: ChatState["messages"]) => {
+      if (cancelled) return;
+      setState((current) => {
+        if (current.currentChatId && current.currentChatId !== pendingChatId) {
+          return current.isLoading ? { ...current, isLoading: false } : current;
+        }
+
+        const nextChat = current.chats.find(matchesPendingId) ?? pendingChat;
+        if (!nextChat) {
+          return { ...current, isLoading: false };
+        }
+
+        return {
+          ...current,
+          currentChatId: String(nextChat._id ?? ""),
+          currentChat: nextChat,
+          messages,
+          isLoading: false,
+        };
+      });
+    };
+
     repository
       .getMessages(pendingChatId)
-      .then((messages) => {
-        if (cancelled) return;
-
-        setState((current) => {
-          if (
-            current.currentChatId &&
-            current.currentChatId !== pendingChatId
-          ) {
-            return current.isLoading
-              ? { ...current, isLoading: false }
-              : current;
-          }
-
-          const nextChat =
-            current.chats.find(
-              (chat) => String(chat._id ?? "") === String(pendingChatId),
-            ) ?? pendingChat;
-
-          if (!nextChat) {
-            return {
-              ...current,
-              isLoading: false,
-            };
-          }
-
-          return {
-            ...current,
-            currentChatId: String(nextChat._id ?? ""),
-            currentChat: nextChat,
-            messages,
-            isLoading: false,
-          };
-        });
-      })
+      .then(applyAutoSelect)
       .catch((error) => {
         if (cancelled) return;
 

@@ -1,5 +1,44 @@
+/**
+ * URL ↔ State Synchronization Hook (Single Source of Truth)
+ *
+ * This hook is the ONLY place that may call `selectChat()` or navigate
+ * in response to a URL/state mismatch. All other code MUST go through
+ * `useChatNavigation` helpers (`navigateToChat`, `navigateHome`,
+ * `navigateWithVerification`) to change chat selection.
+ *
+ * ## State Machine (5 steps, evaluated top-to-bottom with early returns)
+ *
+ * 1. **Resolve** — Derive `targetChatId` from URL params + Convex queries.
+ * 2. **Wait**   — If any query is still loading (`isResolving`), bail out.
+ * 3. **URL→State** — If URL targets a specific chat that differs from
+ *    `currentChatId`, dispatch `selectChat` and return early.
+ * 4. **State→URL** — If `currentChatId` exists on a chat route but the
+ *    URL doesn't match, navigate to `/chat/${currentChatId}`.
+ * 5. **Home**   — If no chat and no target on a chat route, navigate `/`.
+ *
+ * ## Why this ordering prevents flicker
+ *
+ * Step 3 returns early whenever a URL-driven transition is in-flight,
+ * which prevents step 4 from pushing the stale `currentChatId` into the
+ * URL. Step 4 only fires when there is no pending target (targetChatId
+ * is null or already matches currentChatId).
+ *
+ * ## Anti-patterns — DO NOT introduce:
+ *
+ * - Calling `selectChat()` from any file other than this hook.
+ * - Calling `setState({ currentChatId })` except inside `createChat` /
+ *   `deleteChat` / `useChatDataLoader` (which cooperate with step 4).
+ * - Adding a conditional early-return inside step 3 (caused the Bugbot
+ *   flicker regression — the return MUST be unconditional).
+ * - Gating step 4 on `currentChatId === targetChatId` (broke new-chat
+ *   creation where state updates before the URL).
+ *
+ * See `docs/contracts/navigation.md` for the full navigation contract.
+ */
+
 import { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { logger } from "@/lib/logger";
 import type { Doc } from "../../convex/_generated/dataModel";
 
 interface UseUrlStateSyncProps {
@@ -13,15 +52,6 @@ interface UseUrlStateSyncProps {
   selectChat: (chatId: string | null) => Promise<void>;
 }
 
-import { logger } from "@/lib/logger";
-
-/**
- * Hook to sync URL state with current chat
- *
- * Ensures the browser URL matches the currently selected chat.
- * Handles navigation to /chat/:id when a chat is selected,
- * and redirects to / when no chat is selected.
- */
 const resolveChatId = (chat: Doc<"chats"> | null | undefined): string | null =>
   chat?._id ? String(chat._id) : null;
 
@@ -39,7 +69,7 @@ export function useUrlStateSync({
   const location = useLocation();
   const lastResolvedChatIdRef = useRef<string | null>(null);
 
-  // Track if we are currently navigating to prevent fighting
+  /** Prevents re-entrant navigation from causing oscillation. */
   const isNavigatingRef = useRef(false);
 
   useEffect(() => {
@@ -50,18 +80,14 @@ export function useUrlStateSync({
       location.pathname === "/chat" ||
       location.pathname.startsWith("/chat/");
 
-    // 1. Resolve target chat ID from URL/props/queries
+    // ── Step 1: Resolve targetChatId from URL params + queries ──────
     const shareChatId =
       propShareId && isShareRoute ? resolveChatId(chatByShareId) : null;
     const publicChatId =
       propPublicId && isPublicRoute ? resolveChatId(chatByPublicId) : null;
-    const isOpaquePending = Boolean(
-      propChatId && isChatRoute && chatByOpaqueId === undefined,
-    );
     const opaqueChatId =
       propChatId && isChatRoute ? resolveChatId(chatByOpaqueId) : null;
 
-    // Check if we are still resolving a query that is required for this route
     const isResolvingShare =
       propShareId && isShareRoute && chatByShareId === undefined;
     const isResolvingPublic =
@@ -72,25 +98,25 @@ export function useUrlStateSync({
     const isResolving =
       isResolvingShare || isResolvingPublic || isResolvingOpaque;
 
-    // Use isOpaquePending (not just propChatId) for fallback so that when
-    // chatByOpaqueId resolves to null (missing chat), targetChatId becomes null
-    // and we correctly redirect home instead of looping on a stale propChatId.
-    const targetChatId =
-      shareChatId ??
-      publicChatId ??
-      opaqueChatId ??
-      (isOpaquePending ? String(propChatId) : null);
+    const targetChatId = shareChatId ?? publicChatId ?? opaqueChatId;
 
-    // 2. Wait for pending query resolution before acting
-    // When a query (share/public/opaque) hasn't resolved yet, any sync would
-    // use stale or incomplete data. Bail out and wait for the next render.
+    // ── Step 2: Wait for pending queries ────────────────────────────
+    // INVARIANT: No sync action may fire while a Convex query that
+    // determines targetChatId is still loading. Doing so would use
+    // stale or incomplete data and cause flicker.
     if (isResolving) {
       return;
     }
 
-    // 3. URL -> State: URL requests a specific chat that differs from state.
-    // Dispatch selectChat and return early so we don't sync the stale
-    // currentChatId into the URL (which would cause visible flicker).
+    // ── Step 3: URL → State ─────────────────────────────────────────
+    // INVARIANT: When the URL requests a specific chat that differs
+    // from currentChatId, dispatch selectChat and return UNCONDITIONALLY.
+    // The unconditional return prevents step 4 from pushing the stale
+    // currentChatId into the URL (the "Bugbot flicker" regression).
+    //
+    // REGRESSION GUARD (sidebar switch, opaque ID resolution):
+    // If this return is made conditional, the old currentChatId will
+    // briefly appear in the URL before selectChat completes.
     if (targetChatId && currentChatId !== targetChatId) {
       if (
         lastResolvedChatIdRef.current !== targetChatId &&
@@ -102,15 +128,18 @@ export function useUrlStateSync({
           lastResolvedChatIdRef.current = null;
         });
       }
-      // Transition in-flight: don't sync URL to stale currentChatId below
       return;
     }
 
-    // 4. State -> URL: Ensure URL reflects the current chat.
-    // This handles both "already synced but URL differs" (e.g. opaque -> internal)
-    // and "new chat created" (state updated, URL still at /).
-    // Safe from flicker because step 3 already returned when a different
-    // targetChatId is in-flight.
+    // ── Step 4: State → URL ─────────────────────────────────────────
+    // INVARIANT: Fires only when no URL-driven transition is pending
+    // (step 3 returned). Ensures the URL reflects the current chat.
+    //
+    // REGRESSION GUARD (new chat creation, createChat setState):
+    // When createChat sets currentChatId before the URL has changed,
+    // this step navigates to `/chat/${currentChatId}`. Do NOT gate
+    // this on `currentChatId === targetChatId` — that breaks new-chat
+    // creation where targetChatId is null (no propChatId in URL yet).
     if (currentChatId && isChatRoute) {
       const expectedPath = `/chat/${currentChatId}`;
       if (location.pathname !== expectedPath) {
@@ -123,7 +152,10 @@ export function useUrlStateSync({
       return;
     }
 
-    // 5. Home: No chat selected and no target in URL — ensure we're at root
+    // ── Step 5: Home redirect ───────────────────────────────────────
+    // REGRESSION GUARD (delete current chat, navigate home):
+    // When currentChatId is null and no target exists, ensure the URL
+    // is at root. This handles chat deletion and explicit deselection.
     if (
       !currentChatId &&
       !targetChatId &&

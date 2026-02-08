@@ -40,14 +40,14 @@ function ChatInterfaceComponent({
   chatId: propChatId,
   shareId: propShareId,
   publicId: propPublicId,
-}: {
+}: Readonly<{
   isAuthenticated: boolean;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   chatId?: string;
   shareId?: string;
   publicId?: string;
-}) {
+}>) {
   const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
   const apiBase = buildApiBase(convexUrl);
   const resolveApi = useCallback(
@@ -55,7 +55,7 @@ function ChatInterfaceComponent({
     [apiBase],
   );
 
-  const [localIsGenerating, setIsGenerating] = useState(false);
+  const [localIsGenerating, setLocalIsGenerating] = useState(false);
 
   const unified = useUnifiedChat();
   const chatState = unified;
@@ -90,11 +90,14 @@ function ChatInterfaceComponent({
   // Get all chats (Convex-backed only)
   const allChats = useMemo<Chat[]>(() => chats ?? [], [chats]);
 
-  const { navigateWithVerification, handleSelectChat: navHandleSelectChat } =
-    useChatNavigation({
-      currentChatId,
-      allChats,
-    });
+  const {
+    navigateToChat,
+    navigateHome,
+    handleSelectChat: navHandleSelectChat,
+  } = useChatNavigation({
+    currentChatId,
+    allChats,
+  });
   const summarizeRecentAction = useAction(api.chats.summarizeRecentAction);
 
   const { chatByOpaqueId, chatByShareId, chatByPublicId } = useConvexQueries({
@@ -106,8 +109,8 @@ function ChatInterfaceComponent({
 
   // Use deletion handlers hook for all deletion operations
   const {
-    handleRequestDeleteChat,
-    handleRequestDeleteMessage,
+    handleRequestDeleteChat: requestDeleteChat,
+    handleRequestDeleteMessage: requestDeleteMessage,
     undoBanner,
     setUndoBanner,
   } = useDeletionHandlers({
@@ -122,12 +125,12 @@ function ChatInterfaceComponent({
     (id: Id<"chats"> | string | null) => {
       userSelectedChatAtRef.current = Date.now();
       if (!id) {
-        void chatActions.selectChat(null);
+        navigateHome();
         return;
       }
       void navHandleSelectChat(String(id));
     },
-    [chatActions, navHandleSelectChat],
+    [navigateHome, navHandleSelectChat],
   );
 
   // Use paginated messages for authenticated users with Convex chats
@@ -182,11 +185,12 @@ function ChatInterfaceComponent({
     async (_opts?: { userInitiated?: boolean }): Promise<string | null> => {
       setIsCreatingChat(true);
       try {
-        // Simply use the createChat action from useUnifiedChat
         const chat = await chatActions.createChat("New Chat");
         if (chat?._id) {
-          // Navigate to the new chat
-          await navigateWithVerification(String(chat._id));
+          // Direct navigation — we know the chat exists because we just created it.
+          // Do NOT use navigateWithVerification here: allChats reactive query
+          // may not have updated yet, causing silent navigation failure.
+          navigateToChat(String(chat._id));
           setIsCreatingChat(false);
           return chat._id;
         }
@@ -196,7 +200,7 @@ function ChatInterfaceComponent({
       setIsCreatingChat(false);
       return null;
     },
-    [chatActions, navigateWithVerification],
+    [chatActions, navigateToChat],
   );
 
   useEffect(() => {
@@ -230,13 +234,14 @@ function ChatInterfaceComponent({
     chatState,
 
     // Actions
-    setIsGenerating,
+    setIsGenerating: setLocalIsGenerating,
     setMessageCount,
 
     // Functions
     handleNewChat,
     maybeShowFollowUpPrompt,
     chatActions,
+    navigateToChat,
     setErrorMessage: chatActions.setError,
   });
 
@@ -298,8 +303,10 @@ function ChatInterfaceComponent({
     handleSelectChat,
     handleToggleSidebar,
     handleNewChatButton,
-    handleRequestDeleteChat,
-    handleRequestDeleteMessage,
+    handleRequestDeleteChat: (id: Id<"chats"> | string) =>
+      void requestDeleteChat(id),
+    handleRequestDeleteMessage: (id: Id<"messages"> | string) =>
+      void requestDeleteMessage(id),
     handleMobileSidebarClose,
     handleSendMessage,
     handleDraftChange,
