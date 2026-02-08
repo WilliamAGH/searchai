@@ -129,6 +129,14 @@ export function sanitizeWebResearchSources(
       const safeUrl = safeParseUrl(refRaw.url);
       if (safeUrl) {
         sanitized.url = safeUrl;
+      } else if (refRaw.url !== undefined) {
+        console.warn("[http] Stripped invalid URL from source", {
+          contextId,
+          originalUrl:
+            typeof refRaw.url === "string"
+              ? refRaw.url.slice(0, 200)
+              : typeof refRaw.url,
+        });
       }
       if (typeof refRaw.title === "string") {
         sanitized.title = refRaw.title.slice(0, MAX_TITLE_LENGTH);
