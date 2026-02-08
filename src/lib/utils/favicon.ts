@@ -16,7 +16,10 @@ function safeParseUrl(url: string): URL | null {
       return null;
     }
     return parsed;
-  } catch {
+  } catch (error: unknown) {
+    if (import.meta.env.DEV) {
+      logger.debug("Failed to parse URL", { url, error });
+    }
     return null;
   }
 }
