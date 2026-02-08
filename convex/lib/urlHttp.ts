@@ -8,6 +8,19 @@ function toBoundedUrl(serialized: string, maxLength?: number): string {
     : serialized;
 }
 
+function normalizeHttpCandidate(trimmed: string): string | undefined {
+  if (trimmed.startsWith("//")) {
+    return `https:${trimmed}`;
+  }
+  if (URL_SCHEME_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+  if (!trimmed.includes(".")) {
+    return undefined;
+  }
+  return `https://${trimmed}`;
+}
+
 export function normalizeHttpUrl(
   value: unknown,
   maxLength?: number,
@@ -16,20 +29,16 @@ export function normalizeHttpUrl(
   const trimmed = value.trim();
   if (!trimmed) return undefined;
 
-  const direct = safeParseUrl(trimmed);
-  if (direct && (direct.protocol === "http:" || direct.protocol === "https:")) {
-    return toBoundedUrl(direct.toString(), maxLength);
+  const candidate = normalizeHttpCandidate(trimmed);
+  if (!candidate) {
+    return undefined;
   }
-
-  if (!URL_SCHEME_PATTERN.test(trimmed) && trimmed.includes(".")) {
-    const prefixed = safeParseUrl(`https://${trimmed}`);
-    if (
-      prefixed &&
-      (prefixed.protocol === "http:" || prefixed.protocol === "https:")
-    ) {
-      return toBoundedUrl(prefixed.toString(), maxLength);
-    }
+  const parsed = safeParseUrl(candidate);
+  if (
+    !parsed ||
+    (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+  ) {
+    return undefined;
   }
-
-  return undefined;
+  return toBoundedUrl(parsed.toString(), maxLength);
 }
