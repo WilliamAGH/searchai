@@ -135,6 +135,8 @@ export function MessageInput({
         <form onSubmit={handleSubmit}>
           <div className="relative flex items-center">
             <textarea
+              id="message-input"
+              name="message"
               ref={textareaRef}
               value={message}
               onChange={handleChange}

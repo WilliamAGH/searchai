@@ -48,7 +48,6 @@ export function MessageItem({
 
   return (
     <div
-      key={message._id || `message-${index}-${message.timestamp || Date.now()}`}
       className="flex gap-2 sm:gap-4 max-w-full overflow-hidden"
       data-testid={`message-${message.role}`}
       data-chat-id={message.chatId}

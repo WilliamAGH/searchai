@@ -20,6 +20,9 @@ interface UseUrlStateSyncProps {
  * Handles navigation to /chat/:id when a chat is selected,
  * and redirects to / when no chat is selected.
  */
+const resolveChatId = (chat: Doc<"chats"> | null | undefined): string | null =>
+  chat?._id ? String(chat._id) : null;
+
 export function useUrlStateSync({
   currentChatId,
   propChatId,
@@ -33,10 +36,6 @@ export function useUrlStateSync({
   const navigate = useNavigate();
   const location = useLocation();
   const lastResolvedChatIdRef = useRef<string | null>(null);
-
-  const resolveChatId = (
-    chat: Doc<"chats"> | null | undefined,
-  ): string | null => (chat?._id ? String(chat._id) : null);
 
   useEffect(() => {
     const isShareRoute = location.pathname.startsWith("/s/");
@@ -78,7 +77,13 @@ export function useUrlStateSync({
     }
 
     // If no chat ID but we're on a chat route, go home
-    if (!currentChatId && isChatRoute && location.pathname !== "/") {
+    // Only redirect if we don't have a target chat ID we're trying to resolve
+    if (
+      !currentChatId &&
+      !targetChatId &&
+      isChatRoute &&
+      location.pathname !== "/"
+    ) {
       void navigate("/", { replace: true });
     }
   }, [
