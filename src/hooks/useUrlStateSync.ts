@@ -81,25 +81,17 @@ export function useUrlStateSync({
       opaqueChatId ??
       (isOpaquePending ? String(propChatId) : null);
 
-    // 2. Sync State -> URL (Priority 1: State drives URL)
-    // Only enforce canonical URL if we are already synced (State == Target).
-    // This prevents URL flicker: we never navigate to /chat/${currentChatId}
-    // while a transition to a different target is in-flight.
-    if (currentChatId && isChatRoute && currentChatId === targetChatId) {
-      const expectedPath = `/chat/${currentChatId}`;
-      if (location.pathname !== expectedPath) {
-        isNavigatingRef.current = true;
-        void navigate(expectedPath, { replace: true });
-        queueMicrotask(() => {
-          isNavigatingRef.current = false;
-        });
-      }
+    // 2. Wait for pending query resolution before acting
+    // When a query (share/public/opaque) hasn't resolved yet, any sync would
+    // use stale or incomplete data. Bail out and wait for the next render.
+    if (isResolving) {
+      return;
     }
 
-    // 3. Sync URL -> State (Priority 2: URL drives State)
-    // If URL implies a different chat (or no chat), update state.
-    // Skip if we are still resolving the target ID from a query.
-    if (currentChatId !== targetChatId && !isResolving) {
+    // 3. URL -> State: URL requests a specific chat that differs from state.
+    // Dispatch selectChat and return early so we don't sync the stale
+    // currentChatId into the URL (which would cause visible flicker).
+    if (targetChatId && currentChatId !== targetChatId) {
       if (
         lastResolvedChatIdRef.current !== targetChatId &&
         !isNavigatingRef.current
@@ -110,10 +102,28 @@ export function useUrlStateSync({
           lastResolvedChatIdRef.current = null;
         });
       }
+      // Transition in-flight: don't sync URL to stale currentChatId below
+      return;
     }
 
-    // 4. Handle "Home" state (No chat selected)
-    // If no chat ID in state AND no target in URL, ensure we are at root
+    // 4. State -> URL: Ensure URL reflects the current chat.
+    // This handles both "already synced but URL differs" (e.g. opaque -> internal)
+    // and "new chat created" (state updated, URL still at /).
+    // Safe from flicker because step 3 already returned when a different
+    // targetChatId is in-flight.
+    if (currentChatId && isChatRoute) {
+      const expectedPath = `/chat/${currentChatId}`;
+      if (location.pathname !== expectedPath) {
+        isNavigatingRef.current = true;
+        void navigate(expectedPath, { replace: true });
+        queueMicrotask(() => {
+          isNavigatingRef.current = false;
+        });
+      }
+      return;
+    }
+
+    // 5. Home: No chat selected and no target in URL — ensure we're at root
     if (
       !currentChatId &&
       !targetChatId &&
