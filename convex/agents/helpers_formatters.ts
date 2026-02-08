@@ -2,6 +2,7 @@
 
 import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import { TOKEN_BUDGETS, CONTENT_LIMITS } from "../lib/constants/cache";
+import { safeParseUrl } from "../lib/url";
 import { normalizeHttpUrl } from "../lib/urlHttp";
 import { truncate } from "./helpers_utils";
 
@@ -119,7 +120,9 @@ export function formatWebResearchSourcesForPrompt(
       let label = ref.title;
       if (!label && ref.url) {
         const normalized = normalizeHttpUrl(ref.url);
-        label = normalized ? new URL(normalized).hostname : ref.url;
+        label = normalized
+          ? (safeParseUrl(normalized)?.hostname ?? ref.url)
+          : ref.url;
       }
       if (!label) label = ref.contextId;
       const relevance =
