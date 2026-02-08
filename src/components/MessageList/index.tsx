@@ -19,7 +19,6 @@ import { VirtualizedMessageList } from "./VirtualizedMessageList";
 import type { Message, SearchProgress } from "@/lib/types/message";
 import { useMessageListScroll } from "@/hooks/useMessageListScroll";
 import { resolveMessageKey } from "./messageKey";
-import { ReasoningDisplay } from "./ReasoningDisplay";
 import { hasWebResearchSources } from "@/lib/domain/webResearchSources";
 
 /** Virtualize message list when exceeding this count for performance */
@@ -276,19 +275,6 @@ export function MessageList({
               );
             })
           )}
-
-          {/* Show reasoning/thinking while AI is planning or thinking */}
-          {isGenerating &&
-            messages.length > 0 &&
-            (() => {
-              const lastMessage = messages[messages.length - 1];
-              return (
-                lastMessage?.role === "assistant" &&
-                lastMessage?.reasoning && (
-                  <ReasoningDisplay reasoning={lastMessage.reasoning} />
-                )
-              );
-            })()}
 
           {/* Search progress and generation status now shown inline within MessageItem */}
         </div>
