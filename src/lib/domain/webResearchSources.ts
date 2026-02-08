@@ -7,7 +7,11 @@
  * This module is the single mapping path between the two.
  */
 
-import { getDomainFromUrl, getSafeHostname } from "@/lib/utils/favicon";
+import {
+  getDomainFromUrl,
+  getSafeHostname,
+  safeParseHttpUrl,
+} from "@/lib/utils/favicon";
 import { logger } from "@/lib/logger";
 import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
@@ -19,20 +23,10 @@ export type WebSourceCard = {
 };
 
 function normalizeUrlKey(rawUrl: string): string | null {
-  const trimmed = rawUrl.trim();
-  const normalized = trimmed.startsWith("//")
-    ? `https:${trimmed}`
-    : /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)
-      ? trimmed
-      : `https://${trimmed}`;
-
-  let u: URL;
-  try {
-    u = new URL(normalized);
-  } catch (error) {
-    logger.warn("normalizeUrlKey: URL unparseable after normalization", {
-      url: trimmed,
-      error: error instanceof Error ? error.message : String(error),
+  const u = safeParseHttpUrl(rawUrl);
+  if (!u) {
+    logger.warn("normalizeUrlKey: URL rejected during normalization", {
+      url: rawUrl.trim(),
     });
     return null;
   }
