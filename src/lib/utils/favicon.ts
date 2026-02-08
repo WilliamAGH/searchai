@@ -1,12 +1,19 @@
-function safeParseUrl(url: string): URL | null {
+const URL_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//;
+
+export function safeParseHttpUrl(url: string): URL | null {
   const trimmed = url.trim();
   if (!trimmed) return null;
 
   const normalized = trimmed.startsWith("//")
     ? `https:${trimmed}`
-    : /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)
+    : URL_SCHEME_PATTERN.test(trimmed)
       ? trimmed
-      : `https://${trimmed}`;
+      : !trimmed.includes(".")
+        ? null
+        : `https://${trimmed}`;
+  if (!normalized) {
+    return null;
+  }
 
   try {
     const parsed = new URL(normalized);
@@ -24,7 +31,7 @@ function safeParseUrl(url: string): URL | null {
  * - Used for citation display and matching
  */
 export function getDomainFromUrl(url: string): string {
-  const parsed = safeParseUrl(url);
+  const parsed = safeParseHttpUrl(url);
   if (!parsed) {
     return "";
   }
@@ -36,7 +43,7 @@ export function getDomainFromUrl(url: string): string {
  * - Handles malformed URLs and bare hostnames
  */
 export function getSafeHostname(url: string): string {
-  const parsed = safeParseUrl(url);
+  const parsed = safeParseHttpUrl(url);
   if (!parsed) {
     return "";
   }
