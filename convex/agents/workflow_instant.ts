@@ -44,8 +44,6 @@ export async function* executeInstantPath({
     "Skipping all agent calls for simple message",
   );
 
-  yield writeEvent("workflow_start", { workflowId, nonce });
-
   yield writeEvent("progress", {
     stage: "generating",
     message: "Responding...",
