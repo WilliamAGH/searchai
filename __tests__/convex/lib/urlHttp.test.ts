@@ -63,6 +63,12 @@ describe("normalizeHttpUrl", () => {
   });
 
   describe("bare domain auto-prefixing", () => {
+    it("supports protocol-relative URLs", () => {
+      expect(normalizeHttpUrl("//example.com/path")).toBe(
+        "https://example.com/path",
+      );
+    });
+
     it("adds https:// to bare domain with dot", () => {
       expect(normalizeHttpUrl("example.com")).toBe("https://example.com/");
     });
