@@ -29,7 +29,6 @@ import { useEffectiveMessages } from "@/hooks/useEffectiveMessages";
 import { logger } from "@/lib/logger";
 import { ChatLayout } from "@/components/ChatInterface/ChatLayout";
 import type { Chat } from "@/lib/types/chat";
-import { DRAFT_MIN_LENGTH } from "@/lib/constants/topicDetection";
 import { buildApiBase, resolveApiPath } from "@/lib/utils/httpUtils";
 import { buildUserHistory } from "@/lib/utils/chatHistory";
 
@@ -135,7 +134,6 @@ function ChatInterfaceComponent({
     clearError,
   } = usePaginatedMessages({
     chatId: usePagination ? currentChatId : null,
-    initialLimit: 50,
     enabled: usePagination,
   });
   const handlePaginatedLoadMore = useCallback(async () => {
@@ -248,11 +246,7 @@ function ChatInterfaceComponent({
   useEffect(() => {
     sendRefTemp.current = sendRef.current;
   }, [sendRef]);
-  const { handleDraftChange: analyzeDraft } = useDraftAnalyzer({
-    minLength: DRAFT_MIN_LENGTH,
-    debounceMs: 1200,
-    onAnalysis: () => {},
-  });
+  const { handleDraftChange: analyzeDraft } = useDraftAnalyzer();
   const handleDraftChange = useCallback(
     (draft: string) => {
       if (!isGenerating) analyzeDraft(draft);
