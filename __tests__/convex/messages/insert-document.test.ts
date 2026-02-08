@@ -151,12 +151,6 @@ describe("buildMessageInsertDocument", () => {
         title: "CHP",
         timestamp: 1700000000004,
       },
-      {
-        contextId: "ctx_3",
-        type: "search_result",
-        title: "Bad",
-        timestamp: 1700000000005,
-      },
     ]);
   });
 });

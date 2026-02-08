@@ -57,7 +57,7 @@ describe("convertToWebResearchSources", () => {
     expect(out[0]?.url).toBe("https://ots.ca.gov/child-passenger-safety/");
   });
 
-  it("drops non-http protocols from persisted source URLs", () => {
+  it("excludes sources with non-http protocols entirely", () => {
     const out = convertToWebResearchSources([
       {
         contextId: "019a122e-c507-7851-99f7-b8f5d7345b45",
@@ -68,8 +68,7 @@ describe("convertToWebResearchSources", () => {
       },
     ]);
 
-    expect(out).toHaveLength(1);
-    expect(out[0]?.url).toBeUndefined();
+    expect(out).toHaveLength(0);
   });
 });
 

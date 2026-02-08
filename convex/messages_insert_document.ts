@@ -46,30 +46,28 @@ function normalizePersistedWebResearchSources(
 ): WebResearchSource[] | undefined {
   if (!sources) return undefined;
 
-  return sources.map((source) => {
+  const normalized: WebResearchSource[] = [];
+  for (const source of sources) {
+    if (source.url === undefined) {
+      normalized.push(source);
+      continue;
+    }
     const normalizedUrl = normalizeHttpUrl(
       source.url,
       MAX_PERSISTED_URL_LENGTH,
     );
     if (!normalizedUrl) {
-      if (source.url === undefined) return source;
-      console.warn("[messages] Rejected invalid URL from web research source", {
+      console.error("[messages] Excluded source with invalid URL", {
         contextId: source.contextId,
         originalUrl: source.url,
       });
-      const { url: _url, ...withoutUrl } = source;
-      return withoutUrl;
+      continue;
     }
-
-    if (source.url === normalizedUrl) {
-      return source;
-    }
-
-    return {
-      ...source,
-      url: normalizedUrl,
-    };
-  });
+    normalized.push(
+      source.url === normalizedUrl ? source : { ...source, url: normalizedUrl },
+    );
+  }
+  return normalized;
 }
 
 /** Explicit allowlist of optional fields copied from args to the document. */

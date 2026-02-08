@@ -76,10 +76,11 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
   for (const scraped of harvested.scrapedContent) {
     const normalizedUrl = normalizeSourceUrl(scraped.url);
     if (scraped.url && !normalizedUrl) {
-      console.warn("[agents] Rejected invalid scraped URL", {
+      console.error("[agents] Excluded scraped source with invalid URL", {
         contextId: scraped.contextId,
         originalUrl: scraped.url,
       });
+      continue;
     }
     webResearchSources.push({
       contextId: scraped.contextId,
@@ -102,16 +103,9 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
   for (const result of harvested.searchResults) {
     const normalizedUrl = normalizeSourceUrl(result.url);
     if (!normalizedUrl) {
-      console.warn("[agents] Rejected invalid search result URL", {
+      console.error("[agents] Excluded search result with invalid URL", {
         contextId: result.contextId,
         originalUrl: result.url,
-      });
-      webResearchSources.push({
-        contextId: result.contextId ?? generateMessageId(),
-        type: "search_result",
-        title: result.title,
-        timestamp: now,
-        relevanceScore: result.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
       });
       continue;
     }
@@ -164,21 +158,24 @@ export function convertToWebResearchSources(
     low: RELEVANCE_SCORES.LOW_LABEL,
   };
 
-  return sources.map((source) => {
+  const converted: WebResearchSource[] = [];
+  for (const source of sources) {
     const normalizedUrl = normalizeSourceUrl(source.url);
     if (source.url && !normalizedUrl) {
-      console.warn("[agents] Rejected invalid source URL during conversion", {
+      console.error("[agents] Excluded source with invalid URL", {
         contextId: source.contextId,
         originalUrl: source.url,
       });
+      continue;
     }
-    return {
+    converted.push({
       contextId: source.contextId,
       type: source.type,
       ...(normalizedUrl ? { url: normalizedUrl } : {}),
       title: source.title,
       timestamp: now,
       relevanceScore: relevanceToScore[source.relevance],
-    };
-  });
+    });
+  }
+  return converted;
 }
