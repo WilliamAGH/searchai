@@ -148,6 +148,7 @@ export function registerSearchRoutes(http: HttpRouter) {
         >();
         for (const r of mergedResults) {
           const key = normalizeUrlForKey(r.url);
+          if (!key) continue;
           const prev = byUrl.get(key);
           const curScore =
             typeof r.relevanceScore === "number" ? r.relevanceScore : 0.5;

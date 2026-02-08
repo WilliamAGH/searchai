@@ -37,14 +37,11 @@ export function normalizeUrl(rawUrl: string | undefined): string | null {
  * @param rawUrl - Raw URL string to normalize
  * @returns Normalized URL string
  */
-export function normalizeUrlForKey(rawUrl: string): string {
+export function normalizeUrlForKey(rawUrl: string): string | null {
   const normalized = normalizeUrl(rawUrl);
   if (!normalized) {
-    // Fallback for invalid URLs
-    // Ensure we still try to strip the hash if possible, even if it's not a valid URL
-    const trimmed = (rawUrl || "").trim();
-    const hashIndex = trimmed.indexOf("#");
-    return hashIndex !== -1 ? trimmed.slice(0, hashIndex) : trimmed;
+    console.warn("[url] normalizeUrlForKey: rejected invalid URL", { rawUrl });
+    return null;
   }
 
   const u = safeParseUrl(normalized);

@@ -73,7 +73,13 @@ function fromStructuredSource(
       : ctx.fallbackTimestamp;
   const relevanceScore = sanitizeRelevanceScore(input.relevanceScore);
 
-  if (!url && !title) return null;
+  if (!url && !title) {
+    console.warn("[resolver] Dropped source with no URL and no title", {
+      messageId: ctx.messageId,
+      index: ctx.index,
+    });
+    return null;
+  }
 
   return {
     contextId:
@@ -157,7 +163,10 @@ function collectParsed(
 
 /** Stable deduplication key: URL-based when available, otherwise type+title. */
 function deduplicationKey(source: WebResearchSource): string {
-  if (source.url) return normalizeUrlForKey(source.url);
+  if (source.url) {
+    const key = normalizeUrlForKey(source.url);
+    if (key) return key;
+  }
   return `${source.type}:${source.title ?? source.contextId}`;
 }
 

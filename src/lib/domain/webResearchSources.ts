@@ -18,7 +18,7 @@ export type WebSourceCard = {
   relevanceScore?: number;
 };
 
-function normalizeUrlKey(rawUrl: string): string {
+function normalizeUrlKey(rawUrl: string): string | null {
   const trimmed = rawUrl.trim();
   const normalized = trimmed.startsWith("//")
     ? `https:${trimmed}`
@@ -35,8 +35,12 @@ function normalizeUrlKey(rawUrl: string): string {
       u.pathname = u.pathname.slice(0, -1);
     }
     return u.toString();
-  } catch {
-    return trimmed;
+  } catch (error) {
+    logger.warn("normalizeUrlKey: rejected unparseable URL", {
+      url: trimmed,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }
 
@@ -64,7 +68,7 @@ export function toWebSourceCards(
   const byUrl = new Map<string, WebSourceCard>();
   for (const src of withUrls) {
     const key = normalizeUrlKey(src.url);
-    if (byUrl.has(key)) continue;
+    if (!key || byUrl.has(key)) continue;
 
     const fallbackTitle = getSafeHostname(src.url) || "Source";
     byUrl.set(key, {
