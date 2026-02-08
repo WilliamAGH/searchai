@@ -5,15 +5,18 @@ import {
   getSafeHostname,
 } from "../../../../src/lib/utils/favicon";
 
+function isSvgDataUrl(value: string | null): value is string {
+  return typeof value === "string" && value.startsWith("data:image/svg+xml,");
+}
+
 describe("favicon URL parsing", () => {
   it("parses scheme-less URLs safely", () => {
     const input = "chp.ca.gov/programs-services/programs/child-safety-seats/";
+    const icon = getFaviconUrl(input);
 
     expect(getSafeHostname(input)).toBe("chp.ca.gov");
     expect(getDomainFromUrl(input)).toBe("chp.ca.gov");
-    expect(getFaviconUrl(input)).toBe(
-      "https://icons.duckduckgo.com/ip3/chp.ca.gov.ico",
-    );
+    expect(isSvgDataUrl(icon)).toBe(true);
   });
 
   it("normalizes www prefix for domain display", () => {
@@ -23,11 +26,19 @@ describe("favicon URL parsing", () => {
 
   it("supports protocol-relative URLs", () => {
     const input = "//docs.example.com/path";
+    const icon = getFaviconUrl(input);
+
     expect(getSafeHostname(input)).toBe("docs.example.com");
     expect(getDomainFromUrl(input)).toBe("docs.example.com");
-    expect(getFaviconUrl(input)).toBe(
-      "https://icons.duckduckgo.com/ip3/docs.example.com.ico",
-    );
+    expect(isSvgDataUrl(icon)).toBe(true);
+  });
+
+  it("produces deterministic favicon icons per canonical domain", () => {
+    const withWww = getFaviconUrl("https://www.substack.com/p/example");
+    const withoutWww = getFaviconUrl("https://substack.com/p/another");
+
+    expect(isSvgDataUrl(withWww)).toBe(true);
+    expect(withWww).toBe(withoutWww);
   });
 
   it("rejects single-label scheme-less values", () => {

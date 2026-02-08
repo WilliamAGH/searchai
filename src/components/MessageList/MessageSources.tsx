@@ -101,23 +101,19 @@ export function MessageSources({
             {previewSources.map((source, i) => {
               const hostname =
                 getDomainFromUrl(source.url) || getSafeHostname(source.url);
+              const favicon = getFaviconUrl(source.url);
               return (
                 <a
-                  key={`${messageId}-preview-${i}`}
+                  key={`${messageId}-preview-${source.url}-${i}`}
                   href={source.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
                   className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <img
-                    src={getFaviconUrl(source.url) ?? undefined}
-                    alt=""
-                    className="w-3 h-3 rounded"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
+                  {favicon && (
+                    <img src={favicon} alt="" className="w-3 h-3 rounded" />
+                  )}
                   <span className="max-w-[120px] truncate">{hostname}</span>
                 </a>
               );
@@ -136,6 +132,7 @@ export function MessageSources({
           {displaySources.map((source, i) => {
             const hostname =
               getDomainFromUrl(source.url) || getSafeHostname(source.url);
+            const favicon = getFaviconUrl(source.url);
             const isHovered = hoveredSourceUrl === source.url;
 
             const relevanceBadge =
@@ -172,7 +169,7 @@ export function MessageSources({
 
             return (
               <a
-                key={`${messageId}-source-${i}`}
+                key={`${messageId}-source-${source.url}-${i}`}
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -185,14 +182,13 @@ export function MessageSources({
                 onMouseLeave={() => onSourceHover(null)}
               >
                 <div className="flex items-start gap-2">
-                  <img
-                    src={getFaviconUrl(source.url) ?? undefined}
-                    alt=""
-                    className="w-4 h-4 mt-0.5 rounded"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
+                  {favicon && (
+                    <img
+                      src={favicon}
+                      alt=""
+                      className="w-4 h-4 mt-0.5 rounded"
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <div className="font-medium text-[15px] sm:text-base text-gray-900 dark:text-gray-100 line-clamp-1 flex-1 min-w-0">
