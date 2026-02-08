@@ -28,7 +28,7 @@ export function isLocalId(str: string | null | undefined): boolean {
 
 function extractRawIdentifier<TableName extends TableNames>(
   str: Id<TableName>,
-): Id<TableName>;
+): Id<TableName> | null;
 function extractRawIdentifier(str: string): string | null;
 function extractRawIdentifier(str: string): string | null {
   if (LOCAL_ID_PREFIXES.some((prefix) => str.startsWith(prefix))) {
