@@ -1,4 +1,7 @@
-const URL_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//;
+import { safeParseHttpUrl } from "../../../convex/lib/urlHttp";
+
+export { safeParseHttpUrl };
+
 const DOMAIN_PREFIX_PATTERN = /^www\./;
 const FAVICON_ICON_CACHE = new Map<string, string>();
 const FAVICON_SIZE = 16;
@@ -44,30 +47,6 @@ function buildFaviconDataUrl(hostname: string): string {
   ].join("");
 
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-export function safeParseHttpUrl(url: string): URL | null {
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-
-  const normalized = trimmed.startsWith("//")
-    ? `https:${trimmed}`
-    : URL_SCHEME_PATTERN.test(trimmed)
-      ? trimmed
-      : !trimmed.includes(".")
-        ? null
-        : `https://${trimmed}`;
-  if (!normalized) return null;
-
-  try {
-    const parsed = new URL(normalized);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
 }
 
 /**

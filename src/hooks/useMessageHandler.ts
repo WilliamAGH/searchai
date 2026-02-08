@@ -39,6 +39,12 @@ interface UseMessageHandlerDeps {
   maybeShowFollowUpPrompt: () => void;
   /** Chat management actions */
   chatActions: ChatActions;
+  /**
+   * Navigate to a chat by ID via URL. Used instead of `chatActions.selectChat`
+   * to enforce URL as the single source of truth for chat selection.
+   * See `docs/contracts/navigation.md`.
+   */
+  navigateToChat: (chatId: string) => void;
   /** Surface user-visible errors when message sending fails */
   setErrorMessage?: (message: string) => void;
 }
@@ -83,8 +89,9 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
             existingChatId,
           });
           activeChatId = existingChatId;
-          // Ensure state is updated
-          await deps.chatActions.selectChat(existingChatId);
+          // Navigate via URL so useUrlStateSync drives the state update.
+          // Do NOT call selectChat directly — see docs/contracts/navigation.md.
+          deps.navigateToChat(existingChatId);
         }
       }
 

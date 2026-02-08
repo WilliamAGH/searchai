@@ -18,10 +18,10 @@ interface DraftAnalysis {
  * Hook to analyze message drafts as user types
  */
 export function useDraftAnalyzer({
-  minLength = 10,
-  debounceMs = 500,
+  minLength = 50,
+  debounceMs = 1200,
   onAnalysis,
-}: UseDraftAnalyzerProps) {
+}: UseDraftAnalyzerProps = {}) {
   const lastAnalysisRef = useRef<string>("");
 
   const analyzeDraft = useCallback(
