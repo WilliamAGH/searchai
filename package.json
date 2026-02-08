@@ -139,7 +139,10 @@
       "oxlint -c .oxlintrc.json --type-aware",
       "oxfmt --write"
     ],
-    "*.{css,md,json}": [
+    "*.{css,md}": [
+      "oxfmt --write"
+    ],
+    "!(package-lock).json": [
       "oxfmt --write"
     ]
   },
