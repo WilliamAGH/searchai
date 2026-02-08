@@ -13,12 +13,17 @@ import { platform } from "node:os";
 
 const isCI = process.env.CI === "true";
 const isMac = platform() === "darwin";
+const includeWebkitEnv = process.env.PLAYWRIGHT_INCLUDE_WEBKIT;
+const forceWebkitInstall =
+  includeWebkitEnv === "1" || includeWebkitEnv === "true";
+const disableWebkitInstall =
+  includeWebkitEnv === "0" || includeWebkitEnv === "false";
 
 const args = ["playwright", "install", "--with-deps"];
 
 if (!isCI) {
   args.push("chromium");
-  if (!isMac) {
+  if (forceWebkitInstall || (!disableWebkitInstall && !isMac)) {
     args.push("webkit");
   }
 }
