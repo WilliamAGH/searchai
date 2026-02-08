@@ -4,6 +4,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { ensureSidebarOpen } from "../helpers/sidebar-helpers";
 
 test.describe("Critical User Paths", () => {
   test("user can create and send a message", async ({ page }) => {
@@ -29,6 +30,8 @@ test.describe("Critical User Paths", () => {
 
   test("user can create new chat", async ({ page }) => {
     await page.goto("/");
+
+    await ensureSidebarOpen(page);
 
     // Click new chat button
     const newChatBtn = page.locator('button:has-text("New Chat")').first();
