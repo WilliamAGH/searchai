@@ -48,15 +48,12 @@ export interface ChatActions {
 }
 
 /**
- * Creates chat actions for managing chat state
- * @param repository - Chat repository for persistence (null for unauthenticated)
- * @param state - Current chat state
- * @param setState - State setter function
- * @returns Object containing all chat actions
+ * Creates chat actions for managing chat state.
+ * All actions use the setState updater form to read current state,
+ * so no stale `state` capture is needed.
  */
 export function createChatActions(
   repository: IChatRepository | null,
-  state: ChatState,
   setState: Dispatch<SetStateAction<ChatState>>,
 ): ChatActions {
   return {
@@ -111,16 +108,14 @@ export function createChatActions(
       }
 
       try {
-        // Parallelize fetching chat and messages
-        const [chat, messages] = await Promise.all([
-          repository.getChatById(id),
-          repository.getMessages(id),
-        ]);
+        const chat = await repository.getChatById(id);
 
         if (chat) {
+          const canonicalChatId = String(chat._id);
+          const messages = await repository.getMessages(canonicalChatId);
           setState((prev) => ({
             ...prev,
-            currentChatId: id,
+            currentChatId: canonicalChatId,
             currentChat: chat,
             messages,
             error: null,

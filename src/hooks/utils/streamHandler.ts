@@ -193,6 +193,8 @@ export class StreamEventHandler {
     this.persistedDetails = chunk.payload;
 
     const messageUpdates: Partial<Message> = {
+      _id: String(chunk.payload.assistantMessageId),
+      content: chunk.payload.answer,
       workflowId: chunk.payload.workflowId,
       webResearchSources: chunk.payload.webResearchSources,
       isStreaming: false,

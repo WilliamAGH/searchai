@@ -132,6 +132,7 @@ export function SignInModal({
       <div className="w-full">
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <input
+            id="signin-email"
             className="w-full px-4 py-3 rounded-lg bg-background border border-input focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-shadow text-base dark:text-white"
             type="email"
             name="email"
@@ -140,6 +141,7 @@ export function SignInModal({
             required
           />
           <input
+            id="signin-password"
             className="w-full px-4 py-3 rounded-lg bg-background border border-input focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-shadow text-base dark:text-white"
             type="password"
             name="password"

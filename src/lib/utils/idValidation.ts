@@ -40,6 +40,21 @@ function extractRawIdentifier(str: string): string | null {
 }
 
 /**
+ * Normalize an identifier for string comparison.
+ * - Converts legacy `table|id` form to raw `id`
+ * - Preserves local IDs and unrecognized strings as-is
+ */
+export function normalizeIdForComparison(
+  str: string | null | undefined,
+): string {
+  if (!str || typeof str !== "string") {
+    return "";
+  }
+  const raw = extractRawIdentifier(str);
+  return raw ?? str;
+}
+
+/**
  * Validate if a string is a valid Convex ID format
  * Accepts both modern base32 IDs and legacy `table|id` strings
  */
@@ -79,5 +94,10 @@ export function toConvexId<TableName extends TableNames>(
   if (!str || !isConvexId<TableName>(str)) {
     return null;
   }
-  return str;
+
+  const raw = extractRawIdentifier(str);
+  if (!raw || !isConvexId<TableName>(raw)) {
+    return null;
+  }
+  return raw;
 }

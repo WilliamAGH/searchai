@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   convertToWebResearchSources,
+  buildWebResearchSourcesFromHarvested,
   buildUrlContextMap,
   formatScrapedContentForPrompt,
   formatSerpEnrichmentForPrompt,
@@ -39,6 +40,62 @@ describe("convertToWebResearchSources", () => {
     expect(typeof out[0].timestamp).toBe("number");
     expect(out[0].relevanceScore).toBeGreaterThan(0.8); // ~0.9 for 'high'
     expect(out[1].relevanceScore).toBeGreaterThan(0.6); // ~0.7 for 'medium'
+  });
+
+  it("normalizes scheme-less URLs to https", () => {
+    const out = convertToWebResearchSources([
+      {
+        contextId: "019a122e-c507-7851-99f7-b8f5d7345b44",
+        type: "search_result",
+        url: "ots.ca.gov/child-passenger-safety/",
+        title: "OTS",
+        relevance: "medium",
+      },
+    ]);
+
+    expect(out).toHaveLength(1);
+    expect(out[0]?.url).toBe("https://ots.ca.gov/child-passenger-safety/");
+  });
+
+  it("excludes sources with non-http protocols entirely", () => {
+    const out = convertToWebResearchSources([
+      {
+        contextId: "019a122e-c507-7851-99f7-b8f5d7345b45",
+        type: "search_result",
+        url: "javascript:alert(1)",
+        title: "Bad URL",
+        relevance: "low",
+      },
+    ]);
+
+    expect(out).toHaveLength(0);
+  });
+});
+
+describe("buildWebResearchSourcesFromHarvested", () => {
+  it("normalizes harvested URLs and deduplicates scraped/search duplicates", () => {
+    const out = buildWebResearchSourcesFromHarvested({
+      scrapedContent: [
+        {
+          contextId: "019a122e-c507-7851-99f7-b8f5d7345b60",
+          url: "chp.ca.gov/programs-services/programs/child-safety-seats/",
+          title: "CHP",
+          scrapedAt: fixedNow,
+        },
+      ],
+      searchResults: [
+        {
+          contextId: "019a122e-c507-7851-99f7-b8f5d7345b61",
+          url: "https://chp.ca.gov/programs-services/programs/child-safety-seats/",
+          title: "CHP duplicate",
+        },
+      ],
+    });
+
+    expect(out).toHaveLength(1);
+    expect(out[0]?.url).toBe(
+      "https://chp.ca.gov/programs-services/programs/child-safety-seats/",
+    );
   });
 });
 

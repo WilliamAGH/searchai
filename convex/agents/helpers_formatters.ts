@@ -2,6 +2,8 @@
 
 import type { ScrapedContent, SerpEnrichment } from "../schemas/search";
 import { TOKEN_BUDGETS, CONTENT_LIMITS } from "../lib/constants/cache";
+import { safeParseUrl } from "../lib/url";
+import { normalizeHttpUrl } from "../lib/urlHttp";
 import { truncate } from "./helpers_utils";
 
 const CHARS_PER_TOKEN_ESTIMATE = 4;
@@ -115,18 +117,14 @@ export function formatWebResearchSourcesForPrompt(
   const recent = references
     .slice(-8)
     .map((ref, idx) => {
-      let label = ref.title || ref.url || ref.contextId;
+      let label = ref.title;
       if (!label && ref.url) {
-        try {
-          label = new URL(ref.url).hostname;
-        } catch (error) {
-          console.warn("Failed to parse web research source URL", {
-            url: ref.url,
-            error,
-          });
-          label = ref.url;
-        }
+        const normalized = normalizeHttpUrl(ref.url);
+        label = normalized
+          ? (safeParseUrl(normalized)?.hostname ?? ref.url)
+          : ref.url;
       }
+      if (!label) label = ref.contextId;
       const relevance =
         typeof ref.relevanceScore === "number"
           ? ` (relevance ${ref.relevanceScore.toFixed(2)})`

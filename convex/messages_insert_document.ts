@@ -1,4 +1,5 @@
 import type { SearchMethod } from "./lib/constants/search";
+import { normalizeHttpUrl } from "./lib/urlHttp";
 import type { WebResearchSource } from "./lib/validators";
 
 /**
@@ -38,6 +39,36 @@ export interface BuildMessageInsertDocumentParams<
 }
 
 type OptionalField = keyof Omit<PersistableMessageArgs, "role">;
+const MAX_PERSISTED_URL_LENGTH = 2048;
+
+function normalizePersistedWebResearchSources(
+  sources: WebResearchSource[] | undefined,
+): WebResearchSource[] | undefined {
+  if (!sources) return undefined;
+
+  const normalized: WebResearchSource[] = [];
+  for (const source of sources) {
+    if (source.url === undefined) {
+      normalized.push(source);
+      continue;
+    }
+    const normalizedUrl = normalizeHttpUrl(
+      source.url,
+      MAX_PERSISTED_URL_LENGTH,
+    );
+    if (!normalizedUrl) {
+      console.error("[messages] Excluded source with invalid URL", {
+        contextId: source.contextId,
+        originalUrl: source.url,
+      });
+      continue;
+    }
+    normalized.push(
+      source.url === normalizedUrl ? source : { ...source, url: normalizedUrl },
+    );
+  }
+  return normalized;
+}
 
 /** Explicit allowlist of optional fields copied from args to the document. */
 const OPTIONAL_FIELDS: readonly OptionalField[] = [
@@ -79,13 +110,19 @@ export function buildMessageInsertDocument<TChatId extends string>(
   params: BuildMessageInsertDocumentParams<TChatId>,
 ): MessageInsertDocument<TChatId> {
   const { chatId, messageId, threadId, args, timestamp = Date.now() } = params;
+  const normalizedArgs: PersistableMessageArgs = {
+    ...args,
+    webResearchSources: normalizePersistedWebResearchSources(
+      args.webResearchSources,
+    ),
+  };
 
   return {
     chatId,
     messageId,
     threadId,
-    role: args.role,
+    role: normalizedArgs.role,
     timestamp,
-    ...pickDefinedFields(args),
+    ...pickDefinedFields(normalizedArgs),
   };
 }

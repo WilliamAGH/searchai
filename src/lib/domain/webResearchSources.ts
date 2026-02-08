@@ -7,7 +7,11 @@
  * This module is the single mapping path between the two.
  */
 
-import { getSafeHostname } from "@/lib/utils/favicon";
+import {
+  getDomainFromUrl,
+  getSafeHostname,
+  safeParseHttpUrl,
+} from "@/lib/utils/favicon";
 import { logger } from "@/lib/logger";
 import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
@@ -18,19 +22,21 @@ export type WebSourceCard = {
   relevanceScore?: number;
 };
 
-function normalizeUrlKey(rawUrl: string): string {
-  try {
-    const u = new URL(rawUrl);
-    u.hash = "";
-    // Lightweight normalization: remove common www and trailing slash.
-    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
-    if (u.pathname !== "/" && u.pathname.endsWith("/")) {
-      u.pathname = u.pathname.slice(0, -1);
-    }
-    return u.toString();
-  } catch {
-    return rawUrl.trim();
+function normalizeUrlKey(rawUrl: string): string | null {
+  const u = safeParseHttpUrl(rawUrl);
+  if (!u) {
+    logger.warn("normalizeUrlKey: URL rejected during normalization", {
+      url: rawUrl.trim(),
+    });
+    return null;
   }
+
+  u.hash = "";
+  u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
+  if (u.pathname !== "/" && u.pathname.endsWith("/")) {
+    u.pathname = u.pathname.slice(0, -1);
+  }
+  return u.toString();
 }
 
 export function hasWebResearchSources(
@@ -57,7 +63,7 @@ export function toWebSourceCards(
   const byUrl = new Map<string, WebSourceCard>();
   for (const src of withUrls) {
     const key = normalizeUrlKey(src.url);
-    if (byUrl.has(key)) continue;
+    if (!key || byUrl.has(key)) continue;
 
     const fallbackTitle = getSafeHostname(src.url) || "Source";
     byUrl.set(key, {
@@ -78,18 +84,16 @@ export function toDomainToUrlMap(
   const map = new Map<string, string>();
 
   for (const c of cards) {
-    try {
-      const hostname = new URL(c.url).hostname.replace(/^www\./, "");
-      if (!hostname) continue;
-      // Prefer first-seen URL per domain for stable mapping.
-      if (!map.has(hostname)) {
-        map.set(hostname, c.url);
-      }
-    } catch (error) {
-      logger.warn("Failed to parse web research source URL for domain map", {
+    const hostname = getDomainFromUrl(c.url);
+    if (!hostname) {
+      logger.warn("Skipped source with unparseable URL in domain map", {
         url: c.url,
-        error,
       });
+      continue;
+    }
+    // Prefer first-seen URL per domain for stable mapping.
+    if (!map.has(hostname)) {
+      map.set(hostname, c.url);
     }
   }
 

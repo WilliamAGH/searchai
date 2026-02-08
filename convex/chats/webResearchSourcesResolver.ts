@@ -8,6 +8,7 @@
 
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
 import { normalizeUrlForKey, safeParseUrl } from "../lib/url";
+import { normalizeHttpUrl } from "../lib/urlHttp";
 import { isRecord, type WebResearchSource } from "../lib/validators";
 
 const UNKNOWN_MESSAGE_ID = "unknown" as const;
@@ -35,18 +36,7 @@ type SourceParser = (
 ) => WebResearchSource | null;
 
 function safeUrlFromUnknown(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-
-  const direct = safeParseUrl(trimmed);
-  if (direct) return direct.toString().slice(0, 2048);
-
-  if (!/^https?:\/\//i.test(trimmed) && trimmed.includes(".")) {
-    const prefixed = safeParseUrl(`https://${trimmed}`);
-    if (prefixed) return prefixed.toString().slice(0, 2048);
-  }
-  return undefined;
+  return normalizeHttpUrl(value, 2048);
 }
 
 function sanitizeType(value: unknown): WebResearchSource["type"] {
@@ -83,7 +73,13 @@ function fromStructuredSource(
       : ctx.fallbackTimestamp;
   const relevanceScore = sanitizeRelevanceScore(input.relevanceScore);
 
-  if (!url && !title) return null;
+  if (!url && !title) {
+    console.warn("[resolver] Dropped source: no URL and no title", {
+      messageId: ctx.messageId,
+      index: ctx.index,
+    });
+    return null;
+  }
 
   return {
     contextId:
@@ -167,7 +163,10 @@ function collectParsed(
 
 /** Stable deduplication key: URL-based when available, otherwise type+title. */
 function deduplicationKey(source: WebResearchSource): string {
-  if (source.url) return normalizeUrlForKey(source.url);
+  if (source.url) {
+    const key = normalizeUrlForKey(source.url);
+    if (key) return key;
+  }
   return `${source.type}:${source.title ?? source.contextId}`;
 }
 

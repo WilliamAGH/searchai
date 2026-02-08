@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React from "react";
 import { getFaviconUrl, getSafeHostname } from "@/lib/utils/favicon";
 
 interface SearchProgressProps {
@@ -21,12 +21,6 @@ interface SearchProgressProps {
 }
 
 export function SearchProgress({ progress }: SearchProgressProps) {
-  const handleFaviconError = useCallback(
-    (e: React.SyntheticEvent<HTMLImageElement>) => {
-      e.currentTarget.style.display = "none";
-    },
-    [],
-  );
   const getStageIcon = (stage: string) => {
     switch (stage) {
       case "planning":
@@ -159,7 +153,6 @@ export function SearchProgress({ progress }: SearchProgressProps) {
                     width={12}
                     height={12}
                     className="w-3 h-3 object-contain rounded-sm"
-                    onError={handleFaviconError}
                   />
                 ) : null;
               })()}
@@ -198,7 +191,6 @@ export function SearchProgress({ progress }: SearchProgressProps) {
                         width={12}
                         height={12}
                         className="w-3 h-3 object-contain rounded-sm"
-                        onError={handleFaviconError}
                       />
                     ) : null;
                   })()}

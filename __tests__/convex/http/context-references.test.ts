@@ -48,6 +48,30 @@ describe("sanitizeWebResearchSources", () => {
     vi.useRealTimers();
   });
 
+  it("normalizes scheme-less URLs and rejects non-http protocols", () => {
+    const result = sanitizeWebResearchSources([
+      {
+        contextId: "019a122e-c507-7851-99f7-b8f5d7345b50",
+        type: "search_result",
+        url: "chp.ca.gov/programs-services/programs/child-safety-seats/",
+      },
+      {
+        contextId: "019a122e-c507-7851-99f7-b8f5d7345b51",
+        type: "search_result",
+        url: "javascript:alert(1)",
+      },
+    ]);
+
+    expect(result).toEqual([
+      {
+        contextId: "019a122e-c507-7851-99f7-b8f5d7345b50",
+        type: "search_result",
+        timestamp: expect.any(Number),
+        url: "https://chp.ca.gov/programs-services/programs/child-safety-seats/",
+      },
+    ]);
+  });
+
   it("limits to 12 entries and trims strings", () => {
     const oversizedTitle = "x".repeat(1000);
     const oversizedUrl = `https://example.com/${"y".repeat(5000)}`;

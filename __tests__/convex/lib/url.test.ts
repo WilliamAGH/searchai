@@ -7,14 +7,15 @@ test("normalizeUrl strips hash", () => {
   );
 });
 
-test("normalizeUrlForKey handles invalid URLs consistently with fallback", () => {
-  // Case 1: Valid URL - hash stripped by normalizeUrl
+test("normalizeUrlForKey strips hash from valid URLs", () => {
   expect(normalizeUrlForKey("https://example.com/page#section")).toBe(
     "https://example.com/page",
   );
+});
 
-  // Case 2: Invalid URL - hash is manually stripped in fallback
-  expect(normalizeUrlForKey("not-a-url#hash")).toBe("not-a-url");
+test("normalizeUrlForKey returns null for invalid URLs", () => {
+  expect(normalizeUrlForKey("not-a-url#hash")).toBeNull();
+  expect(normalizeUrlForKey("not-a-url")).toBeNull();
 });
 
 test("normalizeUrlForKey redundant logic check", () => {

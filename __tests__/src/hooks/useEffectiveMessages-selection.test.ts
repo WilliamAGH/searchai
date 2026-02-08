@@ -87,4 +87,24 @@ describe("selectEffectiveMessages", () => {
 
     expect(selected.map((message) => message._id)).toEqual(["u-optimistic"]);
   });
+
+  it("matches messages when route chat ID is in legacy table|id format", () => {
+    const unified = [
+      createMessage({
+        id: "u-legacy",
+        chatId: "kg24lrv8sq2j9xf0v2q8k6z5sw6z",
+        content: "legacy-match",
+      }),
+    ];
+
+    const selected = selectEffectiveMessages({
+      messages: unified,
+      paginatedMessages: [],
+      currentChatId: "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z",
+      preferPaginatedSource: true,
+      isPaginatedLoading: true,
+    });
+
+    expect(selected.map((message) => message._id)).toEqual(["u-legacy"]);
+  });
 });

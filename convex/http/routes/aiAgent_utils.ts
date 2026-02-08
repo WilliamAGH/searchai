@@ -1,5 +1,6 @@
 import { serializeError } from "../utils";
 import { corsResponse } from "../cors";
+import { normalizeHttpUrl } from "../../lib/urlHttp";
 import { isRecord, type WebResearchSource } from "../../lib/validators";
 
 /**
@@ -27,18 +28,7 @@ function clampRelevanceScore(score: number): number {
  * Returns undefined for invalid URLs or non-http(s) protocols - safe by design.
  */
 function safeParseUrl(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-    return url.toString().slice(0, MAX_URL_LENGTH);
-  } catch (error) {
-    console.warn("[sanitize] Rejected malformed URL in web research source", {
-      input: typeof value === "string" ? value.slice(0, 100) : typeof value,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return undefined;
-  }
+  return normalizeHttpUrl(value, MAX_URL_LENGTH);
 }
 
 type JsonPayloadResult =
@@ -139,6 +129,15 @@ export function sanitizeWebResearchSources(
       const safeUrl = safeParseUrl(refRaw.url);
       if (safeUrl) {
         sanitized.url = safeUrl;
+      } else if (refRaw.url !== undefined) {
+        console.warn("[http] Excluded source with invalid URL", {
+          contextId,
+          originalUrl:
+            typeof refRaw.url === "string"
+              ? refRaw.url.slice(0, 200)
+              : typeof refRaw.url,
+        });
+        return null;
       }
       if (typeof refRaw.title === "string") {
         sanitized.title = refRaw.title.slice(0, MAX_TITLE_LENGTH);

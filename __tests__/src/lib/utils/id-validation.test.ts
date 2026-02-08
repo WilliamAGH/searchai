@@ -12,6 +12,7 @@ import {
   isValidConvexId,
   toConvexId,
   isLocalId,
+  normalizeIdForComparison,
 } from "../../../../src/lib/utils/idValidation";
 
 // Backend utilities
@@ -44,7 +45,7 @@ describe("Frontend ID Validation", () => {
     it("should return typed ID for valid Convex ID", () => {
       const validId = "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z";
       const result = toConvexId<"chats">(validId);
-      expect(result).toBe(validId);
+      expect(result).toBe("kg24lrv8sq2j9xf0v2q8k6z5sw6z");
     });
 
     it("should return null for local identifiers", () => {
@@ -90,7 +91,7 @@ describe("Backend ID Validation", () => {
     it("should return typed ID for valid format", () => {
       const validId = "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z";
       const result = safeConvexId<"chats">(validId);
-      expect(result).toBe(validId);
+      expect(result).toBe("kg24lrv8sq2j9xf0v2q8k6z5sw6z");
     });
 
     it("should return null for local identifiers", () => {
@@ -105,6 +106,50 @@ describe("Backend ID Validation", () => {
       const opaqueId = "kg24lrv8sq2j9xf0v2q8k6z5sw6z";
       expect(safeConvexId<"chats">(opaqueId)).toBe(opaqueId);
     });
+  });
+});
+
+describe("normalizeIdForComparison", () => {
+  it("returns empty string for null", () => {
+    expect(normalizeIdForComparison(null)).toBe("");
+  });
+
+  it("returns empty string for undefined", () => {
+    expect(normalizeIdForComparison(undefined)).toBe("");
+  });
+
+  it("returns empty string for empty string", () => {
+    expect(normalizeIdForComparison("")).toBe("");
+  });
+
+  it("strips table prefix from table|id format", () => {
+    expect(normalizeIdForComparison("chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(
+      "kg24lrv8sq2j9xf0v2q8k6z5sw6z",
+    );
+  });
+
+  it("returns bare alphanumeric ID unchanged", () => {
+    expect(normalizeIdForComparison("kg24lrv8sq2j9xf0v2q8k6z5sw6z")).toBe(
+      "kg24lrv8sq2j9xf0v2q8k6z5sw6z",
+    );
+  });
+
+  it("preserves local IDs as-is (not stripped)", () => {
+    expect(normalizeIdForComparison("local_123")).toBe("local_123");
+    expect(normalizeIdForComparison("chat_456")).toBe("chat_456");
+    expect(normalizeIdForComparison("msg_789")).toBe("msg_789");
+  });
+
+  it("preserves unrecognized strings as-is", () => {
+    expect(normalizeIdForComparison("hello-world")).toBe("hello-world");
+  });
+
+  it("enables matching table|id with bare id", () => {
+    const fromServer = "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z";
+    const fromClient = "kg24lrv8sq2j9xf0v2q8k6z5sw6z";
+    expect(normalizeIdForComparison(fromServer)).toBe(
+      normalizeIdForComparison(fromClient),
+    );
   });
 });
 
@@ -139,8 +184,8 @@ describe("Type Safety", () => {
     const chatId = toConvexId<"chats">(validChatId);
     const messageId = toConvexId<"messages">(validMessageId);
 
-    expect(chatId).toBe(validChatId);
-    expect(messageId).toBe(validMessageId);
+    expect(chatId).toBe("kg24lrv8sq2j9xf0v2q8k6z5sw6z");
+    expect(messageId).toBe("abc123xyz456def789ghi012");
   });
 
   it("should handle null safely in conditional flows", () => {
@@ -153,6 +198,6 @@ describe("Type Safety", () => {
     const validId = "chats|kg24lrv8sq2j9xf0v2q8k6z5sw6z";
     const validResult = toConvexId<"chats">(validId);
     expect(validResult).toBeTruthy();
-    expect(validResult).toBe(validId);
+    expect(validResult).toBe("kg24lrv8sq2j9xf0v2q8k6z5sw6z");
   });
 });
