@@ -179,6 +179,5 @@ export function safeConvexId<TableName extends TableNames>(
     return null;
   }
 
-  const raw = extractRawIdentifier(str);
-  return raw;
+  return extractRawIdentifier(str);
 }
