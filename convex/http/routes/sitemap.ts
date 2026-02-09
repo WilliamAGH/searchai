@@ -8,21 +8,17 @@ import {
   SITEMAP_MAX_URLS,
 } from "../../sitemap/constants";
 
-const listPublicChatSitemapEntriesRef = makeFunctionReference<
-  "query",
-  { cursor?: string; limit?: number },
-  {
-    entries: Array<{ publicId: string; updatedAt: number }>;
-    nextCursor?: string;
-    isDone: boolean;
-  }
->("sitemap:listPublicChatSitemapEntries");
-
 type SitemapEntriesPage = {
   entries: Array<{ publicId: string; updatedAt: number }>;
   nextCursor?: string;
   isDone: boolean;
 };
+
+const listPublicChatSitemapEntriesRef = makeFunctionReference<
+  "query",
+  { cursor?: string; limit?: number },
+  SitemapEntriesPage
+>("sitemap:listPublicChatSitemapEntries");
 
 function normalizeSiteUrl(value: string): string {
   return value.replace(/\/+$/, "");
@@ -59,7 +55,10 @@ async function loadPublicEntries(
   const entries: Array<{ publicId: string; updatedAt: number }> = [];
   let cursor: string | undefined = undefined;
 
-  while (entries.length < SITEMAP_MAX_URLS) {
+  // Reserve one slot for the homepage <url> that buildSitemapXml always includes
+  const maxEntries = SITEMAP_MAX_URLS - 1;
+
+  while (entries.length < maxEntries) {
     const page: SitemapEntriesPage = await ctx.runQuery(
       listPublicChatSitemapEntriesRef,
       {
@@ -68,7 +67,7 @@ async function loadPublicEntries(
       },
     );
 
-    const remainingCapacity = SITEMAP_MAX_URLS - entries.length;
+    const remainingCapacity = maxEntries - entries.length;
     entries.push(...page.entries.slice(0, remainingCapacity));
 
     if (page.isDone || !page.nextCursor) {
