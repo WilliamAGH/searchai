@@ -45,7 +45,16 @@ export function robustSanitize(input: string): string {
     if (match.length < 20) return match;
     if (match.length % 4 !== 0 || !STRICT_BASE64.test(match)) return match;
 
-    const decoded = atob(match);
+    let decoded: string;
+    try {
+      decoded = atob(match);
+    } catch (e) {
+      console.warn("[sanitize] atob failed on structurally valid base64", {
+        length: match.length,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      return match;
+    }
 
     // Check for common injection keywords in decoded content
     if (/system|ignore|instruction|assistant|forget|disregard/i.test(decoded)) {

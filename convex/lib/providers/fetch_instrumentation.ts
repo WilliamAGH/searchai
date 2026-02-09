@@ -71,8 +71,12 @@ export const redactSensitiveHeaders = (
 
 /** Pretty-print JSON text, falling back to the raw string for non-JSON. */
 function formatJsonSafe(text: string): string {
-  const parsed = JSON.parse(text);
-  return JSON.stringify(parsed, null, 2);
+  try {
+    const parsed = JSON.parse(text);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return text;
+  }
 }
 
 export interface InstrumentedFetchOptions {
@@ -94,7 +98,15 @@ export const createInstrumentedFetch = (
 
     if (clonedInit.body && typeof clonedInit.body === "string") {
       bodyText = clonedInit.body;
-      parsedBody = JSON.parse(bodyText);
+      try {
+        parsedBody = JSON.parse(bodyText);
+      } catch {
+        if (debugLogging) {
+          console.error(
+            "[llm-debug] Request body is not valid JSON, skipping ID injection",
+          );
+        }
+      }
     }
 
     // Inject IDs for function_call_output items (required by Responses API)
