@@ -77,6 +77,11 @@ window.addEventListener('message', async (message) => {
               secure: true,
               rewrite: (path) => path,
             },
+            "/sitemap.xml": {
+              target: convexProxyTarget,
+              changeOrigin: true,
+              secure: true,
+            },
           },
         }
       : {},

@@ -148,6 +148,14 @@ const server = http.createServer(async (req, res) => {
     res.end("Bad request");
     return;
   }
+  const safeRaw = typeof req.url === "string" ? req.url : "/";
+  const urlPath = decodeURIComponent(safeRaw.split("?")[0] || "/");
+
+  if (urlPath === "/sitemap.xml") {
+    const target = `${CONVEX_SITE_URL}/sitemap.xml`;
+    return void forwardTo(target, req, res);
+  }
+
   if (req.url.startsWith("/api/")) {
     // Rate-limit POST /api/publishChat
     if (req.method === "POST" && req.url.startsWith("/api/publishChat")) {
@@ -180,10 +188,8 @@ const server = http.createServer(async (req, res) => {
     accept.includes("text/markdown") ||
     /curl|wget|httpie|python-requests|go-http-client|httpclient/.test(ua);
   try {
-    const rawUrl = typeof req.url === "string" ? req.url : "/";
-    const pathOnly = decodeURIComponent(rawUrl.split("?")[0] || "/");
-    const shareMatch = pathOnly.match(/^\/s\/([A-Za-z0-9_-]+)/);
-    const publicMatch = pathOnly.match(/^\/p\/([A-Za-z0-9_-]+)/);
+    const shareMatch = urlPath.match(/^\/s\/([A-Za-z0-9_-]+)/);
+    const publicMatch = urlPath.match(/^\/p\/([A-Za-z0-9_-]+)/);
     if (wantsPlain && (shareMatch || publicMatch)) {
       const qp = shareMatch
         ? `shareId=${encodeURIComponent(shareMatch[1])}`
@@ -199,8 +205,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Static file try
-  const safeRaw = typeof req.url === "string" ? req.url : "/";
-  const urlPath = decodeURIComponent(safeRaw.split("?")[0] || "/");
   const filePath = join(DIST_DIR, urlPath === "/" ? "/index.html" : urlPath);
   if (existsSync(filePath) && statSync(filePath).isFile()) {
     return sendFile(res, filePath);
