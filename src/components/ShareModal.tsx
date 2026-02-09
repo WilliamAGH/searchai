@@ -65,7 +65,14 @@ export function ShareModal({
   const openedAtRef = useRef<number>(0);
 
   useEffect(() => {
-    setSelectedPrivacy(privacy);
+    setSelectedPrivacy((currentPrivacy) => {
+      // LLM links persist as "shared" on the server. Keep the local LLM
+      // selection so the generated .txt URL remains visible after persistence.
+      if (currentPrivacy === "llm" && privacy === "shared") {
+        return currentPrivacy;
+      }
+      return privacy;
+    });
   }, [privacy]);
 
   // When switching options, clear any previously generated URL
