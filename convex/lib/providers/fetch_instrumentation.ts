@@ -121,49 +121,57 @@ export const createInstrumentedFetch = (
     }
 
     if (debugLogging) {
-      if (!bodyText && clonedInit.body) {
-        bodyText =
-          typeof clonedInit.body === "string"
-            ? clonedInit.body
-            : await new Response(clonedInit.body).text();
+      try {
+        if (!bodyText && clonedInit.body) {
+          bodyText =
+            typeof clonedInit.body === "string"
+              ? clonedInit.body
+              : await new Response(clonedInit.body).text();
+        }
+        console.error("[llm-debug] ========== OUTGOING REQUEST ==========");
+        console.error("[llm-debug] URL:", input);
+        console.error(
+          "[llm-debug] Headers:",
+          JSON.stringify(
+            redactSensitiveHeaders(clonedInit.headers) ?? {},
+            null,
+            2,
+          ),
+        );
+        console.error("[llm-debug] Body:", bodyText || "");
+        console.error("[llm-debug] =====================================");
+      } catch (error) {
+        console.error("[llm-debug] Failed to log request", error);
       }
-      console.error("[llm-debug] ========== OUTGOING REQUEST ==========");
-      console.error("[llm-debug] URL:", input);
-      console.error(
-        "[llm-debug] Headers:",
-        JSON.stringify(
-          redactSensitiveHeaders(clonedInit.headers) ?? {},
-          null,
-          2,
-        ),
-      );
-      console.error("[llm-debug] Body:", bodyText ? bodyText : "");
-      console.error("[llm-debug] =====================================");
     }
 
     const response = await fetch(input, clonedInit);
 
     if (debugLogging) {
-      const responseClone = response.clone();
-      const responseText = await responseClone.text();
-      console.error("[llm-debug] ========== INCOMING RESPONSE ==========");
-      console.error(
-        "[llm-debug] Status:",
-        response.status,
-        response.statusText,
-      );
-      console.error(
-        "[llm-debug] Headers:",
-        JSON.stringify(
-          redactSensitiveHeaders(
-            Object.fromEntries(response.headers.entries()),
-          ) ?? {},
-          null,
-          2,
-        ),
-      );
-      console.error("[llm-debug] Body:", responseText ? responseText : "");
-      console.error("[llm-debug] ======================================");
+      try {
+        const responseClone = response.clone();
+        const responseText = await responseClone.text();
+        console.error("[llm-debug] ========== INCOMING RESPONSE ==========");
+        console.error(
+          "[llm-debug] Status:",
+          response.status,
+          response.statusText,
+        );
+        console.error(
+          "[llm-debug] Headers:",
+          JSON.stringify(
+            redactSensitiveHeaders(
+              Object.fromEntries(response.headers.entries()),
+            ) ?? {},
+            null,
+            2,
+          ),
+        );
+        console.error("[llm-debug] Body:", responseText || "");
+        console.error("[llm-debug] ======================================");
+      } catch (error) {
+        console.error("[llm-debug] Failed to log response", error);
+      }
     }
 
     return response;
