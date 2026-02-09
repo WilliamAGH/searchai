@@ -51,37 +51,32 @@ function parsePublishMessages(raw: unknown): ParsedPublishPayload["messages"] {
   return raw.slice(0, MAX_MESSAGES).map((m: unknown) => {
     const msg = isRecord(m) ? m : {};
     return {
-      role: (msg.role === "user" ? "user" : "assistant") as
-        | "user"
-        | "assistant",
+      role: msg.role === "user" ? "user" : "assistant",
       content:
         typeof msg.content === "string"
           ? msg.content.slice(0, CONTENT_MAX_LENGTH)
           : undefined,
       webResearchSources: sanitizeWebResearchSources(msg.webResearchSources),
       timestamp:
-        typeof msg.timestamp === "number" && isFinite(msg.timestamp)
+        typeof msg.timestamp === "number" && Number.isFinite(msg.timestamp)
           ? Math.floor(msg.timestamp)
           : undefined,
     };
   });
 }
 
-type ShareUrlEnv = {
-  siteUrl: string;
-  convexSiteUrl: string;
-};
-
 function buildShareUrls(
   result: { shareId: string; publicId: string },
   allowOrigin: string,
-  env: ShareUrlEnv,
+  siteUrl: string,
 ) {
   const baseUrl =
-    allowOrigin !== "*" && allowOrigin !== "null" ? allowOrigin : env.siteUrl;
-  const convexBase = env.convexSiteUrl.replace(/\/+$/, "");
-  const exportBase = convexBase
-    ? `${convexBase}/api/exportChat`
+    allowOrigin !== "*" && allowOrigin !== "null" ? allowOrigin : siteUrl;
+  // Use the branded base URL for export links so they point to
+  // search-ai.io/api/exportChat instead of the raw Convex deployment.
+  // The /api/* proxy (server.mjs) forwards to Convex transparently.
+  const exportBase = baseUrl
+    ? `${baseUrl.replace(/\/+$/, "")}/api/exportChat`
     : `/api/exportChat`;
   return {
     shareUrl: `${baseUrl}/s/${result.shareId}`,
@@ -129,15 +124,16 @@ export async function handlePublishChat(
   const payload = parsePublishPayload(record);
 
   try {
-    // @ts-ignore - TS2589: Known Convex limitation with complex type inference
     const result = await ctx.runMutation(
+      // @ts-ignore - TS2589: Known Convex limitation with complex type inference
       api.chats.publishAnonymousChat,
       payload,
     );
-    const urls = buildShareUrls(result, allowOrigin, {
-      siteUrl: process.env.SITE_URL || "",
-      convexSiteUrl: process.env.CONVEX_SITE_URL || "",
-    });
+    const urls = buildShareUrls(
+      result,
+      allowOrigin,
+      process.env.SITE_URL || "",
+    );
     return corsResponse({
       body: JSON.stringify({ ...result, ...urls }),
       status: 200,

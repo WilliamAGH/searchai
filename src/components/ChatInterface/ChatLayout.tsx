@@ -61,9 +61,6 @@ interface ChatLayoutProps {
 
   // Chat data
   chatActions: ChatActions;
-
-  // API functions
-  resolveApi: (path: string) => string;
 }
 
 export function ChatLayout({
@@ -86,8 +83,7 @@ export function ChatLayout({
   handleNewChatForFollowUp,
   handleNewChatWithSummary,
   chatActions,
-  resolveApi,
-}: ChatLayoutProps) {
+}: Readonly<ChatLayoutProps>) {
   // Desktop sidebar visible: not mobile AND sidebar is open
   const showDesktopSidebar = !isMobile && sidebarOpen;
 
@@ -177,7 +173,6 @@ export function ChatLayout({
         currentChatId={currentChatId}
         currentChat={currentChat}
         chatActions={chatActions}
-        resolveApi={resolveApi}
       />
 
       {/* Global agent status overlay removed to prevent overlap and duplication */}

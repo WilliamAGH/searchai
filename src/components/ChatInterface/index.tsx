@@ -29,7 +29,6 @@ import { useEffectiveMessages } from "@/hooks/useEffectiveMessages";
 import { logger } from "@/lib/logger";
 import { ChatLayout } from "@/components/ChatInterface/ChatLayout";
 import type { Chat } from "@/lib/types/chat";
-import { buildApiBase, resolveApiPath } from "@/lib/utils/httpUtils";
 import { buildUserHistory } from "@/lib/utils/chatHistory";
 
 function ChatInterfaceComponent({
@@ -47,12 +46,6 @@ function ChatInterfaceComponent({
   shareId?: string;
   publicId?: string;
 }>) {
-  const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
-  const apiBase = buildApiBase(convexUrl);
-  const resolveApi = useCallback(
-    (path: string) => resolveApiPath(apiBase, path),
-    [apiBase],
-  );
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
   const unified = useUnifiedChat();
   const chatState = unified;
@@ -339,7 +332,6 @@ function ChatInterfaceComponent({
       handleNewChatForFollowUp={handleNewChatForFollowUp}
       handleNewChatWithSummary={handleNewChatWithSummary}
       chatActions={chatActions}
-      resolveApi={resolveApi}
     />
   );
 }
