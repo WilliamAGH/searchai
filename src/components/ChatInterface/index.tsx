@@ -1,5 +1,5 @@
 /** Main chat interface - orchestrates chats/messages for all users. */
-import { useAction, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import React, {
   useCallback,
   useEffect,
@@ -29,6 +29,7 @@ import { useEffectiveMessages } from "@/hooks/useEffectiveMessages";
 import { logger } from "@/lib/logger";
 import { ChatLayout } from "@/components/ChatInterface/ChatLayout";
 import type { Chat } from "@/lib/types/chat";
+import { IdUtils } from "@/lib/types/unified";
 import { buildUserHistory } from "@/lib/utils/chatHistory";
 
 function ChatInterfaceComponent({
@@ -90,7 +91,6 @@ function ChatInterfaceComponent({
     propPublicId,
     sessionId: sessionId || undefined,
   });
-  // Use deletion handlers hook for all deletion operations
   const {
     handleRequestDeleteChat: requestDeleteChat,
     handleRequestDeleteMessage: requestDeleteMessage,
@@ -129,7 +129,6 @@ function ChatInterfaceComponent({
     },
     [navigateHome, navHandleSelectChat],
   );
-  // Use paginated messages for authenticated users with Convex chats
   const usePagination = isAuthenticated && !!currentChatId;
   const {
     messages: paginatedMessages,
@@ -167,7 +166,6 @@ function ChatInterfaceComponent({
       clearError,
     ],
   );
-  // Use the extracted hook for message source selection
   const effectiveMessages = useEffectiveMessages({
     messages,
     paginatedMessages,
@@ -180,6 +178,19 @@ function ChatInterfaceComponent({
     () => buildUserHistory(currentMessages),
     [currentMessages],
   );
+  const isSharedRoute = !!(propShareId || propPublicId);
+  const canCheckWrite =
+    isSharedRoute && !!currentChatId && IdUtils.isConvexId(currentChatId);
+  const canWriteChat = useQuery(
+    api.chats.canWriteChat,
+    canCheckWrite
+      ? {
+          chatId: IdUtils.toConvexChatId(currentChatId),
+          sessionId: sessionId || undefined,
+        }
+      : "skip",
+  );
+  const isReadOnly = isSharedRoute && !!currentChatId && canWriteChat === false;
   useUrlStateSync({
     currentChatId,
     propChatId,
@@ -206,6 +217,7 @@ function ChatInterfaceComponent({
         }
       } catch (error) {
         logger.error("Failed to create chat:", error);
+        chatActions.setError("Failed to create a new chat. Please try again.");
       }
       setIsCreatingChat(false);
       return null;
@@ -232,7 +244,6 @@ function ChatInterfaceComponent({
     summarizeRecentAction,
     chatState,
   });
-  // Use the message handler hook with race condition fixes
   const { handleSendMessage, sendRef } = useMessageHandler({
     // State
     isGenerating,
@@ -261,11 +272,8 @@ function ChatInterfaceComponent({
     },
     [isGenerating, analyzeDraft],
   );
-  // Auto-create first chat for new users (currently disabled)
   useAutoCreateFirstChat();
-  // Track if we're on mobile for rendering decisions
   const isMobile = useIsMobile(1024);
-  // Keyboard shortcuts and interaction handlers
   const { swipeHandlers, handleToggleSidebar, handleNewChatButton } =
     useKeyboardShortcuts({
       isMobile,
@@ -283,7 +291,6 @@ function ChatInterfaceComponent({
       },
       onShare: openShareModal,
     });
-  // Prepare props for all child components
   const {
     chatSidebarProps,
     mobileSidebarProps,
@@ -307,6 +314,7 @@ function ChatInterfaceComponent({
     handleSendMessage,
     handleDraftChange,
     setShowShareModal,
+    isReadOnly,
     userHistory,
     pagination,
   });

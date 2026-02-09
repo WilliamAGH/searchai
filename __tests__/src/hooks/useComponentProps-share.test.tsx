@@ -58,4 +58,32 @@ describe("useComponentProps share behavior", () => {
 
     expect(setShowShareModal).toHaveBeenCalledWith(true);
   });
+
+  it("disables message input in read-only mode", () => {
+    const args = createArgs({
+      currentChatId: "chat_123",
+      isReadOnly: true,
+    });
+
+    const { result } = renderHook(() => useComponentProps(args));
+
+    expect(result.current.messageInputProps.disabled).toBe(true);
+    expect(result.current.messageInputProps.placeholder).toBe(
+      "Read-only shared chat",
+    );
+  });
+
+  it("keeps message input enabled when writable", () => {
+    const args = createArgs({
+      currentChatId: "chat_123",
+      isReadOnly: false,
+    });
+
+    const { result } = renderHook(() => useComponentProps(args));
+
+    expect(result.current.messageInputProps.disabled).toBe(false);
+    expect(result.current.messageInputProps.placeholder).toBe(
+      "Type your message...",
+    );
+  });
 });
