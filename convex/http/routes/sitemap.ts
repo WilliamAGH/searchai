@@ -1,3 +1,9 @@
+/**
+ * Sitemap HTTP route
+ * - Serves /sitemap.xml with paginated public chat entries
+ * - Respects the 50,000 URL sitemaps protocol limit
+ */
+
 import type { HttpRouter } from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import type { ActionCtx } from "../../_generated/server";
@@ -8,8 +14,10 @@ import {
   SITEMAP_MAX_URLS,
 } from "../../sitemap/constants";
 
+type SitemapEntry = { publicId: string; updatedAt: number };
+
 type SitemapEntriesPage = {
-  entries: Array<{ publicId: string; updatedAt: number }>;
+  entries: Array<SitemapEntry>;
   nextCursor?: string;
   isDone: boolean;
 };
@@ -49,10 +57,8 @@ function toIsoDate(timestamp: number): string {
   return date.toISOString();
 }
 
-async function loadPublicEntries(
-  ctx: ActionCtx,
-): Promise<Array<{ publicId: string; updatedAt: number }>> {
-  const entries: Array<{ publicId: string; updatedAt: number }> = [];
+async function loadPublicEntries(ctx: ActionCtx): Promise<Array<SitemapEntry>> {
+  const entries: Array<SitemapEntry> = [];
   let cursor: string | undefined = undefined;
 
   // Reserve one slot for the homepage <url> that buildSitemapXml always includes
@@ -82,7 +88,7 @@ async function loadPublicEntries(
 
 function buildSitemapXml(
   baseUrl: string,
-  entries: Array<{ publicId: string; updatedAt: number }>,
+  entries: Array<SitemapEntry>,
 ): string {
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
