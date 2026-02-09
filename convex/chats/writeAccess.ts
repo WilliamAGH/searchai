@@ -15,6 +15,29 @@ export function hasChatWriteAccess(
   return isOwner || canClaimUnowned;
 }
 
+/**
+ * Determine whether an HTTP-path message write is authorized.
+ *
+ * Two independent access paths:
+ *  - Token path: a valid workflow token whose session matches the caller.
+ *  - Base path: direct ownership (user ID or session) checked by hasChatWriteAccess.
+ *
+ * If a token is provided it MUST be valid; an expired/invalid token always
+ * denies even when the caller has base access, preventing callers from
+ * silently falling back to weaker credentials.
+ */
+export function isHttpWriteAuthorized(params: {
+  hasBaseAccess: boolean;
+  hasValidToken: boolean;
+  tokenProvided: boolean;
+  tokenSessionMatches: boolean;
+}): boolean {
+  if (params.tokenProvided) {
+    return params.hasValidToken && params.tokenSessionMatches;
+  }
+  return params.hasBaseAccess;
+}
+
 /** Discriminated write-access result so callers can distinguish "denied" from "not_found". */
 export type WriteAccessResult = "allowed" | "denied" | "not_found";
 
