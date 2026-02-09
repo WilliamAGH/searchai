@@ -62,14 +62,11 @@ export const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
     provider.order = ["novita"];
   }
 
-  if (allowFallbacks !== undefined) {
+  if (allowFallbacks === undefined) {
+    provider.allow_fallbacks = true;
+  } else {
     provider.allow_fallbacks =
       allowFallbacks === "true" || allowFallbacks === "1";
-  } else {
-    provider.allow_fallbacks = true;
-    console.info(
-      "[openai-client] LLM_PROVIDER_ALLOW_FALLBACKS not set, defaulting to true",
-    );
   }
 
   return provider;
