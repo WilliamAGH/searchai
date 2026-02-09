@@ -90,7 +90,7 @@ export async function loadExportData(
   }
 
   // @ts-ignore - Known Convex TS2589 type instantiation issue on api.chats.*
-  let chat: Doc<"chats"> | null;
+  let chat: Doc<"chats"> | null = null;
   if (shareId) {
     chat = await ctx.runQuery(
       mode === "auth"
@@ -100,16 +100,6 @@ export async function loadExportData(
     );
   } else if (publicId) {
     chat = await ctx.runQuery(api.chats.getChatByPublicId, { publicId });
-  } else {
-    // Unreachable: guarded by !shareId && !publicId check above
-    return {
-      ok: false,
-      response: publicCorsResponse({
-        body: JSON.stringify({ error: "Missing shareId or publicId" }),
-        status: 400,
-        origin,
-      }),
-    };
   }
 
   if (!chat) {

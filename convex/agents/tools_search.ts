@@ -41,7 +41,7 @@ function getCurrentDateString(): string {
  * Uses FunctionTool<any, any, unknown> per [SDK1] policy — required for SDK compatibility.
  */
 // oxfmt-ignore
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required by OpenAI Agents SDK; see docs/contracts/sdk-integration.md
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- Required by OpenAI Agents SDK; see docs/contracts/sdk-integration.md
 export const searchWebTool: FunctionTool<any, any, unknown> = tool({  
   name: "search_web",
   description: `Search the web for current information. 

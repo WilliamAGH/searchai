@@ -59,8 +59,8 @@
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
     "lint:loc": "node scripts/check-loc.mjs",
     "lint:convex-types": "node scripts/lint-convex-types.mjs",
-    "lint:duplicates": "DRY_T=$(node -p \"require('./config/drylintrc.json').threshold\") && dry --no-cache --threshold $DRY_T && dry --no-cache --threshold $DRY_T --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
-    "lint:duplicates:near": "dry --no-cache --threshold $(node -p \"require('./config/drylintrc.json').threshold\")",
+    "lint:duplicates": "DRY_T=$(node -p \"require('./config/drylintrc.json').threshold\") && dry --no-cache --threshold $DRY_T --ignore 'node_modules/**' && dry --no-cache --threshold $DRY_T --ignore 'node_modules/**' --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
+    "lint:duplicates:near": "dry --no-cache --threshold $(node -p \"require('./config/drylintrc.json').threshold\") --ignore 'node_modules/**'",
     "lint:boundaries": "ast-grep scan -c config/sgconfig.yml && echo 'No boundary violations found'",
     "playwright:install:firefox": "npx playwright install --with-deps firefox",
     "playwright:install:all": "npx playwright install --with-deps",
@@ -143,6 +143,9 @@
       "oxfmt -c config/oxfmtrc.json --write"
     ],
     "!(package-lock).json": [
+      "oxfmt -c config/oxfmtrc.json --write"
+    ],
+    "*.toml": [
       "oxfmt -c config/oxfmtrc.json --write"
     ]
   },
