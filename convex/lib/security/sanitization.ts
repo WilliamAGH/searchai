@@ -8,6 +8,8 @@
  * - Template injections
  */
 
+import { isRecord } from "../validators";
+
 /**
  * Main sanitization function that applies all security measures
  * @param input - Raw user input to sanitize
@@ -220,13 +222,12 @@ export function sanitizeJson(jsonString: string): string | null {
         return robustSanitize(obj);
       } else if (Array.isArray(obj)) {
         return obj.map(sanitizeObject);
-      } else if (obj !== null && typeof obj === "object") {
-        const typedObj = obj as Record<string, unknown>;
+      } else if (isRecord(obj)) {
         const result: Record<string, unknown> = {};
-        for (const key of Object.keys(typedObj)) {
+        for (const key of Object.keys(obj)) {
           // Sanitize the key as well
           const sanitizedKey = robustSanitize(key);
-          result[sanitizedKey] = sanitizeObject(typedObj[key]);
+          result[sanitizedKey] = sanitizeObject(obj[key]);
         }
         return result;
       }

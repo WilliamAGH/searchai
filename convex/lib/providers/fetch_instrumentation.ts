@@ -1,6 +1,7 @@
 "use node";
 
 import { generateMessageId } from "../id_generator";
+import { isRecord } from "../validators";
 
 /**
  * Type guards for request payload inspection
@@ -17,24 +18,21 @@ type InstrumentedRequestPayload = Record<string, unknown> & {
 const isFunctionCallOutputItem = (
   value: unknown,
 ): value is FunctionCallOutputItem => {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
-  const candidate = value as Record<string, unknown>;
   return (
-    typeof candidate.type === "string" &&
-    candidate.type === "function_call_output"
+    typeof value.type === "string" && value.type === "function_call_output"
   );
 };
 
 const isInstrumentedRequestPayload = (
   value: unknown,
 ): value is InstrumentedRequestPayload => {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
-  const candidate = value as Record<string, unknown>;
-  return Array.isArray(candidate.input);
+  return Array.isArray(value.input);
 };
 
 /**

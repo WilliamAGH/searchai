@@ -160,12 +160,8 @@ export function buildToolCallLog(
     .map((entry) => {
       const args = entry.args;
       const reasoning =
-        args &&
-        typeof args === "object" &&
-        args !== null &&
-        "reasoning" in args &&
-        typeof (args as Record<string, unknown>).reasoning === "string"
-          ? ((args as Record<string, unknown>).reasoning as string)
+        isRecord(args) && typeof args.reasoning === "string"
+          ? args.reasoning
           : "";
       const durationMs =
         entry.completionTimestamp !== undefined

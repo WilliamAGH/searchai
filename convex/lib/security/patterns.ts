@@ -217,14 +217,22 @@ export const INJECTION_PATTERNS = {
   ],
 };
 
+function isInjectionCategory(
+  key: string,
+): key is keyof typeof INJECTION_PATTERNS {
+  return key in INJECTION_PATTERNS;
+}
+
 /**
  * Get all patterns as a flat array for comprehensive checking
  */
 export function getAllPatterns(): RegExp[] {
   const allPatterns: RegExp[] = [];
 
-  for (const category of Object.values(INJECTION_PATTERNS)) {
-    allPatterns.push(...category);
+  for (const key of Object.keys(INJECTION_PATTERNS)) {
+    if (isInjectionCategory(key)) {
+      allPatterns.push(...INJECTION_PATTERNS[key]);
+    }
   }
 
   return allPatterns;
@@ -247,9 +255,8 @@ export function checkForInjection(
   const matchedCategories: string[] = [];
   const matchedPatterns: string[] = [];
 
-  const categoriesToCheck =
-    categories ||
-    (Object.keys(INJECTION_PATTERNS) as (keyof typeof INJECTION_PATTERNS)[]);
+  const categoriesToCheck: (keyof typeof INJECTION_PATTERNS)[] =
+    categories || Object.keys(INJECTION_PATTERNS).filter(isInjectionCategory);
 
   for (const category of categoriesToCheck) {
     const patterns = INJECTION_PATTERNS[category];

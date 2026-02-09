@@ -38,7 +38,7 @@ interface CustomEventInit<T> {
 // Minimal CustomEvent interface matching SDK usage
 interface PolyfillCustomEvent<T = unknown> {
   type: string;
-  detail: T;
+  detail: T | undefined;
 }
 
 interface PolyfillCustomEventConstructor {
@@ -58,10 +58,10 @@ export const ensureCustomEventPolyfill = (): void => {
   try {
     // Attempt to extend native Event (works in modern runtimes)
     class NodeCustomEvent<T = unknown> extends Event {
-      detail: T;
+      detail: T | undefined;
       constructor(type: string, init?: CustomEventInit<T>) {
         super(type, init);
-        this.detail = init?.detail as T;
+        this.detail = init?.detail;
       }
     }
     // Type assertion needed: NodeCustomEvent extends Event but TS can't verify
@@ -78,10 +78,10 @@ export const ensureCustomEventPolyfill = (): void => {
     );
     class NodeCustomEvent<T = unknown> {
       type: string;
-      detail: T;
+      detail: T | undefined;
       constructor(type: string, init?: CustomEventInit<T>) {
         this.type = type;
-        this.detail = init?.detail as T;
+        this.detail = init?.detail;
       }
     }
     global.CustomEvent = NodeCustomEvent as PolyfillCustomEventConstructor;
