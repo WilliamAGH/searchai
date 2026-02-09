@@ -66,8 +66,10 @@ export const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
     provider.allow_fallbacks =
       allowFallbacks === "true" || allowFallbacks === "1";
   } else {
-    // Default to allowing fallbacks for better reliability
     provider.allow_fallbacks = true;
+    console.info(
+      "[openai-client] LLM_PROVIDER_ALLOW_FALLBACKS not set, defaulting to true",
+    );
   }
 
   return provider;

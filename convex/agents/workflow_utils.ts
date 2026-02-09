@@ -49,10 +49,12 @@ interface GlobalWithCustomEvent {
   CustomEvent?: PolyfillCustomEventConstructor;
 }
 
-export const ensureCustomEventPolyfill = (): void => {
+type PolyfillResult = "native" | "event-based" | "standalone";
+
+export const ensureCustomEventPolyfill = (): PolyfillResult => {
   const global = globalThis as GlobalWithCustomEvent;
   if (typeof global.CustomEvent !== "undefined") {
-    return;
+    return "native";
   }
 
   try {
@@ -68,13 +70,11 @@ export const ensureCustomEventPolyfill = (): void => {
     // it matches the full DOM CustomEvent interface. Safe because SDK only uses
     // type and detail properties which our implementation provides.
     global.CustomEvent = NodeCustomEvent as PolyfillCustomEventConstructor;
+    return "event-based";
   } catch (extendError) {
-    // Fallback for environments where Event is not extendable
     console.warn(
-      "CustomEvent polyfill: Event not extendable, using standalone fallback class",
-      {
-        error: extendError,
-      },
+      "CustomEvent polyfill: Event not extendable, using standalone class",
+      { error: extendError },
     );
     class NodeCustomEvent<T = unknown> {
       type: string;
@@ -85,6 +85,7 @@ export const ensureCustomEventPolyfill = (): void => {
       }
     }
     global.CustomEvent = NodeCustomEvent as PolyfillCustomEventConstructor;
+    return "standalone";
   }
 };
 

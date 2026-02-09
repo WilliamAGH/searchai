@@ -39,29 +39,17 @@ export function robustSanitize(input: string): string {
   // 4. Detect and neutralize base64 encoded injections
   const base64Pattern =
     /(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?/g;
+  const STRICT_BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
   clean = clean.replace(base64Pattern, (match) => {
-    // Skip short matches that are likely not base64
+    // Skip short matches and strings that aren't structurally valid base64
     if (match.length < 20) return match;
+    if (match.length % 4 !== 0 || !STRICT_BASE64.test(match)) return match;
 
-    try {
-      // Use atob() for base64 decoding (Convex runtime compatible)
-      // atob() is available in the Convex V8 runtime
-      const decoded = atob(match);
+    const decoded = atob(match);
 
-      // Check for common injection keywords in decoded content
-      if (
-        /system|ignore|instruction|assistant|forget|disregard/i.test(decoded)
-      ) {
-        return "[BASE64_BLOCKED]";
-      }
-    } catch (error) {
-      // Safe to keep: atob() failure means the string is NOT valid base64,
-      // so it cannot contain a hidden decoded payload. Only successfully
-      // decoded strings can carry injection keywords.
-      console.warn("sanitizeBase64: decode failed, keeping original", {
-        length: match.length,
-        error,
-      });
+    // Check for common injection keywords in decoded content
+    if (/system|ignore|instruction|assistant|forget|disregard/i.test(decoded)) {
+      return "[BASE64_BLOCKED]";
     }
     return match;
   });

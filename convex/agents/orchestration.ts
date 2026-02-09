@@ -2,8 +2,8 @@
 
 import { ensureCustomEventPolyfill } from "./workflow_utils";
 
-// Ensure polyfill is loaded
-ensureCustomEventPolyfill();
+const polyfillImpl = ensureCustomEventPolyfill();
+console.info(`[polyfill] CustomEvent implementation: ${polyfillImpl}`);
 
 // Re-export workflows
 export { streamConversationalWorkflow } from "./workflow_conversational";

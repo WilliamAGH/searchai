@@ -308,46 +308,11 @@ export const PATTERN_SEVERITY = {
 export function assessRisk(
   matchedCategories: string[],
 ): "critical" | "high" | "medium" | "low" | "none" {
-  for (const category of matchedCategories) {
-    if (PATTERN_SEVERITY.critical.includes(category)) {
-      return "critical";
+  const levels = ["critical", "high", "medium"] as const;
+  for (const level of levels) {
+    if (matchedCategories.some((c) => PATTERN_SEVERITY[level].includes(c))) {
+      return level;
     }
   }
-
-  for (const category of matchedCategories) {
-    if (PATTERN_SEVERITY.high.includes(category)) {
-      return "high";
-    }
-  }
-
-  for (const category of matchedCategories) {
-    if (PATTERN_SEVERITY.medium.includes(category)) {
-      return "medium";
-    }
-  }
-
-  if (matchedCategories.length > 0) {
-    return "low";
-  }
-
-  return "none";
+  return matchedCategories.length > 0 ? "low" : "none";
 }
-
-/**
- * Export individual pattern categories for specific use cases
- */
-export const {
-  systemCommands,
-  instructionOverrides,
-  roleEscalation,
-  templateInjection,
-  htmlScripts,
-  eventHandlers,
-  protocolInjection,
-  sqlInjection,
-  commandInjection,
-  delimiterInjection,
-  unicodeAttacks,
-  promptLeaking,
-  jailbreakAttempts,
-} = INJECTION_PATTERNS;
