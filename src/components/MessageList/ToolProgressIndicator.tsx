@@ -138,11 +138,11 @@ export function ToolProgressIndicator({
 
             {/* Stage info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0">
+                <span className="flex-shrink-0 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {stageText.label}
                 </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="min-w-0 text-xs text-gray-500 dark:text-gray-400 break-words">
                   {message || stageText.description}
                 </span>
               </div>
@@ -162,7 +162,7 @@ export function ToolProgressIndicator({
           {/* Query/URL display with scan line effect */}
           {displayTarget && (
             <div
-              className="mt-2.5 relative overflow-hidden animate-slide-up-fade"
+              className="mt-2.5 relative overflow-hidden min-w-0 animate-slide-up-fade"
               style={{ animationDelay: `${ANIMATION_DELAY_TARGET}ms` }}
             >
               <div className="px-2.5 py-1.5 rounded-md bg-white/80 dark:bg-gray-900/50 border border-gray-200/60 dark:border-gray-700/60">
@@ -172,7 +172,7 @@ export function ToolProgressIndicator({
                 </div>
 
                 {/* Content */}
-                <code className="relative text-xs font-mono text-gray-700 dark:text-gray-300 truncate block">
+                <code className="relative block text-xs font-mono text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words leading-relaxed">
                   {displayTarget}
                 </code>
               </div>

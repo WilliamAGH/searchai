@@ -109,7 +109,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
   };
 
   return (
-    <div className="flex gap-2 sm:gap-4 max-w-full overflow-hidden">
+    <div className="flex gap-2 sm:gap-4 max-w-full min-w-0 overflow-hidden">
       {/* Avatar icon matching MessageItem assistant style */}
       <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
         <svg
@@ -132,12 +132,12 @@ export function SearchProgress({ progress }: SearchProgressProps) {
         <div className="text-xs text-gray-500 dark:text-gray-500 mb-1">
           {new Date().toLocaleTimeString()}
         </div>
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="text-emerald-600 dark:text-emerald-400 animate-pulse">
+        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700 min-w-0">
+          <div className="flex items-center gap-3 mb-3 min-w-0">
+            <div className="text-emerald-600 dark:text-emerald-400 animate-pulse flex-shrink-0">
               {getStageIcon(progress.stage)}
             </div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span className="flex-1 min-w-0 text-sm font-medium text-gray-700 dark:text-gray-300 break-words">
               {progress.message}
             </span>
           </div>
@@ -167,7 +167,7 @@ export function SearchProgress({ progress }: SearchProgressProps) {
               <div className="font-medium mb-1">Search queries:</div>
               <ul className="list-disc list-inside space-y-0.5">
                 {progress.queries.map((query, idx) => (
-                  <li key={idx} className="truncate min-w-0">
+                  <li key={idx} className="min-w-0 break-words">
                     {query}
                   </li>
                 ))}

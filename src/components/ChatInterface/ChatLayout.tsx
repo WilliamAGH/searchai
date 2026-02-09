@@ -91,10 +91,10 @@ export function ChatLayout({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   return (
-    <div className="flex-1 flex h-full min-h-0 relative">
+    <div className="flex-1 flex h-full min-h-0 min-w-0 relative overflow-x-hidden">
       {/* Desktop Sidebar - Fixed position so scroll appears at browser edge */}
       {showDesktopSidebar && (
-        <div className="fixed left-0 top-[3.75rem] sm:top-16 w-80 h-[calc(var(--app-dvh,100dvh)_-_3.75rem)] sm:h-[calc(var(--app-dvh,100dvh)_-_4rem)] z-40">
+        <div className="desktop-sidebar-container fixed left-0 top-[3.75rem] sm:top-16 w-80 h-[calc(var(--app-dvh,100dvh)_-_3.75rem)] sm:h-[calc(var(--app-dvh,100dvh)_-_4rem)] z-40">
           <div className="h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
             <ChatSidebar {...chatSidebarProps} />
           </div>
@@ -109,11 +109,12 @@ export function ChatLayout({
         DO NOT REMOVE OR OVERRIDE: Layout Stability Strategy
         - pl-80: Uses padding instead of margin (ml-80) to keep the scrollbar at the browser edge
           while reserving space for the fixed sidebar. Margin pushes the scrollbar off-screen.
+        - w-full + box-border: Prevents right-edge overflow when sidebar padding is applied.
         - min-w-0: Critical for allowing flex children to shrink below their content size.
       */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-y-auto overscroll-contain ${showDesktopSidebar ? "pl-80" : ""}`}
+        className={`w-full box-border flex flex-col h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain ${showDesktopSidebar ? "pl-80" : ""}`}
         {...swipeHandlers}
       >
         {/*

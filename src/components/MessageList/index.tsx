@@ -295,7 +295,9 @@ export function MessageList({
   // don't shrink when content is large (allows scroll overflow)
   if (useExternalScroll) {
     return (
-      <div className="grow shrink-0 flex flex-col relative">{content}</div>
+      <div className="grow shrink-0 flex flex-col min-w-0 w-full relative overflow-x-hidden">
+        {content}
+      </div>
     );
   }
 
@@ -303,7 +305,7 @@ export function MessageList({
   return (
     <div
       ref={internalScrollRef}
-      className="flex-1 overflow-y-auto relative overscroll-contain"
+      className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden relative overscroll-contain"
     >
       {content}
     </div>

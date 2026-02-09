@@ -59,7 +59,8 @@ export function ShareModalContainer(props: Readonly<ShareModalContainerProps>) {
   // Use branded origin so export URLs point to search-ai.io, not the raw
   // Convex deployment. The /api/* proxy (server.mjs + Vite dev) forwards
   // requests to the Convex HTTP layer transparently.
-  const exportBase = `${globalThis.location.origin}/api/chatTextMarkdown`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const exportBase = `${origin}/api/chatTextMarkdown`;
 
   const onShare = async (
     p: ChatPrivacy,

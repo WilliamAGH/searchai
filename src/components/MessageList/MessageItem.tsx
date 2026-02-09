@@ -109,9 +109,9 @@ export function MessageItem({
         {message.role === "assistant" &&
           message.thinking &&
           message.thinking.trim() && (
-            <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
+            <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm max-w-full min-w-0 overflow-hidden">
               <svg
-                className="w-4 h-4 animate-spin"
+                className="w-4 h-4 animate-spin flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
               >
@@ -129,7 +129,7 @@ export function MessageItem({
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 />
               </svg>
-              <span>{message.thinking}</span>
+              <span className="min-w-0 break-words">{message.thinking}</span>
             </div>
           )}
 
@@ -192,8 +192,8 @@ export function MessageItem({
           )}
         </div>
 
-        <div className="-mt-1 flex items-start justify-between">
-          <div className="text-xs text-gray-500 dark:text-gray-500">
+        <div className="-mt-1 flex items-start justify-between gap-2 min-w-0">
+          <div className="text-xs text-gray-500 dark:text-gray-500 min-w-0 break-words">
             {new Date(safeTimestamp).toLocaleTimeString()}
           </div>
           <div className="flex items-center gap-2">

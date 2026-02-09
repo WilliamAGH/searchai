@@ -44,7 +44,7 @@ export function ResponsiveChatLayout({
             <div className="fixed inset-0 bg-gray-900/80" />
           </Transition.Child>
 
-          <div className="fixed inset-0 flex">
+          <div className="fixed inset-0 flex pr-16 overflow-x-hidden">
             <Transition.Child
               as={Fragment}
               enter="transition ease-in-out duration-300 transform"
@@ -54,7 +54,7 @@ export function ResponsiveChatLayout({
               leaveFrom="translate-x-0"
               leaveTo="-translate-x-full"
             >
-              <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
+              <Dialog.Panel className="relative flex w-full max-w-xs flex-1 min-w-0">
                 <Transition.Child
                   as={Fragment}
                   enter="ease-in-out duration-300"
@@ -87,7 +87,7 @@ export function ResponsiveChatLayout({
                     </button>
                   </div>
                 </Transition.Child>
-                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-900 px-6 pb-2">
+                <div className="flex grow min-w-0 flex-col gap-y-5 overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900 px-6 pb-2">
                   {sidebarContent}
                 </div>
               </Dialog.Panel>
