@@ -5,8 +5,8 @@ import { internal } from "./_generated/api";
 import { vWebResearchSource, vSearchMethod } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
-import { isAuthorized, isValidWorkflowToken } from "./lib/auth";
-import { hasChatWriteAccess } from "./chats/writeAccess";
+import { isValidWorkflowToken } from "./lib/auth";
+import { hasChatWriteAccess, isHttpWriteAuthorized } from "./chats/writeAccess";
 import { buildMessageInsertDocument } from "./messages_insert_document";
 export const addMessage = internalMutation({
   args: {
@@ -83,19 +83,19 @@ export const addMessageHttp = internalMutation({
       : null;
     const hasValidToken = isValidWorkflowToken(workflowToken, args.chatId);
     const hasBaseAccess = hasChatWriteAccess(chat, userId, args.sessionId);
-
-    // When a workflow token is provided it must be valid and its session must
-    // match the caller's session.  Without a token, owner/claim access alone
-    // is sufficient (used by persistAssistantMessage when token is absent).
     const tokenSessionMatches =
       !workflowToken?.sessionId || workflowToken.sessionId === args.sessionId;
-    const tokenOk =
-      !args.workflowTokenId || (hasValidToken && tokenSessionMatches);
 
-    if (!hasBaseAccess || !tokenOk) {
+    if (
+      !isHttpWriteAuthorized({
+        hasBaseAccess,
+        hasValidToken,
+        tokenProvided: !!args.workflowTokenId,
+        tokenSessionMatches,
+      })
+    ) {
       throw new Error(
-        `Unauthorized: addMessageHttp denied for chat ${args.chatId} ` +
-          `(baseAccess=${hasBaseAccess}, tokenOk=${tokenOk})`,
+        `Unauthorized: addMessageHttp denied for chat ${args.chatId}`,
       );
     }
 
@@ -178,15 +178,12 @@ export const updateMessageMetadata = mutation({
       throw new Error(`Message not found: ${messageId}`);
     }
 
-    // Check authorization - only the chat owner can update message metadata
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(message.chatId);
-    if (!chat) {
-      throw new Error("Chat not found");
-    }
-    if (!isAuthorized(chat, userId, sessionId)) {
+    if (!chat) throw new Error("Chat not found");
+    if (!hasChatWriteAccess(chat, userId, sessionId)) {
       throw new Error(
-        "Unauthorized: You can only update messages in your own chats",
+        `Unauthorized: updateMessageMetadata denied for chat ${message.chatId}`,
       );
     }
 
@@ -238,8 +235,10 @@ export const deleteMessage = mutation({
     if (!chat) throw new Error("Chat not found");
 
     const userId = await getAuthUserId(ctx);
-    if (!isAuthorized(chat, userId, args.sessionId)) {
-      throw new Error("Unauthorized");
+    if (!hasChatWriteAccess(chat, userId, args.sessionId)) {
+      throw new Error(
+        `Unauthorized: deleteMessage denied for chat ${message.chatId}`,
+      );
     }
 
     await ctx.db.delete(args.messageId);
@@ -339,10 +338,11 @@ export const addMessageWithTransaction = internalMutation({
 
       return { success: true, assistantMessageId };
     } catch (error) {
-      return {
-        success: false,
+      console.error("[messages] addMessageWithTransaction failed", {
+        chatId: args.chatId,
         error: getErrorMessage(error),
-      };
+      });
+      return { success: false, error: getErrorMessage(error) };
     }
   },
 });
