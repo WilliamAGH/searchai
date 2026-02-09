@@ -100,7 +100,7 @@ export function robustSanitize(input: string): string {
   ];
 
   for (const pattern of injectionPatterns) {
-    clean = clean.replace(pattern, "[INJECTION_BLOCKED]");
+    clean = clean.replaceAll(pattern, "[INJECTION_BLOCKED]");
   }
 
   // 6. Remove HTML/Script tags
