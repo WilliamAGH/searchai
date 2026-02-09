@@ -15,6 +15,7 @@ import {
 } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { validateScrapeUrl } from "../../lib/url";
+import { isRecord } from "../../lib/validators";
 
 /**
  * Register scrape routes on the HTTP router
@@ -72,10 +73,7 @@ export function registerScrapeRoutes(http: HttpRouter) {
       }
 
       // Validate and normalize input
-      const payload =
-        rawPayload && typeof rawPayload === "object"
-          ? (rawPayload as Record<string, unknown>)
-          : null;
+      const payload = isRecord(rawPayload) ? rawPayload : null;
       if (!payload) {
         return corsResponse({
           body: JSON.stringify({ error: "Invalid request payload" }),

@@ -3,7 +3,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { viewports } from "../config/viewports";
+import { viewports } from "../../config/playwright.viewports";
 import { setupNewChatPage } from "../helpers/new-chat";
 import { getNewChatButton, createNewChat } from "../helpers/sidebar-helpers";
 

@@ -4,8 +4,8 @@
  * Ensures client code does not import server-only modules.
  * Non-fatal by default to avoid blocking local dev.
  */
-const fs = require("fs");
-const path = require("path");
+const fs = require("node:fs");
+const path = require("node:path");
 
 function listFiles(dir, acc = []) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -136,7 +136,7 @@ function main() {
     !pathAliasViolations.length;
 
   if (allPassed) {
-    console.log("[OK] Convex import/type/path-alias checks passed");
+    console.info("[OK] Convex import/type/path-alias checks passed");
   }
 
   // Non-fatal to avoid blocking local dev as per policy; CI can enforce via wrapper

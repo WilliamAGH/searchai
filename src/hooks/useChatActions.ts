@@ -12,7 +12,6 @@ import { TitleUtils } from "@/lib/types/unified";
 import { getErrorMessage } from "@/lib/utils/errorUtils";
 import { logger } from "@/lib/logger";
 import { sendMessageWithStreaming } from "@/hooks/chatActions/sendMessage";
-import { isLocalId } from "@/lib/utils/idValidation";
 
 export interface ChatActions {
   // Chat management
@@ -118,30 +117,18 @@ export function createChatActions(
             ...prev,
             currentChatId: canonicalChatId,
             currentChat: chat,
-            // Preserve in-flight optimistic messages for this chat so URL-driven
-            // selection does not wipe local streaming placeholders mid-send.
-            messages: (() => {
-              const optimisticForChat = prev.messages.filter(
-                (message) =>
-                  String(message.chatId) === canonicalChatId &&
-                  (message.isStreaming === true ||
-                    isLocalId(String(message._id))),
-              );
-              if (optimisticForChat.length === 0) {
-                return messages;
-              }
-
-              const persistedIds = new Set(messages.map((m) => String(m._id)));
-              const optimisticOnly = optimisticForChat.filter(
-                (message) => !persistedIds.has(String(message._id)),
-              );
-
-              return [...messages, ...optimisticOnly].sort((a, b) => {
-                const aTime = a._creationTime ?? a.timestamp ?? 0;
-                const bTime = b._creationTime ?? b.timestamp ?? 0;
-                return aTime - bTime;
-              });
-            })(),
+            // Preserve in-flight optimistic messages for this chat so
+            // URL-driven selection does not wipe streaming placeholders.
+            //
+            // ID-based dedup is impossible here: optimistic messages use
+            // local IDs (msg_xxx) that never match Convex-assigned IDs.
+            // When actively generating for this chat, keep the optimistic
+            // messages as the live source of truth. Once generation ends,
+            // DB messages contain everything and are authoritative.
+            messages:
+              prev.isGenerating && prev.currentChatId === canonicalChatId
+                ? prev.messages
+                : messages,
             error: null,
           }));
         }

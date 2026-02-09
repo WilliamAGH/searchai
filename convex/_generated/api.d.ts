@@ -87,6 +87,7 @@ import type * as http_routes_publish_export_data from "../http/routes/publish_ex
 import type * as http_routes_publish_text from "../http/routes/publish_text.js";
 import type * as http_routes_scrape from "../http/routes/scrape.js";
 import type * as http_routes_search from "../http/routes/search.js";
+import type * as http_routes_sitemap from "../http/routes/sitemap.js";
 import type * as http_utils from "../http/utils.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -141,6 +142,9 @@ import type * as search_scraper_content from "../search/scraper_content.js";
 import type * as search_search_web_handler from "../search/search_web_handler.js";
 import type * as search_utils from "../search/utils.js";
 import type * as search from "../search.js";
+import type * as sitemap_constants from "../sitemap/constants.js";
+import type * as sitemap_publicChats from "../sitemap/publicChats.js";
+import type * as sitemap from "../sitemap.js";
 import type * as workflowEvents from "../workflowEvents.js";
 import type * as workflowTokens from "../workflowTokens.js";
 import type * as workflowTokensActions from "../workflowTokensActions.js";
@@ -228,6 +232,7 @@ declare const fullApi: ApiFromModules<{
   "http/routes/publish_text": typeof http_routes_publish_text;
   "http/routes/scrape": typeof http_routes_scrape;
   "http/routes/search": typeof http_routes_search;
+  "http/routes/sitemap": typeof http_routes_sitemap;
   "http/utils": typeof http_utils;
   http: typeof http;
   "lib/auth": typeof lib_auth;
@@ -282,6 +287,9 @@ declare const fullApi: ApiFromModules<{
   "search/search_web_handler": typeof search_search_web_handler;
   "search/utils": typeof search_utils;
   search: typeof search;
+  "sitemap/constants": typeof sitemap_constants;
+  "sitemap/publicChats": typeof sitemap_publicChats;
+  sitemap: typeof sitemap;
   workflowEvents: typeof workflowEvents;
   workflowTokens: typeof workflowTokens;
   workflowTokensActions: typeof workflowTokensActions;

@@ -1,8 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
-import { includeFirefox, includeWebkit } from "./__tests__/config/browsers";
-import { desktopViewport } from "./__tests__/config/viewports";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { includeFirefox, includeWebkit } from "./playwright.browsers";
+import { desktopViewport } from "./playwright.viewports";
 
 const useProxyRuntime = process.env.PLAYWRIGHT_RUNTIME === "proxy";
+const ROOT_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
 const projects = [
   {
@@ -28,7 +34,8 @@ const projects = [
 ];
 
 export default defineConfig({
-  testDir: "./__tests__/e2e",
+  testDir: path.join(ROOT_DIR, "__tests__", "e2e"),
+  outputDir: path.join(ROOT_DIR, "test-results"),
   timeout: 30_000,
   retries: 0,
   reporter: "list",
@@ -40,6 +47,9 @@ export default defineConfig({
   },
   projects,
   webServer: {
+    // Playwright resolves cwd from the config file directory; point back to
+    // the project root so npm/npx commands resolve correctly.
+    cwd: ROOT_DIR,
     // CRITICAL: DO NOT REMOVE "npx" from "npx vite preview" - CI/CD WILL BREAK!
     // Inside bash -c, node_modules/.bin is NOT in PATH. Without npx, vite is not
     // found and the server silently fails, causing a 180s timeout. This was the

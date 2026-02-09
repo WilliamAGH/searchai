@@ -2,7 +2,6 @@
 
 import { ensureCustomEventPolyfill } from "./workflow_utils";
 
-// Ensure polyfill is loaded
 ensureCustomEventPolyfill();
 
 // Re-export workflows

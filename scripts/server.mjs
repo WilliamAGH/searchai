@@ -4,10 +4,11 @@
 
 import http from "node:http";
 import { createReadStream, statSync, existsSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { Readable } from "node:stream";
 
 const DIST_DIR = resolve("./dist");
+const DIST_PATH_PREFIX = `${DIST_DIR}${DIST_DIR.endsWith("/") ? "" : "/"}`;
 const PORT = process.env.PORT || 3000;
 // Prefer explicit CONVEX_SITE_URL when provided; otherwise derive from
 // VITE_CONVEX_URL by swapping .convex.cloud → .convex.site
@@ -148,6 +149,26 @@ const server = http.createServer(async (req, res) => {
     res.end("Bad request");
     return;
   }
+  const safeRaw = typeof req.url === "string" ? req.url : "/";
+  const rawPath = safeRaw.split("?")[0] || "/";
+  let urlPath = "/";
+  try {
+    urlPath = decodeURIComponent(rawPath);
+  } catch (error) {
+    console.error("Failed to decode request path", { rawPath, error });
+    res.writeHead(400);
+    res.end("Bad request");
+    return;
+  }
+  if (!urlPath.startsWith("/")) {
+    urlPath = `/${urlPath}`;
+  }
+
+  if (urlPath === "/sitemap.xml") {
+    const target = `${CONVEX_SITE_URL}/sitemap.xml`;
+    return void forwardTo(target, req, res);
+  }
+
   if (req.url.startsWith("/api/")) {
     // Rate-limit POST /api/publishChat
     if (req.method === "POST" && req.url.startsWith("/api/publishChat")) {
@@ -180,10 +201,8 @@ const server = http.createServer(async (req, res) => {
     accept.includes("text/markdown") ||
     /curl|wget|httpie|python-requests|go-http-client|httpclient/.test(ua);
   try {
-    const rawUrl = typeof req.url === "string" ? req.url : "/";
-    const pathOnly = decodeURIComponent(rawUrl.split("?")[0] || "/");
-    const shareMatch = pathOnly.match(/^\/s\/([A-Za-z0-9_-]+)/);
-    const publicMatch = pathOnly.match(/^\/p\/([A-Za-z0-9_-]+)/);
+    const shareMatch = urlPath.match(/^\/s\/([A-Za-z0-9_-]+)/);
+    const publicMatch = urlPath.match(/^\/p\/([A-Za-z0-9_-]+)/);
     if (wantsPlain && (shareMatch || publicMatch)) {
       const qp = shareMatch
         ? `shareId=${encodeURIComponent(shareMatch[1])}`
@@ -199,14 +218,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Static file try
-  const safeRaw = typeof req.url === "string" ? req.url : "/";
-  const urlPath = decodeURIComponent(safeRaw.split("?")[0] || "/");
-  const filePath = join(DIST_DIR, urlPath === "/" ? "/index.html" : urlPath);
+  const staticPath = urlPath === "/" ? "/index.html" : urlPath;
+  const filePath = resolve(DIST_DIR, `.${staticPath}`);
+  if (!filePath.startsWith(DIST_PATH_PREFIX)) {
+    res.writeHead(400);
+    res.end("Bad request");
+    return;
+  }
   if (existsSync(filePath) && statSync(filePath).isFile()) {
     return sendFile(res, filePath);
   }
   // SPA fallback
-  return sendFile(res, join(DIST_DIR, "index.html"));
+  return sendFile(res, resolve(DIST_DIR, "index.html"));
 });
 
 server.listen(PORT, () => {

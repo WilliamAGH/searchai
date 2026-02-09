@@ -101,9 +101,9 @@ export function logWorkflow(
 ): void {
   const prefix = LOG_PREFIXES[event];
   if (data) {
-    console.log(`${prefix} ${event}: ${message}`, data);
+    console.info(`${prefix} ${event}: ${message}`, data);
   } else {
-    console.log(`${prefix} ${event}: ${message}`);
+    console.info(`${prefix} ${event}: ${message}`);
   }
 }
 

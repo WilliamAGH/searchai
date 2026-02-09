@@ -38,7 +38,7 @@ interface CustomEventInit<T> {
 // Minimal CustomEvent interface matching SDK usage
 interface PolyfillCustomEvent<T = unknown> {
   type: string;
-  detail: T;
+  detail: T | undefined;
 }
 
 interface PolyfillCustomEventConstructor {
@@ -49,42 +49,43 @@ interface GlobalWithCustomEvent {
   CustomEvent?: PolyfillCustomEventConstructor;
 }
 
-export const ensureCustomEventPolyfill = (): void => {
+type PolyfillResult = "native" | "event-based" | "standalone";
+
+export const ensureCustomEventPolyfill = (): PolyfillResult => {
   const global = globalThis as GlobalWithCustomEvent;
   if (typeof global.CustomEvent !== "undefined") {
-    return;
+    return "native";
   }
 
   try {
     // Attempt to extend native Event (works in modern runtimes)
     class NodeCustomEvent<T = unknown> extends Event {
-      detail: T;
+      detail: T | undefined;
       constructor(type: string, init?: CustomEventInit<T>) {
         super(type, init);
-        this.detail = init?.detail as T;
+        this.detail = init?.detail;
       }
     }
     // Type assertion needed: NodeCustomEvent extends Event but TS can't verify
     // it matches the full DOM CustomEvent interface. Safe because SDK only uses
     // type and detail properties which our implementation provides.
     global.CustomEvent = NodeCustomEvent as PolyfillCustomEventConstructor;
+    return "event-based";
   } catch (extendError) {
-    // Fallback for environments where Event is not extendable
     console.warn(
-      "CustomEvent polyfill: Event not extendable, using standalone fallback class",
-      {
-        error: extendError,
-      },
+      "CustomEvent polyfill: Event not extendable, using standalone class",
+      { error: extendError },
     );
     class NodeCustomEvent<T = unknown> {
       type: string;
-      detail: T;
+      detail: T | undefined;
       constructor(type: string, init?: CustomEventInit<T>) {
         this.type = type;
-        this.detail = init?.detail as T;
+        this.detail = init?.detail;
       }
     }
     global.CustomEvent = NodeCustomEvent as PolyfillCustomEventConstructor;
+    return "standalone";
   }
 };
 

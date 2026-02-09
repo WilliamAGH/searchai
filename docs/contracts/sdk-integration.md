@@ -42,8 +42,8 @@ import type { FunctionTool, Tool } from "@openai/agents";
 
 // Individual tool — use FunctionTool<any, any, unknown>
 // oxfmt-ignore
+// oxlint-disable-next-line typescript-eslint/no-explicit-any
 export const myTool: FunctionTool<any, any, unknown> = tool({
-  // eslint-disable-line @typescript-eslint/no-explicit-any
   name: "my_tool",
   description: "...",
   parameters: z.object({

@@ -1,5 +1,6 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
+import type { Doc } from "../../_generated/dataModel";
 import { formatConversationMarkdown } from "../utils";
 import { publicCorsResponse } from "../cors";
 import { isValidUuidV7 } from "../../lib/uuid";
@@ -88,14 +89,18 @@ export async function loadExportData(
     };
   }
 
-  const chat = shareId
-    ? await ctx.runQuery(
-        mode === "auth"
-          ? api.chats.getChatByShareId
-          : api.chats.getChatByShareIdHttp,
-        { shareId },
-      )
-    : await ctx.runQuery(api.chats.getChatByPublicId, { publicId: publicId! });
+  // @ts-ignore - Known Convex TS2589 type instantiation issue on api.chats.*
+  let chat: Doc<"chats"> | null = null;
+  if (shareId) {
+    chat = await ctx.runQuery(
+      mode === "auth"
+        ? api.chats.getChatByShareId
+        : api.chats.getChatByShareIdHttp,
+      { shareId },
+    );
+  } else if (publicId) {
+    chat = await ctx.runQuery(api.chats.getChatByPublicId, { publicId });
+  }
 
   if (!chat) {
     return {

@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "$schema": "../node_modules/oxlint/configuration_schema.json",
   "plugins": [
     "import",
     "typescript",
@@ -113,7 +113,10 @@
         "*.mjs",
         "tests/**/*",
         "__tests__/**/*",
-        "scripts/**/*"
+        "scripts/**/*",
+        "../tests/**/*",
+        "../__tests__/**/*",
+        "../scripts/**/*"
       ],
       "rules": {
         "typescript/no-explicit-any": "off",
@@ -131,7 +134,7 @@
       }
     },
     {
-      "files": ["convex/**/*.ts"],
+      "files": ["convex/**/*.ts", "../convex/**/*.ts"],
       "rules": {
         "no-console": "off",
         "typescript/no-explicit-any": "off",
@@ -153,7 +156,12 @@
       }
     },
     {
-      "files": ["src/**/*.ts", "src/**/*.tsx"],
+      "files": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "../src/**/*.ts",
+        "../src/**/*.tsx"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",

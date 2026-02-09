@@ -1,3 +1,5 @@
+import { isRecord } from "./validators";
+
 /**
  * Deep object inspector to find empty objects {}
  * Returns paths to all empty objects in the structure
@@ -20,6 +22,10 @@ export function findEmptyObjects(obj: unknown, path = "root"): string[] {
     return results;
   }
 
+  if (!isRecord(obj)) {
+    return results;
+  }
+
   const keys = Object.keys(obj);
   if (keys.length === 0) {
     results.push(path);
@@ -27,21 +33,18 @@ export function findEmptyObjects(obj: unknown, path = "root"): string[] {
   }
 
   for (const key of keys) {
-    results.push(
-      ...findEmptyObjects(
-        (obj as Record<string, unknown>)[key],
-        `${path}.${key}`,
-      ),
-    );
+    results.push(...findEmptyObjects(obj[key], `${path}.${key}`));
   }
 
   return results;
 }
 
 /**
- * Recursively remove all empty objects from a structure
+ * Recursively remove all empty objects from a structure.
+ * Returns unknown: the transform removes keys/elements so the output
+ * is a structural subset that cannot be typed as the original T.
  */
-export function removeEmptyObjects<T>(obj: T): T {
+export function removeEmptyObjects(obj: unknown): unknown {
   if (obj === null || obj === undefined || typeof obj !== "object") {
     return obj;
   }
@@ -50,11 +53,15 @@ export function removeEmptyObjects<T>(obj: T): T {
     return obj
       .map((item) => removeEmptyObjects(item))
       .filter((item) => {
-        if (typeof item === "object" && item !== null && !Array.isArray(item)) {
+        if (isRecord(item)) {
           return Object.keys(item).length > 0;
         }
         return true;
-      }) as T;
+      });
+  }
+
+  if (!isRecord(obj)) {
+    return obj;
   }
 
   const cleaned: Record<string, unknown> = {};
@@ -63,16 +70,12 @@ export function removeEmptyObjects<T>(obj: T): T {
       continue;
     }
 
-    if (typeof value === "object" && !Array.isArray(value)) {
-      const keys = Object.keys(value);
-      if (keys.length === 0) {
-        // Skip empty objects
-        continue;
-      }
+    if (isRecord(value) && Object.keys(value).length === 0) {
+      continue;
     }
 
     cleaned[key] = removeEmptyObjects(value);
   }
 
-  return cleaned as T;
+  return cleaned;
 }

@@ -30,12 +30,14 @@ export interface ReasoningConfig {
  * Supports LLM_PROVIDER_SORT, LLM_PROVIDER_ORDER, LLM_PROVIDER_ALLOW_FALLBACKS
  * @see https://openrouter.ai/docs/features/provider-routing
  */
+const isValidSort = (s: string): s is "price" | "throughput" | "latency" => {
+  return ["price", "throughput", "latency"].includes(s);
+};
+
 export const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
-  const sort = process.env.LLM_PROVIDER_SORT as
-    | "price"
-    | "throughput"
-    | "latency"
-    | undefined;
+  const sortEnv = process.env.LLM_PROVIDER_SORT;
+  const sort = sortEnv && isValidSort(sortEnv) ? sortEnv : undefined;
+
   const orderRaw = process.env.LLM_PROVIDER_ORDER;
   const allowFallbacks = process.env.LLM_PROVIDER_ALLOW_FALLBACKS;
 
@@ -60,12 +62,11 @@ export const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
     provider.order = ["novita"];
   }
 
-  if (allowFallbacks !== undefined) {
+  if (allowFallbacks === undefined) {
+    provider.allow_fallbacks = true;
+  } else {
     provider.allow_fallbacks =
       allowFallbacks === "true" || allowFallbacks === "1";
-  } else {
-    // Default to allowing fallbacks for better reliability
-    provider.allow_fallbacks = true;
   }
 
   return provider;
@@ -84,25 +85,25 @@ export const parseOpenRouterProvider = (): OpenRouterProvider | undefined => {
  * @see https://platform.openai.com/docs/guides/reasoning
  * @see https://openrouter.ai/docs/use-cases/reasoning-tokens
  */
+const isValidReasoningEffort = (
+  s: string,
+): s is "minimal" | "low" | "medium" | "high" => {
+  return ["minimal", "low", "medium", "high"].includes(s);
+};
+
 export const parseReasoningSettings = ():
   | ModelSettings["reasoning"]
   | undefined => {
-  const reasoningEffort = process.env.LLM_REASONING as
-    | "minimal"
-    | "low"
-    | "medium"
-    | "high"
-    | undefined;
+  const reasoningEffort = process.env.LLM_REASONING;
 
   if (!reasoningEffort) {
     return undefined;
   }
 
   // Validate the reasoning effort value
-  const validEfforts = ["minimal", "low", "medium", "high"];
-  if (!validEfforts.includes(reasoningEffort)) {
+  if (!isValidReasoningEffort(reasoningEffort)) {
     console.warn(
-      `[openai-client] Invalid LLM_REASONING value: ${reasoningEffort}. Must be one of: ${validEfforts.join(", ")}`,
+      `[openai-client] Invalid LLM_REASONING value: ${reasoningEffort}. Must be one of: minimal, low, medium, high`,
     );
     return undefined;
   }

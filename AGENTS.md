@@ -31,6 +31,7 @@ alwaysApply: true
 - [UI1a-c] UI Status & Overlays (inline-only; never block input)
 - [HP1a-c] HTTP Endpoints (Convex): validation, clarity, no ambiguous routing
 - [CS1a-c] Code Search Policy (semantic-first; validate Convex code before commit)
+- [CF1a-b] Config Directory (`config/` houses tooling configs; never move them back to root)
 - [VR1a-e] Verification Loops (build/typecheck/lint/tests/e2e)
 - [LG1a] Language (American English only)
 
@@ -199,12 +200,17 @@ alwaysApply: true
 - [CS1b] Use exact-text searches for symbols/strings once context is known.
 - [CS1c] When touching Convex code, run the provided scripts to validate imports and generated types before committing.
 
+## [CF1] Config Directory
+
+- [CF1a] **Location**: Tooling configs (`oxlintrc.json`, `oxfmtrc.json`, `drylintrc.json`, `sgconfig.yml`, `tsconfig.app.json`, `tsconfig.node.json`, `vitest.config.ts`, `playwright.config.ts`, `postcss.config.cjs`, `tailwind.config.js`, `prek.toml`) live in `config/`. Do not move them back to root.
+- [CF1b] **References**: All `package.json` scripts and `lint-staged` entries use explicit `-c config/...` paths; `tsconfig.json` references sub-configs via `./config/`; `vite.config.ts` sets `css.postcss: './config'`; `postcss.config.cjs` points Tailwind to `./config/tailwind.config.js`; `prek` uses `-c config/prek.toml`; `vitest` uses `--config config/vitest.config.ts`; `playwright test` uses `--config config/playwright.config.ts`. Keep these paths in sync when adding new tooling configs.
+
 ## [VR1] Verification Loops (Mandatory)
 
 - [VR1a] Build & types: `npm run build` and `npm run typecheck`
 - [VR1b] Lint: `npm run lint`
 - [VR1c] Tests (full suite): `npm run test:all`
-- [VR1d] E2E (smoke/share flows): run Playwright with the required proxy runtime, e.g. `PLAYWRIGHT_RUNTIME=proxy npx playwright test -g "(smoke|share)"`
+- [VR1d] E2E (smoke/share flows): run Playwright with the required proxy runtime, e.g. `PLAYWRIGHT_RUNTIME=proxy npx playwright test --config config/playwright.config.ts -g "(smoke|share)"`
 - [VR1e] All checks must pass with no skipped tests and coverage meeting thresholds.
 
 ## [LG1] Language

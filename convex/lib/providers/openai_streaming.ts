@@ -51,7 +51,7 @@ const getOpenRouterClient = (): OpenAI => {
   openRouterClient = new OpenAI({
     apiKey: config.apiKey,
     baseURL: config.baseURL,
-    fetch: createInstrumentedFetch(debugLogging),
+    fetch: createInstrumentedFetch({ debugLogging }),
   });
 
   return openRouterClient;

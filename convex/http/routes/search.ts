@@ -11,6 +11,7 @@ import { corsPreflightResponse, corsResponse } from "../cors";
 import { checkIpRateLimit } from "../../lib/rateLimit";
 import { applyEnhancements, sortResultsWithPriority } from "../../enhancements";
 import { normalizeUrlForKey } from "../../lib/url";
+import { isRecord } from "../../lib/validators";
 
 /**
  * Register search routes on the HTTP router
@@ -70,10 +71,7 @@ export function registerSearchRoutes(http: HttpRouter) {
       }
 
       // Validate and normalize input
-      const payload =
-        rawPayload && typeof rawPayload === "object"
-          ? (rawPayload as Record<string, unknown>)
-          : null;
+      const payload = isRecord(rawPayload) ? rawPayload : null;
       if (!payload) {
         return corsResponse({
           body: JSON.stringify({ error: "Invalid request payload" }),

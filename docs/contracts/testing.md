@@ -27,7 +27,7 @@ REACT_VERSION: 19.1.x
 - **Mirrored Structure**: All tests live in `__tests__/` and mirror the source directory structure.
   - `convex/chats.ts` → `__tests__/convex/chats.test.ts`
   - `src/components/ui/Button.tsx` → `__tests__/src/components/ui/Button.test.tsx`
-- **Co-location Exception**: Only strictly purely unit-testable utils may be co-located if `vitest.config.ts` allows, but preference is `__tests__/`.
+- **Co-location Exception**: Only strictly purely unit-testable utils may be co-located if `config/vitest.config.ts` allows, but preference is `__tests__/`.
 
 ### Never Allowed
 
@@ -111,7 +111,7 @@ npm run test:integration
 ## Vitest Configuration
 
 ```typescript
-// vitest.config.ts
+// config/vitest.config.ts
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -239,7 +239,7 @@ npm run test:ui
 npx vitest --reporter=verbose path/to/test.spec.ts
 
 # Playwright
-npx playwright test --debug
-npx playwright test --ui
+npx playwright test --config config/playwright.config.ts --debug
+npx playwright test --config config/playwright.config.ts --ui
 npx playwright codegen localhost:5173
 ```

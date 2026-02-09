@@ -99,17 +99,24 @@ export async function searchWithSerpApiDuckDuckGo(
       const enrichment: SerpEnrichment = {};
 
       if (data.knowledge_graph) {
+        let attributes: Record<string, string> | undefined;
+        if (data.knowledge_graph.attributes) {
+          const filteredEntries = Object.entries(
+            data.knowledge_graph.attributes,
+          ).filter((entry): entry is [string, string] => {
+            const [, value] = entry;
+            return typeof value === "string";
+          });
+          if (filteredEntries.length > 0) {
+            attributes = Object.fromEntries(filteredEntries);
+          }
+        }
+
         enrichment.knowledgeGraph = {
           title: data.knowledge_graph.title,
           type: data.knowledge_graph.type,
           description: data.knowledge_graph.description,
-          attributes: data.knowledge_graph.attributes
-            ? (Object.fromEntries(
-                Object.entries(data.knowledge_graph.attributes).filter(
-                  ([, v]) => v !== undefined,
-                ),
-              ) as Record<string, string>)
-            : undefined,
+          attributes,
           url: data.knowledge_graph.url,
         };
       }

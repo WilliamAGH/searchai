@@ -217,14 +217,22 @@ export const INJECTION_PATTERNS = {
   ],
 };
 
+function isInjectionCategory(
+  key: string,
+): key is keyof typeof INJECTION_PATTERNS {
+  return key in INJECTION_PATTERNS;
+}
+
 /**
  * Get all patterns as a flat array for comprehensive checking
  */
 export function getAllPatterns(): RegExp[] {
   const allPatterns: RegExp[] = [];
 
-  for (const category of Object.values(INJECTION_PATTERNS)) {
-    allPatterns.push(...category);
+  for (const key of Object.keys(INJECTION_PATTERNS)) {
+    if (isInjectionCategory(key)) {
+      allPatterns.push(...INJECTION_PATTERNS[key]);
+    }
   }
 
   return allPatterns;
@@ -247,9 +255,8 @@ export function checkForInjection(
   const matchedCategories: string[] = [];
   const matchedPatterns: string[] = [];
 
-  const categoriesToCheck =
-    categories ||
-    (Object.keys(INJECTION_PATTERNS) as (keyof typeof INJECTION_PATTERNS)[]);
+  const categoriesToCheck: (keyof typeof INJECTION_PATTERNS)[] =
+    categories || Object.keys(INJECTION_PATTERNS).filter(isInjectionCategory);
 
   for (const category of categoriesToCheck) {
     const patterns = INJECTION_PATTERNS[category];
@@ -301,46 +308,11 @@ export const PATTERN_SEVERITY = {
 export function assessRisk(
   matchedCategories: string[],
 ): "critical" | "high" | "medium" | "low" | "none" {
-  for (const category of matchedCategories) {
-    if (PATTERN_SEVERITY.critical.includes(category)) {
-      return "critical";
+  const levels = ["critical", "high", "medium"] as const;
+  for (const level of levels) {
+    if (matchedCategories.some((c) => PATTERN_SEVERITY[level].includes(c))) {
+      return level;
     }
   }
-
-  for (const category of matchedCategories) {
-    if (PATTERN_SEVERITY.high.includes(category)) {
-      return "high";
-    }
-  }
-
-  for (const category of matchedCategories) {
-    if (PATTERN_SEVERITY.medium.includes(category)) {
-      return "medium";
-    }
-  }
-
-  if (matchedCategories.length > 0) {
-    return "low";
-  }
-
-  return "none";
+  return matchedCategories.length > 0 ? "low" : "none";
 }
-
-/**
- * Export individual pattern categories for specific use cases
- */
-export const {
-  systemCommands,
-  instructionOverrides,
-  roleEscalation,
-  templateInjection,
-  htmlScripts,
-  eventHandlers,
-  protocolInjection,
-  sqlInjection,
-  commandInjection,
-  delimiterInjection,
-  unicodeAttacks,
-  promptLeaking,
-  jailbreakAttempts,
-} = INJECTION_PATTERNS;

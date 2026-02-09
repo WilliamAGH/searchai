@@ -1,6 +1,7 @@
 "use node";
 
 import { generateMessageId } from "../id_generator";
+import { isRecord } from "../validators";
 
 /**
  * Type guards for request payload inspection
@@ -17,24 +18,21 @@ type InstrumentedRequestPayload = Record<string, unknown> & {
 const isFunctionCallOutputItem = (
   value: unknown,
 ): value is FunctionCallOutputItem => {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
-  const candidate = value as Record<string, unknown>;
   return (
-    typeof candidate.type === "string" &&
-    candidate.type === "function_call_output"
+    typeof value.type === "string" && value.type === "function_call_output"
   );
 };
 
 const isInstrumentedRequestPayload = (
   value: unknown,
 ): value is InstrumentedRequestPayload => {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
-  const candidate = value as Record<string, unknown>;
-  return Array.isArray(candidate.input);
+  return Array.isArray(value.input);
 };
 
 /**
@@ -71,9 +69,15 @@ export const redactSensitiveHeaders = (
   return redacted;
 };
 
+export interface InstrumentedFetchOptions {
+  debugLogging?: boolean;
+}
+
 export const createInstrumentedFetch = (
-  debugLogging: boolean,
+  options: InstrumentedFetchOptions,
 ): typeof fetch => {
+  const { debugLogging = false } = options;
+
   const instrumented = async (
     ...args: Parameters<typeof fetch>
   ): Promise<Response> => {
@@ -86,9 +90,11 @@ export const createInstrumentedFetch = (
       bodyText = clonedInit.body;
       try {
         parsedBody = JSON.parse(bodyText);
-      } catch (error) {
+      } catch {
         if (debugLogging) {
-          console.error("[llm-debug] Failed to parse request body", error);
+          console.error(
+            "[llm-debug] Request body is not valid JSON, skipping ID injection",
+          );
         }
       }
     }
@@ -132,10 +138,7 @@ export const createInstrumentedFetch = (
             2,
           ),
         );
-        console.error(
-          "[llm-debug] Body:",
-          bodyText ? JSON.stringify(JSON.parse(bodyText), null, 2) : "",
-        );
+        console.error("[llm-debug] Body:", bodyText || "");
         console.error("[llm-debug] =====================================");
       } catch (error) {
         console.error("[llm-debug] Failed to log request", error);
@@ -164,10 +167,7 @@ export const createInstrumentedFetch = (
             2,
           ),
         );
-        console.error(
-          "[llm-debug] Body:",
-          responseText ? JSON.stringify(JSON.parse(responseText), null, 2) : "",
-        );
+        console.error("[llm-debug] Body:", responseText || "");
         console.error("[llm-debug] ======================================");
       } catch (error) {
         console.error("[llm-debug] Failed to log response", error);

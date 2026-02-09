@@ -89,7 +89,7 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   const client = new OpenAI({
     apiKey,
     baseURL,
-    fetch: createInstrumentedFetch(debugLogging),
+    fetch: createInstrumentedFetch({ debugLogging }),
   });
 
   // Configure API type based on endpoint

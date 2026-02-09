@@ -20,6 +20,7 @@ import type { AgentToolRunContext } from "./tools_context";
  * 3. The three parameters form a cohesive "research plan" unit together
  */
 // oxfmt-ignore
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- Required by OpenAI Agents SDK; see docs/contracts/sdk-integration.md
 export const planResearchTool: FunctionTool<any, any, unknown> = tool({
   name: "plan_research",
   description: `Plan a research strategy by generating targeted search queries.

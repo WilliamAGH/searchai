@@ -1,0 +1,3 @@
+export const SITEMAP_DEFAULT_BATCH_SIZE = 500;
+export const SITEMAP_MAX_BATCH_SIZE = 1000;
+export const SITEMAP_MAX_URLS = 50_000;

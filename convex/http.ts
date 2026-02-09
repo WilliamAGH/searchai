@@ -14,6 +14,7 @@ import { registerSearchRoutes } from "./http/routes/search";
 import { registerScrapeRoutes } from "./http/routes/scrape";
 import { registerAgentAIRoutes } from "./http/routes/aiAgent";
 import { registerPublishRoutes } from "./http/routes/publish";
+import { registerSitemapRoutes } from "./http/routes/sitemap";
 import { publicCorsResponse } from "./http/cors";
 
 /**
@@ -34,6 +35,7 @@ registerSearchRoutes(http);
 registerScrapeRoutes(http);
 registerAgentAIRoutes(http); // Agent-based AI routes (SSE streaming only)
 registerPublishRoutes(http);
+registerSitemapRoutes(http);
 
 // Register auth routes
 auth.addHttpRoutes(http);

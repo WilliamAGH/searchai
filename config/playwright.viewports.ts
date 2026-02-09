@@ -1,6 +1,5 @@
 /**
- * Shared viewport configurations for Playwright tests
- * Ensures consistency across all test files
+ * Shared viewport configurations for Playwright tests.
  */
 
 export const viewports = {
@@ -26,12 +25,10 @@ export const viewports = {
   galaxyS21: { width: 384, height: 854 },
 } as const;
 
-// Default viewports for common test scenarios
 export const desktopViewport = viewports.desktop;
 export const mobileViewport = viewports.mobile;
 export const tabletViewport = viewports.tablet;
 
-// Helper to get viewport by device name
 export function getViewport(device: keyof typeof viewports) {
   return viewports[device];
 }
