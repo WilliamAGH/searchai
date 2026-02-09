@@ -31,6 +31,7 @@ alwaysApply: true
 - [UI1a-c] UI Status & Overlays (inline-only; never block input)
 - [HP1a-c] HTTP Endpoints (Convex): validation, clarity, no ambiguous routing
 - [CS1a-c] Code Search Policy (semantic-first; validate Convex code before commit)
+- [CF1a-b] Config Directory (`config/` houses tooling configs; never move them back to root)
 - [VR1a-e] Verification Loops (build/typecheck/lint/tests/e2e)
 - [LG1a] Language (American English only)
 
@@ -198,6 +199,11 @@ alwaysApply: true
 - [CS1a] Prefer semantic search to locate behavior and architecture-level patterns.
 - [CS1b] Use exact-text searches for symbols/strings once context is known.
 - [CS1c] When touching Convex code, run the provided scripts to validate imports and generated types before committing.
+
+## [CF1] Config Directory
+
+- [CF1a] **Location**: Tooling configs (`oxlintrc.json`, `oxfmtrc.json`, `drylintrc.json`, `sgconfig.yml`, `tsconfig.app.json`, `tsconfig.node.json`) live in `config/`. Do not move them back to root.
+- [CF1b] **References**: All `package.json` scripts and `lint-staged` entries use explicit `-c config/...` paths; `tsconfig.json` references sub-configs via `./config/`. Keep these paths in sync when adding new tooling configs.
 
 ## [VR1] Verification Loops (Mandatory)
 

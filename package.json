@@ -28,13 +28,13 @@
     "build": "vite build",
     "preview": "vite preview --strictPort --port 4173",
     "lint": "npm-run-all --sequential lint:ox lint:ox:typeaware lint:eslint",
-    "lint:ox": "oxlint -c .oxlintrc.json --import-plugin --nextjs-plugin --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin .",
-    "lint:ox:typeaware": "oxlint -c .oxlintrc.json --type-aware .",
+    "lint:ox": "oxlint -c config/oxlintrc.json --import-plugin --nextjs-plugin --react-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --react-perf-plugin .",
+    "lint:ox:typeaware": "oxlint -c config/oxlintrc.json --type-aware .",
     "lint:eslint": "eslint .",
     "lint:fix": "oxlint --fix && eslint --fix",
     "typecheck": "tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false",
-    "format": "oxfmt --write .",
-    "format:check": "oxfmt --check .",
+    "format": "oxfmt -c config/oxfmtrc.json --write .",
+    "format:check": "oxfmt -c config/oxfmtrc.json --check .",
     "validate": "npm-run-all --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates lint:boundaries --sequential test:single build",
     "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo 'Cleaned build caches'",
     "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo 'Cleaned everything - run npm install'",
@@ -59,9 +59,9 @@
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
     "lint:loc": "node scripts/check-loc.mjs",
     "lint:convex-types": "node scripts/lint-convex-types.mjs",
-    "lint:duplicates": "DRY_T=$(node -p \"require('./.drylintrc.json').threshold\") && dry --no-cache --threshold $DRY_T && dry --no-cache --threshold $DRY_T --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
-    "lint:duplicates:near": "dry --no-cache --threshold $(node -p \"require('./.drylintrc.json').threshold\")",
-    "lint:boundaries": "ast-grep scan && echo 'No boundary violations found'",
+    "lint:duplicates": "DRY_T=$(node -p \"require('./config/drylintrc.json').threshold\") && dry --no-cache --threshold $DRY_T && dry --no-cache --threshold $DRY_T --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
+    "lint:duplicates:near": "dry --no-cache --threshold $(node -p \"require('./config/drylintrc.json').threshold\")",
+    "lint:boundaries": "ast-grep scan -c config/sgconfig.yml && echo 'No boundary violations found'",
     "playwright:install:firefox": "npx playwright install --with-deps firefox",
     "playwright:install:all": "npx playwright install --with-deps",
     "test:playwright:firefox": "PLAYWRIGHT_INCLUDE_FIREFOX=1 playwright test --project=firefox"
@@ -136,14 +136,14 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}": [
-      "oxlint -c .oxlintrc.json --type-aware",
-      "oxfmt --write"
+      "oxlint -c config/oxlintrc.json --type-aware",
+      "oxfmt -c config/oxfmtrc.json --write"
     ],
     "*.{css,md}": [
-      "oxfmt --write"
+      "oxfmt -c config/oxfmtrc.json --write"
     ],
     "!(package-lock).json": [
-      "oxfmt --write"
+      "oxfmt -c config/oxfmtrc.json --write"
     ]
   },
   "engines": {
