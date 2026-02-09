@@ -60,7 +60,7 @@ export function MessageList({
   retryCount = 0,
   onClearError,
   scrollContainerRef: externalScrollRef,
-}: MessageListProps) {
+}: Readonly<MessageListProps>) {
   // Use the scroll behavior hook
   const {
     scrollContainerRef: _scrollContainerRef,
@@ -75,7 +75,7 @@ export function MessageList({
     messageCount: messages.length,
     isGenerating,
     externalScrollRef,
-    searchProgress,
+    searchProgress: searchProgress ?? undefined,
   });
 
   const [collapsedById, setCollapsedById] = useState<Record<string, boolean>>(
@@ -93,7 +93,7 @@ export function MessageList({
       if (!messageId) return;
 
       try {
-        if (!window.confirm("Delete this message? This cannot be undone."))
+        if (!globalThis.confirm("Delete this message? This cannot be undone."))
           return;
         onRequestDeleteMessage(String(messageId));
       } catch (err) {
@@ -122,8 +122,8 @@ export function MessageList({
         const id = m._id || String(index);
         if (!id || m.role !== "assistant") return;
 
-        const hasReasoning = Boolean(m.reasoning && m.reasoning.trim());
-        const hasContent = Boolean(m.content && m.content.trim());
+        const hasReasoning = Boolean(m.reasoning?.trim());
+        const hasContent = Boolean(m.content?.trim());
         const isStreaming = Boolean(m.isStreaming);
 
         // Sources should NOT be collapsed initially - let users see search results
@@ -166,95 +166,55 @@ export function MessageList({
     await hookHandleLoadMore(onLoadMore);
   }, [onLoadMore, hookHandleLoadMore]);
 
-  // Content to render (shared between internal and external scroll modes)
-  const content = (
-    <>
-      <ScrollToBottomFab
-        visible={userHasScrolled && messages.length > 0}
-        onClick={handleScrollToBottom}
-        unseenCount={unseenMessageCount}
-      />
+  // Resolve the main body: skeleton, empty, or message list
+  const isInitialLoad = isLoadingMessages && messages.length === 0;
+  let messageBody: React.ReactNode;
 
-      {/* Show skeleton when initially loading messages */}
-      {isLoadingMessages && messages.length === 0 ? (
-        <div className="px-4 sm:px-6 py-6 sm:py-8">
-          <MessageSkeleton count={5} />
-        </div>
-      ) : messages.length === 0 ? (
-        <EmptyState onToggleSidebar={onToggleSidebar} />
-      ) : (
-        <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8 min-w-0">
-          {/* Error state for pagination */}
-          {loadError && onClearError && (
-            <LoadErrorState
-              error={loadError}
-              onRetry={onClearError}
-              retryCount={retryCount}
-            />
-          )}
+  if (isInitialLoad) {
+    messageBody = (
+      <div className="px-4 sm:px-6 py-6 sm:py-8">
+        <MessageSkeleton count={5} />
+      </div>
+    );
+  } else if (messages.length === 0) {
+    messageBody = <EmptyState onToggleSidebar={onToggleSidebar} />;
+  } else {
+    messageBody = (
+      <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8 min-w-0">
+        {/* Error state for pagination */}
+        {loadError && onClearError && (
+          <LoadErrorState
+            error={loadError}
+            onRetry={onClearError}
+            retryCount={retryCount}
+          />
+        )}
 
-          {/* Test hook: hidden count for E2E smoke assertions */}
-          <span data-testid="count" style={{ display: "none" }}>
-            {messages.length}
-          </span>
+        {/* Test hook: hidden count for E2E smoke assertions */}
+        <span data-testid="count" style={{ display: "none" }}>
+          {messages.length}
+        </span>
 
-          {/* Load More Button at the top for loading older messages */}
-          {hasMore && onLoadMore && !loadError && (
-            <LoadMoreButton
-              onClick={handleLoadMore}
-              isLoading={isLoadingMore}
-              hasMore={hasMore}
-            />
-          )}
+        {/* Load More Button at the top for loading older messages */}
+        {hasMore && onLoadMore && !loadError && (
+          <LoadMoreButton
+            onClick={handleLoadMore}
+            isLoading={isLoadingMore}
+            hasMore={hasMore}
+          />
+        )}
 
-          {/* Loading indicator when fetching more messages */}
-          {isLoadingMore && !loadError && <LoadingMoreIndicator />}
+        {/* Loading indicator when fetching more messages */}
+        {isLoadingMore && !loadError && <LoadingMoreIndicator />}
 
-          {/* Use virtualization for large message lists */}
-          {messages.length > VIRTUALIZATION_THRESHOLD ? (
-            <VirtualizedMessageList
-              messages={messages}
-              className="space-y-6 sm:space-y-8"
-              estimatedItemHeight={150}
-              renderItem={(message, index) => {
-                const messageKey = resolveMessageKey(
-                  message,
-                  `virtual-${index}`,
-                );
-                return (
-                  <MessageItem
-                    key={messageKey}
-                    message={message}
-                    index={index}
-                    collapsedById={collapsedById}
-                    hoveredSourceUrl={hoveredSourceUrl}
-                    onToggleCollapsed={toggleCollapsed}
-                    onDeleteMessage={handleDeleteMessage}
-                    onSourceHover={setHoveredSourceUrl}
-                    onCitationHover={handleCitationHover}
-                    searchProgress={
-                      index === messages.length - 1 && isGenerating
-                        ? searchProgress
-                        : undefined
-                    }
-                  />
-                );
-              }}
-            />
-          ) : (
-            messages.map((message, index) => {
-              // Generate stable unique key for each message
-              const messageKey = resolveMessageKey(message, `linear-${index}`);
-
-              // Debug undefined keys in development
-              if (!message._id && import.meta.env.DEV) {
-                console.warn("Message missing _id:", {
-                  index,
-                  role: message.role,
-                  content: message.content?.substring(0, 50),
-                });
-              }
-
+        {/* Use virtualization for large message lists */}
+        {messages.length > VIRTUALIZATION_THRESHOLD ? (
+          <VirtualizedMessageList
+            messages={messages}
+            className="space-y-6 sm:space-y-8"
+            estimatedItemHeight={150}
+            renderItem={(message, index) => {
+              const messageKey = resolveMessageKey(message, `virtual-${index}`);
               return (
                 <MessageItem
                   key={messageKey}
@@ -273,12 +233,58 @@ export function MessageList({
                   }
                 />
               );
-            })
-          )}
+            }}
+          />
+        ) : (
+          messages.map((message, index) => {
+            // Generate stable unique key for each message
+            const messageKey = resolveMessageKey(message, `linear-${index}`);
 
-          {/* Search progress and generation status now shown inline within MessageItem */}
-        </div>
-      )}
+            // Debug undefined keys in development
+            if (!message._id && import.meta.env.DEV) {
+              console.warn("Message missing _id:", {
+                index,
+                role: message.role,
+                content: message.content?.substring(0, 50),
+              });
+            }
+
+            return (
+              <MessageItem
+                key={messageKey}
+                message={message}
+                index={index}
+                collapsedById={collapsedById}
+                hoveredSourceUrl={hoveredSourceUrl}
+                onToggleCollapsed={toggleCollapsed}
+                onDeleteMessage={handleDeleteMessage}
+                onSourceHover={setHoveredSourceUrl}
+                onCitationHover={handleCitationHover}
+                searchProgress={
+                  index === messages.length - 1 && isGenerating
+                    ? searchProgress
+                    : undefined
+                }
+              />
+            );
+          })
+        )}
+
+        {/* Search progress and generation status now shown inline within MessageItem */}
+      </div>
+    );
+  }
+
+  // Content to render (shared between internal and external scroll modes)
+  const content = (
+    <>
+      <ScrollToBottomFab
+        visible={userHasScrolled && messages.length > 0}
+        onClick={handleScrollToBottom}
+        unseenCount={unseenMessageCount}
+      />
+
+      {messageBody}
       <div ref={messagesEndRef} />
     </>
   );
