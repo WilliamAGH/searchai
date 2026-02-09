@@ -27,6 +27,8 @@ import { executeInstantPath } from "./workflow_instant";
 import { executeFastPath } from "./workflow_fast_path";
 import { executeParallelPath } from "./workflow_parallel_path";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
+import { isRecord } from "../lib/validators";
+import { getErrorMessage } from "../lib/errors";
 
 export async function* streamResearchWorkflow(
   ctx: WorkflowActionCtx,
@@ -103,9 +105,13 @@ export async function* streamResearchWorkflow(
         event.type === "run_item_stream_event" &&
         event.name === "reasoning_item_created"
       ) {
-        const item = event.item as { content?: string; text?: string };
+        const item = isRecord(event.item) ? event.item : null;
+        const content =
+          (typeof item?.content === "string" ? item.content : undefined) ??
+          (typeof item?.text === "string" ? item.text : undefined) ??
+          "";
         yield writeEvent("reasoning", {
-          content: item.content || item.text || "",
+          content,
         });
       }
     }
@@ -123,10 +129,10 @@ export async function* streamResearchWorkflow(
         "Planning agent error",
         planningResult.error,
       );
-      const errorMsg =
-        planningResult.error instanceof Error
-          ? planningResult.error.message
-          : String(planningResult.error);
+      const errorMsg = getErrorMessage(
+        planningResult.error,
+        "Unknown planning error",
+      );
       throw new Error(`Planning agent failed: ${errorMsg}`);
     }
 
