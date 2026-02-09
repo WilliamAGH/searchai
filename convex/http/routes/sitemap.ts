@@ -3,6 +3,10 @@ import { makeFunctionReference } from "convex/server";
 import type { ActionCtx } from "../../_generated/server";
 import { httpAction } from "../../_generated/server";
 import { publicCorsResponse } from "../cors";
+import {
+  SITEMAP_DEFAULT_BATCH_SIZE,
+  SITEMAP_MAX_URLS,
+} from "../../sitemap/constants";
 
 const listPublicChatSitemapEntriesRef = makeFunctionReference<
   "query",
@@ -13,9 +17,6 @@ const listPublicChatSitemapEntriesRef = makeFunctionReference<
     isDone: boolean;
   }
 >("sitemap:listPublicChatSitemapEntries");
-
-const DEFAULT_BATCH_SIZE = 500;
-const MAX_URLS = 50_000;
 
 type SitemapEntriesPage = {
   entries: Array<{ publicId: string; updatedAt: number }>;
@@ -58,16 +59,16 @@ async function loadPublicEntries(
   const entries: Array<{ publicId: string; updatedAt: number }> = [];
   let cursor: string | undefined = undefined;
 
-  while (entries.length < MAX_URLS) {
+  while (entries.length < SITEMAP_MAX_URLS) {
     const page: SitemapEntriesPage = await ctx.runQuery(
       listPublicChatSitemapEntriesRef,
       {
         cursor,
-        limit: DEFAULT_BATCH_SIZE,
+        limit: SITEMAP_DEFAULT_BATCH_SIZE,
       },
     );
 
-    const remainingCapacity = MAX_URLS - entries.length;
+    const remainingCapacity = SITEMAP_MAX_URLS - entries.length;
     entries.push(...page.entries.slice(0, remainingCapacity));
 
     if (page.isDone || !page.nextCursor) {

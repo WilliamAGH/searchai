@@ -142,6 +142,7 @@ import type * as search_scraper_content from "../search/scraper_content.js";
 import type * as search_search_web_handler from "../search/search_web_handler.js";
 import type * as search_utils from "../search/utils.js";
 import type * as search from "../search.js";
+import type * as sitemap_constants from "../sitemap/constants.js";
 import type * as sitemap_publicChats from "../sitemap/publicChats.js";
 import type * as sitemap from "../sitemap.js";
 import type * as workflowEvents from "../workflowEvents.js";
@@ -286,6 +287,7 @@ declare const fullApi: ApiFromModules<{
   "search/search_web_handler": typeof search_search_web_handler;
   "search/utils": typeof search_utils;
   search: typeof search;
+  "sitemap/constants": typeof sitemap_constants;
   "sitemap/publicChats": typeof sitemap_publicChats;
   sitemap: typeof sitemap;
   workflowEvents: typeof workflowEvents;

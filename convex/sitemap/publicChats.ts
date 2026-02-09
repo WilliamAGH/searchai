@@ -1,15 +1,16 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-
-const DEFAULT_BATCH_SIZE = 500;
-const MAX_BATCH_SIZE = 1000;
+import {
+  SITEMAP_DEFAULT_BATCH_SIZE,
+  SITEMAP_MAX_BATCH_SIZE,
+} from "./constants";
 
 function normalizeBatchSize(limit?: number): number {
   const safeLimit =
     limit !== undefined && Number.isFinite(limit)
       ? Math.floor(limit)
-      : DEFAULT_BATCH_SIZE;
-  return Math.min(Math.max(safeLimit, 1), MAX_BATCH_SIZE);
+      : SITEMAP_DEFAULT_BATCH_SIZE;
+  return Math.min(Math.max(safeLimit, 1), SITEMAP_MAX_BATCH_SIZE);
 }
 
 export const listPublicChatSitemapEntries = query({
