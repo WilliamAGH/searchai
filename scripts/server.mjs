@@ -4,10 +4,11 @@
 
 import http from "node:http";
 import { createReadStream, statSync, existsSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { Readable } from "node:stream";
 
 const DIST_DIR = resolve("./dist");
+const DIST_PATH_PREFIX = `${DIST_DIR}${DIST_DIR.endsWith("/") ? "" : "/"}`;
 const PORT = process.env.PORT || 3000;
 // Prefer explicit CONVEX_SITE_URL when provided; otherwise derive from
 // VITE_CONVEX_URL by swapping .convex.cloud → .convex.site
@@ -149,7 +150,19 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const safeRaw = typeof req.url === "string" ? req.url : "/";
-  const urlPath = decodeURIComponent(safeRaw.split("?")[0] || "/");
+  const rawPath = safeRaw.split("?")[0] || "/";
+  let urlPath = "/";
+  try {
+    urlPath = decodeURIComponent(rawPath);
+  } catch (error) {
+    console.error("Failed to decode request path", { rawPath, error });
+    res.writeHead(400);
+    res.end("Bad request");
+    return;
+  }
+  if (!urlPath.startsWith("/")) {
+    urlPath = `/${urlPath}`;
+  }
 
   if (urlPath === "/sitemap.xml") {
     const target = `${CONVEX_SITE_URL}/sitemap.xml`;
@@ -205,12 +218,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Static file try
-  const filePath = join(DIST_DIR, urlPath === "/" ? "/index.html" : urlPath);
+  const staticPath = urlPath === "/" ? "/index.html" : urlPath;
+  const filePath = resolve(DIST_DIR, `.${staticPath}`);
+  if (!filePath.startsWith(DIST_PATH_PREFIX)) {
+    res.writeHead(400);
+    res.end("Bad request");
+    return;
+  }
   if (existsSync(filePath) && statSync(filePath).isFile()) {
     return sendFile(res, filePath);
   }
   // SPA fallback
-  return sendFile(res, join(DIST_DIR, "index.html"));
+  return sendFile(res, resolve(DIST_DIR, "index.html"));
 });
 
 server.listen(PORT, () => {
