@@ -29,7 +29,7 @@ describe("ShareModal LLM link behavior", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate URL" }));
 
     await waitFor(() => {
-      const linkInput = screen.getByLabelText("Link") as HTMLInputElement;
+      const linkInput = screen.getByLabelText<HTMLInputElement>("Link");
       expect(linkInput.value).toBe(EXPECTED_LLM_URL);
     });
 
@@ -44,11 +44,11 @@ describe("ShareModal LLM link behavior", () => {
     );
 
     await waitFor(() => {
-      const linkInput = screen.getByLabelText("Link") as HTMLInputElement;
+      const linkInput = screen.getByLabelText<HTMLInputElement>("Link");
       expect(linkInput.value).toBe(EXPECTED_LLM_URL);
     });
 
-    const linkInput = screen.getByLabelText("Link") as HTMLInputElement;
+    const linkInput = screen.getByLabelText<HTMLInputElement>("Link");
     expect(linkInput.placeholder).toBe("Generate LLM-friendly .txt link");
   });
 });
