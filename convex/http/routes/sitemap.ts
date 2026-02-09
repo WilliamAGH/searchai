@@ -22,6 +22,10 @@ type SitemapEntriesPage = {
   isDone: boolean;
 };
 
+// Convex's generated `api` type triggers "Type instantiation is excessively
+// deep" (TS2589) when used with `ctx.runQuery` in this file.
+// `makeFunctionReference` is the documented Convex escape hatch for this
+// TypeScript recursion-depth limitation (see [TY1a] exception).
 const listPublicChatSitemapEntriesRef = makeFunctionReference<
   "query",
   { cursor?: string; limit?: number },
@@ -52,6 +56,7 @@ function escapeXml(value: string): string {
 function toIsoDate(timestamp: number): string {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
+    console.warn("[WARN] Invalid sitemap timestamp", { timestamp });
     return new Date(0).toISOString();
   }
   return date.toISOString();
@@ -131,11 +136,13 @@ export function registerSitemapRoutes(http: HttpRouter) {
           },
         });
       } catch (error) {
-        console.error("[ERROR] SITEMAP GENERATION:", error);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("[ERROR] SITEMAP GENERATION:", message, error);
         return publicCorsResponse({
-          body: JSON.stringify({ error: "Failed to generate sitemap" }),
+          body: `<?xml version="1.0" encoding="UTF-8"?>\n<error>${escapeXml(message)}</error>`,
           status: 500,
           origin,
+          contentType: "application/xml; charset=utf-8",
         });
       }
     }),
