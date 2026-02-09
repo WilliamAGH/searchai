@@ -69,16 +69,6 @@ export const redactSensitiveHeaders = (
   return redacted;
 };
 
-/** Pretty-print JSON text, falling back to the raw string for non-JSON. */
-function formatJsonSafe(text: string): string {
-  try {
-    const parsed = JSON.parse(text);
-    return JSON.stringify(parsed, null, 2);
-  } catch {
-    return text;
-  }
-}
-
 export interface InstrumentedFetchOptions {
   debugLogging?: boolean;
 }
@@ -147,10 +137,7 @@ export const createInstrumentedFetch = (
           2,
         ),
       );
-      console.error(
-        "[llm-debug] Body:",
-        bodyText ? formatJsonSafe(bodyText) : "",
-      );
+      console.error("[llm-debug] Body:", bodyText ? bodyText : "");
       console.error("[llm-debug] =====================================");
     }
 
@@ -175,10 +162,7 @@ export const createInstrumentedFetch = (
           2,
         ),
       );
-      console.error(
-        "[llm-debug] Body:",
-        responseText ? formatJsonSafe(responseText) : "",
-      );
+      console.error("[llm-debug] Body:", responseText ? responseText : "");
       console.error("[llm-debug] ======================================");
     }
 

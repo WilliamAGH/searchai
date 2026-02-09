@@ -45,15 +45,17 @@ export function robustSanitize(input: string): string {
     if (match.length < 20) return match;
     if (match.length % 4 !== 0 || !STRICT_BASE64.test(match)) return match;
 
+    // Pre-validation (length, %4, strict regex) filters structurally invalid
+    // base64. If atob still throws, our validation has a gap — re-throw with
+    // diagnostic context so the gap surfaces rather than being swallowed.
     let decoded: string;
     try {
       decoded = atob(match);
-    } catch (e) {
-      console.warn("[sanitize] atob failed on structurally valid base64", {
-        length: match.length,
-        error: e instanceof Error ? e.message : String(e),
-      });
-      return match;
+    } catch (cause) {
+      throw new Error(
+        `Base64 pre-validation gap: atob() rejected structurally valid input (length=${match.length})`,
+        { cause },
+      );
     }
 
     // Check for common injection keywords in decoded content
