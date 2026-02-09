@@ -100,7 +100,7 @@ export function extractLimitations(text: string): string | undefined {
   for (const pattern of limitationHeaderPatterns) {
     const match = text.match(pattern);
     if (match) {
-      const startIndex = match.index! + match[0].length;
+      const startIndex = (match.index ?? 0) + match[0].length;
       // Extract until the end or next major section
       const remainingText = text.slice(startIndex);
       const nextSectionMatch = remainingText.match(/\n##|$$/);

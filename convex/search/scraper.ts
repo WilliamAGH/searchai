@@ -189,7 +189,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     // Trim whitespace after junk removal
     cleanedContent = cleanedContent.trim();
 
-    console.log("Junk content removed:", {
+    console.info("Junk content removed:", {
       url: validatedUrl,
       removedCount: removedJunkCount,
       contentLengthBefore: content.length,
