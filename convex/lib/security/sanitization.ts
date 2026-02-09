@@ -46,13 +46,18 @@ export function robustSanitize(input: string): string {
     if (match.length % 4 !== 0 || !STRICT_BASE64.test(match)) return match;
 
     // Pre-validation (length, %4, strict regex) filters structurally invalid
-    // base64. If atob still throws, keep the original match — throwing inside
-    // a replace callback would abort the entire replace, leaving `clean` in a
-    // partially-sanitized state.
+    // base64. If atob still rejects, the input is not real base64 and therefore
+    // cannot hide decoded injection keywords — safe to pass through. Throwing
+    // inside a replaceAll callback would abort the entire sanitization pass,
+    // leaving `clean` in a partially-sanitized state (worse security outcome).
     let decoded: string;
     try {
       decoded = atob(match);
-    } catch {
+    } catch (error) {
+      console.error(
+        `[sanitization] atob() rejected structurally-valid input (length=${match.length})`,
+        error,
+      );
       return match;
     }
 
