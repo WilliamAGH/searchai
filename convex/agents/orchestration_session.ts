@@ -91,6 +91,32 @@ export async function initializeWorkflowSession(
   workflowId: string,
   nonce: string,
 ): Promise<WorkflowSessionResult> {
+  // Write-access gate: check BEFORE minting a workflow token.
+  // Infrastructure failures (network, Convex errors) are caught separately
+  // from auth denial and not-found — keep the three failure modes distinct.
+  let writeAccess: "allowed" | "denied" | "not_found";
+  try {
+    writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
+      chatId: args.chatId,
+      sessionId: args.sessionId,
+    });
+  } catch (queryError) {
+    throw new Error(
+      `Failed to verify write access for chat ${args.chatId}: ` +
+        `${getErrorMessage(queryError, "query failed")}`,
+      { cause: queryError },
+    );
+  }
+  if (writeAccess === "not_found") {
+    throw new Error(`Chat not found: ${args.chatId}`);
+  }
+  if (writeAccess === "denied") {
+    throw new Error(
+      `Unauthorized: no write access to chat ${args.chatId} ` +
+        `(sessionId=${args.sessionId ? "present" : "absent"})`,
+    );
+  }
+
   // 1. Create workflow token
   const issuedAt = Date.now();
   const workflowTokenPayload: {

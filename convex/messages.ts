@@ -5,12 +5,8 @@ import { internal } from "./_generated/api";
 import { vWebResearchSource, vSearchMethod } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { getErrorMessage } from "./lib/errors";
-import {
-  isAuthorized,
-  isUnownedChat,
-  hasSessionAccess,
-  isValidWorkflowToken,
-} from "./lib/auth";
+import { isAuthorized, isValidWorkflowToken } from "./lib/auth";
+import { hasChatWriteAccess } from "./chats/writeAccess";
 import { buildMessageInsertDocument } from "./messages_insert_document";
 export const addMessage = internalMutation({
   args: {
@@ -34,12 +30,10 @@ export const addMessage = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
-    const authorized =
-      isAuthorized(chat, userId, args.sessionId) ||
-      (isUnownedChat(chat) && !!args.sessionId);
-
-    if (!authorized) {
-      throw new Error("Unauthorized");
+    if (!hasChatWriteAccess(chat, userId, args.sessionId)) {
+      throw new Error(
+        `Unauthorized: addMessage denied for chat ${args.chatId}`,
+      );
     }
 
     const messageId = generateMessageId();
@@ -62,7 +56,6 @@ export const addMessage = internalMutation({
     );
   },
 });
-// HTTP-only variant for actions without auth context.
 export const addMessageHttp = internalMutation({
   args: {
     chatId: v.id("chats"),
@@ -81,6 +74,7 @@ export const addMessageHttp = internalMutation({
   },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
 
@@ -88,14 +82,21 @@ export const addMessageHttp = internalMutation({
       ? await ctx.db.get(args.workflowTokenId)
       : null;
     const hasValidToken = isValidWorkflowToken(workflowToken, args.chatId);
+    const hasBaseAccess = hasChatWriteAccess(chat, userId, args.sessionId);
 
-    const authorized =
-      hasValidToken ||
-      (!chat.userId && hasSessionAccess(chat, args.sessionId)) ||
-      (isUnownedChat(chat) && !!args.sessionId);
+    // When a workflow token is provided it must be valid and its session must
+    // match the caller's session.  Without a token, owner/claim access alone
+    // is sufficient (used by persistAssistantMessage when token is absent).
+    const tokenSessionMatches =
+      !workflowToken?.sessionId || workflowToken.sessionId === args.sessionId;
+    const tokenOk =
+      !args.workflowTokenId || (hasValidToken && tokenSessionMatches);
 
-    if (!authorized) {
-      throw new Error("Unauthorized");
+    if (!hasBaseAccess || !tokenOk) {
+      throw new Error(
+        `Unauthorized: addMessageHttp denied for chat ${args.chatId} ` +
+          `(baseAccess=${hasBaseAccess}, tokenOk=${tokenOk})`,
+      );
     }
 
     const messageId = generateMessageId();

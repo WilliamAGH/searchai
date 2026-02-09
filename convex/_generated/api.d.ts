@@ -67,6 +67,7 @@ import type * as chats_updates from "../chats/updates.js";
 import type * as chats_utils from "../chats/utils.js";
 import type * as chats_webResearchSourcesMigration from "../chats/webResearchSourcesMigration.js";
 import type * as chats_webResearchSourcesResolver from "../chats/webResearchSourcesResolver.js";
+import type * as chats_writeAccess from "../chats/writeAccess.js";
 import type * as chats from "../chats.js";
 import type * as crons from "../crons.js";
 import type * as email from "../email.js";
@@ -212,6 +213,7 @@ declare const fullApi: ApiFromModules<{
   "chats/utils": typeof chats_utils;
   "chats/webResearchSourcesMigration": typeof chats_webResearchSourcesMigration;
   "chats/webResearchSourcesResolver": typeof chats_webResearchSourcesResolver;
+  "chats/writeAccess": typeof chats_writeAccess;
   chats: typeof chats;
   crons: typeof crons;
   email: typeof email;
