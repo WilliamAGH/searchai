@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { hasChatWriteAccess } from "../../../convex/chats/writeAccess";
+import {
+  hasChatWriteAccess,
+  isHttpWriteAuthorized,
+} from "../../../convex/chats/writeAccess";
 import { safeConvexId } from "../../../convex/lib/validators";
 
 function requireUserId(raw: string) {
@@ -51,5 +54,84 @@ describe("hasChatWriteAccess", () => {
     const canWrite = hasChatWriteAccess({}, null, undefined);
 
     expect(canWrite).toBe(false);
+  });
+});
+
+describe("isHttpWriteAuthorized", () => {
+  it("allows base access when no token is provided", () => {
+    expect(
+      isHttpWriteAuthorized({
+        hasBaseAccess: true,
+        hasValidToken: false,
+        tokenProvided: false,
+        tokenSessionMatches: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("denies when no base access and no token", () => {
+    expect(
+      isHttpWriteAuthorized({
+        hasBaseAccess: false,
+        hasValidToken: false,
+        tokenProvided: false,
+        tokenSessionMatches: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("allows valid token with matching session", () => {
+    expect(
+      isHttpWriteAuthorized({
+        hasBaseAccess: false,
+        hasValidToken: true,
+        tokenProvided: true,
+        tokenSessionMatches: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("denies valid token with mismatched session", () => {
+    expect(
+      isHttpWriteAuthorized({
+        hasBaseAccess: true,
+        hasValidToken: true,
+        tokenProvided: true,
+        tokenSessionMatches: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("denies invalid token even with base access", () => {
+    expect(
+      isHttpWriteAuthorized({
+        hasBaseAccess: true,
+        hasValidToken: false,
+        tokenProvided: true,
+        tokenSessionMatches: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("denies expired token without base access (fixed vulnerability)", () => {
+    expect(
+      isHttpWriteAuthorized({
+        hasBaseAccess: false,
+        hasValidToken: false,
+        tokenProvided: true,
+        tokenSessionMatches: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("allows base access with valid session-matched token", () => {
+    expect(
+      isHttpWriteAuthorized({
+        hasBaseAccess: true,
+        hasValidToken: true,
+        tokenProvided: true,
+        tokenSessionMatches: true,
+      }),
+    ).toBe(true);
   });
 });

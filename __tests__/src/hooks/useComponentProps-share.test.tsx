@@ -86,4 +86,18 @@ describe("useComponentProps share behavior", () => {
       "Type your message...",
     );
   });
+
+  it("shows new-chat placeholder when no chat is selected", () => {
+    const args = createArgs({
+      currentChatId: null,
+      isReadOnly: false,
+    });
+
+    const { result } = renderHook(() => useComponentProps(args));
+
+    expect(result.current.messageInputProps.disabled).toBe(false);
+    expect(result.current.messageInputProps.placeholder).toBe(
+      "Start a new chat...",
+    );
+  });
 });
