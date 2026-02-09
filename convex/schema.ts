@@ -40,6 +40,7 @@ const applicationTables = {
   })
     .index("by_user", ["userId"])
     .index("by_sessionId", ["sessionId"])
+    .index("by_privacy", ["privacy"])
     .index("by_share_id", ["shareId"])
     .index("by_public_id", ["publicId"])
     .index("by_thread_id", ["threadId"]),
