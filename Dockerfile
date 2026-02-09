@@ -24,8 +24,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY tsconfig*.json ./
 COPY vite.config.ts ./
-COPY tailwind.config.js ./
-COPY postcss.config.cjs ./
+COPY config/tailwind.config.js ./config/
+COPY config/postcss.config.cjs ./config/
 COPY index.html ./
 
 # Copy source code and styles

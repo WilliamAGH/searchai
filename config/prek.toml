@@ -1,0 +1,137 @@
+# prek.toml — Git hook configuration (replaces .husky/)
+# Docs: https://prek.j178.dev/configuration/
+#
+# Priority controls execution order within a stage:
+#   - Lower numbers run first
+#   - Same priority = parallel execution (prek feature)
+#   - Different priority = sequential
+
+default_install_hook_types = ["pre-commit", "pre-push"]
+
+[[repos]]
+repo = "local"
+hooks = [
+  # ── Pre-commit hooks ──────────────────────────────────────────────
+  # p0: typecheck + build run in parallel (independent, both fast-fail)
+  {
+    id = "typecheck",
+    name = "TypeScript type check",
+    language = "system",
+    entry = "npm run typecheck",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-commit"],
+    priority = 0,
+  },
+  {
+    id = "build",
+    name = "Vite build validation",
+    language = "system",
+    entry = "npm run build",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-commit"],
+    priority = 0,
+  },
+  # p10: Convex deployment validation (depends on types being clean)
+  {
+    id = "convex-validate",
+    name = "Convex deployment validation",
+    language = "system",
+    entry = "npx convex dev --once --typecheck=enable",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-commit"],
+    priority = 10,
+  },
+  # p20: lint-staged (format + lint staged files)
+  {
+    id = "lint-staged",
+    name = "Lint staged files",
+    language = "system",
+    entry = "npx lint-staged",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-commit"],
+    priority = 20,
+  },
+  # p30: tests (run after lint to avoid wasting time on unformatted code)
+  {
+    id = "test",
+    name = "Run tests",
+    language = "system",
+    entry = "npm test",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-commit"],
+    priority = 30,
+  },
+
+  # ── Pre-push hooks ────────────────────────────────────────────────
+  # p0: full lint — fail_fast so bad code never reaches further checks
+  {
+    id = "lint-full",
+    name = "Full lint (oxlint + eslint)",
+    language = "system",
+    entry = "npm run lint",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-push"],
+    priority = 0,
+    fail_fast = true,
+  },
+  # p10: build + typecheck in parallel
+  {
+    id = "build-push",
+    name = "Production build",
+    language = "system",
+    entry = "npm run build",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-push"],
+    priority = 10,
+  },
+  {
+    id = "typecheck-push",
+    name = "Full TypeScript validation",
+    language = "system",
+    entry = "npm run typecheck",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-push"],
+    priority = 10,
+  },
+  # p20: Convex deployment dry-run
+  {
+    id = "convex-push",
+    name = "Convex deployment dry-run",
+    language = "system",
+    entry = "npx convex dev --once --typecheck=enable",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-push"],
+    priority = 20,
+  },
+  # p30: full test suite
+  {
+    id = "test-push",
+    name = "Full test suite",
+    language = "system",
+    entry = "npm test",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-push"],
+    priority = 30,
+  },
+  # p40: Playwright smoke test
+  {
+    id = "smoke-test",
+    name = "Playwright smoke test",
+    language = "system",
+    entry = "npx playwright test -g smoke --reporter=line",
+    always_run = true,
+    pass_filenames = false,
+    stages = ["pre-push"],
+    priority = 40,
+  },
+]

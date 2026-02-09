@@ -50,6 +50,9 @@ window.addEventListener('message', async (message) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    css: {
+      postcss: "./config",
+    },
     build: {
       // Conservative chunk splitting to keep React/runtime intact while
       // extracting a few heavy but decoupled areas for caching.
