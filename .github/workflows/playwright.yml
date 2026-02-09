@@ -57,7 +57,7 @@ jobs:
       - name: Run Playwright tests (integration)
         env:
           CI: "1"
-        run: npx playwright test --config=__tests__/playwright-integration.config.ts --reporter=line
+        run: npx playwright test --config config/playwright-integration.config.ts --reporter=line
 
       - name: Run Playwright smoke/share tests
         env:

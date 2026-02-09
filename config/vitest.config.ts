@@ -33,7 +33,7 @@ export default defineConfig({
     },
   },
   test: {
-    setupFiles: ["./__tests__/setup.ts"],
+    setupFiles: [path.resolve(__dirname, "../__tests__/setup.ts")],
     environment: "node",
     silent: false, // Set to true to suppress console output during tests
     // Suppress expected negative-path diagnostics to keep test output readable.

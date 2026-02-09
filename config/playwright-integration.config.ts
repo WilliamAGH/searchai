@@ -1,33 +1,28 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
+import { includeWebkit } from "./playwright.browsers";
+import { desktopViewport } from "./playwright.viewports";
 
-// Ensure env vars are available (optional .env)
-// Intentional: dotenv is optional - silently continue if not installed
+// Ensure env vars are available (optional .env).
 try {
   await import("dotenv/config");
 } catch {
-  // dotenv not available - this is fine, env vars may be set via other means
+  // dotenv not available; env vars may already be provided by CI/runtime.
 }
-import { includeWebkit } from "./config/browsers";
-import { desktopViewport } from "./config/viewports";
 
 const ROOT_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
 
-/**
- * Playwright configuration for integration tests
- * Runs against local development server with both frontend and backend
- */
 export default defineConfig({
-  testDir: "./integration",
+  testDir: "../__tests__/integration",
   testIgnore: ["**/integration/pagination.test.ts"],
-  timeout: 60_000, // Longer timeout for integration tests
-  fullyParallel: false, // Run tests sequentially for consistency
-  retries: 2, // Retry failed tests
-  workers: 1, // Single worker for integration tests
+  timeout: 60_000,
+  fullyParallel: false,
+  retries: 2,
+  workers: 1,
   reporter: [
     ["list"],
     [
@@ -41,7 +36,6 @@ export default defineConfig({
     trace: "on",
     screenshot: "on",
     video: "retain-on-failure",
-    // Longer timeouts for integration tests
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
   },
@@ -66,12 +60,9 @@ export default defineConfig({
   webServer: [
     {
       cwd: ROOT_DIR,
-      // CI: workflow already builds; just start preview server.
-      // Using output-based wait instead of URL polling for reliability.
       command: process.env.CI
         ? "npx vite preview --strictPort --port 5173 --host 127.0.0.1"
         : "npm run dev:frontend",
-      // Use stdout pattern matching - more reliable than HTTP polling in CI
       url: "http://127.0.0.1:5173",
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
@@ -79,7 +70,6 @@ export default defineConfig({
       stderr: "pipe",
       env: {
         PORT: "5173",
-        // Use provided env or fall back to dev Convex cloud URL for tests
         VITE_CONVEX_URL:
           process.env.VITE_CONVEX_URL ||
           "https://diligent-greyhound-240.convex.cloud",
