@@ -62,7 +62,7 @@ jobs:
       - name: Run Playwright smoke/share tests
         env:
           CI: "1"
-        run: npx playwright test -g "(smoke|share)" --reporter=line
+        run: npx playwright test --config config/playwright.config.ts -g "(smoke|share)" --reporter=line
 
       - name: Upload Playwright report
         if: always()

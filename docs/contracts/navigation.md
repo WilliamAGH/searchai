@@ -115,4 +115,4 @@ Before modifying ANY navigation code, verify these scenarios pass:
 7. **Rapid switching** — Click multiple chats in quick succession. Must
    settle on the last clicked chat without oscillation.
 
-Run: `npx playwright test -g smoke --reporter=line`
+Run: `npx playwright test --config config/playwright.config.ts -g smoke --reporter=line`

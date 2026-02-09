@@ -68,7 +68,7 @@ jobs:
       - name: Run Playwright smoke/share tests
         env:
           CI: "1"
-        run: npx playwright test -g "(smoke|share)" --reporter=line
+        run: npx playwright test --config config/playwright.config.ts -g "(smoke|share)" --reporter=line
 
   deploy:
     name: Deploy to ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'production' && 'Production' || 'Development') || (github.ref_name == 'main' && 'Production' || 'Development') }}

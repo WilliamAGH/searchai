@@ -239,7 +239,7 @@ npm run test:ui
 npx vitest --reporter=verbose path/to/test.spec.ts
 
 # Playwright
-npx playwright test --debug
-npx playwright test --ui
+npx playwright test --config config/playwright.config.ts --debug
+npx playwright test --config config/playwright.config.ts --ui
 npx playwright codegen localhost:5173
 ```
