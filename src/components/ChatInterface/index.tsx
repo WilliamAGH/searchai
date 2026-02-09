@@ -191,7 +191,7 @@ function ChatInterfaceComponent({
       : "skip",
   );
   const isReadOnly =
-    isSharedRoute && !!currentChatId && canWriteChat === "denied";
+    isSharedRoute && !!currentChatId && canWriteChat !== "allowed";
   useUrlStateSync({
     currentChatId,
     propChatId,
