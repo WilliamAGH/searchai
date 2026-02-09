@@ -106,8 +106,10 @@ test.describe("smoke: pagination", () => {
     }
 
     // Check for message list container - look for the scrollable area
-    // The message list is the flex-1 overflow-y-auto container
-    const messageList = page.locator(".flex-1.overflow-y-auto").first();
+    // The scroll container in ChatLayout uses overflow-y-auto + overscroll-contain
+    const messageList = page
+      .locator(".overflow-y-auto.overscroll-contain")
+      .first();
 
     // Check visibility - count() is safe and won't throw
     const messageListCount = await messageList.count();
