@@ -7,7 +7,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
-import { isAuthorized } from "../lib/auth";
+import { hasPrimaryOwnerAccess } from "../lib/auth";
 
 /**
  * Delete chat and messages
@@ -25,7 +25,7 @@ export const deleteChat = mutation({
     // Silently succeed if chat already deleted (idempotent operation)
     if (!chat) return null;
 
-    if (!isAuthorized(chat, userId, args.sessionId)) {
+    if (!hasPrimaryOwnerAccess(chat, userId, args.sessionId)) {
       throw new Error("Unauthorized");
     }
 

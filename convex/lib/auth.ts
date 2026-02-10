@@ -71,7 +71,7 @@ export function hasSessionAccess(
  *   throw new Error("Unauthorized");
  * }
  */
-export function isAuthorized(
+export function hasPrimaryOwnerAccess(
   chat: ChatOwnership,
   userId: Id<"users"> | null,
   sessionId?: string,
