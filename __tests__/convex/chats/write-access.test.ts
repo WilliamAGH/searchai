@@ -50,10 +50,26 @@ describe("hasChatWriteAccess", () => {
     expect(canWrite).toBe(true);
   });
 
-  it("denies writes for unowned chats without session id", () => {
-    const canWrite = hasChatWriteAccess({}, null, undefined);
+  it("denies authenticated non-owner even with a session id (if session mismatch)", () => {
+    const nonOwnerId = requireUserId("user456");
+    const canWrite = hasChatWriteAccess(
+      { userId: ownerId, sessionId: "session-owner" },
+      nonOwnerId,
+      "session-other",
+    );
 
     expect(canWrite).toBe(false);
+  });
+
+  it("allows non-owner if they possess the originating session credential", () => {
+    const nonOwnerId = requireUserId("user456");
+    const canWrite = hasChatWriteAccess(
+      { userId: ownerId, sessionId: "session-owner" },
+      nonOwnerId,
+      "session-owner",
+    );
+
+    expect(canWrite).toBe(true);
   });
 });
 
