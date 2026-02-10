@@ -18,6 +18,11 @@ export const CrawlMetadataSchema = z
      */
     markedLowRelevance: z.boolean().optional(),
     relevanceThreshold: z.number().optional(),
+    /**
+     * Developer-inspection markdown copied from server-side Convex harvest data.
+     * This is provenance/debug text only and does not change model context.
+     */
+    serverContextMarkdown: z.string().optional(),
   })
   .strip();
 

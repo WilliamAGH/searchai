@@ -6,6 +6,7 @@
  */
 
 import React from "react";
+import { CopyButton } from "@/components/CopyButton";
 import {
   hasWebResearchSources,
   toWebSourceCards,
@@ -51,6 +52,16 @@ function getSourceCrawlState(source: {
   return "not_attempted";
 }
 
+function getServerContextMarkdown(
+  metadata: WebResearchSourceClient["metadata"],
+): string | undefined {
+  if (!isRecord(metadata)) {
+    return undefined;
+  }
+  const raw = metadata.serverContextMarkdown;
+  return typeof raw === "string" && raw.length > 0 ? raw : undefined;
+}
+
 interface MessageSourcesProps {
   id: string;
   webResearchSources: WebResearchSourceClient[] | undefined;
@@ -80,10 +91,14 @@ export function MessageSources({
 
   const displaySources = toWebSourceCards(webResearchSources);
   const previewSources = displaySources.slice(0, 3);
+  const showDevSourceContextCopy = import.meta.env.DEV;
   const sourceRows = displaySources.map((source) => ({
     source,
     crawlState: getSourceCrawlState(source),
     markedLowRelevance: source.metadata?.markedLowRelevance === true,
+    serverContextMarkdown: showDevSourceContextCopy
+      ? getServerContextMarkdown(source.metadata)
+      : undefined,
   }));
 
   return (
@@ -165,122 +180,140 @@ export function MessageSources({
 
       {!collapsed && (
         <div className="mt-2 space-y-2 px-2 max-h-[300px] overflow-y-auto">
-          {sourceRows.map(({ source, crawlState, markedLowRelevance }, i) => {
-            const hostname =
-              getDomainFromUrl(source.url) || getSafeHostname(source.url);
-            const favicon = getFaviconUrl(source.url);
-            const isHovered = hoveredSourceUrl === source.url;
-            const crawlStatus =
-              source.type === "research_summary"
-                ? null
-                : markedLowRelevance
-                  ? {
-                      label: "Low relevance source",
-                      dotColor: "bg-slate-500/70 dark:bg-slate-400/70",
-                    }
-                  : crawlState === "succeeded"
+          {sourceRows.map(
+            (
+              { source, crawlState, markedLowRelevance, serverContextMarkdown },
+              i,
+            ) => {
+              const hostname =
+                getDomainFromUrl(source.url) || getSafeHostname(source.url);
+              const favicon = getFaviconUrl(source.url);
+              const isHovered = hoveredSourceUrl === source.url;
+              const crawlStatus =
+                source.type === "research_summary"
+                  ? null
+                  : markedLowRelevance
                     ? {
-                        label: "Crawl successful",
-                        dotColor: "bg-emerald-500/80",
+                        label: "Low relevance source",
+                        dotColor: "bg-slate-500/70 dark:bg-slate-400/70",
                       }
-                    : crawlState === "failed"
+                    : crawlState === "succeeded"
                       ? {
-                          label: "Crawl attempted, failed",
-                          dotColor: "bg-amber-500/80",
+                          label: "Crawl successful",
+                          dotColor: "bg-emerald-500/80",
                         }
-                      : null;
+                      : crawlState === "failed"
+                        ? {
+                            label: "Crawl attempted, failed",
+                            dotColor: "bg-amber-500/80",
+                          }
+                        : null;
 
-            const relevanceBadge =
-              source.relevanceScore !== undefined &&
-              source.relevanceScore >= 0.8
-                ? {
-                    label: "high",
-                    color:
-                      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-                  }
-                : source.relevanceScore !== undefined &&
-                    source.relevanceScore >= 0.5
+              const relevanceBadge =
+                source.relevanceScore !== undefined &&
+                source.relevanceScore >= 0.8
                   ? {
-                      label: "medium",
+                      label: "high",
                       color:
-                        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+                        "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
                     }
-                  : null;
+                  : source.relevanceScore !== undefined &&
+                      source.relevanceScore >= 0.5
+                    ? {
+                        label: "medium",
+                        color:
+                          "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+                      }
+                    : null;
 
-            const typeBadge =
-              source.type === "scraped_page"
-                ? {
-                    label: "crawled",
-                    color:
-                      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-                  }
-                : source.type === "research_summary"
+              const typeBadge =
+                source.type === "scraped_page"
                   ? {
-                      label: "summary",
+                      label: "crawled",
                       color:
-                        "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+                        "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
                     }
-                  : null;
+                  : source.type === "research_summary"
+                    ? {
+                        label: "summary",
+                        color:
+                          "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+                      }
+                    : null;
 
-            return (
-              <a
-                key={`${messageId}-source-${source.url}-${i}`}
-                href={source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`block p-2 sm:p-3 rounded-lg border transition-all ${
-                  isHovered
-                    ? "border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20"
-                    : "border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                }`}
-                onMouseEnter={() => onSourceHover(source.url)}
-                onMouseLeave={() => onSourceHover(null)}
-              >
-                <div className="flex items-start gap-2">
-                  {favicon && (
-                    <img
-                      src={favicon}
-                      alt=""
-                      className="w-4 h-4 mt-0.5 rounded"
+              return (
+                <div
+                  key={`${messageId}-source-${source.url}-${i}`}
+                  className="flex items-start gap-2"
+                >
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`block flex-1 min-w-0 p-2 sm:p-3 rounded-lg border transition-all ${
+                      isHovered
+                        ? "border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20"
+                        : "border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    }`}
+                    onMouseEnter={() => onSourceHover(source.url)}
+                    onMouseLeave={() => onSourceHover(null)}
+                  >
+                    <div className="flex items-start gap-2">
+                      {favicon && (
+                        <img
+                          src={favicon}
+                          alt=""
+                          className="w-4 h-4 mt-0.5 rounded"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <div className="font-medium text-[15px] sm:text-base text-gray-900 dark:text-gray-100 line-clamp-1 flex-1 min-w-0">
+                            {source.title}
+                          </div>
+                          {typeBadge && (
+                            <span
+                              className={`px-1.5 py-0.5 text-[10px] sm:text-xs font-medium rounded flex-shrink-0 ${typeBadge.color}`}
+                            >
+                              {typeBadge.label}
+                            </span>
+                          )}
+                          {relevanceBadge && (
+                            <span
+                              className={`px-1.5 py-0.5 text-[10px] sm:text-xs font-medium rounded flex-shrink-0 ${relevanceBadge.color}`}
+                            >
+                              {relevanceBadge.label}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                          <span className="inline-flex items-center gap-1.5">
+                            {crawlStatus && (
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${crawlStatus.dotColor}`}
+                                title={crawlStatus.label}
+                                aria-label={crawlStatus.label}
+                              />
+                            )}
+                            <span>{hostname}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                  {showDevSourceContextCopy && serverContextMarkdown && (
+                    <CopyButton
+                      text={serverContextMarkdown}
+                      size="sm"
+                      className="mt-2 sm:mt-3 shrink-0"
+                      title="Copy Convex source context (Markdown)"
+                      ariaLabel="Copy Convex source context markdown"
                     />
                   )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <div className="font-medium text-[15px] sm:text-base text-gray-900 dark:text-gray-100 line-clamp-1 flex-1 min-w-0">
-                        {source.title}
-                      </div>
-                      {typeBadge && (
-                        <span
-                          className={`px-1.5 py-0.5 text-[10px] sm:text-xs font-medium rounded flex-shrink-0 ${typeBadge.color}`}
-                        >
-                          {typeBadge.label}
-                        </span>
-                      )}
-                      {relevanceBadge && (
-                        <span
-                          className={`px-1.5 py-0.5 text-[10px] sm:text-xs font-medium rounded flex-shrink-0 ${relevanceBadge.color}`}
-                        >
-                          {relevanceBadge.label}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                      <span className="inline-flex items-center gap-1.5">
-                        {crawlStatus && (
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${crawlStatus.dotColor}`}
-                            title={crawlStatus.label}
-                            aria-label={crawlStatus.label}
-                          />
-                        )}
-                        <span>{hostname}</span>
-                      </span>
-                    </div>
-                  </div>
                 </div>
-              </a>
-            );
-          })}
+              );
+            },
+          )}
         </div>
       )}
     </div>
