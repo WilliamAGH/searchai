@@ -39,7 +39,7 @@ function getSourceCrawlState(source: {
 
   const attempted = source.metadata.crawlAttempted;
   const succeeded = source.metadata.crawlSucceeded;
-  if (source.metadata.excludedByRelevance === true) {
+  if (source.metadata.markedLowRelevance === true) {
     return "not_attempted";
   }
   if (attempted === true && succeeded === false) {
@@ -83,7 +83,7 @@ export function MessageSources({
   const sourceRows = displaySources.map((source) => ({
     source,
     crawlState: getSourceCrawlState(source),
-    excludedByRelevance: source.metadata?.excludedByRelevance === true,
+    markedLowRelevance: source.metadata?.markedLowRelevance === true,
   }));
 
   return (
@@ -165,7 +165,7 @@ export function MessageSources({
 
       {!collapsed && (
         <div className="mt-2 space-y-2 px-2 max-h-[300px] overflow-y-auto">
-          {sourceRows.map(({ source, crawlState, excludedByRelevance }, i) => {
+          {sourceRows.map(({ source, crawlState, markedLowRelevance }, i) => {
             const hostname =
               getDomainFromUrl(source.url) || getSafeHostname(source.url);
             const favicon = getFaviconUrl(source.url);
@@ -173,9 +173,9 @@ export function MessageSources({
             const crawlStatus =
               source.type === "research_summary"
                 ? null
-                : excludedByRelevance
+                : markedLowRelevance
                   ? {
-                      label: "Context excluded: low relevance",
+                      label: "Low relevance source",
                       dotColor: "bg-slate-500/70 dark:bg-slate-400/70",
                     }
                   : crawlState === "succeeded"

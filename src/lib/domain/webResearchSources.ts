@@ -34,7 +34,7 @@ function isFailureMetadata(
 function isLowRelevanceMetadata(
   metadata: WebResearchSourceClient["metadata"] | undefined,
 ): boolean {
-  return metadata?.excludedByRelevance === true;
+  return metadata?.markedLowRelevance === true;
 }
 
 function getSourceCardPriority(card: WebSourceCard): number {

@@ -12,7 +12,11 @@ export const CrawlMetadataSchema = z
     crawlAttempted: z.boolean().optional(),
     crawlSucceeded: z.boolean().optional(),
     crawlErrorMessage: z.string().optional(),
-    excludedByRelevance: z.boolean().optional(),
+    /**
+     * Annotation only: this source scored below relevance threshold when
+     * metadata was built post-run. It does not imply model-context filtering.
+     */
+    markedLowRelevance: z.boolean().optional(),
     relevanceThreshold: z.number().optional(),
   })
   .strip();

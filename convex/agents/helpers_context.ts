@@ -134,7 +134,9 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
       const crawlErrorMessage = failedErrorByUrl.get(normalizedResultUrl);
       const relevanceScore =
         result.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT;
-      const excludedByRelevance =
+      // This flag is source metadata for UI/provenance only.
+      // It does NOT remove tool output from the already-executed model run.
+      const markedLowRelevance =
         !wasFailedScrape && relevanceScore < RELEVANCE_SCORES.MEDIUM_THRESHOLD;
       webResearchSources.push({
         contextId: result.contextId ?? generateMessageId(),
@@ -150,10 +152,10 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
             crawlErrorMessage,
           },
         }),
-        ...(excludedByRelevance && {
+        ...(markedLowRelevance && {
           metadata: {
             crawlAttempted: false,
-            excludedByRelevance: true,
+            markedLowRelevance: true,
             relevanceThreshold: RELEVANCE_SCORES.MEDIUM_THRESHOLD,
           },
         }),
