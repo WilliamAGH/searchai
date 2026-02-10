@@ -7,21 +7,24 @@ import { generateMessageId, generateThreadId } from "./lib/id_generator";
 import { isValidWorkflowToken } from "./lib/auth";
 import { hasChatWriteAccess, isHttpWriteAuthorized } from "./chats/writeAccess";
 import { buildMessageInsertDocument } from "./messages_insert_document";
+
+const messageBaseArgs = {
+  chatId: v.id("chats"),
+  role: v.union(v.literal("user"), v.literal("assistant")),
+  content: v.optional(v.string()),
+  isStreaming: v.optional(v.boolean()),
+  streamedContent: v.optional(v.string()),
+  thinking: v.optional(v.string()),
+  reasoning: v.optional(v.string()),
+  searchMethod: v.optional(vSearchMethod),
+  hasRealResults: v.optional(v.boolean()),
+  webResearchSources: v.optional(v.array(vWebResearchSource)),
+  workflowId: v.optional(v.string()),
+  sessionId: v.optional(v.string()),
+};
+
 export const addMessage = internalMutation({
-  args: {
-    chatId: v.id("chats"),
-    role: v.union(v.literal("user"), v.literal("assistant")),
-    content: v.optional(v.string()),
-    isStreaming: v.optional(v.boolean()),
-    streamedContent: v.optional(v.string()),
-    thinking: v.optional(v.string()),
-    reasoning: v.optional(v.string()),
-    searchMethod: v.optional(vSearchMethod),
-    hasRealResults: v.optional(v.boolean()),
-    webResearchSources: v.optional(v.array(vWebResearchSource)),
-    workflowId: v.optional(v.string()),
-    sessionId: v.optional(v.string()),
-  },
+  args: { ...messageBaseArgs },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -55,21 +58,11 @@ export const addMessage = internalMutation({
     );
   },
 });
+
 export const addMessageHttp = internalMutation({
   args: {
-    chatId: v.id("chats"),
-    role: v.union(v.literal("user"), v.literal("assistant")),
-    content: v.optional(v.string()),
-    isStreaming: v.optional(v.boolean()),
-    streamedContent: v.optional(v.string()),
-    thinking: v.optional(v.string()),
-    reasoning: v.optional(v.string()),
-    searchMethod: v.optional(vSearchMethod),
-    hasRealResults: v.optional(v.boolean()),
-    webResearchSources: v.optional(v.array(vWebResearchSource)),
-    workflowId: v.optional(v.string()),
+    ...messageBaseArgs,
     workflowTokenId: v.optional(v.id("workflowTokens")),
-    sessionId: v.optional(v.string()),
   },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
@@ -123,44 +116,7 @@ export const addMessageHttp = internalMutation({
     );
   },
 });
-export const internalUpdateMessageContent = internalMutation({
-  args: {
-    messageId: v.id("messages"),
-    contentChunk: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const message = await ctx.db.get(args.messageId);
-    if (!message) {
-      console.error("[streaming] Message not found during content append", {
-        messageId: args.messageId,
-        chunkLength: args.contentChunk.length,
-      });
-      return;
-    }
-    await ctx.db.patch(args.messageId, {
-      content: (message.content || "") + args.contentChunk,
-    });
-  },
-});
-export const internalUpdateMessageReasoning = internalMutation({
-  args: {
-    messageId: v.id("messages"),
-    reasoningChunk: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const message = await ctx.db.get(args.messageId);
-    if (!message) {
-      console.error("[streaming] Message not found during reasoning append", {
-        messageId: args.messageId,
-        chunkLength: args.reasoningChunk.length,
-      });
-      return;
-    }
-    await ctx.db.patch(args.messageId, {
-      reasoning: (message.reasoning || "") + args.reasoningChunk,
-    });
-  },
-});
+
 export const updateMessageMetadata = mutation({
   args: {
     messageId: v.id("messages"),
@@ -190,6 +146,7 @@ export const updateMessageMetadata = mutation({
     return null;
   },
 });
+
 export const updateMessage = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -207,6 +164,7 @@ export const updateMessage = internalMutation({
     await ctx.db.patch(messageId, { ...rest });
   },
 });
+
 /** Count user messages for a chat. */
 export const countMessages = internalMutation({
   args: { chatId: v.id("chats") },
@@ -220,6 +178,7 @@ export const countMessages = internalMutation({
     return messages.length;
   },
 });
+
 export const deleteMessage = mutation({
   args: {
     messageId: v.id("messages"),
