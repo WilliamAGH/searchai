@@ -8,6 +8,40 @@
  * - Template injections
  */
 
+const MIN_BASE64_DECODE_LENGTH = 20;
+const MAX_INPUT_LENGTH = 2000;
+const MAX_SEARCH_QUERY_LENGTH = 200;
+
+const INJECTION_PATTERNS = [
+  // System command attempts
+  /sys[\s\-_]*tem[\s\-_]*[:：]/gi,
+  /assistant[\s\-_]*[:：]/gi,
+  /human[\s\-_]*[:：]/gi,
+  /user[\s\-_]*[:：]/gi,
+
+  // Instruction override attempts
+  /ignore[\s\-_]*previous/gi,
+  /ignore[\s\-_]*above/gi,
+  /disregard[\s\-_]*previous/gi,
+  /disregard[\s\-_]*above/gi,
+  /forget[\s\-_]*everything/gi,
+  /forget[\s\-_]*previous/gi,
+
+  // Role escalation attempts
+  /you[\s\-_]*are[\s\-_]*now/gi,
+  /act[\s\-_]*as[\s\-_]*a/gi,
+  /pretend[\s\-_]*to[\s\-_]*be/gi,
+  /switch[\s\-_]*to/gi,
+  /become[\s\-_]*a/gi,
+
+  // Delimiter injection attempts
+  /\[INST\]/gi,
+  /\[\/INST\]/gi,
+  /<<<\s*\/\s*SYS\s*>>>/gi,
+  /###\s*Human/gi,
+  /###\s*Assistant/gi,
+];
+
 /**
  * Main sanitization function that applies all security measures
  * @param input - Raw user input to sanitize
@@ -40,7 +74,7 @@ export function robustSanitize(input: string): string {
   const STRICT_BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
   clean = clean.replaceAll(base64Pattern, (match) => {
     // Skip short matches and strings that aren't structurally valid base64
-    if (match.length < 20) return match;
+    if (match.length < MIN_BASE64_DECODE_LENGTH) return match;
     if (match.length % 4 !== 0 || !STRICT_BASE64.test(match)) return match;
 
     // Pre-validation (length, %4, strict regex) filters structurally invalid
@@ -67,37 +101,7 @@ export function robustSanitize(input: string): string {
   });
 
   // 5. Remove prompt injection patterns
-  const injectionPatterns = [
-    // System command attempts
-    /sys[\s\-_]*tem[\s\-_]*[:：]/gi,
-    /assistant[\s\-_]*[:：]/gi,
-    /human[\s\-_]*[:：]/gi,
-    /user[\s\-_]*[:：]/gi,
-
-    // Instruction override attempts
-    /ignore[\s\-_]*previous/gi,
-    /ignore[\s\-_]*above/gi,
-    /disregard[\s\-_]*previous/gi,
-    /disregard[\s\-_]*above/gi,
-    /forget[\s\-_]*everything/gi,
-    /forget[\s\-_]*previous/gi,
-
-    // Role escalation attempts
-    /you[\s\-_]*are[\s\-_]*now/gi,
-    /act[\s\-_]*as[\s\-_]*a/gi,
-    /pretend[\s\-_]*to[\s\-_]*be/gi,
-    /switch[\s\-_]*to/gi,
-    /become[\s\-_]*a/gi,
-
-    // Delimiter injection attempts
-    /\[INST\]/gi,
-    /\[\/INST\]/gi,
-    /<<<\s*\/\s*SYS\s*>>>/gi,
-    /###\s*Human/gi,
-    /###\s*Assistant/gi,
-  ];
-
-  for (const pattern of injectionPatterns) {
+  for (const pattern of INJECTION_PATTERNS) {
     clean = clean.replaceAll(pattern, "[INJECTION_BLOCKED]");
   }
 
@@ -122,8 +126,8 @@ export function robustSanitize(input: string): string {
 
   // 8. Enforce maximum length (2000 characters)
   // Extremely long inputs can be used for buffer overflow or DoS
-  if (clean.length > 2000) {
-    clean = clean.slice(0, 2000);
+  if (clean.length > MAX_INPUT_LENGTH) {
+    clean = clean.slice(0, MAX_INPUT_LENGTH);
   }
 
   return clean.trim();
@@ -143,8 +147,8 @@ export function sanitizeForSearch(input: string): string {
   clean = clean.replaceAll(/\s+/g, " ");
 
   // Limit to 200 chars for search queries
-  if (clean.length > 200) {
-    clean = clean.slice(0, 200);
+  if (clean.length > MAX_SEARCH_QUERY_LENGTH) {
+    clean = clean.slice(0, MAX_SEARCH_QUERY_LENGTH);
   }
 
   return clean.trim();
@@ -166,17 +170,20 @@ export function detectInjectionAttempt(input: string): boolean {
     return false;
   }
 
-  const suspiciousPatterns = [
-    /system[\s\-_]*:/i,
-    /ignore[\s\-_]*previous/i,
-    /you[\s\-_]*are[\s\-_]*now/i,
-    /<script/i,
-    /javascript:/i,
-    /\[INST\]/i,
-    /<<<\s*SYS\s*>>>/i,
-  ];
+  // Check shared injection patterns
+  if (
+    INJECTION_PATTERNS.some((pattern) => {
+      pattern.lastIndex = 0; // Reset stateful regex
+      return pattern.test(input);
+    })
+  ) {
+    return true;
+  }
 
-  return suspiciousPatterns.some((pattern) => pattern.test(input));
+  // Additional checks for scripts/JS
+  const scriptPatterns = [/<script/i, /javascript:/i];
+
+  return scriptPatterns.some((pattern) => pattern.test(input));
 }
 
 /**
