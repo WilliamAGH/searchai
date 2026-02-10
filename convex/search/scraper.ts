@@ -2,8 +2,8 @@
 
 /**
  * Web Scraping Module
- * Handles URL content extraction and cleaning with Cheerio,
- * and optionally falls back to Playwright for JS-rendered pages.
+ * Handles URL content extraction and cleaning with Cheerio.
+ * Playwright fallback is intentionally not part of the active Convex runtime path.
  */
 
 import { load } from "cheerio";

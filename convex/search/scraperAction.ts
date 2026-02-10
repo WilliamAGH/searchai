@@ -2,7 +2,7 @@
 
 /**
  * Scraper Actions - Node runtime only
- * Handles webpage scraping with Cheerio and Playwright fallback
+ * Handles webpage scraping with the Cheerio-based scraper path.
  */
 
 import { v } from "convex/values";
