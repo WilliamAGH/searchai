@@ -53,7 +53,9 @@ export const canWriteChat = query({
   ),
   handler: async (ctx, args): Promise<WriteAccessResult> => {
     const chat = await ctx.db.get(args.chatId);
-    if (!chat) return "not_found";
+    // Return "denied" (not "not_found") so the public query does not reveal
+    // whether a chat ID exists, preventing chat-existence probing.
+    if (!chat) return "denied";
 
     const userId = await getAuthUserId(ctx);
     return hasChatWriteAccess(chat, userId, args.sessionId)
