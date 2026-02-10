@@ -101,8 +101,9 @@ test.describe("smoke: pagination", () => {
       await expect(msgInput).toBeEnabled({ timeout: 5000 });
       await msgInput.fill(msg);
       await page.keyboard.press("Enter");
-      // Small delay between messages
-      await page.waitForTimeout(500);
+      // Wait for message to appear in the list to ensure sequential processing
+      // and avoid flaky race conditions with rapid-fire inputs
+      await expect(page.getByText(msg).last()).toBeVisible({ timeout: 10000 });
     }
 
     // Check for message list container - look for the scrollable area
