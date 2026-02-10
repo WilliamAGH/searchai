@@ -1,5 +1,12 @@
 "use node";
 
+/**
+ * Context Management Helpers for Agent Workflows
+ *
+ * Handles source harvesting, normalization, and context/provenance tracking.
+ * Used by orchestration.ts to prepare data for LLM context window.
+ */
+
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
 import { generateMessageId } from "../lib/id_generator";
 import { normalizeHttpUrl } from "../lib/urlHttp";
@@ -10,6 +17,30 @@ const MAX_SOURCE_URL_LENGTH = 2048;
 
 function normalizeSourceUrl(url: string | undefined): string | undefined {
   return normalizeHttpUrl(url, MAX_SOURCE_URL_LENGTH);
+}
+
+function requireNormalizedUrl(
+  url: string,
+  contextId: string,
+  label: string,
+): string | null {
+  const normalized = normalizeSourceUrl(url);
+  if (!normalized) {
+    console.error(`[agents] Excluded ${label} with invalid URL`, {
+      contextId,
+      originalUrl: url,
+    });
+    return null;
+  }
+  return normalized;
+}
+
+function toNormalizedUrlSet(urls: string[]): Set<string> {
+  return new Set(
+    urls
+      .map((url) => normalizeUrl(url))
+      .filter((url): url is string => url !== null),
+  );
 }
 
 type ScrapedHarvestedSource = {
@@ -158,14 +189,13 @@ export function buildWebResearchSourcesFromHarvested(
   const now = Date.now();
 
   for (const scraped of harvested.scrapedContent) {
-    const normalizedUrl = normalizeSourceUrl(scraped.url);
-    if (!normalizedUrl) {
-      console.error("[agents] Excluded scraped source with invalid URL", {
-        contextId: scraped.contextId,
-        originalUrl: scraped.url,
-      });
-      continue;
-    }
+    const normalizedUrl = requireNormalizedUrl(
+      scraped.url,
+      scraped.contextId,
+      "scraped source",
+    );
+    if (!normalizedUrl) continue;
+
     const metadata: Record<string, unknown> = {
       crawlAttempted: true,
       crawlSucceeded: true,
@@ -189,18 +219,18 @@ export function buildWebResearchSourcesFromHarvested(
     });
   }
 
-  const scrapedNormalizedUrls = new Set(
-    harvested.scrapedContent
-      .map((s) => normalizeSourceUrl(s.url))
-      .filter((url): url is string => typeof url === "string")
-      .map((url) => normalizeUrl(url))
-      .filter((url): url is string => url !== null),
+  // Deduplicate and normalize scraped URLs
+  const scrapedUrls = harvested.scrapedContent
+    .map((s) => normalizeSourceUrl(s.url))
+    .filter((url): url is string => typeof url === "string");
+  const scrapedNormalizedUrls = toNormalizedUrlSet(scrapedUrls);
+
+  // Deduplicate and normalize failed scrape URLs
+  const failedUrls = Array.from(
+    harvested.failedScrapeUrls ?? new Set<string>(),
   );
-  const failedNormalizedUrls = new Set(
-    Array.from(harvested.failedScrapeUrls ?? new Set<string>())
-      .map((url) => normalizeUrl(url))
-      .filter((url): url is string => url !== null),
-  );
+  const failedNormalizedUrls = toNormalizedUrlSet(failedUrls);
+
   const failedErrorByUrl = new Map<string, string>();
   for (const [url, error] of harvested.failedScrapeErrors ?? new Map()) {
     const normalized = normalizeUrl(url);
@@ -210,14 +240,12 @@ export function buildWebResearchSourcesFromHarvested(
   }
 
   for (const result of harvested.searchResults) {
-    const normalizedUrl = normalizeSourceUrl(result.url);
-    if (!normalizedUrl) {
-      console.error("[agents] Excluded search result with invalid URL", {
-        contextId: result.contextId,
-        originalUrl: result.url,
-      });
-      continue;
-    }
+    const normalizedUrl = requireNormalizedUrl(
+      result.url,
+      result.contextId ?? "unknown",
+      "search result",
+    );
+    if (!normalizedUrl) continue;
 
     const normalizedResultUrl = normalizeUrl(normalizedUrl) ?? normalizedUrl;
     if (!scrapedNormalizedUrls.has(normalizedResultUrl)) {
@@ -301,14 +329,13 @@ export function convertToWebResearchSources(
 
   const converted: WebResearchSource[] = [];
   for (const source of sources) {
-    const normalizedUrl = normalizeSourceUrl(source.url);
-    if (!normalizedUrl) {
-      console.error("[agents] Excluded source with invalid URL", {
-        contextId: source.contextId,
-        originalUrl: source.url,
-      });
-      continue;
-    }
+    const normalizedUrl = requireNormalizedUrl(
+      source.url,
+      source.contextId,
+      "source",
+    );
+    if (!normalizedUrl) continue;
+
     converted.push({
       contextId: source.contextId,
       type: source.type,
