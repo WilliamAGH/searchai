@@ -17,6 +17,40 @@ import {
   getSafeHostname,
 } from "@/lib/utils/favicon";
 
+type CrawlState = "succeeded" | "failed" | "not_attempted" | "not_applicable";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getSourceCrawlState(source: {
+  type?: WebResearchSourceClient["type"];
+  metadata?: WebResearchSourceClient["metadata"];
+}): CrawlState {
+  if (source.type === "research_summary") {
+    return "not_applicable";
+  }
+  if (source.type === "scraped_page") {
+    return "succeeded";
+  }
+  if (!isRecord(source.metadata)) {
+    return "not_attempted";
+  }
+
+  const attempted = source.metadata.crawlAttempted;
+  const succeeded = source.metadata.crawlSucceeded;
+  if (source.metadata.excludedByRelevance === true) {
+    return "not_attempted";
+  }
+  if (attempted === true && succeeded === false) {
+    return "failed";
+  }
+  if (attempted === true && succeeded === true) {
+    return "succeeded";
+  }
+  return "not_attempted";
+}
+
 interface MessageSourcesProps {
   id: string;
   webResearchSources: WebResearchSourceClient[] | undefined;
@@ -46,6 +80,11 @@ export function MessageSources({
 
   const displaySources = toWebSourceCards(webResearchSources);
   const previewSources = displaySources.slice(0, 3);
+  const sourceRows = displaySources.map((source) => ({
+    source,
+    crawlState: getSourceCrawlState(source),
+    excludedByRelevance: source.metadata?.excludedByRelevance === true,
+  }));
 
   return (
     <div className="mt-3 max-w-full min-w-0 overflow-hidden">
@@ -75,9 +114,6 @@ export function MessageSources({
             <span className="font-medium">Sources</span>
             <span className="text-gray-500 dark:text-gray-400">
               ({displaySources.length})
-            </span>
-            <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400 truncate">
-              via web research
             </span>
           </div>
           <svg
@@ -129,11 +165,30 @@ export function MessageSources({
 
       {!collapsed && (
         <div className="mt-2 space-y-2 px-2 max-h-[300px] overflow-y-auto">
-          {displaySources.map((source, i) => {
+          {sourceRows.map(({ source, crawlState, excludedByRelevance }, i) => {
             const hostname =
               getDomainFromUrl(source.url) || getSafeHostname(source.url);
             const favicon = getFaviconUrl(source.url);
             const isHovered = hoveredSourceUrl === source.url;
+            const crawlStatus =
+              source.type === "research_summary"
+                ? null
+                : excludedByRelevance
+                  ? {
+                      label: "Context excluded: low relevance",
+                      dotColor: "bg-slate-500/70 dark:bg-slate-400/70",
+                    }
+                  : crawlState === "succeeded"
+                    ? {
+                        label: "Crawl successful",
+                        dotColor: "bg-emerald-500/80",
+                      }
+                    : crawlState === "failed"
+                      ? {
+                          label: "Crawl attempted, failed",
+                          dotColor: "bg-amber-500/80",
+                        }
+                      : null;
 
             const relevanceBadge =
               source.relevanceScore !== undefined &&
@@ -155,7 +210,7 @@ export function MessageSources({
             const typeBadge =
               source.type === "scraped_page"
                 ? {
-                    label: "scraped",
+                    label: "crawled",
                     color:
                       "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
                   }
@@ -210,7 +265,16 @@ export function MessageSources({
                       )}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                      {hostname}
+                      <span className="inline-flex items-center gap-1.5">
+                        {crawlStatus && (
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${crawlStatus.dotColor}`}
+                            title={crawlStatus.label}
+                            aria-label={crawlStatus.label}
+                          />
+                        )}
+                        <span>{hostname}</span>
+                      </span>
                     </div>
                   </div>
                 </div>

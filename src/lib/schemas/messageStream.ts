@@ -7,8 +7,18 @@
 import { z } from "zod/v4";
 import { WebResearchSourceSchema } from "../../../convex/schemas/webResearchSources";
 
-export const WebResearchSourceClientSchema = WebResearchSourceSchema.omit({
-  metadata: true,
+export const CrawlMetadataSchema = z
+  .object({
+    crawlAttempted: z.boolean().optional(),
+    crawlSucceeded: z.boolean().optional(),
+    crawlErrorMessage: z.string().optional(),
+    excludedByRelevance: z.boolean().optional(),
+    relevanceThreshold: z.number().optional(),
+  })
+  .strip();
+
+export const WebResearchSourceClientSchema = WebResearchSourceSchema.extend({
+  metadata: CrawlMetadataSchema.optional(),
 }).strip();
 
 export type WebResearchSourceClient = z.infer<
