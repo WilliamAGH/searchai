@@ -26,7 +26,12 @@ export function isToolError(output: unknown, toolName: string): boolean {
   if (!isRecord(output)) return false;
   const hasError = "error" in output && Boolean(output.error);
   if (!hasError) return false;
-  if (toolName === "scrape_webpage") return false;
+  if (toolName === "scrape_webpage") {
+    console.warn("[stream] Scrape error treated as non-fatal", {
+      error: String(output.error),
+    });
+    return false;
+  }
   return true;
 }
 
