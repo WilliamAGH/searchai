@@ -82,11 +82,6 @@ export function MessageList({
     {},
   );
   const [hoveredSourceUrl, setHoveredSourceUrl] = useState<string | null>(null);
-  // Citation hover callback
-  // Currently no-op at this level; could sync with hoveredSourceUrl for cross-component highlighting
-  const handleCitationHover = useCallback((_url: string | null) => {
-    // Placeholder for future citation highlight synchronization
-  }, []);
 
   const handleDeleteMessage = React.useCallback(
     async (messageId: Id<"messages"> | string | undefined) => {
@@ -122,7 +117,9 @@ export function MessageList({
         const id = m._id || String(index);
         if (!id || m.role !== "assistant") return;
 
-        const hasReasoning = Boolean(m.reasoning?.trim());
+        const hasReasoningOrThinking = Boolean(
+          m.reasoning?.trim() || m.thinking?.trim(),
+        );
         const hasContent = Boolean(m.content?.trim());
         const isStreaming = Boolean(m.isStreaming);
 
@@ -137,7 +134,7 @@ export function MessageList({
         }
 
         // Reasoning should default to collapsed and only expand on user toggle
-        if (hasReasoning) {
+        if (hasReasoningOrThinking) {
           const reasoningId = `reasoning-${id}`;
           if (prev[reasoningId] === undefined) {
             updates[reasoningId] = true;
@@ -224,7 +221,6 @@ export function MessageList({
                   onToggleCollapsed={toggleCollapsed}
                   onDeleteMessage={handleDeleteMessage}
                   onSourceHover={setHoveredSourceUrl}
-                  onCitationHover={handleCitationHover}
                   searchProgress={
                     index === messages.length - 1 && isGenerating
                       ? searchProgress
@@ -258,7 +254,6 @@ export function MessageList({
                 onToggleCollapsed={toggleCollapsed}
                 onDeleteMessage={handleDeleteMessage}
                 onSourceHover={setHoveredSourceUrl}
-                onCitationHover={handleCitationHover}
                 searchProgress={
                   index === messages.length - 1 && isGenerating
                     ? searchProgress

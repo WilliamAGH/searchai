@@ -22,7 +22,7 @@ interface MessageItemProps {
   onToggleCollapsed: (id: string) => void;
   onDeleteMessage: (messageId: Id<"messages"> | string | undefined) => void;
   onSourceHover: (url: string | null) => void;
-  onCitationHover: (url: string | null) => void;
+  onCitationHover?: (url: string | null) => void;
   searchProgress?: SearchProgress | null;
 }
 
