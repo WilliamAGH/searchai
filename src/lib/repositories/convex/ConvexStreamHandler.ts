@@ -125,10 +125,19 @@ export class ConvexStreamHandler {
       return this.parseStreamEvent(WorkflowStartEventSchema, evt);
     }
     if (evt.type === "complete") {
-      return this.parseStreamEvent(CompleteEventSchema, evt);
+      return (
+        this.parseStreamEvent(CompleteEventSchema, evt) ?? {
+          type: "complete" as const,
+        }
+      );
     }
     if (evt.type === "error") {
-      return this.parseStreamEvent(ErrorEventSchema, evt);
+      return (
+        this.parseStreamEvent(ErrorEventSchema, evt) ?? {
+          type: "error" as const,
+          error: "Received malformed error response from server",
+        }
+      );
     }
     if (evt.type === "persisted") {
       return this.handlePersistedEvent(evt);
@@ -182,7 +191,10 @@ export class ConvexStreamHandler {
               nonce: parsed.data.nonce,
             },
           );
-          return null;
+          return {
+            type: "error" as const,
+            error: "Message integrity verification failed. Please refresh.",
+          };
         }
 
         logger.debug("[OK] Signature verified for persisted event", {
