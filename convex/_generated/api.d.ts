@@ -138,7 +138,6 @@ import type * as search_providers_openrouter from "../search/providers/openroute
 import type * as search_providers_serpapi from "../search/providers/serpapi.js";
 import type * as search_scraper from "../search/scraper.js";
 import type * as search_scraperAction from "../search/scraperAction.js";
-import type * as search_scraperUnified from "../search/scraperUnified.js";
 import type * as search_scraper_content from "../search/scraper_content.js";
 import type * as search_search_web_handler from "../search/search_web_handler.js";
 import type * as search_utils from "../search/utils.js";
@@ -284,7 +283,6 @@ declare const fullApi: ApiFromModules<{
   "search/providers/serpapi": typeof search_providers_serpapi;
   "search/scraper": typeof search_scraper;
   "search/scraperAction": typeof search_scraperAction;
-  "search/scraperUnified": typeof search_scraperUnified;
   "search/scraper_content": typeof search_scraper_content;
   "search/search_web_handler": typeof search_search_web_handler;
   "search/utils": typeof search_utils;
