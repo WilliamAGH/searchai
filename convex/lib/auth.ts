@@ -67,7 +67,7 @@ export function hasSessionAccess(
  *
  * @example
  * const userId = await getAuthUserId(ctx);
- * if (!isAuthorized(chat, userId, args.sessionId)) {
+ * if (!hasPrimaryOwnerAccess(chat, userId, args.sessionId)) {
  *   throw new Error("Unauthorized");
  * }
  */
@@ -85,7 +85,7 @@ export function hasPrimaryOwnerAccess(
 /**
  * Check write ownership using either account owner or originating session.
  *
- * Unlike `isAuthorized`, this intentionally supports dual ownership even when
+ * Unlike `hasPrimaryOwnerAccess`, this intentionally supports dual ownership even when
  * both `userId` and `sessionId` are present on the chat.
  */
 export function hasOwnerAccess(

@@ -45,6 +45,7 @@ This file defines the exact active behavior for URL discovery, scraping, and sou
   - [`scrape_webpage` tool](../../convex/agents/tools_scrape.ts)
   - [`api.search.scraperAction.scrapeUrl`](../../convex/search/scraperAction.ts)
   - [`scrapeWithCheerio`](../../convex/search/scraper.ts)
+- Refactor note: `scraperUnified` was removed; `scrapeUrl` remains the active action entrypoint for scraping.
 - Active dependencies:
   - platform `fetch` in Convex Node runtime ([`convex/search/scraper.ts#L96`](../../convex/search/scraper.ts#L96))
   - [`cheerio`](../../package.json) HTML parsing ([`convex/search/scraper.ts#L9`](../../convex/search/scraper.ts#L9))
