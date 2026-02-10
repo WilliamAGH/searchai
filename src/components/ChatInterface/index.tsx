@@ -49,14 +49,12 @@ function ChatInterfaceComponent({
 }>) {
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
   const unified = useUnifiedChat();
-  const chatState = unified;
-  const chatActions = unified;
-  const currentChatId = chatState.currentChatId;
-  const isGenerating = chatState.isGenerating || localIsGenerating;
-  const searchProgress = chatState.searchProgress;
-  const currentChat = chatState.currentChat;
-  const messages = chatState.messages;
-  const chats = chatState.chats;
+  const currentChatId = unified.currentChatId;
+  const isGenerating = unified.isGenerating || localIsGenerating;
+  const searchProgress = unified.searchProgress;
+  const currentChat = unified.currentChat;
+  const messages = unified.messages;
+  const chats = unified.chats;
   const sidebarOpen = isSidebarOpen ?? false;
   const { handleMobileSidebarClose } = useSidebarTiming({
     onToggleSidebar,
@@ -69,7 +67,7 @@ function ChatInterfaceComponent({
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const sessionId = useAnonymousSession();
   const userSelectedChatAtRef = useRef<number | null>(null);
-  // @ts-ignore - Convex api type instantiation is too deep here
+  // @ts-expect-error TS2589: Convex type instantiation depth limit
   const deleteChat = useMutation(api.chats.deleteChat);
   const deleteMessage = useMutation<typeof api.messages.deleteMessage>(
     api.messages.deleteMessage,
@@ -97,8 +95,8 @@ function ChatInterfaceComponent({
     undoBanner,
     setUndoBanner,
   } = useDeletionHandlers({
-    chatState,
-    chatActions,
+    chatState: unified,
+    chatActions: unified,
     deleteChat,
     deleteMessage,
     sessionId: sessionId || undefined,
@@ -173,10 +171,9 @@ function ChatInterfaceComponent({
     preferPaginatedSource: usePagination,
     isPaginatedLoading: isLoadingMessages,
   });
-  const currentMessages = effectiveMessages;
   const userHistory = useMemo(
-    () => buildUserHistory(currentMessages),
-    [currentMessages],
+    () => buildUserHistory(effectiveMessages),
+    [effectiveMessages],
   );
   const isSharedRoute = !!(propShareId || propPublicId);
   const canCheckWrite =
@@ -202,14 +199,14 @@ function ChatInterfaceComponent({
     chatByOpaqueId,
     chatByShareId,
     chatByPublicId,
-    selectChat: chatActions.selectChat,
+    selectChat: unified.selectChat,
   });
   useMetaTags({ currentChatId, allChats });
   const handleNewChat = useCallback(
     async (_opts?: { userInitiated?: boolean }): Promise<string | null> => {
       setIsCreatingChat(true);
       try {
-        const chat = await chatActions.createChat("New Chat");
+        const chat = await unified.createChat("New Chat");
         if (chat?._id) {
           // Direct navigation — we know the chat exists because we just created it.
           // Do NOT use navigateWithVerification here: allChats reactive query
@@ -220,12 +217,12 @@ function ChatInterfaceComponent({
         }
       } catch (error) {
         logger.error("Failed to create chat:", error);
-        chatActions.setError("Failed to create a new chat. Please try again.");
+        unified.setError("Failed to create a new chat. Please try again.");
       }
       setIsCreatingChat(false);
       return null;
     },
-    [chatActions, navigateToChat],
+    [unified, navigateToChat],
   );
   useEffect(() => {
     if (isCreatingChat && currentChatId) setIsCreatingChat(false);
@@ -245,14 +242,14 @@ function ChatInterfaceComponent({
     handleNewChat,
     sendRef: sendRefTemp,
     summarizeRecentAction,
-    chatState,
+    chatState: unified,
   });
   const { handleSendMessage, sendRef } = useMessageHandler({
     // State
     isGenerating,
     currentChatId,
     messageCount,
-    chatState,
+    chatState: unified,
 
     // Actions
     setIsGenerating: setLocalIsGenerating,
@@ -261,9 +258,9 @@ function ChatInterfaceComponent({
     // Functions
     handleNewChat,
     maybeShowFollowUpPrompt,
-    chatActions,
+    chatActions: unified,
     navigateToChat,
-    setErrorMessage: chatActions.setError,
+    setErrorMessage: unified.setError,
   });
   useEffect(() => {
     sendRefTemp.current = sendRef.current;
@@ -302,7 +299,7 @@ function ChatInterfaceComponent({
   } = useComponentProps({
     allChats,
     currentChatId,
-    currentMessages,
+    currentMessages: effectiveMessages,
     sidebarOpen,
     isMobile,
     isGenerating,
@@ -342,7 +339,7 @@ function ChatInterfaceComponent({
       handleContinueChat={handleContinueChat}
       handleNewChatForFollowUp={handleNewChatForFollowUp}
       handleNewChatWithSummary={handleNewChatWithSummary}
-      chatActions={chatActions}
+      chatActions={unified}
     />
   );
 }
