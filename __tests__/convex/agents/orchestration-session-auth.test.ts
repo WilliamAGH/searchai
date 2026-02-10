@@ -71,4 +71,61 @@ describe("initializeWorkflowSession write access gate", () => {
 
     expect(ctx.runMutation).not.toHaveBeenCalled();
   });
+
+  it("proceeds to mint token when access is allowed", async () => {
+    const ctx = {
+      runQuery: vi
+        .fn()
+        .mockResolvedValueOnce("allowed") // canWriteChat
+        .mockResolvedValueOnce({ _id: chatId }) // chats.getChatByIdHttp
+        .mockResolvedValueOnce([]), // chats.getChatMessagesHttp
+      runMutation: vi
+        .fn()
+        .mockResolvedValueOnce("token_123")
+        .mockResolvedValueOnce(null),
+      runAction: vi.fn(),
+    };
+
+    const session = await initializeWorkflowSession(
+      ctx,
+      { chatId, sessionId: "session-ok", userQuery: "Can I write?" },
+      "workflow_1",
+      "nonce_1",
+    );
+
+    expect(session.workflowTokenId).toBe("token_123");
+    expect(ctx.runMutation).toHaveBeenCalledTimes(2);
+    expect(ctx.runQuery).toHaveBeenNthCalledWith(1, expect.anything(), {
+      chatId,
+      sessionId: "session-ok",
+    });
+  });
+
+  it("supports session-only access", async () => {
+    const ctx = {
+      runQuery: vi
+        .fn()
+        .mockResolvedValueOnce("allowed") // canWriteChat
+        .mockResolvedValueOnce({ _id: chatId }) // chats.getChatById
+        .mockResolvedValueOnce([]), // chats.getChatMessages
+      runMutation: vi
+        .fn()
+        .mockResolvedValueOnce("token_456")
+        .mockResolvedValueOnce(null),
+      runAction: vi.fn(),
+    };
+
+    await initializeWorkflowSession(
+      ctx,
+      { chatId, userQuery: "Anon?" },
+      "workflow_1",
+      "nonce_1",
+    );
+
+    expect(ctx.runQuery).toHaveBeenCalledWith(expect.anything(), {
+      chatId,
+      sessionId: undefined,
+    });
+    expect(ctx.runMutation).toHaveBeenCalledTimes(2);
+  });
 });
