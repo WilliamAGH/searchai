@@ -63,14 +63,14 @@ export function ShareModalContainer(props: Readonly<ShareModalContainerProps>) {
   const exportBase = `${origin}/api/chatTextMarkdown`;
 
   const onShare = async (
-    p: ChatPrivacy,
+    privacy: ChatPrivacy,
   ): Promise<{ shareId?: string; publicId?: string } | void> => {
     if (!props.currentChatId) return;
-    if (p === "private") return;
+    if (privacy === "private") return;
     if (props.chatActions?.shareChat) {
       const result = await props.chatActions.shareChat(
         props.currentChatId,
-        p === "shared" ? "shared" : "public",
+        privacy,
       );
       return result;
     }
