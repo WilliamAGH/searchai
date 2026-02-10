@@ -42,6 +42,7 @@ npm run dev
 - [API](docs/domains/api.md)
 - [Deployment](docs/domains/deployment.md)
 - [Architecture](docs/domains/architecture.md)
+- Review [Context Pipeline](docs/domains/context-pipeline.md) to understand how conversational context is managed by agents/sub-agents, crawling, web search, and other tool calls.
 
 ## Scripts
 
