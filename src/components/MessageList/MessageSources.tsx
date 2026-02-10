@@ -100,6 +100,10 @@ export function MessageSources({
     source,
     crawlState: getSourceCrawlState(source),
     markedLowRelevance: source.metadata?.markedLowRelevance === true,
+    crawlErrorMessage:
+      typeof source.metadata?.crawlErrorMessage === "string"
+        ? source.metadata.crawlErrorMessage
+        : undefined,
     serverContextMarkdown: showDevSourceContextCopy
       ? getServerContextMarkdown(source.metadata)
       : undefined,
@@ -186,7 +190,13 @@ export function MessageSources({
         <div className="mt-2 space-y-2 px-2 max-h-[300px] overflow-y-auto">
           {sourceRows.map(
             (
-              { source, crawlState, markedLowRelevance, serverContextMarkdown },
+              {
+                source,
+                crawlState,
+                markedLowRelevance,
+                crawlErrorMessage,
+                serverContextMarkdown,
+              },
               i,
             ) => {
               const hostname =
@@ -208,7 +218,9 @@ export function MessageSources({
                         }
                       : crawlState === "failed"
                         ? {
-                            label: "Crawl attempted, failed",
+                            label: crawlErrorMessage
+                              ? `Crawl failed: ${crawlErrorMessage}. Some sites do not allow automated visitors — other sources were used instead.`
+                              : "Crawl attempted, failed. Some sites do not allow automated visitors — other sources were used instead.",
                             dotColor: "bg-amber-500/80",
                           }
                         : null;
