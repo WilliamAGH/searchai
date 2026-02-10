@@ -83,9 +83,7 @@ export function MobileSidebar({
           onSelectChat(null);
         }
       } catch (err) {
-        if (import.meta.env?.DEV) {
-          logger.warn("Chat deletion failed:", err);
-        }
+        logger.error("Chat deletion failed:", err);
       }
     },
     [onRequestDeleteChat, deleteChat, onSelectChat],
