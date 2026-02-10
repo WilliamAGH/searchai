@@ -18,6 +18,10 @@ import {
   getSafeHostname,
 } from "@/lib/utils/favicon";
 
+const PREVIEW_SOURCE_COUNT = 3;
+const HIGH_RELEVANCE_THRESHOLD = 0.8;
+const MEDIUM_RELEVANCE_THRESHOLD = 0.5;
+
 type CrawlState = "succeeded" | "failed" | "not_attempted" | "not_applicable";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,7 +94,7 @@ export function MessageSources({
   if (!hasWebResearchSources(webResearchSources)) return null;
 
   const displaySources = toWebSourceCards(webResearchSources);
-  const previewSources = displaySources.slice(0, 3);
+  const previewSources = displaySources.slice(0, PREVIEW_SOURCE_COUNT);
   const showDevSourceContextCopy = import.meta.env.DEV;
   const sourceRows = displaySources.map((source) => ({
     source,
@@ -169,9 +173,9 @@ export function MessageSources({
                 </a>
               );
             })}
-            {displaySources.length > 3 && (
+            {displaySources.length > PREVIEW_SOURCE_COUNT && (
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                +{displaySources.length - 3} more
+                +{displaySources.length - PREVIEW_SOURCE_COUNT} more
               </span>
             )}
           </div>
@@ -211,14 +215,14 @@ export function MessageSources({
 
               const relevanceBadge =
                 source.relevanceScore !== undefined &&
-                source.relevanceScore >= 0.8
+                source.relevanceScore >= HIGH_RELEVANCE_THRESHOLD
                   ? {
                       label: "high",
                       color:
                         "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
                     }
                   : source.relevanceScore !== undefined &&
-                      source.relevanceScore >= 0.5
+                      source.relevanceScore >= MEDIUM_RELEVANCE_THRESHOLD
                     ? {
                         label: "medium",
                         color:
