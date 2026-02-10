@@ -41,15 +41,21 @@ Typical English estimate: `4000` chars is about `650-800` words.
 ## Exact Turn Flow
 
 1. Client sends `chatId`, `message`, and client-built `conversationContext` to `/api/ai/agent/stream` ([`src/lib/repositories/convex/ConvexStreamHandler.ts#L56`](../../src/lib/repositories/convex/ConvexStreamHandler.ts#L56)).
-2. Route sanitizes `message` (10000) and inbound `conversationContext` (5000) ([`convex/http/routes/aiAgent_stream.ts#L39`](../../convex/http/routes/aiAgent_stream.ts#L39), [`convex/http/routes/aiAgent_stream.ts#L76`](../../convex/http/routes/aiAgent_stream.ts#L76)).
-3. Server loads the chat, fetches recent messages (`limit: 20`), then persists the new user message ([`convex/agents/orchestration_session.ts#L180`](../../convex/agents/orchestration_session.ts#L180), [`convex/agents/orchestration_session.ts#L214`](../../convex/agents/orchestration_session.ts#L214)).
-4. Server builds canonical `conversationContext` from previously fetched messages. Current user message is passed separately as `userQuery` ([`convex/agents/orchestration_session.ts#L235`](../../convex/agents/orchestration_session.ts#L235), [`convex/agents/workflow_conversational.ts#L79`](../../convex/agents/workflow_conversational.ts#L79)).
-5. Agent runs (`run(..., stream: true)`) and may call `plan_research`, `search_web`, `scrape_webpage` in this same run ([`convex/agents/workflow_conversational.ts#L89`](../../convex/agents/workflow_conversational.ts#L89), [`convex/agents/tools.ts#L64`](../../convex/agents/tools.ts#L64)).
-6. Tool outputs are harvested from run stream events during this run ([`convex/agents/streaming_processor.ts#L228`](../../convex/agents/streaming_processor.ts#L228)).
-7. After run completion, harvested data is transformed into `webResearchSources`; for low relevance (`< 0.5`) search results, code sets `metadata.markedLowRelevance = true` on source metadata ([`convex/agents/helpers_context.ts`](../../convex/agents/helpers_context.ts), [`convex/lib/constants/cache.ts#L50`](../../convex/lib/constants/cache.ts#L50)).
-8. This low-relevance flag is metadata only; it does not remove already-seen tool output from the current run and is not used by history-context construction ([`convex/agents/streaming_processor.ts#L228`](../../convex/agents/streaming_processor.ts#L228), [`convex/agents/helpers_builders.ts#L228`](../../convex/agents/helpers_builders.ts#L228)).
-9. Assistant message is persisted in the same `chatId` with `content` and `webResearchSources` ([`convex/agents/orchestration_persistence.ts#L127`](../../convex/agents/orchestration_persistence.ts#L127), [`convex/agents/orchestration_persistence.ts#L132`](../../convex/agents/orchestration_persistence.ts#L132)).
-10. Next turn repeats. Next-turn history context is rebuilt from persisted message `content` only.
+2. In local dev UI, client also sends `includeDebugSourceContext: true` so Convex can persist per-source debug markdown for this run ([`src/lib/repositories/convex/ConvexStreamHandler.ts`](../../src/lib/repositories/convex/ConvexStreamHandler.ts), [`convex/http/routes/aiAgent_stream.ts`](../../convex/http/routes/aiAgent_stream.ts)).
+3. Route sanitizes `message` (10000) and inbound `conversationContext` (5000) ([`convex/http/routes/aiAgent_stream.ts#L39`](../../convex/http/routes/aiAgent_stream.ts#L39), [`convex/http/routes/aiAgent_stream.ts#L76`](../../convex/http/routes/aiAgent_stream.ts#L76)).
+4. Server loads the chat, fetches recent messages (`limit: 20`), then persists the new user message ([`convex/agents/orchestration_session.ts#L180`](../../convex/agents/orchestration_session.ts#L180), [`convex/agents/orchestration_session.ts#L214`](../../convex/agents/orchestration_session.ts#L214)).
+5. Server builds canonical `conversationContext` from previously fetched messages. Current user message is passed separately as `userQuery` ([`convex/agents/orchestration_session.ts#L235`](../../convex/agents/orchestration_session.ts#L235), [`convex/agents/workflow_conversational.ts#L79`](../../convex/agents/workflow_conversational.ts#L79)).
+6. Agent runs (`run(..., stream: true)`) and may call `plan_research`, `search_web`, `scrape_webpage` in this same run ([`convex/agents/workflow_conversational.ts#L89`](../../convex/agents/workflow_conversational.ts#L89), [`convex/agents/tools.ts#L64`](../../convex/agents/tools.ts#L64)).
+7. Tool outputs are harvested from run stream events during this run ([`convex/agents/streaming_processor.ts#L228`](../../convex/agents/streaming_processor.ts#L228)).
+8. After run completion, harvested data is transformed into `webResearchSources`; for low relevance (`< 0.5`) search results, code sets `metadata.markedLowRelevance = true`; for persisted `scraped_page` sources, code stores `metadata.scrapedBodyContent` and `metadata.scrapedBodyContentLength` ([`convex/agents/helpers_context.ts`](../../convex/agents/helpers_context.ts), [`convex/lib/constants/cache.ts#L50`](../../convex/lib/constants/cache.ts#L50)).
+9. If `includeDebugSourceContext` was true for this turn, `metadata.serverContextMarkdown` is attached per source during the same harvested-data transformation ([`convex/agents/helpers_context.ts`](../../convex/agents/helpers_context.ts), [`convex/agents/workflow_conversational.ts`](../../convex/agents/workflow_conversational.ts)).
+10. This low-relevance flag is metadata only; it does not remove already-seen tool output from the current run and is not used by history-context construction ([`convex/agents/streaming_processor.ts#L228`](../../convex/agents/streaming_processor.ts#L228), [`convex/agents/helpers_builders.ts#L228`](../../convex/agents/helpers_builders.ts#L228)).
+11. Assistant message is persisted in the same `chatId` with `content` and `webResearchSources` ([`convex/agents/orchestration_persistence.ts#L127`](../../convex/agents/orchestration_persistence.ts#L127), [`convex/agents/orchestration_persistence.ts#L132`](../../convex/agents/orchestration_persistence.ts#L132)).
+12. Next turn repeats. Next-turn history context is rebuilt from persisted message `content` only.
+
+Scrape error handling rule:
+
+- `scrape_webpage` failures (for example HTTP 403) are treated as expected crawl outcomes and are persisted as source status metadata; they do not increment the fatal workflow tool-error threshold ([`convex/agents/streaming_processor_helpers.ts`](../../convex/agents/streaming_processor_helpers.ts), [`convex/agents/streaming_harvest.ts`](../../convex/agents/streaming_harvest.ts)).
 
 ## What Enters Next-Turn Context
 
@@ -63,8 +69,15 @@ Not included in next-turn `conversationContext`:
 - Raw `search_web` output.
 - Raw `scrape_webpage` content/output JSON.
 - `webResearchSources` metadata.
+- `webResearchSources[].metadata.scrapedBodyContent` (persisted source metadata) is not read by history-context construction.
 - `metadata.serverContextMarkdown` (dev inspection payload) is not read by history-context construction.
 - `markedLowRelevance` does not remove text from `conversationContext`; it is a metadata flag used after harvesting/persistence for source status ([`convex/agents/helpers_context.ts`](../../convex/agents/helpers_context.ts), [`convex/agents/orchestration_persistence.ts#L132`](../../convex/agents/orchestration_persistence.ts#L132), [`convex/agents/helpers_builders.ts#L238`](../../convex/agents/helpers_builders.ts#L238)).
+
+Dev UI note:
+
+- Source-card copy in dev mode is a diagnostics workflow and does not affect model context:
+  - full `metadata.serverContextMarkdown` when present
+  - otherwise a markdown snapshot built from persisted `webResearchSources` fields
 
 Carry-forward rule:
 
