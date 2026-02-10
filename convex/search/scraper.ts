@@ -7,8 +7,6 @@
  */
 
 import { load } from "cheerio";
-import { v } from "convex/values";
-import { action } from "../_generated/server";
 import { CACHE_TTL } from "../lib/constants/cache";
 import { validateScrapeUrl } from "../lib/url";
 import { getErrorMessage } from "../lib/errors";
@@ -283,23 +281,3 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     return val;
   }
 }
-
-/**
- * Scrape and clean web page content (action entry)
- * Uses Cheerio for HTML parsing - Playwright not available in Convex runtime
- */
-export const scrapeUrl = action({
-  args: { url: v.string() },
-  returns: v.object({
-    title: v.string(),
-    content: v.string(),
-    summary: v.optional(v.string()),
-    needsJsRendering: v.optional(v.boolean()),
-    // Error fields - present when scrape failed
-    error: v.optional(v.string()),
-    errorCode: v.optional(v.string()),
-  }),
-  handler: async (_, args): Promise<ScrapeResult> => {
-    return await scrapeWithCheerio(args.url);
-  },
-});
