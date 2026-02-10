@@ -4,7 +4,6 @@ import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { vWebResearchSource, vSearchMethod } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
-import { getErrorMessage } from "./lib/errors";
 import { isValidWorkflowToken } from "./lib/auth";
 import { hasChatWriteAccess, isHttpWriteAuthorized } from "./chats/writeAccess";
 import { buildMessageInsertDocument } from "./messages_insert_document";
@@ -270,79 +269,5 @@ export const deleteMessage = mutation({
     });
 
     return null;
-  },
-});
-export const addMessageWithTransaction = internalMutation({
-  args: {
-    chatId: v.id("chats"),
-    userMessage: v.string(),
-    isReplyToAssistant: v.optional(v.boolean()),
-  },
-  returns: v.object({
-    success: v.boolean(),
-    assistantMessageId: v.optional(v.id("messages")),
-    error: v.optional(v.string()),
-  }),
-  handler: async (ctx, args) => {
-    try {
-      const chat = await ctx.db.get(args.chatId);
-      if (!chat) {
-        return { success: false, error: "Chat not found" };
-      }
-
-      let threadId = chat.threadId;
-      if (!threadId) {
-        threadId = generateThreadId();
-        await ctx.db.patch(args.chatId, { threadId });
-      }
-
-      const messages = await ctx.db
-        .query("messages")
-        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-        .collect();
-
-      const userMessageCount = messages.filter((m) => m.role === "user").length;
-
-      // Add user message
-      await ctx.db.insert("messages", {
-        chatId: args.chatId,
-        role: "user",
-        content: args.userMessage,
-        messageId: generateMessageId(),
-        threadId,
-        timestamp: Date.now(),
-      });
-
-      // Update title only for first user message
-      if (userMessageCount === 0 && !args.isReplyToAssistant) {
-        // Import the smart title generation function
-        const { generateChatTitle } = await import("./chats/utils");
-        const title = generateChatTitle({ intent: args.userMessage });
-
-        await ctx.db.patch(args.chatId, {
-          title,
-          updatedAt: Date.now(),
-        });
-      }
-
-      // Create assistant placeholder
-      const assistantMessageId = await ctx.db.insert("messages", {
-        chatId: args.chatId,
-        role: "assistant",
-        content: "",
-        isStreaming: true,
-        messageId: generateMessageId(),
-        threadId,
-        timestamp: Date.now(),
-      });
-
-      return { success: true, assistantMessageId };
-    } catch (error) {
-      console.error("[messages] addMessageWithTransaction failed", {
-        chatId: args.chatId,
-        error: getErrorMessage(error),
-      });
-      return { success: false, error: getErrorMessage(error) };
-    }
   },
 });
