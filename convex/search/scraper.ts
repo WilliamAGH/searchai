@@ -20,6 +20,8 @@ import {
 // (requires native browser binaries that aren't available in Convex runtime)
 
 const MAX_CONTENT_LENGTH = 12000;
+const MIN_CONTENT_LENGTH = 100;
+const SUMMARY_MAX_LENGTH = 500;
 
 export type ScrapeResult = {
   title: string;
@@ -195,7 +197,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     });
 
     // Filter out low-quality content AFTER junk removal
-    if (cleanedContent.length < 100) {
+    if (cleanedContent.length < MIN_CONTENT_LENGTH) {
       const errorDetails = {
         url: validatedUrl,
         contentLengthBefore: content.length,
@@ -211,7 +213,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       );
     }
 
-    const summaryLength = Math.min(500, cleanedContent.length);
+    const summaryLength = Math.min(SUMMARY_MAX_LENGTH, cleanedContent.length);
     const summary =
       cleanedContent.substring(0, summaryLength) +
       (cleanedContent.length > summaryLength ? "..." : "");
