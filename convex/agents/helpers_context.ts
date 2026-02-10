@@ -69,6 +69,8 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
     title: string;
     relevanceScore?: number;
   }>;
+  failedScrapeUrls?: Set<string>;
+  failedScrapeErrors?: Map<string, string>;
 }): WebResearchSource[] {
   const webResearchSources: WebResearchSource[] = [];
   const now = Date.now();
@@ -89,6 +91,10 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
       title: scraped.title,
       timestamp: scraped.scrapedAt ?? now,
       relevanceScore: scraped.relevanceScore ?? RELEVANCE_SCORES.SCRAPED_PAGE,
+      metadata: {
+        crawlAttempted: true,
+        crawlSucceeded: true,
+      },
     });
   }
 
@@ -99,6 +105,18 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
       .map((url) => normalizeUrl(url))
       .filter((url): url is string => url !== null),
   );
+  const failedNormalizedUrls = new Set(
+    Array.from(harvested.failedScrapeUrls ?? new Set<string>())
+      .map((url) => normalizeUrl(url))
+      .filter((url): url is string => url !== null),
+  );
+  const failedErrorByUrl = new Map<string, string>();
+  for (const [url, error] of harvested.failedScrapeErrors ?? new Map()) {
+    const normalized = normalizeUrl(url);
+    if (normalized && typeof error === "string" && error.trim().length > 0) {
+      failedErrorByUrl.set(normalized, error);
+    }
+  }
 
   for (const result of harvested.searchResults) {
     const normalizedUrl = normalizeSourceUrl(result.url);
@@ -112,13 +130,33 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
 
     const normalizedResultUrl = normalizeUrl(normalizedUrl) ?? normalizedUrl;
     if (!scrapedNormalizedUrls.has(normalizedResultUrl)) {
+      const wasFailedScrape = failedNormalizedUrls.has(normalizedResultUrl);
+      const crawlErrorMessage = failedErrorByUrl.get(normalizedResultUrl);
+      const relevanceScore =
+        result.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT;
+      const excludedByRelevance =
+        !wasFailedScrape && relevanceScore < RELEVANCE_SCORES.MEDIUM_THRESHOLD;
       webResearchSources.push({
         contextId: result.contextId ?? generateMessageId(),
         type: "search_result",
         url: normalizedUrl,
         title: result.title,
         timestamp: now,
-        relevanceScore: result.relevanceScore ?? RELEVANCE_SCORES.SEARCH_RESULT,
+        relevanceScore,
+        ...(wasFailedScrape && {
+          metadata: {
+            crawlAttempted: true,
+            crawlSucceeded: false,
+            crawlErrorMessage,
+          },
+        }),
+        ...(excludedByRelevance && {
+          metadata: {
+            crawlAttempted: false,
+            excludedByRelevance: true,
+            relevanceThreshold: RELEVANCE_SCORES.MEDIUM_THRESHOLD,
+          },
+        }),
       });
     }
   }

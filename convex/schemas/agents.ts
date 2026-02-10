@@ -68,6 +68,8 @@ export type HarvestedDataSerializable = z.infer<typeof HarvestedDataSchema>;
 /** Runtime harvested data with URL deduplication tracking */
 export type HarvestedData = HarvestedDataSerializable & {
   scrapedUrls: Set<string>;
+  failedScrapeUrls: Set<string>;
+  failedScrapeErrors: Map<string, string>;
 };
 
 export function createEmptyHarvestedData(): HarvestedData {
@@ -76,6 +78,8 @@ export function createEmptyHarvestedData(): HarvestedData {
     searchResults: [],
     serpEnrichment: undefined,
     scrapedUrls: new Set(),
+    failedScrapeUrls: new Set(),
+    failedScrapeErrors: new Map(),
   };
 }
 

@@ -232,6 +232,9 @@ export async function* processAgentStream(
       if (!output || typeof output !== "object") continue;
 
       if (isToolError(output)) {
+        if (harvestData && harvested) {
+          harvestToolOutput(output, outputToolName, harvested);
+        }
         stats.toolErrorCount++;
         const shouldContinue = callbacks.onToolError?.(
           outputToolName,
