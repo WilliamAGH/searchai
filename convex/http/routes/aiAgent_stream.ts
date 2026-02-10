@@ -81,6 +81,7 @@ export async function handleAgentStream(
   const webResearchSources = sanitizeWebResearchSources(
     payload.webResearchSources,
   );
+  const includeDebugSourceContext = payload.includeDebugSourceContext === true;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -100,6 +101,7 @@ export async function handleAgentStream(
           userQuery: message,
           conversationContext,
           webResearchSources,
+          includeDebugSourceContext,
         });
 
         for await (const event of eventStream) {

@@ -42,6 +42,7 @@ export class ConvexStreamHandler {
     try {
       const host = window.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
+      const includeDebugSourceContext = isDev || env.isDev;
       const apiUrl = isDev
         ? "/api/ai/agent/stream"
         : `${env.convexUrl.replace(".convex.cloud", ".convex.site")}/api/ai/agent/stream`;
@@ -65,6 +66,7 @@ export class ConvexStreamHandler {
             )
             .join("\n")
             .slice(0, 4000),
+          includeDebugSourceContext,
         }),
       });
 

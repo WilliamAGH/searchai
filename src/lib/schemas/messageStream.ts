@@ -23,6 +23,12 @@ export const CrawlMetadataSchema = z
      * This is provenance/debug text only and does not change model context.
      */
     serverContextMarkdown: z.string().optional(),
+    /**
+     * Persisted scraped page body content for `scraped_page` sources.
+     * This mirrors the cleaned body captured by the scrape tool.
+     */
+    scrapedBodyContent: z.string().optional(),
+    scrapedBodyContentLength: z.number().optional(),
   })
   .strip();
 

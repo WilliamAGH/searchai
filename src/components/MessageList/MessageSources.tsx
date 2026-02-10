@@ -7,6 +7,7 @@
 
 import React from "react";
 import { CopyButton } from "@/components/CopyButton";
+import { buildSourceRecordSnapshotMarkdown } from "@/lib/domain/sourceContextMarkdown";
 import {
   hasWebResearchSources,
   toWebSourceCards,
@@ -301,13 +302,31 @@ export function MessageSources({
                       </div>
                     </div>
                   </a>
-                  {showDevSourceContextCopy && serverContextMarkdown && (
+                  {showDevSourceContextCopy && (
                     <CopyButton
-                      text={serverContextMarkdown}
+                      text={
+                        serverContextMarkdown ??
+                        buildSourceRecordSnapshotMarkdown({
+                          contextId: source.contextId,
+                          url: source.url,
+                          title: source.title,
+                          type: source.type,
+                          relevanceScore: source.relevanceScore,
+                          metadata: source.metadata,
+                        })
+                      }
                       size="sm"
                       className="mt-2 sm:mt-3 shrink-0"
-                      title="Copy Convex source context (Markdown)"
-                      ariaLabel="Copy Convex source context markdown"
+                      title={
+                        serverContextMarkdown
+                          ? "Copy Convex source context (Markdown)"
+                          : "Copy persisted source snapshot (Markdown)"
+                      }
+                      ariaLabel={
+                        serverContextMarkdown
+                          ? "Copy Convex source context markdown"
+                          : "Copy persisted source snapshot markdown"
+                      }
                     />
                   )}
                 </div>

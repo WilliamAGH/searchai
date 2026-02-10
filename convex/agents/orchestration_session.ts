@@ -32,6 +32,7 @@ export interface StreamingWorkflowArgs {
   userQuery: string;
   conversationContext?: string;
   webResearchSources?: WebResearchSource[];
+  includeDebugSourceContext?: boolean;
 }
 
 /**

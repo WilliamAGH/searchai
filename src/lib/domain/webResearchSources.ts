@@ -16,6 +16,7 @@ import { logger } from "@/lib/logger";
 import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
 export type WebSourceCard = {
+  contextId: string;
   url: string;
   title: string;
   type?: WebResearchSourceClient["type"];
@@ -90,6 +91,7 @@ export function toWebSourceCards(
 
     const fallbackTitle = getSafeHostname(src.url) || "Source";
     const nextCard: WebSourceCard = {
+      contextId: src.contextId,
       url: src.url,
       title: src.title || fallbackTitle,
       type: src.type,

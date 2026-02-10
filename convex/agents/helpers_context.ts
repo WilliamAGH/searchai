@@ -7,7 +7,6 @@ import type { WebResearchSource } from "../lib/validators";
 import { isUuidV7, normalizeUrl } from "./helpers_utils";
 
 const MAX_SOURCE_URL_LENGTH = 2048;
-const INCLUDE_DEBUG_SOURCE_CONTEXT = process.env.NODE_ENV !== "production";
 
 function normalizeSourceUrl(url: string | undefined): string | undefined {
   return normalizeHttpUrl(url, MAX_SOURCE_URL_LENGTH);
@@ -145,12 +144,16 @@ export function normalizeSourceContextIds(
   return { normalized, invalidCount: invalidSources.length };
 }
 
-export function buildWebResearchSourcesFromHarvested(harvested: {
-  scrapedContent: ScrapedHarvestedSource[];
-  searchResults: SearchHarvestedSource[];
-  failedScrapeUrls?: Set<string>;
-  failedScrapeErrors?: Map<string, string>;
-}): WebResearchSource[] {
+export function buildWebResearchSourcesFromHarvested(
+  harvested: {
+    scrapedContent: ScrapedHarvestedSource[];
+    searchResults: SearchHarvestedSource[];
+    failedScrapeUrls?: Set<string>;
+    failedScrapeErrors?: Map<string, string>;
+  },
+  options?: { includeDebugSourceContext?: boolean },
+): WebResearchSource[] {
+  const includeDebugSourceContext = options?.includeDebugSourceContext === true;
   const webResearchSources: WebResearchSource[] = [];
   const now = Date.now();
 
@@ -166,8 +169,11 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
     const metadata: Record<string, unknown> = {
       crawlAttempted: true,
       crawlSucceeded: true,
+      // Persist the cleaned body captured by scrape_webpage for downstream UI/debug copy.
+      scrapedBodyContent: scraped.content,
+      scrapedBodyContentLength: scraped.contentLength,
     };
-    if (INCLUDE_DEBUG_SOURCE_CONTEXT) {
+    if (includeDebugSourceContext) {
       metadata.serverContextMarkdown =
         buildScrapedSourceContextMarkdown(scraped);
     }
@@ -236,7 +242,7 @@ export function buildWebResearchSourcesFromHarvested(harvested: {
         metadata.markedLowRelevance = true;
         metadata.relevanceThreshold = RELEVANCE_SCORES.MEDIUM_THRESHOLD;
       }
-      if (INCLUDE_DEBUG_SOURCE_CONTEXT) {
+      if (includeDebugSourceContext) {
         metadata.serverContextMarkdown = buildSearchSourceContextMarkdown({
           source: result,
           crawlAttempted: wasFailedScrape,
