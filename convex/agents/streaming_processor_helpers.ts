@@ -14,9 +14,20 @@ import {
 } from "./streaming_harvest";
 import { isRecord } from "../lib/validators";
 
-export function isToolError(output: unknown): boolean {
+/**
+ * Determine whether a tool output should count toward the workflow-level
+ * fatal tool-error threshold.
+ *
+ * Scrape failures are expected in normal web crawling (403/robots/anti-bot),
+ * so `scrape_webpage` error payloads are treated as non-fatal and surfaced
+ * through harvested source metadata instead.
+ */
+export function isToolError(output: unknown, toolName: string): boolean {
   if (!isRecord(output)) return false;
-  return "error" in output && Boolean(output.error);
+  const hasError = "error" in output && Boolean(output.error);
+  if (!hasError) return false;
+  if (toolName === "scrape_webpage") return false;
+  return true;
 }
 
 export function hasToolContext(args: ToolCallArgs): boolean {
