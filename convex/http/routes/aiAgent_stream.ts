@@ -86,11 +86,14 @@ export async function handleAgentStream(
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let streamBroken = false;
       const sendEvent = (data: unknown) => {
+        if (streamBroken) return;
         try {
           controller.enqueue(encoder.encode(formatSseEvent(data)));
         } catch (error) {
           console.error("Failed to send SSE event:", serializeError(error));
+          streamBroken = true;
         }
       };
 
@@ -105,6 +108,7 @@ export async function handleAgentStream(
         });
 
         for await (const event of eventStream) {
+          if (streamBroken) break;
           sendEvent(event);
         }
 
