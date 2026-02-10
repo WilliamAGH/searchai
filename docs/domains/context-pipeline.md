@@ -2,6 +2,7 @@
 
 This file defines the active chat pipeline in strict terms.
 For provider-level cache behavior and optimization plan, see [`docs/domains/llm-caching.md`](./llm-caching.md).
+For exact runtime details of URL discovery/scraping/crawling, see [`docs/domains/scraping-crawling.md`](./scraping-crawling.md).
 
 ## Definitions
 
@@ -45,7 +46,7 @@ Typical English estimate: `4000` chars is about `650-800` words.
 4. Server builds canonical `conversationContext` from previously fetched messages. Current user message is passed separately as `userQuery` ([`convex/agents/orchestration_session.ts#L235`](../../convex/agents/orchestration_session.ts#L235), [`convex/agents/workflow_conversational.ts#L79`](../../convex/agents/workflow_conversational.ts#L79)).
 5. Agent runs (`run(..., stream: true)`) and may call `plan_research`, `search_web`, `scrape_webpage` in this same run ([`convex/agents/workflow_conversational.ts#L89`](../../convex/agents/workflow_conversational.ts#L89), [`convex/agents/tools.ts#L64`](../../convex/agents/tools.ts#L64)).
 6. Tool outputs are harvested from run stream events during this run ([`convex/agents/streaming_processor.ts#L228`](../../convex/agents/streaming_processor.ts#L228)).
-7. After run completion, harvested data is transformed into `webResearchSources`; for low relevance (`< 0.5`) search results, code sets `metadata.markedLowRelevance = true` on source metadata ([`convex/agents/helpers_context.ts#L139`](../../convex/agents/helpers_context.ts#L139), [`convex/agents/helpers_context.ts#L155`](../../convex/agents/helpers_context.ts#L155), [`convex/lib/constants/cache.ts#L50`](../../convex/lib/constants/cache.ts#L50)).
+7. After run completion, harvested data is transformed into `webResearchSources`; for low relevance (`< 0.5`) search results, code sets `metadata.markedLowRelevance = true` on source metadata ([`convex/agents/helpers_context.ts`](../../convex/agents/helpers_context.ts), [`convex/lib/constants/cache.ts#L50`](../../convex/lib/constants/cache.ts#L50)).
 8. This low-relevance flag is metadata only; it does not remove already-seen tool output from the current run and is not used by history-context construction ([`convex/agents/streaming_processor.ts#L228`](../../convex/agents/streaming_processor.ts#L228), [`convex/agents/helpers_builders.ts#L228`](../../convex/agents/helpers_builders.ts#L228)).
 9. Assistant message is persisted in the same `chatId` with `content` and `webResearchSources` ([`convex/agents/orchestration_persistence.ts#L127`](../../convex/agents/orchestration_persistence.ts#L127), [`convex/agents/orchestration_persistence.ts#L132`](../../convex/agents/orchestration_persistence.ts#L132)).
 10. Next turn repeats. Next-turn history context is rebuilt from persisted message `content` only.
@@ -62,7 +63,8 @@ Not included in next-turn `conversationContext`:
 - Raw `search_web` output.
 - Raw `scrape_webpage` content/output JSON.
 - `webResearchSources` metadata.
-- `markedLowRelevance` does not remove text from `conversationContext`; it is a metadata flag used after harvesting/persistence for source status ([`convex/agents/helpers_context.ts#L155`](../../convex/agents/helpers_context.ts#L155), [`convex/agents/orchestration_persistence.ts#L132`](../../convex/agents/orchestration_persistence.ts#L132), [`convex/agents/helpers_builders.ts#L238`](../../convex/agents/helpers_builders.ts#L238)).
+- `metadata.serverContextMarkdown` (dev inspection payload) is not read by history-context construction.
+- `markedLowRelevance` does not remove text from `conversationContext`; it is a metadata flag used after harvesting/persistence for source status ([`convex/agents/helpers_context.ts`](../../convex/agents/helpers_context.ts), [`convex/agents/orchestration_persistence.ts#L132`](../../convex/agents/orchestration_persistence.ts#L132), [`convex/agents/helpers_builders.ts#L238`](../../convex/agents/helpers_builders.ts#L238)).
 
 Carry-forward rule:
 
@@ -94,8 +96,9 @@ Code: [`convex/agents/helpers_builders.ts#L235`](../../convex/agents/helpers_bui
 
 ## URL Discovery And Crawling Stack
 
-- URL discovery: `search_web` -> `api.search.searchWeb` using SerpAPI -> OpenRouter -> DuckDuckGo -> fallback ([`convex/agents/tools_search.ts#L106`](../../convex/agents/tools_search.ts#L106), [`convex/search/search_web_handler.ts#L37`](../../convex/search/search_web_handler.ts#L37)).
-- Crawling/parsing: `scrape_webpage` -> `api.search.scraperAction.scrapeUrl` -> `scrapeUrlUnified` -> `scrapeWithCheerio` ([`convex/agents/tools_scrape.ts#L67`](../../convex/agents/tools_scrape.ts#L67), [`convex/search/scraperAction.ts#L22`](../../convex/search/scraperAction.ts#L22), [`convex/search/scraperUnified.ts#L12`](../../convex/search/scraperUnified.ts#L12), [`convex/search/scraper.ts#L52`](../../convex/search/scraper.ts#L52)).
+- URL discovery is `search_web` -> `api.search.searchWeb` with provider cascade SerpAPI -> OpenRouter -> DuckDuckGo -> fallback ([`convex/agents/tools_search.ts#L106`](../../convex/agents/tools_search.ts#L106), [`convex/search/search_web_handler.ts`](../../convex/search/search_web_handler.ts)).
+- Crawling/parsing is `scrape_webpage` -> `api.search.scraperAction.scrapeUrl` -> `scrapeUrlUnified` -> `scrapeWithCheerio` ([`convex/agents/tools_scrape.ts#L67`](../../convex/agents/tools_scrape.ts#L67), [`convex/search/scraperAction.ts`](../../convex/search/scraperAction.ts), [`convex/search/scraperUnified.ts`](../../convex/search/scraperUnified.ts), [`convex/search/scraper.ts`](../../convex/search/scraper.ts)).
+- Runtime boundary, dependency list, success/failure rules, and proxy/deployment details are defined in [`docs/domains/scraping-crawling.md`](./scraping-crawling.md).
 
 ## Active Path vs Dormant Code
 
