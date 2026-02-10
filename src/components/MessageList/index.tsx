@@ -136,12 +136,11 @@ export function MessageList({
           }
         }
 
-        // Reasoning should expand while streaming, collapse when content starts
+        // Reasoning should default to collapsed and only expand on user toggle
         if (hasReasoning) {
           const reasoningId = `reasoning-${id}`;
           if (prev[reasoningId] === undefined) {
-            // Show reasoning while it's being generated, collapse when content arrives
-            updates[reasoningId] = hasContent && !isStreaming;
+            updates[reasoningId] = true;
           }
         }
       });

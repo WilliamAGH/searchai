@@ -105,53 +105,27 @@ export function MessageItem({
             </div>
           )}
 
-        {/* 2) Thinking status - shows real-time AI processing */}
+        {/* 2) Reasoning / thinking - default collapsed */}
         {message.role === "assistant" &&
-          message.thinking &&
-          message.thinking.trim() && (
-            <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm max-w-full min-w-0 overflow-hidden">
-              <svg
-                className="w-4 h-4 animate-spin flex-shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <span className="min-w-0 break-words">{message.thinking}</span>
-            </div>
-          )}
-
-        {/* 3) Reasoning / thinking - positioned below sources */}
-        {message.role === "assistant" &&
-          message.reasoning &&
-          message.reasoning.trim() && (
+          ((message.reasoning && message.reasoning.trim()) ||
+            (message.thinking && message.thinking.trim())) && (
             <div className="mb-4">
               <ReasoningDisplay
                 id={messageId}
-                reasoning={message.reasoning}
+                reasoning={message.reasoning ?? ""}
+                thinkingText={message.thinking?.trim()}
+                isThinkingActive={Boolean(message.thinking?.trim())}
                 isStreaming={message.isStreaming}
                 hasStartedContent={Boolean(
                   message.content && message.content.trim(),
                 )}
-                collapsed={collapsedById[`reasoning-${messageId}`] ?? false}
+                collapsed={collapsedById[`reasoning-${messageId}`] ?? true}
                 onToggle={onToggleCollapsed}
               />
             </div>
           )}
 
-        {/* 4) Search progress status when streaming */}
+        {/* 3) Search progress status when streaming */}
         {message.role === "assistant" &&
           searchProgress &&
           searchProgress.stage !== "idle" && (
@@ -176,7 +150,7 @@ export function MessageItem({
             />
           )}
 
-        {/* 5) AI/user content last – always appears under sources/thinking */}
+        {/* 4) AI/user content last – always appears under sources/thinking */}
         <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden text-[15px] sm:text-base leading-6">
           {message.role === "assistant" ? (
             <ContentWithCitations
