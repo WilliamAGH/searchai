@@ -191,7 +191,9 @@ function ChatInterfaceComponent({
       : "skip",
   );
   const isReadOnly =
-    isSharedRoute && !!currentChatId && canWriteChat !== "allowed";
+    isSharedRoute &&
+    !!currentChatId &&
+    (canWriteChat === "denied" || canWriteChat === "not_found");
   useUrlStateSync({
     currentChatId,
     propChatId,
@@ -345,5 +347,4 @@ function ChatInterfaceComponent({
   );
 }
 
-export const ChatInterface = React.memo(ChatInterfaceComponent);
-export default ChatInterface;
+export default React.memo(ChatInterfaceComponent);
