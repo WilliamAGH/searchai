@@ -145,6 +145,12 @@ html.dark .prose code {
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /*
+   * Vertical breathing room around tables. Tailwind Preflight resets table
+   * margins to 0; we restore them here to match paragraph rhythm.
+   * CSS margin-collapsing prevents doubling with adjacent-element margins.
+   */
+  margin: 0.75rem 0;
 }
 
 .prose thead,
