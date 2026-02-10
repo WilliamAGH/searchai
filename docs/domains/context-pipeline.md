@@ -110,7 +110,7 @@ Code: [`convex/agents/helpers_builders.ts#L235`](../../convex/agents/helpers_bui
 ## URL Discovery And Crawling Stack
 
 - URL discovery is `search_web` -> `api.search.searchWeb` with provider cascade SerpAPI -> OpenRouter -> DuckDuckGo -> fallback ([`convex/agents/tools_search.ts#L106`](../../convex/agents/tools_search.ts#L106), [`convex/search/search_web_handler.ts`](../../convex/search/search_web_handler.ts)).
-- Crawling/parsing is `scrape_webpage` -> `api.search.scraperAction.scrapeUrl` -> `scrapeUrlUnified` -> `scrapeWithCheerio` ([`convex/agents/tools_scrape.ts#L67`](../../convex/agents/tools_scrape.ts#L67), [`convex/search/scraperAction.ts`](../../convex/search/scraperAction.ts), [`convex/search/scraperUnified.ts`](../../convex/search/scraperUnified.ts), [`convex/search/scraper.ts`](../../convex/search/scraper.ts)).
+- Crawling/parsing is `scrape_webpage` -> `api.search.scraperAction.scrapeUrl` -> `scrapeWithCheerio` ([`convex/agents/tools_scrape.ts#L67`](../../convex/agents/tools_scrape.ts#L67), [`convex/search/scraperAction.ts`](../../convex/search/scraperAction.ts), [`convex/search/scraper.ts`](../../convex/search/scraper.ts)).
 - Runtime boundary, dependency list, success/failure rules, and proxy/deployment details are defined in [`docs/domains/scraping-crawling.md`](./scraping-crawling.md).
 
 ## Active Path vs Dormant Code

@@ -7,7 +7,7 @@
 
 import { v } from "convex/values";
 import { action } from "../_generated/server";
-import { scrapeUrlUnified } from "./scraperUnified";
+import { scrapeWithCheerio } from "./scraper";
 import { validateScrapeUrl } from "../lib/url";
 
 export const scrapeUrl = action({
@@ -19,6 +19,6 @@ export const scrapeUrl = action({
     if (!validation.ok) {
       throw new Error(validation.error);
     }
-    return await scrapeUrlUnified(validation.url);
+    return await scrapeWithCheerio(validation.url);
   },
 });

@@ -44,12 +44,11 @@ This file defines the exact active behavior for URL discovery, scraping, and sou
 - Active scrape implementation path:
   - [`scrape_webpage` tool](../../convex/agents/tools_scrape.ts)
   - [`api.search.scraperAction.scrapeUrl`](../../convex/search/scraperAction.ts)
-  - [`scrapeUrlUnified`](../../convex/search/scraperUnified.ts)
   - [`scrapeWithCheerio`](../../convex/search/scraper.ts)
 - Active dependencies:
   - platform `fetch` in Convex Node runtime ([`convex/search/scraper.ts#L96`](../../convex/search/scraper.ts#L96))
   - [`cheerio`](../../package.json) HTML parsing ([`convex/search/scraper.ts#L9`](../../convex/search/scraper.ts#L9))
-- Playwright fallback is not active in this runtime path ([`convex/search/scraperUnified.ts#L5`](../../convex/search/scraperUnified.ts#L5)).
+- Playwright is not available in the Convex deployment runtime.
 
 ## Scrape Success/Failure Rules
 
