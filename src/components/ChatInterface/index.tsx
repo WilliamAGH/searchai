@@ -27,6 +27,7 @@ import { useConvexQueries } from "@/hooks/useConvexQueries";
 import { usePaginatedMessages } from "@/hooks/usePaginatedMessages";
 import { useEffectiveMessages } from "@/hooks/useEffectiveMessages";
 import { logger } from "@/lib/logger";
+import { DESKTOP_BREAKPOINT } from "@/lib/constants/layout";
 import { ChatLayout } from "@/components/ChatInterface/ChatLayout";
 import type { Chat } from "@/lib/types/chat";
 import { IdUtils } from "@/lib/types/unified";
@@ -273,7 +274,7 @@ function ChatInterfaceComponent({
     [isGenerating, analyzeDraft],
   );
   useAutoCreateFirstChat();
-  const isMobile = useIsMobile(1024);
+  const isMobile = useIsMobile(DESKTOP_BREAKPOINT);
   const { swipeHandlers, handleToggleSidebar, handleNewChatButton } =
     useKeyboardShortcuts({
       isMobile,

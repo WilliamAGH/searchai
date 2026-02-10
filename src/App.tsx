@@ -19,6 +19,7 @@ import { SignOutButton } from "@/SignOutButton";
 import { useClaimAnonymousChats } from "@/hooks/useClaimAnonymousChats";
 import { ChatPage } from "@/components/ChatPage";
 import { toastIcons } from "@/components/toastIcons";
+import { DESKTOP_BREAKPOINT } from "@/lib/constants/layout";
 
 export default function App() {
   const [showSignInModal, setShowSignInModal] = useState(false);
@@ -80,10 +81,10 @@ export default function App() {
       });
     };
 
-    let lastIsDesktop = window.innerWidth >= 1024;
+    let lastIsDesktop = window.innerWidth >= DESKTOP_BREAKPOINT;
 
     const handleResize = () => {
-      const isDesktop = window.innerWidth >= 1024;
+      const isDesktop = window.innerWidth >= DESKTOP_BREAKPOINT;
 
       if (hasManuallyToggled) {
         if (isDesktop !== lastIsDesktop) {
