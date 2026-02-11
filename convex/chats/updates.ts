@@ -71,10 +71,10 @@ export const updateRollingSummary = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    // No auth check: internalMutation is only reachable from trusted internal
+    // actions. Matches the pattern of internalUpdateChatTitle above.
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
-    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
     await ctx.db.patch(args.chatId, {
       rollingSummary: args.summary.slice(0, 2000),
