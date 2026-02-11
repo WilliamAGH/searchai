@@ -1,5 +1,6 @@
 "use node";
 
+import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { streamConversationalWorkflow } from "../../agents/orchestration";
 import { checkIpRateLimit } from "../../lib/rateLimit";
@@ -82,6 +83,21 @@ export async function handleAgentStream(
     payload.webResearchSources,
   );
   const includeDebugSourceContext = payload.includeDebugSourceContext === true;
+
+  // Gate: verify write access before starting the streaming workflow to prevent
+  // resource exhaustion (OpenAI API + Convex runtime) from unauthorized callers.
+  // @ts-ignore - TS2589: Known Convex limitation with complex type inference
+  const writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
+    chatId,
+    sessionId,
+  });
+  if (writeAccess !== "allowed") {
+    return corsResponse({
+      body: JSON.stringify({ error: "Unauthorized" }),
+      status: 403,
+      origin,
+    });
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
