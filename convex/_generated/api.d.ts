@@ -95,6 +95,7 @@ import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_constants_cache from "../lib/constants/cache.js";
 import type * as lib_constants_search from "../lib/constants/search.js";
+import type * as lib_constants_seo from "../lib/constants/seo.js";
 import type * as lib_dateTime from "../lib/dateTime.js";
 import type * as lib_debugUtils from "../lib/debugUtils.js";
 import type * as lib_errors from "../lib/errors.js";
@@ -241,6 +242,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/constants/cache": typeof lib_constants_cache;
   "lib/constants/search": typeof lib_constants_search;
+  "lib/constants/seo": typeof lib_constants_seo;
   "lib/dateTime": typeof lib_dateTime;
   "lib/debugUtils": typeof lib_debugUtils;
   "lib/errors": typeof lib_errors;

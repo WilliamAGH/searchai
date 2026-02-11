@@ -7,10 +7,16 @@
  */
 
 import { httpAction } from "../../_generated/server";
+import type { ActionCtx } from "../../_generated/server";
 import { api } from "../../_generated/api";
 import type { HttpRouter } from "convex/server";
 import { publicCorsResponse } from "../cors";
 import { isValidUuidV7 } from "../../lib/uuid_validation";
+import {
+  descriptionForPrivacy,
+  robotsForPrivacy,
+  DEFAULT_CHAT_TITLE,
+} from "../../lib/constants/seo";
 
 const MAX_ID_PARAM_LENGTH = 100;
 
@@ -21,26 +27,23 @@ type OgMeta = {
   robots: string;
 };
 
-function buildDescription(privacy: string): string {
-  if (privacy === "shared") return "Shared Research Chat on SearchAI";
-  return "AI-Powered Research Chat on SearchAI";
-}
-
-function buildRobots(privacy: string): string {
-  return privacy === "public" ? "index, follow" : "noindex, nofollow";
-}
-
 async function resolveChat(
-  ctx: { runQuery: typeof Object.prototype.constructor },
+  ctx: ActionCtx,
   shareId: string | undefined,
   publicId: string | undefined,
 ): Promise<{ title?: string; privacy?: string } | null> {
   if (shareId) {
-    // @ts-ignore - Known Convex TS2589 type instantiation issue on api.chats.*
+    // @ts-ignore — Permanent Convex limitation: deeply nested generated types
+    // in api.chats.* hit TypeScript's TS2589 "type instantiation excessively
+    // deep" cap. The same suppression is used across all HTTP route files
+    // (publish_export_data.ts, etc.). Convex tracks this upstream.
     return ctx.runQuery(api.chats.getChatByShareIdHttp, { shareId });
   }
   if (publicId) {
-    // @ts-ignore - Known Convex TS2589 type instantiation issue on api.chats.*
+    // @ts-ignore — Permanent Convex limitation: deeply nested generated types
+    // in api.chats.* hit TypeScript's TS2589 "type instantiation excessively
+    // deep" cap. The same suppression is used across all HTTP route files
+    // (publish_export_data.ts, etc.). Convex tracks this upstream.
     return ctx.runQuery(api.chats.getChatByPublicId, { publicId });
   }
   return null;
@@ -98,10 +101,10 @@ export function registerOgMetaRoutes(http: HttpRouter) {
 
       const privacy = chat.privacy ?? "private";
       const meta: OgMeta = {
-        title: typeof chat.title === "string" ? chat.title : "Chat on SearchAI",
-        description: buildDescription(privacy),
+        title: typeof chat.title === "string" ? chat.title : DEFAULT_CHAT_TITLE,
+        description: descriptionForPrivacy(privacy),
         privacy,
-        robots: buildRobots(privacy),
+        robots: robotsForPrivacy(privacy),
       };
 
       return publicCorsResponse({

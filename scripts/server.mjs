@@ -6,6 +6,7 @@ import http from "node:http";
 import { createReadStream, readFileSync, statSync, existsSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { Readable } from "node:stream";
+import { fetchOgMeta, injectMetaTags, SITE_URL } from "./lib/seoInject.mjs";
 
 const DIST_DIR = resolve("./dist");
 const DIST_PATH_PREFIX = `${DIST_DIR}${DIST_DIR.endsWith("/") ? "" : "/"}`;
@@ -13,14 +14,17 @@ const PORT = process.env.PORT || 3000;
 // Prefer explicit CONVEX_SITE_URL when provided; otherwise derive from
 // VITE_CONVEX_URL by swapping .convex.cloud → .convex.site
 const deriveConvexSite = (val = "") => {
+  if (!val) return "";
   try {
-    if (!val) return "";
     const u = new URL(val);
     const host = u.host.replace(".convex.cloud", ".convex.site");
     return `${u.protocol}//${host}`.replace(/\/+$/, "");
   } catch (error) {
-    console.error("Failed to derive Convex site URL", { value: val, error });
-    return (val || "").replace(/\/+$/, "");
+    console.error("FATAL: VITE_CONVEX_URL is not a valid URL", {
+      value: val,
+      error,
+    });
+    process.exit(1);
   }
 };
 
@@ -40,73 +44,6 @@ const INDEX_HTML_PATH = resolve(DIST_DIR, "index.html");
 const cachedIndexHtml = existsSync(INDEX_HTML_PATH)
   ? readFileSync(INDEX_HTML_PATH, "utf-8")
   : "";
-
-const OG_META_TIMEOUT_MS = 3000;
-const SITE_URL = "https://search-ai.io";
-
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-async function fetchOgMeta(queryString) {
-  const target = `${CONVEX_SITE_URL}/api/ogMeta?${queryString}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OG_META_TIMEOUT_MS);
-  try {
-    const resp = await fetch(target, { signal: controller.signal });
-    if (!resp.ok) return null;
-    return await resp.json();
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function injectMetaTags(html, meta, canonicalUrl) {
-  const safeTitle = escapeHtml(meta.title);
-  const safeDesc = escapeHtml(meta.description);
-  const safeUrl = escapeHtml(canonicalUrl);
-  const fullTitle = `${safeTitle} · SearchAI`;
-  let result = html;
-  result = result.replace(
-    /<title>[^<]*<\/title>/,
-    `<title>${fullTitle}</title>`,
-  );
-  result = result.replace(
-    /(<meta\s+property="og:title"\s+content=")[^"]*(")/,
-    `$1${fullTitle}$2`,
-  );
-  result = result.replace(
-    /(<meta\s+property="og:description"[\s\S]*?content=")[^"]*(")/,
-    `$1${safeDesc}$2`,
-  );
-  result = result.replace(
-    /(<meta\s+property="og:url"\s+content=")[^"]*(")/,
-    `$1${safeUrl}$2`,
-  );
-  result = result.replace(
-    /(<meta\s+name="twitter:title"\s+content=")[^"]*(")/,
-    `$1${fullTitle}$2`,
-  );
-  result = result.replace(
-    /(<meta\s+name="twitter:description"[\s\S]*?content=")[^"]*(")/,
-    `$1${safeDesc}$2`,
-  );
-  result = result.replace(
-    /(<meta\s+name="twitter:url"\s+content=")[^"]*(")/,
-    `$1${safeUrl}$2`,
-  );
-  result = result.replace(
-    /(<meta\s+name="robots"\s+content=")[^"]*(")/,
-    `$1${meta.robots}$2`,
-  );
-  return result;
-}
 
 const mime = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -132,10 +69,13 @@ const PUBLISH_WINDOW_MS = Number(
 ); // 5 minutes
 const publishHits = new Map(); // key -> array of timestamps
 
-function rateLimited(remote, now = Date.now()) {
+/** Check rate limit and atomically record the hit in one step. */
+function checkAndRecordHit(remote) {
+  const now = Date.now();
   const key = remote || "unknown";
-  const arr = publishHits.get(key) || [];
-  const fresh = arr.filter((t) => now - t < PUBLISH_WINDOW_MS);
+  const fresh = (publishHits.get(key) || []).filter(
+    (t) => now - t < PUBLISH_WINDOW_MS,
+  );
   if (fresh.length >= PUBLISH_MAX) {
     publishHits.set(key, fresh);
     return {
@@ -247,7 +187,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url.startsWith("/api/publishChat")) {
       const remote =
         req.socket?.remoteAddress || req.headers["x-forwarded-for"];
-      const rl = rateLimited(String(remote || ""));
+      const remoteKey = String(remote || "");
+      const rl = checkAndRecordHit(remoteKey);
       if (rl.limited) {
         res.writeHead(429, {
           "Content-Type": "application/json",
@@ -301,14 +242,44 @@ const server = http.createServer(async (req, res) => {
       const routePrefix = shareMatch ? "/s/" : "/p/";
       const routeId = shareMatch ? shareMatch[1] : publicMatch[1];
       const canonicalUrl = `${SITE_URL}${routePrefix}${routeId}`;
-      const meta = await fetchOgMeta(qp);
-      const html = meta
-        ? injectMetaTags(cachedIndexHtml, meta, canonicalUrl)
-        : cachedIndexHtml;
+      const result = await fetchOgMeta(CONVEX_SITE_URL, qp);
+      let html;
+      let cacheControl;
+      let ogMetaStatus;
+      if (result.ok && result.data) {
+        html = injectMetaTags({
+          html: cachedIndexHtml,
+          meta: result.data,
+          canonicalUrl,
+        });
+        cacheControl = "public, max-age=60";
+        ogMetaStatus = "resolved";
+      } else if (!result.ok) {
+        console.error("[ogMeta] Infrastructure failure fetching metadata", {
+          queryString: qp,
+          error: result.error,
+        });
+        // Return 502 so crawlers know the metadata is unreliable and won't
+        // cache stale OG tags.  Browsers still render 502 HTML bodies, so
+        // the SPA boots normally for human visitors.
+        res.writeHead(502, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Content-Length": Buffer.byteLength(cachedIndexHtml),
+          "Cache-Control": "no-store",
+          "X-OG-Meta-Status": "error",
+        });
+        res.end(cachedIndexHtml);
+        return;
+      } else {
+        html = cachedIndexHtml;
+        cacheControl = "no-cache";
+        ogMetaStatus = "not-found";
+      }
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
         "Content-Length": Buffer.byteLength(html),
-        "Cache-Control": "no-cache",
+        "Cache-Control": cacheControl,
+        "X-OG-Meta-Status": ogMetaStatus,
       });
       res.end(html);
       return;
