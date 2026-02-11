@@ -125,19 +125,35 @@ export class ConvexStreamHandler {
       return this.parseStreamEvent(WorkflowStartEventSchema, evt);
     }
     if (evt.type === "complete") {
-      return (
-        this.parseStreamEvent(CompleteEventSchema, evt) ?? {
-          type: "complete" as const,
-        }
-      );
+      const parsed = this.parseStreamEvent(CompleteEventSchema, evt);
+      if (!parsed) {
+        logger.warn(
+          "Emitting synthetic complete event after validation failure",
+          {
+            sessionId: this.sessionId,
+          },
+        );
+        return { type: "complete" as const };
+      }
+      return parsed;
     }
     if (evt.type === "error") {
-      return (
-        this.parseStreamEvent(ErrorEventSchema, evt) ?? {
+      const parsed = this.parseStreamEvent(ErrorEventSchema, evt);
+      if (!parsed) {
+        const rawError =
+          "error" in evt && typeof evt.error === "string"
+            ? evt.error
+            : undefined;
+        logger.warn("Emitting synthetic error event after validation failure", {
+          rawError,
+          sessionId: this.sessionId,
+        });
+        return {
           type: "error" as const,
-          error: "Received malformed error response from server",
-        }
-      );
+          error: rawError ?? "Received malformed error response from server",
+        };
+      }
+      return parsed;
     }
     if (evt.type === "persisted") {
       return this.handlePersistedEvent(evt);
