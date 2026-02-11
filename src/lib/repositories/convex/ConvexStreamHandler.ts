@@ -158,6 +158,10 @@ export class ConvexStreamHandler {
     if (evt.type === "persisted") {
       return this.handlePersistedEvent(evt);
     }
+    logger.warn("Unrecognized SSE event type, skipping", {
+      type: evt.type,
+      sessionId: this.sessionId,
+    });
     return null;
   }
 
@@ -170,7 +174,11 @@ export class ConvexStreamHandler {
         error: parsed.error,
         sessionId: this.sessionId,
       });
-      return null;
+      return {
+        type: "error" as const,
+        error:
+          "Failed to verify message was saved. Your response may still be available on refresh.",
+      };
     }
 
     const signingKey = env.agentSigningKey;
@@ -232,7 +240,11 @@ export class ConvexStreamHandler {
         error: getErrorMessage(error),
         assistantMessageId: parsed.data.payload.assistantMessageId,
       });
-      return null;
+      return {
+        type: "error" as const,
+        error:
+          "Failed to confirm message was saved. Your response may still be available on refresh.",
+      };
     }
 
     return {
