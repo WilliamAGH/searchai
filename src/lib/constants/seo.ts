@@ -19,4 +19,10 @@ export const SEO = {
   locale: "en_US",
   sharedDescription: "Shared Research Chat on SearchAI",
   publicDescription: "AI-Powered Research Chat on SearchAI",
+  selectors: {
+    ogTitle: 'meta[property="og:title"]',
+    ogDescription: 'meta[property="og:description"]',
+    twitterTitle: 'meta[name="twitter:title"]',
+    twitterDescription: 'meta[name="twitter:description"]',
+  },
 } as const;

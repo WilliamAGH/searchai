@@ -202,7 +202,12 @@ function ChatInterfaceComponent({
     chatByPublicId,
     selectChat: unified.selectChat,
   });
-  useMetaTags({ currentChatId, allChats });
+  useMetaTags({
+    currentChatId,
+    allChats,
+    shareId: propShareId,
+    publicId: propPublicId,
+  });
   const handleNewChat = useCallback(
     async (_opts?: { userInitiated?: boolean }): Promise<string | null> => {
       setIsCreatingChat(true);
