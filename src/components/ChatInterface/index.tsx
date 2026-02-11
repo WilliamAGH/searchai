@@ -106,15 +106,11 @@ function ChatInterfaceComponent({
   // to synchronous void, matching the useComponentProps interface.
   // These MUST be useCallback — inline arrows would break useMemo memoization.
   const handleDeleteChat = useCallback(
-    (id: Id<"chats"> | string) => {
-      void requestDeleteChat(id);
-    },
+    (id: Id<"chats"> | string) => void requestDeleteChat(id),
     [requestDeleteChat],
   );
   const handleDeleteMessage = useCallback(
-    (id: Id<"messages"> | string) => {
-      void requestDeleteMessage(id);
-    },
+    (id: Id<"messages"> | string) => void requestDeleteMessage(id),
     [requestDeleteMessage],
   );
   const handleSelectChat = useCallback(
