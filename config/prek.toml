@@ -12,10 +12,6 @@ default_install_hook_types = ["pre-commit", "pre-push"]
 repo = "local"
 hooks = [
   # ── Pre-commit hooks ──────────────────────────────────────────────
-  # p0: auto-format all files so formatting issues never reach the commit
-  { id = "format", name = "Auto-format", language = "system", entry = "npm run format", always_run = true, pass_filenames = false, stages = [
-    "pre-commit",
-  ], priority = 0 },
   # p10: typecheck + build in parallel (independent, both fast-fail)
   { id = "typecheck", name = "TypeScript type check", language = "system", entry = "npm run typecheck", always_run = true, pass_filenames = false, stages = [
     "pre-commit",

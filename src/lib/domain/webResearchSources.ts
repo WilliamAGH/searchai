@@ -16,16 +16,40 @@ import { logger } from "@/lib/logger";
 import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
 export type WebSourceCard = {
+  contextId: string;
   url: string;
   title: string;
   type?: WebResearchSourceClient["type"];
   relevanceScore?: number;
+  metadata?: WebResearchSourceClient["metadata"];
 };
 
-function normalizeUrlKey(rawUrl: string): string | null {
+function isFailureMetadata(
+  metadata: WebResearchSourceClient["metadata"] | undefined,
+): boolean {
+  return (
+    metadata?.crawlAttempted === true && metadata?.crawlSucceeded === false
+  );
+}
+
+function isLowRelevanceMetadata(
+  metadata: WebResearchSourceClient["metadata"] | undefined,
+): boolean {
+  return metadata?.markedLowRelevance === true;
+}
+
+function getSourceCardPriority(card: WebSourceCard): number {
+  if (card.type === "scraped_page") return 4;
+  if (isFailureMetadata(card.metadata)) return 3;
+  if (isLowRelevanceMetadata(card.metadata)) return 2;
+  if (card.type === "search_result") return 1;
+  return 0;
+}
+
+export function toNormalizedUrlKey(rawUrl: string): string | null {
   const u = safeParseHttpUrl(rawUrl);
   if (!u) {
-    logger.warn("normalizeUrlKey: URL rejected during normalization", {
+    logger.warn("toNormalizedUrlKey: URL rejected during normalization", {
       url: rawUrl.trim(),
     });
     return null;
@@ -62,16 +86,27 @@ export function toWebSourceCards(
 
   const byUrl = new Map<string, WebSourceCard>();
   for (const src of withUrls) {
-    const key = normalizeUrlKey(src.url);
-    if (!key || byUrl.has(key)) continue;
+    const key = toNormalizedUrlKey(src.url);
+    if (!key) continue;
 
     const fallbackTitle = getSafeHostname(src.url) || "Source";
-    byUrl.set(key, {
+    const nextCard: WebSourceCard = {
+      contextId: src.contextId,
       url: src.url,
       title: src.title || fallbackTitle,
       type: src.type,
       relevanceScore: src.relevanceScore,
-    });
+      metadata: src.metadata,
+    };
+    const existingCard = byUrl.get(key);
+    if (!existingCard) {
+      byUrl.set(key, nextCard);
+      continue;
+    }
+
+    if (getSourceCardPriority(nextCard) > getSourceCardPriority(existingCard)) {
+      byUrl.set(key, nextCard);
+    }
   }
 
   return Array.from(byUrl.values());

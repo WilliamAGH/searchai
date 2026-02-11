@@ -8,9 +8,10 @@
  * Notes
  * - Intentionally keeps props minimal to avoid leaking unrelated UI state.
  * - Uses optional `chatActions.shareChat` to persist/upgrade sharing mode.
- * - Computes `exportBase` via optional `resolveApi` helper or window.origin.
+ * - Export URLs use the branded origin (window.location.origin) so that
+ *   shared links point to search-ai.io, not the raw Convex deployment.
+ *   The production server and Vite dev proxy both forward /api/* to Convex.
  */
-import { useMemo } from "react";
 import { ShareModal } from "@/components/ShareModal";
 import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
 
@@ -32,7 +33,6 @@ interface ShareChatActions {
  * Minimal prop surface needed by ShareModalContainer.
  * - `currentChat` supplies existing privacy and IDs (if any).
  * - `chatActions` provides an optional `shareChat` action to persist changes.
- * - `resolveApi` maps a relative API path to an absolute URL for export.
  */
 interface ShareModalContainerProps {
   isOpen: boolean;
@@ -45,40 +45,32 @@ interface ShareModalContainerProps {
     messages?: Array<{
       role: "user" | "assistant" | "system";
       content?: string;
-      webResearchSources?: WebResearchSourceClient[] | undefined;
+      webResearchSources?: WebResearchSourceClient[];
     }>;
   } | null;
   chatActions?: ShareChatActions;
-  resolveApi?: (path: string) => string;
 }
 
-export function ShareModalContainer(props: ShareModalContainerProps) {
-  const { resolveApi } = props;
+export function ShareModalContainer(props: Readonly<ShareModalContainerProps>) {
   const privacy = props.currentChat?.privacy || "private";
   const shareId = props.currentChat?.shareId || undefined;
   const publicId = props.currentChat?.publicId || undefined;
 
-  const exportBase = useMemo(() => {
-    if (typeof resolveApi === "function") {
-      try {
-        return resolveApi("/api/chatTextMarkdown");
-      } catch (error) {
-        // Fall back to default if resolveApi fails
-        console.error("Failed to resolve API path", error);
-      }
-    }
-    return `${window.location.origin}/api/chatTextMarkdown`;
-  }, [resolveApi]);
+  // Use branded origin so export URLs point to search-ai.io, not the raw
+  // Convex deployment. The /api/* proxy (server.mjs + Vite dev) forwards
+  // requests to the Convex HTTP layer transparently.
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const exportBase = `${origin}/api/chatTextMarkdown`;
 
   const onShare = async (
-    p: ChatPrivacy,
+    privacy: ChatPrivacy,
   ): Promise<{ shareId?: string; publicId?: string } | void> => {
     if (!props.currentChatId) return;
-    if (p === "private") return;
+    if (privacy === "private") return;
     if (props.chatActions?.shareChat) {
       const result = await props.chatActions.shareChat(
         props.currentChatId,
-        p === "shared" ? "shared" : "public",
+        privacy,
       );
       return result;
     }

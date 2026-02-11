@@ -2,7 +2,7 @@
 
 import { generateMessageId } from "../lib/id_generator";
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
-import { isUuidV7, normalizeUrl } from "./orchestration_helpers";
+import { isUuidV7, normalizeUrl } from "./helpers_utils";
 import {
   safeParseSearchToolOutput,
   safeParseScrapeToolOutput,
@@ -58,6 +58,26 @@ export function harvestScrapedContent(
 
   // Normalize URL for deduplication
   const normalizedUrl = normalizeUrl(rawUrl) ?? rawUrl;
+  const hasScrapeFailure =
+    (typeof parsed.error === "string" && parsed.error.length > 0) ||
+    (typeof parsed.errorMessage === "string" &&
+      parsed.errorMessage.length > 0) ||
+    parsed.contentLength === 0;
+
+  if (hasScrapeFailure) {
+    harvested.failedScrapeUrls.add(normalizedUrl);
+    if (
+      typeof parsed.errorMessage === "string" &&
+      parsed.errorMessage.trim().length > 0
+    ) {
+      harvested.failedScrapeErrors.set(normalizedUrl, parsed.errorMessage);
+    }
+    return false;
+  }
+
+  harvested.failedScrapeUrls.delete(normalizedUrl);
+  harvested.failedScrapeErrors.delete(normalizedUrl);
+
   if (harvested.scrapedUrls.has(normalizedUrl)) {
     return false; // Duplicate
   }

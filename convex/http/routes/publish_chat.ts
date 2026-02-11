@@ -1,5 +1,6 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
+import { checkIpRateLimit } from "../../lib/rateLimit";
 import { isValidUuidV7 } from "../../lib/uuid";
 import { isRecord } from "../../lib/validators";
 import { serializeError } from "../utils";
@@ -8,7 +9,10 @@ import {
   corsResponse,
   validateOrigin,
 } from "../cors";
-import { sanitizeWebResearchSources } from "./aiAgent_utils";
+import {
+  rateLimitExceededResponse,
+  sanitizeWebResearchSources,
+} from "./aiAgent_utils";
 
 const TITLE_MAX_LENGTH = 200;
 const MAX_MESSAGES = 100;
@@ -51,37 +55,32 @@ function parsePublishMessages(raw: unknown): ParsedPublishPayload["messages"] {
   return raw.slice(0, MAX_MESSAGES).map((m: unknown) => {
     const msg = isRecord(m) ? m : {};
     return {
-      role: (msg.role === "user" ? "user" : "assistant") as
-        | "user"
-        | "assistant",
+      role: msg.role === "user" ? "user" : "assistant",
       content:
         typeof msg.content === "string"
           ? msg.content.slice(0, CONTENT_MAX_LENGTH)
           : undefined,
       webResearchSources: sanitizeWebResearchSources(msg.webResearchSources),
       timestamp:
-        typeof msg.timestamp === "number" && isFinite(msg.timestamp)
+        typeof msg.timestamp === "number" && Number.isFinite(msg.timestamp)
           ? Math.floor(msg.timestamp)
           : undefined,
     };
   });
 }
 
-type ShareUrlEnv = {
-  siteUrl: string;
-  convexSiteUrl: string;
-};
-
 function buildShareUrls(
   result: { shareId: string; publicId: string },
   allowOrigin: string,
-  env: ShareUrlEnv,
+  siteUrl: string,
 ) {
   const baseUrl =
-    allowOrigin !== "*" && allowOrigin !== "null" ? allowOrigin : env.siteUrl;
-  const convexBase = env.convexSiteUrl.replace(/\/+$/, "");
-  const exportBase = convexBase
-    ? `${convexBase}/api/exportChat`
+    allowOrigin !== "*" && allowOrigin !== "null" ? allowOrigin : siteUrl;
+  // Use the branded base URL for export links so they point to
+  // search-ai.io/api/exportChat instead of the raw Convex deployment.
+  // The /api/* proxy (server.mjs) forwards to Convex transparently.
+  const exportBase = baseUrl
+    ? `${baseUrl.replace(/\/+$/, "")}/api/exportChat`
     : `/api/exportChat`;
   return {
     shareUrl: `${baseUrl}/s/${result.shareId}`,
@@ -98,6 +97,11 @@ export async function handlePublishChat(
   const origin = request.headers.get("Origin");
   const allowOrigin = validateOrigin(origin);
   if (!allowOrigin) return buildUnauthorizedOriginResponse();
+
+  const rateLimit = checkIpRateLimit(request, "/api/publish_chat", 5, 60_000);
+  if (!rateLimit.allowed) {
+    return rateLimitExceededResponse(rateLimit.resetAt, allowOrigin);
+  }
 
   let rawPayload: unknown;
   try {
@@ -129,15 +133,16 @@ export async function handlePublishChat(
   const payload = parsePublishPayload(record);
 
   try {
-    // @ts-ignore - TS2589: Known Convex limitation with complex type inference
     const result = await ctx.runMutation(
+      // @ts-ignore - TS2589: Known Convex limitation with complex type inference
       api.chats.publishAnonymousChat,
       payload,
     );
-    const urls = buildShareUrls(result, allowOrigin, {
-      siteUrl: process.env.SITE_URL || "",
-      convexSiteUrl: process.env.CONVEX_SITE_URL || "",
-    });
+    const urls = buildShareUrls(
+      result,
+      allowOrigin,
+      process.env.SITE_URL || "",
+    );
     return corsResponse({
       body: JSON.stringify({ ...result, ...urls }),
       status: 200,

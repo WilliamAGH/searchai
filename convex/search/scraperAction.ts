@@ -2,12 +2,12 @@
 
 /**
  * Scraper Actions - Node runtime only
- * Handles webpage scraping with Cheerio and Playwright fallback
+ * Handles webpage scraping with the Cheerio-based scraper path.
  */
 
 import { v } from "convex/values";
 import { action } from "../_generated/server";
-import { scrapeUrlUnified } from "./scraperUnified";
+import { scrapeWithCheerio } from "./scraper";
 import { validateScrapeUrl } from "../lib/url";
 
 export const scrapeUrl = action({
@@ -19,6 +19,6 @@ export const scrapeUrl = action({
     if (!validation.ok) {
       throw new Error(validation.error);
     }
-    return await scrapeUrlUnified(validation.url);
+    return await scrapeWithCheerio(validation.url);
   },
 });

@@ -42,6 +42,7 @@ export class ConvexStreamHandler {
     try {
       const host = window.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
+      const includeDebugSourceContext = isDev || env.isDev;
       const apiUrl = isDev
         ? "/api/ai/agent/stream"
         : `${env.convexUrl.replace(".convex.cloud", ".convex.site")}/api/ai/agent/stream`;
@@ -65,6 +66,7 @@ export class ConvexStreamHandler {
             )
             .join("\n")
             .slice(0, 4000),
+          includeDebugSourceContext,
         }),
       });
 
@@ -123,14 +125,43 @@ export class ConvexStreamHandler {
       return this.parseStreamEvent(WorkflowStartEventSchema, evt);
     }
     if (evt.type === "complete") {
-      return this.parseStreamEvent(CompleteEventSchema, evt);
+      const parsed = this.parseStreamEvent(CompleteEventSchema, evt);
+      if (!parsed) {
+        logger.warn(
+          "Emitting synthetic complete event after validation failure",
+          {
+            sessionId: this.sessionId,
+          },
+        );
+        return { type: "complete" as const };
+      }
+      return parsed;
     }
     if (evt.type === "error") {
-      return this.parseStreamEvent(ErrorEventSchema, evt);
+      const parsed = this.parseStreamEvent(ErrorEventSchema, evt);
+      if (!parsed) {
+        const rawError =
+          "error" in evt && typeof evt.error === "string"
+            ? evt.error
+            : undefined;
+        logger.warn("Emitting synthetic error event after validation failure", {
+          rawError,
+          sessionId: this.sessionId,
+        });
+        return {
+          type: "error" as const,
+          error: rawError ?? "Received malformed error response from server",
+        };
+      }
+      return parsed;
     }
     if (evt.type === "persisted") {
       return this.handlePersistedEvent(evt);
     }
+    logger.warn("Unrecognized SSE event type, skipping", {
+      type: evt.type,
+      sessionId: this.sessionId,
+    });
     return null;
   }
 
@@ -143,7 +174,11 @@ export class ConvexStreamHandler {
         error: parsed.error,
         sessionId: this.sessionId,
       });
-      return null;
+      return {
+        type: "error" as const,
+        error:
+          "Failed to verify message was saved. Your response may still be available on refresh.",
+      };
     }
 
     const signingKey = env.agentSigningKey;
@@ -180,7 +215,10 @@ export class ConvexStreamHandler {
               nonce: parsed.data.nonce,
             },
           );
-          return null;
+          return {
+            type: "error" as const,
+            error: "Message integrity verification failed. Please refresh.",
+          };
         }
 
         logger.debug("[OK] Signature verified for persisted event", {
@@ -202,7 +240,11 @@ export class ConvexStreamHandler {
         error: getErrorMessage(error),
         assistantMessageId: parsed.data.payload.assistantMessageId,
       });
-      return null;
+      return {
+        type: "error" as const,
+        error:
+          "Failed to confirm message was saved. Your response may still be available on refresh.",
+      };
     }
 
     return {

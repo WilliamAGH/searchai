@@ -14,7 +14,7 @@ import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { CACHE_TTL, CONTENT_LIMITS } from "../lib/constants/cache";
 import { getErrorMessage } from "../lib/errors";
-import { buildConversationContext } from "./orchestration_helpers";
+import { buildConversationContext } from "./helpers_builders";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
 import type { ChatQueryResult, MessageQueryResult } from "../schemas/agents";
 import type { WebResearchSource } from "../lib/validators";
@@ -32,6 +32,7 @@ export interface StreamingWorkflowArgs {
   userQuery: string;
   conversationContext?: string;
   webResearchSources?: WebResearchSource[];
+  includeDebugSourceContext?: boolean;
 }
 
 /**
@@ -91,6 +92,32 @@ export async function initializeWorkflowSession(
   workflowId: string,
   nonce: string,
 ): Promise<WorkflowSessionResult> {
+  // Write-access gate: check BEFORE minting a workflow token.
+  // Infrastructure failures (network, Convex errors) are caught separately
+  // from auth denial and not-found — keep the three failure modes distinct.
+  let writeAccess: "allowed" | "denied" | "not_found";
+  try {
+    writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
+      chatId: args.chatId,
+      sessionId: args.sessionId,
+    });
+  } catch (queryError) {
+    throw new Error(
+      `Failed to verify write access for chat ${args.chatId}: ` +
+        `${getErrorMessage(queryError, "query failed")}`,
+      { cause: queryError },
+    );
+  }
+  if (writeAccess === "not_found") {
+    throw new Error(`Chat not found: ${args.chatId}`);
+  }
+  if (writeAccess === "denied") {
+    throw new Error(
+      `Unauthorized: no write access to chat ${args.chatId} ` +
+        `(sessionId=${args.sessionId ? "present" : "absent"})`,
+    );
+  }
+
   // 1. Create workflow token
   const issuedAt = Date.now();
   const workflowTokenPayload: {

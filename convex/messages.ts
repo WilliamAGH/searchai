@@ -4,29 +4,27 @@ import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { vWebResearchSource, vSearchMethod } from "./lib/validators";
 import { generateMessageId, generateThreadId } from "./lib/id_generator";
-import { getErrorMessage } from "./lib/errors";
-import {
-  isAuthorized,
-  isUnownedChat,
-  hasSessionAccess,
-  isValidWorkflowToken,
-} from "./lib/auth";
+import { isValidWorkflowToken } from "./lib/auth";
+import { hasChatWriteAccess, isHttpWriteAuthorized } from "./chats/writeAccess";
 import { buildMessageInsertDocument } from "./messages_insert_document";
+
+const messageBaseArgs = {
+  chatId: v.id("chats"),
+  role: v.union(v.literal("user"), v.literal("assistant")),
+  content: v.optional(v.string()),
+  isStreaming: v.optional(v.boolean()),
+  streamedContent: v.optional(v.string()),
+  thinking: v.optional(v.string()),
+  reasoning: v.optional(v.string()),
+  searchMethod: v.optional(vSearchMethod),
+  hasRealResults: v.optional(v.boolean()),
+  webResearchSources: v.optional(v.array(vWebResearchSource)),
+  workflowId: v.optional(v.string()),
+  sessionId: v.optional(v.string()),
+};
+
 export const addMessage = internalMutation({
-  args: {
-    chatId: v.id("chats"),
-    role: v.union(v.literal("user"), v.literal("assistant")),
-    content: v.optional(v.string()),
-    isStreaming: v.optional(v.boolean()),
-    streamedContent: v.optional(v.string()),
-    thinking: v.optional(v.string()),
-    reasoning: v.optional(v.string()),
-    searchMethod: v.optional(vSearchMethod),
-    hasRealResults: v.optional(v.boolean()),
-    webResearchSources: v.optional(v.array(vWebResearchSource)),
-    workflowId: v.optional(v.string()),
-    sessionId: v.optional(v.string()),
-  },
+  args: { ...messageBaseArgs },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -34,12 +32,10 @@ export const addMessage = internalMutation({
 
     if (!chat) throw new Error("Chat not found");
 
-    const authorized =
-      isAuthorized(chat, userId, args.sessionId) ||
-      (isUnownedChat(chat) && !!args.sessionId);
-
-    if (!authorized) {
-      throw new Error("Unauthorized");
+    if (!hasChatWriteAccess(chat, userId, args.sessionId)) {
+      throw new Error(
+        `Unauthorized: addMessage denied for chat ${args.chatId}`,
+      );
     }
 
     const messageId = generateMessageId();
@@ -62,25 +58,15 @@ export const addMessage = internalMutation({
     );
   },
 });
-// HTTP-only variant for actions without auth context.
+
 export const addMessageHttp = internalMutation({
   args: {
-    chatId: v.id("chats"),
-    role: v.union(v.literal("user"), v.literal("assistant")),
-    content: v.optional(v.string()),
-    isStreaming: v.optional(v.boolean()),
-    streamedContent: v.optional(v.string()),
-    thinking: v.optional(v.string()),
-    reasoning: v.optional(v.string()),
-    searchMethod: v.optional(vSearchMethod),
-    hasRealResults: v.optional(v.boolean()),
-    webResearchSources: v.optional(v.array(vWebResearchSource)),
-    workflowId: v.optional(v.string()),
+    ...messageBaseArgs,
     workflowTokenId: v.optional(v.id("workflowTokens")),
-    sessionId: v.optional(v.string()),
   },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
 
@@ -88,14 +74,21 @@ export const addMessageHttp = internalMutation({
       ? await ctx.db.get(args.workflowTokenId)
       : null;
     const hasValidToken = isValidWorkflowToken(workflowToken, args.chatId);
+    const hasBaseAccess = hasChatWriteAccess(chat, userId, args.sessionId);
+    const tokenSessionMatches =
+      !workflowToken?.sessionId || workflowToken.sessionId === args.sessionId;
 
-    const authorized =
-      hasValidToken ||
-      (!chat.userId && hasSessionAccess(chat, args.sessionId)) ||
-      (isUnownedChat(chat) && !!args.sessionId);
-
-    if (!authorized) {
-      throw new Error("Unauthorized");
+    if (
+      !isHttpWriteAuthorized({
+        hasBaseAccess,
+        hasValidToken,
+        tokenProvided: !!args.workflowTokenId,
+        tokenSessionMatches,
+      })
+    ) {
+      throw new Error(
+        `Unauthorized: addMessageHttp denied for chat ${args.chatId}`,
+      );
     }
 
     const messageId = generateMessageId();
@@ -123,44 +116,7 @@ export const addMessageHttp = internalMutation({
     );
   },
 });
-export const internalUpdateMessageContent = internalMutation({
-  args: {
-    messageId: v.id("messages"),
-    contentChunk: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const message = await ctx.db.get(args.messageId);
-    if (!message) {
-      console.error("[streaming] Message not found during content append", {
-        messageId: args.messageId,
-        chunkLength: args.contentChunk.length,
-      });
-      return;
-    }
-    await ctx.db.patch(args.messageId, {
-      content: (message.content || "") + args.contentChunk,
-    });
-  },
-});
-export const internalUpdateMessageReasoning = internalMutation({
-  args: {
-    messageId: v.id("messages"),
-    reasoningChunk: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const message = await ctx.db.get(args.messageId);
-    if (!message) {
-      console.error("[streaming] Message not found during reasoning append", {
-        messageId: args.messageId,
-        chunkLength: args.reasoningChunk.length,
-      });
-      return;
-    }
-    await ctx.db.patch(args.messageId, {
-      reasoning: (message.reasoning || "") + args.reasoningChunk,
-    });
-  },
-});
+
 export const updateMessageMetadata = mutation({
   args: {
     messageId: v.id("messages"),
@@ -177,15 +133,12 @@ export const updateMessageMetadata = mutation({
       throw new Error(`Message not found: ${messageId}`);
     }
 
-    // Check authorization - only the chat owner can update message metadata
     const userId = await getAuthUserId(ctx);
     const chat = await ctx.db.get(message.chatId);
-    if (!chat) {
-      throw new Error("Chat not found");
-    }
-    if (!isAuthorized(chat, userId, sessionId)) {
+    if (!chat) throw new Error("Chat not found");
+    if (!hasChatWriteAccess(chat, userId, sessionId)) {
       throw new Error(
-        "Unauthorized: You can only update messages in your own chats",
+        `Unauthorized: updateMessageMetadata denied for chat ${message.chatId}`,
       );
     }
 
@@ -193,6 +146,7 @@ export const updateMessageMetadata = mutation({
     return null;
   },
 });
+
 export const updateMessage = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -210,6 +164,7 @@ export const updateMessage = internalMutation({
     await ctx.db.patch(messageId, { ...rest });
   },
 });
+
 /** Count user messages for a chat. */
 export const countMessages = internalMutation({
   args: { chatId: v.id("chats") },
@@ -223,6 +178,7 @@ export const countMessages = internalMutation({
     return messages.length;
   },
 });
+
 export const deleteMessage = mutation({
   args: {
     messageId: v.id("messages"),
@@ -237,8 +193,10 @@ export const deleteMessage = mutation({
     if (!chat) throw new Error("Chat not found");
 
     const userId = await getAuthUserId(ctx);
-    if (!isAuthorized(chat, userId, args.sessionId)) {
-      throw new Error("Unauthorized");
+    if (!hasChatWriteAccess(chat, userId, args.sessionId)) {
+      throw new Error(
+        `Unauthorized: deleteMessage denied for chat ${message.chatId}`,
+      );
     }
 
     await ctx.db.delete(args.messageId);
@@ -270,78 +228,5 @@ export const deleteMessage = mutation({
     });
 
     return null;
-  },
-});
-export const addMessageWithTransaction = internalMutation({
-  args: {
-    chatId: v.id("chats"),
-    userMessage: v.string(),
-    isReplyToAssistant: v.optional(v.boolean()),
-  },
-  returns: v.object({
-    success: v.boolean(),
-    assistantMessageId: v.optional(v.id("messages")),
-    error: v.optional(v.string()),
-  }),
-  handler: async (ctx, args) => {
-    try {
-      const chat = await ctx.db.get(args.chatId);
-      if (!chat) {
-        return { success: false, error: "Chat not found" };
-      }
-
-      let threadId = chat.threadId;
-      if (!threadId) {
-        threadId = generateThreadId();
-        await ctx.db.patch(args.chatId, { threadId });
-      }
-
-      const messages = await ctx.db
-        .query("messages")
-        .withIndex("by_chatId", (q) => q.eq("chatId", args.chatId))
-        .collect();
-
-      const userMessageCount = messages.filter((m) => m.role === "user").length;
-
-      // Add user message
-      await ctx.db.insert("messages", {
-        chatId: args.chatId,
-        role: "user",
-        content: args.userMessage,
-        messageId: generateMessageId(),
-        threadId,
-        timestamp: Date.now(),
-      });
-
-      // Update title only for first user message
-      if (userMessageCount === 0 && !args.isReplyToAssistant) {
-        // Import the smart title generation function
-        const { generateChatTitle } = await import("./chats/utils");
-        const title = generateChatTitle({ intent: args.userMessage });
-
-        await ctx.db.patch(args.chatId, {
-          title,
-          updatedAt: Date.now(),
-        });
-      }
-
-      // Create assistant placeholder
-      const assistantMessageId = await ctx.db.insert("messages", {
-        chatId: args.chatId,
-        role: "assistant",
-        content: "",
-        isStreaming: true,
-        messageId: generateMessageId(),
-        threadId,
-        timestamp: Date.now(),
-      });
-
-      return { success: true, assistantMessageId };
-    } catch (error) {
-      return {
-        success: false,
-        error: getErrorMessage(error),
-      };
-    }
   },
 });

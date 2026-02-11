@@ -19,6 +19,7 @@ import { SignOutButton } from "@/SignOutButton";
 import { useClaimAnonymousChats } from "@/hooks/useClaimAnonymousChats";
 import { ChatPage } from "@/components/ChatPage";
 import { toastIcons } from "@/components/toastIcons";
+import { DESKTOP_BREAKPOINT } from "@/lib/constants/layout";
 
 export default function App() {
   const [showSignInModal, setShowSignInModal] = useState(false);
@@ -80,10 +81,10 @@ export default function App() {
       });
     };
 
-    let lastIsDesktop = window.innerWidth >= 1024;
+    let lastIsDesktop = window.innerWidth >= DESKTOP_BREAKPOINT;
 
     const handleResize = () => {
-      const isDesktop = window.innerWidth >= 1024;
+      const isDesktop = window.innerWidth >= DESKTOP_BREAKPOINT;
 
       if (hasManuallyToggled) {
         if (isDesktop !== lastIsDesktop) {
@@ -135,8 +136,8 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <div className="h-full overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
-          <div className="h-full flex flex-col">
+        <div className="h-full min-w-0 overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
+          <div className="h-full min-w-0 flex flex-col">
             <header className="flex-shrink-0 sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-gray-200/30 dark:border-gray-700/30">
               <div className="h-[3.75rem] sm:h-16 flex items-center justify-between pl-3 sm:pl-4 pr-4 sm:pr-6 lg:pr-8">
                 <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
@@ -213,7 +214,7 @@ export default function App() {
               </div>
             </header>
 
-            <main className="flex-1 flex min-h-0 overflow-hidden">
+            <main className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
               <Routes>
                 {[
                   "/",

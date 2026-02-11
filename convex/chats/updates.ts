@@ -8,7 +8,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, internalMutation } from "../_generated/server";
-import { isAuthorized } from "../lib/auth";
+import { hasPrimaryOwnerAccess } from "../lib/auth";
 import { generateShareId, generatePublicId } from "../lib/uuid";
 
 /**
@@ -30,7 +30,7 @@ export const updateChatTitle = mutation({
     const chat = await ctx.db.get(args.chatId);
 
     if (!chat) throw new Error("Chat not found");
-    if (!isAuthorized(chat, userId, args.sessionId)) {
+    if (!hasPrimaryOwnerAccess(chat, userId, args.sessionId)) {
       throw new Error("Unauthorized");
     }
 
@@ -71,10 +71,10 @@ export const updateRollingSummary = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    // No auth check: internalMutation is only reachable from trusted internal
+    // actions. Matches the pattern of internalUpdateChatTitle above.
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
-    if (chat.userId && chat.userId !== userId) throw new Error("Unauthorized");
 
     await ctx.db.patch(args.chatId, {
       rollingSummary: args.summary.slice(0, 2000),
@@ -110,7 +110,7 @@ export const updateChatPrivacy = mutation({
     const chat = await ctx.db.get(args.chatId);
 
     if (!chat) throw new Error("Chat not found");
-    if (!isAuthorized(chat, userId, args.sessionId)) {
+    if (!hasPrimaryOwnerAccess(chat, userId, args.sessionId)) {
       throw new Error("Unauthorized");
     }
 

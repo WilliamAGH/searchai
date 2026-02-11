@@ -43,6 +43,7 @@ export function FollowUpPrompt({
           {/* Headline row */}
           <div className="flex items-center gap-2 mb-1">
             <svg
+              aria-hidden="true"
               className="w-4 h-4 text-amber-600 dark:text-amber-300"
               fill="none"
               stroke="currentColor"
@@ -86,7 +87,7 @@ export function FollowUpPrompt({
               <button
                 type="button"
                 onClick={onNewChat}
-                className="px-2.5 md:px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] md:text-xs font-medium rounded-md transition-colors whitespace-nowrap w-full sm:w-auto"
+                className="px-2 md:px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] md:text-[11px] font-medium rounded-md transition-colors whitespace-nowrap w-full sm:w-auto"
               >
                 Start New Chat
               </button>
@@ -94,7 +95,7 @@ export function FollowUpPrompt({
                 <button
                   type="button"
                   onClick={onNewChatWithSummary}
-                  className="px-2.5 md:px-3 py-1.5 bg-emerald-600/90 hover:bg-emerald-700 text-white text-[11px] md:text-xs font-medium rounded-md transition-colors whitespace-nowrap w-full sm:w-auto"
+                  className="px-2 md:px-2.5 py-1 bg-emerald-600/90 hover:bg-emerald-700 text-white text-[10px] md:text-[11px] font-medium rounded-md transition-colors whitespace-nowrap w-full sm:w-auto"
                 >
                   New Chat w/ Summary
                 </button>
@@ -102,7 +103,7 @@ export function FollowUpPrompt({
               <button
                 type="button"
                 onClick={onContinue}
-                className="px-2.5 md:px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-[11px] md:text-xs font-medium rounded-md transition-colors whitespace-nowrap w-full sm:w-auto"
+                className="px-2 md:px-2.5 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-[10px] md:text-[11px] font-medium rounded-md transition-colors whitespace-nowrap w-full sm:w-auto"
               >
                 Continue Here
               </button>

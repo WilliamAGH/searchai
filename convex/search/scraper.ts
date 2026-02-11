@@ -2,13 +2,11 @@
 
 /**
  * Web Scraping Module
- * Handles URL content extraction and cleaning with Cheerio,
- * and optionally falls back to Playwright for JS-rendered pages.
+ * Handles URL content extraction and cleaning with Cheerio.
+ * Playwright fallback is intentionally not part of the active Convex runtime path.
  */
 
 import { load } from "cheerio";
-import { v } from "convex/values";
-import { action } from "../_generated/server";
 import { CACHE_TTL } from "../lib/constants/cache";
 import { validateScrapeUrl } from "../lib/url";
 import { getErrorMessage } from "../lib/errors";
@@ -22,6 +20,8 @@ import {
 // (requires native browser binaries that aren't available in Convex runtime)
 
 const MAX_CONTENT_LENGTH = 12000;
+const MIN_CONTENT_LENGTH = 100;
+const SUMMARY_MAX_LENGTH = 500;
 
 export type ScrapeResult = {
   title: string;
@@ -197,7 +197,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     });
 
     // Filter out low-quality content AFTER junk removal
-    if (cleanedContent.length < 100) {
+    if (cleanedContent.length < MIN_CONTENT_LENGTH) {
       const errorDetails = {
         url: validatedUrl,
         contentLengthBefore: content.length,
@@ -213,7 +213,7 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
       );
     }
 
-    const summaryLength = Math.min(500, cleanedContent.length);
+    const summaryLength = Math.min(SUMMARY_MAX_LENGTH, cleanedContent.length);
     const summary =
       cleanedContent.substring(0, summaryLength) +
       (cleanedContent.length > summaryLength ? "..." : "");
@@ -283,23 +283,3 @@ export async function scrapeWithCheerio(url: string): Promise<ScrapeResult> {
     return val;
   }
 }
-
-/**
- * Scrape and clean web page content (action entry)
- * Uses Cheerio for HTML parsing - Playwright not available in Convex runtime
- */
-export const scrapeUrl = action({
-  args: { url: v.string() },
-  returns: v.object({
-    title: v.string(),
-    content: v.string(),
-    summary: v.optional(v.string()),
-    needsJsRendering: v.optional(v.boolean()),
-    // Error fields - present when scrape failed
-    error: v.optional(v.string()),
-    errorCode: v.optional(v.string()),
-  }),
-  handler: async (_, args): Promise<ScrapeResult> => {
-    return await scrapeWithCheerio(args.url);
-  },
-});

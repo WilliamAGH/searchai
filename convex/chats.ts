@@ -27,6 +27,7 @@ export {
 
 // Re-export message operations
 export { getChatMessages, getChatMessagesHttp } from "./chats/messages";
+export { canWriteChat } from "./chats/writeAccess";
 
 // Re-export update operations
 export {

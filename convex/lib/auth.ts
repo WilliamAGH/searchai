@@ -12,7 +12,7 @@ import type { Id } from "../_generated/dataModel";
  * Chat document with optional ownership fields.
  * Matches the minimal shape needed for auth checks.
  */
-interface ChatOwnership {
+export interface ChatOwnership {
   userId?: Id<"users">;
   sessionId?: string;
 }
@@ -67,11 +67,11 @@ export function hasSessionAccess(
  *
  * @example
  * const userId = await getAuthUserId(ctx);
- * if (!isAuthorized(chat, userId, args.sessionId)) {
+ * if (!hasPrimaryOwnerAccess(chat, userId, args.sessionId)) {
  *   throw new Error("Unauthorized");
  * }
  */
-export function isAuthorized(
+export function hasPrimaryOwnerAccess(
   chat: ChatOwnership,
   userId: Id<"users"> | null,
   sessionId?: string,
@@ -80,6 +80,20 @@ export function isAuthorized(
     return hasUserAccess(chat, userId);
   }
   return hasSessionAccess(chat, sessionId);
+}
+
+/**
+ * Check write ownership using either account owner or originating session.
+ *
+ * Unlike `hasPrimaryOwnerAccess`, this intentionally supports dual ownership even when
+ * both `userId` and `sessionId` are present on the chat.
+ */
+export function hasOwnerAccess(
+  chat: ChatOwnership,
+  userId: Id<"users"> | null,
+  sessionId?: string,
+): boolean {
+  return hasUserAccess(chat, userId) || hasSessionAccess(chat, sessionId);
 }
 
 /**

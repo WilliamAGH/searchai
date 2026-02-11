@@ -83,9 +83,7 @@ export function MobileSidebar({
           onSelectChat(null);
         }
       } catch (err) {
-        if (import.meta.env?.DEV) {
-          logger.warn("Chat deletion failed:", err);
-        }
+        logger.error("Chat deletion failed:", err);
       }
     },
     [onRequestDeleteChat, deleteChat, onSelectChat],
@@ -127,7 +125,7 @@ export function MobileSidebar({
           />
         </Transition.Child>
 
-        <div className="fixed inset-0 flex">
+        <div className="fixed inset-0 flex pr-16 overflow-x-hidden">
           <Transition.Child
             as={Fragment}
             enter="transition ease-in-out duration-300 transform"
@@ -139,7 +137,7 @@ export function MobileSidebar({
           >
             <Dialog.Panel
               tabIndex={-1}
-              className="relative mr-16 flex w-full max-w-xs flex-1"
+              className="relative flex w-full max-w-xs flex-1 min-w-0"
             >
               <Transition.Child
                 as={Fragment}
@@ -177,7 +175,7 @@ export function MobileSidebar({
                 </div>
               </Transition.Child>
 
-              <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-900 px-6 pb-2">
+              <div className="flex grow min-w-0 flex-col gap-y-5 overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900 px-6 pb-2">
                 <div className="flex h-16 shrink-0 items-center">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">

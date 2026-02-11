@@ -243,7 +243,9 @@ export async function* streamConversationalWorkflow(
       intent: args.userQuery,
     });
 
-    const webResearchSources = buildWebResearchSourcesFromHarvested(harvested);
+    const webResearchSources = buildWebResearchSourcesFromHarvested(harvested, {
+      includeDebugSourceContext: args.includeDebugSourceContext === true,
+    });
 
     const urlCount = webResearchSources.filter(
       (s) => typeof s.url === "string" && s.url.length > 0,

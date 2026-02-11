@@ -4,7 +4,9 @@ body,
 #root {
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 /*

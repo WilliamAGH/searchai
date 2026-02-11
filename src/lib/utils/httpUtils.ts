@@ -3,30 +3,6 @@
 
 import { getErrorMessage } from "@/lib/utils/errorUtils";
 
-export function buildApiBase(convexUrl: string): string {
-  // Derive the Convex HTTP base (https://<deployment>.convex.site) from the
-  // Convex client URL (typically https://<deployment>.convex.cloud).
-  // Returns the origin without a trailing slash; caller should append paths.
-  try {
-    if (!convexUrl) return "";
-    const url = new URL(convexUrl);
-    const siteHost = url.host.replace(".convex.cloud", ".convex.site");
-    return `${url.protocol}//${siteHost}`.replace(/\/$/, "");
-  } catch (error) {
-    // Fallback: return input without trailing /api if parsing fails
-    console.error("Failed to parse Convex URL for API base", {
-      convexUrl,
-      error,
-    });
-    return convexUrl.replace("/api", "");
-  }
-}
-
-export function resolveApiPath(base: string, path: string): string {
-  // For non-Convex API paths
-  return `${base}${path}`;
-}
-
 export type HttpErrorDetails = {
   status: number;
   statusText: string;

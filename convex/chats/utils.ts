@@ -73,9 +73,6 @@ const DEFAULT_TITLE_MAX_LENGTH = 25;
  * - Smart word-boundary truncation
  * - Capitalizes first letter
  *
- * Called by:
- * - convex/messages.ts:addMessageWithTransaction (on first user message)
- *
  * Frontend (src/lib/types/unified.ts:TitleUtils) only provides sanitization,
  * NOT generation. All title generation happens here.
  */

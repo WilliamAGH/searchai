@@ -101,13 +101,16 @@ test.describe("smoke: pagination", () => {
       await expect(msgInput).toBeEnabled({ timeout: 5000 });
       await msgInput.fill(msg);
       await page.keyboard.press("Enter");
-      // Small delay between messages
-      await page.waitForTimeout(500);
+      // Wait for message to appear in the list to ensure sequential processing
+      // and avoid flaky race conditions with rapid-fire inputs
+      await expect(page.getByText(msg).last()).toBeVisible({ timeout: 10000 });
     }
 
     // Check for message list container - look for the scrollable area
-    // The message list is the flex-1 overflow-y-auto container
-    const messageList = page.locator(".flex-1.overflow-y-auto").first();
+    // The scroll container in ChatLayout uses overflow-y-auto + overscroll-contain
+    const messageList = page
+      .locator(".overflow-y-auto.overscroll-contain")
+      .first();
 
     // Check visibility - count() is safe and won't throw
     const messageListCount = await messageList.count();

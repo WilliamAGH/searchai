@@ -25,6 +25,7 @@ interface UseComponentPropsArgs {
   handleSendMessage: (message: string) => Promise<void>;
   handleDraftChange: (draft: string) => void;
   setShowShareModal: (show: boolean) => void;
+  isReadOnly?: boolean;
   userHistory: string[];
   pagination?: Partial<PaginationState>;
 }
@@ -50,6 +51,7 @@ export function useComponentProps({
   handleSendMessage,
   handleDraftChange,
   setShowShareModal,
+  isReadOnly = false,
   userHistory,
   pagination,
 }: UseComponentPropsArgs) {
@@ -129,10 +131,12 @@ export function useComponentProps({
 
   const messageInputProps = useMemo(
     () => ({
-      disabled: false, // Never block input - allow sending messages while generating
-      placeholder: currentChatId
-        ? "Type your message..."
-        : "Start a new chat...",
+      disabled: isReadOnly,
+      placeholder: isReadOnly
+        ? "Read-only shared chat"
+        : currentChatId
+          ? "Type your message..."
+          : "Start a new chat...",
       onSendMessage: handleSendMessage,
       onDraftChange: handleDraftChange,
       history: userHistory,
@@ -141,6 +145,7 @@ export function useComponentProps({
     }),
     [
       currentChatId,
+      isReadOnly,
       handleSendMessage,
       handleDraftChange,
       userHistory,

@@ -72,6 +72,41 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
       );
 
       const durationMs = Date.now() - callStart;
+      if (
+        (typeof content.error === "string" && content.error.length > 0) ||
+        (typeof content.errorCode === "string" && content.errorCode.length > 0)
+      ) {
+        const errorMessage =
+          typeof content.error === "string" && content.error.length > 0
+            ? content.error
+            : "Unknown scrape error";
+        console.warn("[WARN] SCRAPE TOOL REPORTED FAILURE:", {
+          contextId,
+          url: input.url,
+          error: errorMessage,
+          errorCode: content.errorCode,
+          durationMs,
+        });
+
+        return {
+          contextId,
+          url: input.url,
+          reasoning: input.reasoning,
+          error: "Scrape failed",
+          errorMessage,
+          title: content.title,
+          content: content.content,
+          summary: content.summary || `Content unavailable from ${content.title}`,
+          contentLength: 0,
+          scrapedAt: Date.now(),
+          _toolCallMetadata: {
+            toolName: "scrape_webpage",
+            callStart,
+            durationMs,
+          },
+        };
+      }
+
       console.info("[OK] SCRAPE TOOL SUCCESS:", {
         contextId,
         url: input.url,
@@ -86,7 +121,9 @@ Emit exactly one sourcesUsed entry with type "scraped_page" and relevance "high"
         reasoning: input.reasoning,
         title: content.title,
         content: content.content,
-        summary: content.summary || content.content.substring(0, CONTENT_LIMITS.SUMMARY_TRUNCATE_LENGTH) + "...",
+        summary:
+          content.summary ||
+          `${content.content.substring(0, CONTENT_LIMITS.SUMMARY_TRUNCATE_LENGTH)}...`,
         contentLength: content.content.length,
         scrapedAt: Date.now(),
         _toolCallMetadata: {
