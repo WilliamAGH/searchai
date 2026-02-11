@@ -47,6 +47,21 @@ export async function fetchOgMeta(convexSiteUrl, queryString) {
   }
 }
 
+// Escaped double-quote character used inside RegExp template strings so that
+// the patterns remain readable without nested backslash escaping.
+const REGEX_QUOTE = "\x22";
+
+// Builds a regex that captures the opening portion of a <meta> tag's content
+// attribute, allowing replacement of the value between quotes.  Uses lazy
+// [\s\S]*? between the attr value and content= to handle tags where other
+// attributes appear in between (safe for all meta tags).
+function metaContentPattern(attributeName, attributeValue) {
+  const RQ = REGEX_QUOTE;
+  return new RegExp(
+    `(<meta\\s+${attributeName}=${RQ}${attributeValue}${RQ}[\\s\\S]*?content=${RQ})[^${RQ}]*(${RQ})`,
+  );
+}
+
 export function injectMetaTags({ html, meta, canonicalUrl }) {
   const safeTitle = escapeHtml(meta.title);
   const safeDesc = escapeHtml(meta.description);
@@ -58,50 +73,14 @@ export function injectMetaTags({ html, meta, canonicalUrl }) {
     `<title>${fullTitle}</title>`,
   );
 
-  const Q = "\x22"; // escaped double-quote for regex clarity in oxlint
   const replacements = [
-    [
-      new RegExp(
-        `(<meta\\s+property=${Q}og:title${Q}\\s+content=${Q})[^${Q}]*(${Q})`,
-      ),
-      fullTitle,
-    ],
-    [
-      new RegExp(
-        `(<meta\\s+property=${Q}og:description${Q}[\\s\\S]*?content=${Q})[^${Q}]*(${Q})`,
-      ),
-      safeDesc,
-    ],
-    [
-      new RegExp(
-        `(<meta\\s+property=${Q}og:url${Q}\\s+content=${Q})[^${Q}]*(${Q})`,
-      ),
-      safeUrl,
-    ],
-    [
-      new RegExp(
-        `(<meta\\s+name=${Q}twitter:title${Q}\\s+content=${Q})[^${Q}]*(${Q})`,
-      ),
-      fullTitle,
-    ],
-    [
-      new RegExp(
-        `(<meta\\s+name=${Q}twitter:description${Q}[\\s\\S]*?content=${Q})[^${Q}]*(${Q})`,
-      ),
-      safeDesc,
-    ],
-    [
-      new RegExp(
-        `(<meta\\s+name=${Q}twitter:url${Q}\\s+content=${Q})[^${Q}]*(${Q})`,
-      ),
-      safeUrl,
-    ],
-    [
-      new RegExp(
-        `(<meta\\s+name=${Q}robots${Q}\\s+content=${Q})[^${Q}]*(${Q})`,
-      ),
-      meta.robots,
-    ],
+    [metaContentPattern("property", "og:title"), fullTitle],
+    [metaContentPattern("property", "og:description"), safeDesc],
+    [metaContentPattern("property", "og:url"), safeUrl],
+    [metaContentPattern("name", "twitter:title"), fullTitle],
+    [metaContentPattern("name", "twitter:description"), safeDesc],
+    [metaContentPattern("name", "twitter:url"), safeUrl],
+    [metaContentPattern("name", "robots"), meta.robots],
   ];
 
   for (const [pattern, value] of replacements) {

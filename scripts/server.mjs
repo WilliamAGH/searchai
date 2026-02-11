@@ -156,137 +156,112 @@ async function proxyApi(req, res) {
   return forwardTo(target, req, res);
 }
 
-const server = http.createServer(async (req, res) => {
-  if (!req.url) {
-    res.writeHead(400);
-    res.end("Bad request");
-    return;
-  }
-  const safeRaw = typeof req.url === "string" ? req.url : "/";
+function parseRequestPath(rawUrl) {
+  const safeRaw = typeof rawUrl === "string" ? rawUrl : "/";
   const rawPath = safeRaw.split("?")[0] || "/";
-  let urlPath = "/";
   try {
-    urlPath = decodeURIComponent(rawPath);
+    const decoded = decodeURIComponent(rawPath);
+    return decoded.startsWith("/") ? decoded : `/${decoded}`;
   } catch (error) {
     console.error("Failed to decode request path", { rawPath, error });
-    res.writeHead(400);
-    res.end("Bad request");
-    return;
+    return null;
   }
-  if (!urlPath.startsWith("/")) {
-    urlPath = `/${urlPath}`;
-  }
+}
 
-  if (urlPath === "/sitemap.xml") {
-    const target = `${CONVEX_SITE_URL}/sitemap.xml`;
-    return void forwardTo(target, req, res);
-  }
+const SHARE_PUBLIC_RE = /^\/([sp])\/([A-Za-z0-9_-]+)/;
 
-  if (req.url.startsWith("/api/")) {
-    // Rate-limit POST /api/publishChat
-    if (req.method === "POST" && req.url.startsWith("/api/publishChat")) {
-      const remote =
-        req.socket?.remoteAddress || req.headers["x-forwarded-for"];
-      const remoteKey = String(remote || "");
-      const rl = checkAndRecordHit(remoteKey);
-      if (rl.limited) {
-        res.writeHead(429, {
-          "Content-Type": "application/json",
-          "Retry-After": String(Math.ceil(rl.resetMs / 1000)),
-          "X-RateLimit-Limit": String(PUBLISH_MAX),
-          "X-RateLimit-Remaining": String(rl.remaining),
-        });
-        res.end(
-          JSON.stringify({
-            error: "Too Many Requests",
-            retryAfterMs: rl.resetMs,
-          }),
-        );
-        return;
-      }
-    }
-    return void proxyApi(req, res);
-  }
-  // Conditional LLM/plain rewrite for shared/public routes
-  const accept = String(req.headers["accept"] || "").toLowerCase();
-  const ua = String(req.headers["user-agent"] || "").toLowerCase();
-  const wantsPlain =
-    accept.includes("text/plain") ||
-    accept.includes("text/markdown") ||
-    /curl|wget|httpie|python-requests|go-http-client|httpclient/.test(ua);
-  try {
-    const shareMatch = urlPath.match(/^\/s\/([A-Za-z0-9_-]+)/);
-    const publicMatch = urlPath.match(/^\/p\/([A-Za-z0-9_-]+)/);
-    if (wantsPlain && (shareMatch || publicMatch)) {
-      const qp = shareMatch
-        ? `shareId=${encodeURIComponent(shareMatch[1])}`
-        : `publicId=${encodeURIComponent(publicMatch[1])}`;
-      const target = `${CONVEX_SITE_URL}/api/chatTextMarkdown?${qp}`;
-      return void forwardTo(target, req, res);
-    }
-  } catch (error) {
-    console.error("Failed to rewrite share/public route", {
-      url: req.url,
-      error,
-    });
-  }
+function parseSharePublicIds(urlPath) {
+  const match = urlPath.match(SHARE_PUBLIC_RE);
+  if (!match) return null;
+  const isShare = match[1] === "s";
+  return {
+    qp: isShare
+      ? `shareId=${encodeURIComponent(match[2])}`
+      : `publicId=${encodeURIComponent(match[2])}`,
+    routePrefix: isShare ? "/s/" : "/p/",
+    routeId: match[2],
+  };
+}
 
-  // Server-side meta tag injection for crawlers on share/public routes
-  if (cachedIndexHtml) {
-    const shareMatch = urlPath.match(/^\/s\/([A-Za-z0-9_-]+)/);
-    const publicMatch = urlPath.match(/^\/p\/([A-Za-z0-9_-]+)/);
-    if (shareMatch || publicMatch) {
-      const qp = shareMatch
-        ? `shareId=${encodeURIComponent(shareMatch[1])}`
-        : `publicId=${encodeURIComponent(publicMatch[1])}`;
-      const routePrefix = shareMatch ? "/s/" : "/p/";
-      const routeId = shareMatch ? shareMatch[1] : publicMatch[1];
-      const canonicalUrl = `${SITE_URL}${routePrefix}${routeId}`;
-      const result = await fetchOgMeta(CONVEX_SITE_URL, qp);
-      let html;
-      let cacheControl;
-      let ogMetaStatus;
-      if (result.ok && result.data) {
-        html = injectMetaTags({
-          html: cachedIndexHtml,
-          meta: result.data,
-          canonicalUrl,
-        });
-        cacheControl = "public, max-age=60";
-        ogMetaStatus = "resolved";
-      } else if (!result.ok) {
-        console.error("[ogMeta] Infrastructure failure fetching metadata", {
-          queryString: qp,
-          error: result.error,
-        });
-        // Return 502 so crawlers know the metadata is unreliable and won't
-        // cache stale OG tags.  Browsers still render 502 HTML bodies, so
-        // the SPA boots normally for human visitors.
-        res.writeHead(502, {
-          "Content-Type": "text/html; charset=utf-8",
-          "Content-Length": Buffer.byteLength(cachedIndexHtml),
-          "Cache-Control": "no-store",
-          "X-OG-Meta-Status": "error",
-        });
-        res.end(cachedIndexHtml);
-        return;
-      } else {
-        html = cachedIndexHtml;
-        cacheControl = "no-cache";
-        ogMetaStatus = "not-found";
-      }
-      res.writeHead(200, {
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Length": Buffer.byteLength(html),
-        "Cache-Control": cacheControl,
-        "X-OG-Meta-Status": ogMetaStatus,
+async function handleApiRoute(req, res) {
+  if (req.method === "POST" && req.url.startsWith("/api/publishChat")) {
+    const remote = req.socket?.remoteAddress || req.headers["x-forwarded-for"];
+    const rl = checkAndRecordHit(String(remote || ""));
+    if (rl.limited) {
+      res.writeHead(429, {
+        "Content-Type": "application/json",
+        "Retry-After": String(Math.ceil(rl.resetMs / 1000)),
+        "X-RateLimit-Limit": String(PUBLISH_MAX),
+        "X-RateLimit-Remaining": String(rl.remaining),
       });
-      res.end(html);
+      res.end(
+        JSON.stringify({
+          error: "Too Many Requests",
+          retryAfterMs: rl.resetMs,
+        }),
+      );
       return;
     }
   }
+  await proxyApi(req, res);
+}
 
-  // Static file try
+function wantsPlainText(req) {
+  const accept = String(req.headers["accept"] || "").toLowerCase();
+  const ua = String(req.headers["user-agent"] || "").toLowerCase();
+  return (
+    accept.includes("text/plain") ||
+    accept.includes("text/markdown") ||
+    /curl|wget|httpie|python-requests|go-http-client|httpclient/.test(ua)
+  );
+}
+
+async function handleSharePublicRoute(req, res, ids) {
+  if (wantsPlainText(req)) {
+    const target = `${CONVEX_SITE_URL}/api/chatTextMarkdown?${ids.qp}`;
+    await forwardTo(target, req, res);
+    return;
+  }
+
+  if (!cachedIndexHtml) {
+    sendFile(res, resolve(DIST_DIR, "index.html"));
+    return;
+  }
+
+  const canonicalUrl = `${SITE_URL}${ids.routePrefix}${ids.routeId}`;
+  const result = await fetchOgMeta(CONVEX_SITE_URL, ids.qp);
+
+  if (!result.ok) {
+    console.error("[ogMeta] Infrastructure failure fetching metadata", {
+      queryString: ids.qp,
+      error: result.error,
+    });
+    res.writeHead(502, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": Buffer.byteLength(cachedIndexHtml),
+      "Cache-Control": "no-store",
+      "X-OG-Meta-Status": "error",
+    });
+    res.end(cachedIndexHtml);
+    return;
+  }
+
+  const html = result.data
+    ? injectMetaTags({ html: cachedIndexHtml, meta: result.data, canonicalUrl })
+    : cachedIndexHtml;
+  const cacheControl = result.data ? "public, max-age=60" : "no-cache";
+  const ogMetaStatus = result.data ? "resolved" : "not-found";
+
+  res.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Length": Buffer.byteLength(html),
+    "Cache-Control": cacheControl,
+    "X-OG-Meta-Status": ogMetaStatus,
+  });
+  res.end(html);
+}
+
+function serveStatic(res, urlPath) {
   const staticPath = urlPath === "/" ? "/index.html" : urlPath;
   const filePath = resolve(DIST_DIR, `.${staticPath}`);
   if (!filePath.startsWith(DIST_PATH_PREFIX)) {
@@ -295,10 +270,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (existsSync(filePath) && statSync(filePath).isFile()) {
-    return sendFile(res, filePath);
+    sendFile(res, filePath);
+    return;
   }
-  // SPA fallback
-  return sendFile(res, resolve(DIST_DIR, "index.html"));
+  sendFile(res, resolve(DIST_DIR, "index.html"));
+}
+
+const server = http.createServer(async (req, res) => {
+  if (!req.url) {
+    res.writeHead(400);
+    res.end("Bad request");
+    return;
+  }
+  const urlPath = parseRequestPath(req.url);
+  if (!urlPath) {
+    res.writeHead(400);
+    res.end("Bad request");
+    return;
+  }
+  if (urlPath === "/sitemap.xml") {
+    await forwardTo(`${CONVEX_SITE_URL}/sitemap.xml`, req, res);
+    return;
+  }
+  if (req.url.startsWith("/api/")) {
+    await handleApiRoute(req, res);
+    return;
+  }
+  const sharePublicIds = parseSharePublicIds(urlPath);
+  if (sharePublicIds) {
+    await handleSharePublicRoute(req, res, sharePublicIds);
+    return;
+  }
+  serveStatic(res, urlPath);
 });
 
 server.listen(PORT, () => {
