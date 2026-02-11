@@ -9,7 +9,7 @@ COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including dev) for build
 # Use npm ci for reproducible builds from package-lock.json
-# --ignore-scripts skips postinstall scripts (ast-grep binary download, playwright install, husky)
+# --ignore-scripts skips postinstall scripts (ast-grep binary download, playwright install, prek hooks)
 # which aren't needed for vite build and may fail on Alpine ARM64
 RUN npm ci --ignore-scripts
 

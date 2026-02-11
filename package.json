@@ -55,7 +55,7 @@
     "test:integration": "playwright test --config config/playwright-integration.config.ts",
     "test:smoke": "playwright test --config config/playwright.config.ts -g smoke --reporter=line",
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test --config config/playwright.config.ts -g smoke --reporter=line",
-    "prepare": "prek -c config/prek.toml install",
+    "prepare": "prek -c config/prek.toml install && node scripts/patch-hooks-verbose.mjs",
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
     "lint:loc": "node scripts/check-loc.mjs",
     "lint:convex-types": "node scripts/lint-convex-types.mjs",

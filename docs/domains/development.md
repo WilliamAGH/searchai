@@ -42,6 +42,36 @@ npm run typecheck
 npm run format
 ```
 
+## Git hooks (prek)
+
+Running `npm install` automatically installs git hooks via [prek](https://prek.j178.dev/) (configured in `config/prek.toml`). No manual setup is needed.
+
+### Pre-commit
+
+Runs on every `git commit`:
+
+| Priority | Hook              | What it does                                      |
+| -------- | ----------------- | ------------------------------------------------- |
+| p10      | `typecheck`       | `npm run typecheck`                               |
+| p10      | `build`           | `npm run build` (runs in parallel with typecheck) |
+| p20      | `convex-validate` | `npx convex dev --once --typecheck=enable`        |
+| p30      | `lint-staged`     | `npx lint-staged` (lint + format staged files)    |
+| p40      | `test`            | `npm test`                                        |
+
+### Pre-push
+
+Runs on every `git push`:
+
+| Priority | Hook          | What it does                               |
+| -------- | ------------- | ------------------------------------------ |
+| p0       | `validate`    | `npm run validate` (full suite, fail-fast) |
+| p10      | `convex-push` | Convex deployment dry-run                  |
+| p20      | `smoke-test`  | Playwright smoke tests                     |
+
+Hook output is streamed to the terminal in verbose mode. If a hook hangs (e.g., Convex connectivity), Ctrl+C cleanly aborts and restores any stashed changes.
+
+> **Do not bypass hooks** — see rule [GT1a] in `AGENTS.md`.
+
 ## Validation and tests
 
 ```bash
