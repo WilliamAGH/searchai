@@ -3,7 +3,7 @@
 // - Proxies /api/* to CONVEX_SITE_URL preserving method/headers/body
 
 import http from "node:http";
-import { createReadStream, statSync, existsSync } from "node:fs";
+import { createReadStream, readFileSync, statSync, existsSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { Readable } from "node:stream";
 
@@ -33,6 +33,79 @@ if (!CONVEX_SITE_URL) {
     "ERROR: Set CONVEX_SITE_URL env (e.g., https://<deployment>.convex.site)",
   );
   process.exit(1);
+}
+
+// Cache the HTML template at startup for meta tag injection
+const INDEX_HTML_PATH = resolve(DIST_DIR, "index.html");
+const cachedIndexHtml = existsSync(INDEX_HTML_PATH)
+  ? readFileSync(INDEX_HTML_PATH, "utf-8")
+  : "";
+
+const OG_META_TIMEOUT_MS = 3000;
+const SITE_URL = "https://search-ai.io";
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function fetchOgMeta(queryString) {
+  const target = `${CONVEX_SITE_URL}/api/ogMeta?${queryString}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OG_META_TIMEOUT_MS);
+  try {
+    const resp = await fetch(target, { signal: controller.signal });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function injectMetaTags(html, meta, canonicalUrl) {
+  const safeTitle = escapeHtml(meta.title);
+  const safeDesc = escapeHtml(meta.description);
+  const safeUrl = escapeHtml(canonicalUrl);
+  const fullTitle = `${safeTitle} · SearchAI`;
+  let result = html;
+  result = result.replace(
+    /<title>[^<]*<\/title>/,
+    `<title>${fullTitle}</title>`,
+  );
+  result = result.replace(
+    /(<meta\s+property="og:title"\s+content=")[^"]*(")/,
+    `$1${fullTitle}$2`,
+  );
+  result = result.replace(
+    /(<meta\s+property="og:description"[\s\S]*?content=")[^"]*(")/,
+    `$1${safeDesc}$2`,
+  );
+  result = result.replace(
+    /(<meta\s+property="og:url"\s+content=")[^"]*(")/,
+    `$1${safeUrl}$2`,
+  );
+  result = result.replace(
+    /(<meta\s+name="twitter:title"\s+content=")[^"]*(")/,
+    `$1${fullTitle}$2`,
+  );
+  result = result.replace(
+    /(<meta\s+name="twitter:description"[\s\S]*?content=")[^"]*(")/,
+    `$1${safeDesc}$2`,
+  );
+  result = result.replace(
+    /(<meta\s+name="twitter:url"\s+content=")[^"]*(")/,
+    `$1${safeUrl}$2`,
+  );
+  result = result.replace(
+    /(<meta\s+name="robots"\s+content=")[^"]*(")/,
+    `$1${meta.robots}$2`,
+  );
+  return result;
 }
 
 const mime = new Map([
@@ -215,6 +288,31 @@ const server = http.createServer(async (req, res) => {
       url: req.url,
       error,
     });
+  }
+
+  // Server-side meta tag injection for crawlers on share/public routes
+  if (cachedIndexHtml) {
+    const shareMatch = urlPath.match(/^\/s\/([A-Za-z0-9_-]+)/);
+    const publicMatch = urlPath.match(/^\/p\/([A-Za-z0-9_-]+)/);
+    if (shareMatch || publicMatch) {
+      const qp = shareMatch
+        ? `shareId=${encodeURIComponent(shareMatch[1])}`
+        : `publicId=${encodeURIComponent(publicMatch[1])}`;
+      const routePrefix = shareMatch ? "/s/" : "/p/";
+      const routeId = shareMatch ? shareMatch[1] : publicMatch[1];
+      const canonicalUrl = `${SITE_URL}${routePrefix}${routeId}`;
+      const meta = await fetchOgMeta(qp);
+      const html = meta
+        ? injectMetaTags(cachedIndexHtml, meta, canonicalUrl)
+        : cachedIndexHtml;
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Length": Buffer.byteLength(html),
+        "Cache-Control": "no-cache",
+      });
+      res.end(html);
+      return;
+    }
   }
 
   // Static file try

@@ -1,6 +1,33 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
+import type { HtmlTagDescriptor } from "vite";
+
+const CHEF_WORKER_URL = "https://chef.convex.dev/scripts/worker.bundled.mjs";
+const SA_SCRIPT_BASE = "https://scripts.simpleanalyticscdn.com";
+const SA_NOSCRIPT_IMG =
+  "https://queue.simpleanalyticscdn.com/noscript.gif?collect-dnt=true";
+const ENTRY_FILE = "main.tsx";
+
+function buildAnalyticsScriptTag(scriptFile: string): HtmlTagDescriptor {
+  return {
+    tag: "script",
+    attrs: {
+      async: true,
+      "data-collect-dnt": "true",
+      src: `${SA_SCRIPT_BASE}/${scriptFile}`,
+    },
+    injectTo: "head",
+  };
+}
+
+function buildAnalyticsNoscriptTag(): HtmlTagDescriptor {
+  return {
+    tag: "noscript",
+    children: `<img src="${SA_NOSCRIPT_IMG}" alt="" referrerpolicy="no-referrer-when-downgrade" />`,
+    injectTo: "body",
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -12,18 +39,17 @@ export default defineConfig(({ mode }) => {
   const convexProxyTarget = rawConvex
     ? rawConvex.replace(".convex.cloud", ".convex.site")
     : "";
+  const isDev = mode === "development";
 
   return {
     plugins: [
       react(),
-      // The code below enables dev tools like taking screenshots of your site
-      // while it is being developed on chef.convex.dev.
-      // Feel free to remove this code if you're no longer developing your app with Chef.
-      mode === "development"
+      // Convex Chef dev tools — enables screenshot capture on chef.convex.dev
+      isDev
         ? {
             name: "inject-chef-dev",
             transform(code: string, id: string) {
-              if (id.includes("main.tsx")) {
+              if (id.includes(ENTRY_FILE)) {
                 return {
                   code: `${code}
 
@@ -32,7 +58,7 @@ window.addEventListener('message', async (message) => {
   if (message.source !== window.parent) return;
   if (message.data.type !== 'chefPreviewRequest') return;
 
-  const worker = await import('https://chef.convex.dev/scripts/worker.bundled.mjs');
+  const worker = await import('${CHEF_WORKER_URL}');
   await worker.respondToMessage(message);
 });
             `,
@@ -43,7 +69,17 @@ window.addEventListener('message', async (message) => {
             },
           }
         : null,
-      // End of code for taking screenshots on chef.convex.dev.
+      // Simple Analytics: privacy-first analytics (https://simpleanalytics.com)
+      {
+        name: "simple-analytics",
+        transformIndexHtml(): HtmlTagDescriptor[] {
+          const scriptFile = isDev ? "latest.dev.js" : "latest.js";
+          return [
+            buildAnalyticsScriptTag(scriptFile),
+            buildAnalyticsNoscriptTag(),
+          ];
+        },
+      },
     ].filter(Boolean),
     resolve: {
       alias: {
