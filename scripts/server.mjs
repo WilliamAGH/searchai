@@ -168,6 +168,7 @@ function parseRequestPath(rawUrl) {
   }
 }
 
+const API_ROUTE_PREFIX = "/api/";
 const SHARE_PUBLIC_RE = /^\/([sp])\/([A-Za-z0-9_-]+)/;
 
 function parseSharePublicIds(urlPath) {
@@ -184,7 +185,10 @@ function parseSharePublicIds(urlPath) {
 }
 
 async function handleApiRoute(req, res) {
-  if (req.method === "POST" && req.url.startsWith("/api/publishChat")) {
+  if (
+    req.method === "POST" &&
+    req.url.startsWith(`${API_ROUTE_PREFIX}publishChat`)
+  ) {
     const remote = req.socket?.remoteAddress || req.headers["x-forwarded-for"];
     const rl = checkAndRecordHit(String(remote || ""));
     if (rl.limited) {
@@ -224,6 +228,12 @@ async function handleSharePublicRoute(req, res, ids) {
   }
 
   if (!cachedIndexHtml) {
+    console.warn(
+      "[ogMeta] Startup HTML cache is empty; serving raw index.html without meta injection",
+      {
+        queryString: ids.qp,
+      },
+    );
     sendFile(res, resolve(DIST_DIR, "index.html"));
     return;
   }
@@ -244,6 +254,15 @@ async function handleSharePublicRoute(req, res, ids) {
     });
     res.end(cachedIndexHtml);
     return;
+  }
+
+  if (!result.data) {
+    console.warn(
+      "[ogMeta] No metadata returned for route; serving uninjected HTML",
+      {
+        queryString: ids.qp,
+      },
+    );
   }
 
   const html = result.data
@@ -292,7 +311,7 @@ const server = http.createServer(async (req, res) => {
     await forwardTo(`${CONVEX_SITE_URL}/sitemap.xml`, req, res);
     return;
   }
-  if (req.url.startsWith("/api/")) {
+  if (req.url.startsWith(API_ROUTE_PREFIX)) {
     await handleApiRoute(req, res);
     return;
   }
