@@ -219,7 +219,7 @@ export function MessageSources({
                       : crawlState === "failed"
                         ? {
                             label: crawlErrorMessage
-                              ? `Crawl failed: ${crawlErrorMessage}. Some sites do not allow automated visitors — other sources were used instead.`
+                              ? `Crawl failed: ${crawlErrorMessage.length > 120 ? crawlErrorMessage.slice(0, 120) + "..." : crawlErrorMessage}. Some sites do not allow automated visitors — other sources were used instead.`
                               : "Crawl attempted, failed. Some sites do not allow automated visitors — other sources were used instead.",
                             dotColor: "bg-amber-500/80",
                           }
