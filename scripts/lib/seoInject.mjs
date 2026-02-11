@@ -68,9 +68,11 @@ export function injectMetaTags({ html, meta, canonicalUrl }) {
   const safeUrl = escapeHtml(canonicalUrl);
   const fullTitle = `${safeTitle} · ${SITE_NAME}`;
 
+  // Use replacer function (not string template) to prevent $-sign
+  // interpretation in user-controlled titles (e.g., "Saved $100").
   let result = html.replace(
     /<title>[^<]*<\/title>/,
-    `<title>${fullTitle}</title>`,
+    () => `<title>${fullTitle}</title>`,
   );
 
   const replacements = [
@@ -83,8 +85,22 @@ export function injectMetaTags({ html, meta, canonicalUrl }) {
     [metaContentPattern("name", "robots"), meta.robots],
   ];
 
+  // Use replacer functions to avoid $-sign interpretation in user-controlled
+  // values (e.g., a chat title containing "$100" would corrupt meta content
+  // if passed as a replacement string where $1, $&, $` are special patterns).
   for (const [pattern, value] of replacements) {
-    result = result.replace(pattern, `$1${value}$2`);
+    result = result.replace(
+      pattern,
+      (_, prefix, suffix) => `${prefix}${value}${suffix}`,
+    );
   }
+
+  // Update <link rel="canonical"> so individual public/shared chat pages are
+  // indexed as distinct URLs (not attributed to the homepage).
+  result = result.replace(
+    /(<link\s+rel="canonical"\s+href=")[^"]*(")/,
+    (_, prefix, suffix) => `${prefix}${safeUrl}${suffix}`,
+  );
+
   return result;
 }
