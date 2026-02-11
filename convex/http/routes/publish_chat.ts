@@ -1,5 +1,6 @@
 import { api } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
+import { checkIpRateLimit } from "../../lib/rateLimit";
 import { isValidUuidV7 } from "../../lib/uuid";
 import { isRecord } from "../../lib/validators";
 import { serializeError } from "../utils";
@@ -8,7 +9,10 @@ import {
   corsResponse,
   validateOrigin,
 } from "../cors";
-import { sanitizeWebResearchSources } from "./aiAgent_utils";
+import {
+  rateLimitExceededResponse,
+  sanitizeWebResearchSources,
+} from "./aiAgent_utils";
 
 const TITLE_MAX_LENGTH = 200;
 const MAX_MESSAGES = 100;
@@ -93,6 +97,11 @@ export async function handlePublishChat(
   const origin = request.headers.get("Origin");
   const allowOrigin = validateOrigin(origin);
   if (!allowOrigin) return buildUnauthorizedOriginResponse();
+
+  const rateLimit = checkIpRateLimit(request, "/api/publish_chat", 5, 60_000);
+  if (!rateLimit.allowed) {
+    return rateLimitExceededResponse(rateLimit.resetAt, allowOrigin);
+  }
 
   let rawPayload: unknown;
   try {
