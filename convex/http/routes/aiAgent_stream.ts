@@ -108,7 +108,12 @@ export async function handleAgentStream(
         });
 
         for await (const event of eventStream) {
-          if (streamBroken) break;
+          if (streamBroken) {
+            console.warn(
+              "[CIRCUIT BREAKER] Breaking event loop: client disconnected",
+            );
+            break;
+          }
           sendEvent(event);
         }
 
