@@ -49,10 +49,6 @@ export function MessageItem({
   const hasReasoningContent =
     message.role === "assistant" &&
     Boolean(message.reasoning?.trim() || message.thinking?.trim());
-  // Visible while actively streaming or thinking; collapses via grid animation when done
-  const isReasoningVisible =
-    hasReasoningContent &&
-    Boolean(message.thinking?.trim() || message.isStreaming);
 
   return (
     <div
@@ -113,29 +109,21 @@ export function MessageItem({
             </div>
           )}
 
-        {/* 2) Reasoning / thinking - collapses smoothly when streaming ends */}
+        {/* 2) Reasoning / thinking - ReasoningDisplay owns its own collapse toggle */}
         {hasReasoningContent && (
-          <div
-            className={`grid transition-[grid-template-rows,margin] duration-300 ease-out ${
-              isReasoningVisible
-                ? "grid-rows-[1fr] mb-4"
-                : "grid-rows-[0fr] mb-0"
-            }`}
-          >
-            <div className="overflow-hidden">
-              <ReasoningDisplay
-                id={messageId}
-                reasoning={message.reasoning ?? ""}
-                thinkingText={message.thinking?.trim()}
-                isThinkingActive={Boolean(message.thinking?.trim())}
-                isStreaming={message.isStreaming}
-                hasStartedContent={Boolean(
-                  message.content && message.content.trim(),
-                )}
-                collapsed={collapsedById[`reasoning-${messageId}`] ?? true}
-                onToggle={onToggleCollapsed}
-              />
-            </div>
+          <div className="mb-4">
+            <ReasoningDisplay
+              id={messageId}
+              reasoning={message.reasoning ?? ""}
+              thinkingText={message.thinking?.trim()}
+              isThinkingActive={Boolean(message.thinking?.trim())}
+              isStreaming={message.isStreaming}
+              hasStartedContent={Boolean(
+                message.content && message.content.trim(),
+              )}
+              collapsed={collapsedById[`reasoning-${messageId}`] ?? true}
+              onToggle={onToggleCollapsed}
+            />
           </div>
         )}
 
