@@ -134,34 +134,22 @@ html.dark .prose code {
   max-width: 100%;
 }
 
-/* GFM table overflow protection - tables can contain wide content */
-.prose table {
-  /*
-   * DO NOT REMOVE OR OVERRIDE: Table Containment
-   * Tables must be block-level with max-width: 100% to trigger scrolling
-   * instead of forcing the parent container to expand.
-   */
-  display: block;
+/*
+ * GFM table overflow protection.
+ * The scrollable wrapper (.table-scroll-wrapper) is injected by the
+ * TableRenderer react-markdown component so the native <table> keeps
+ * `display: table` and thead/tbody share one column-width calculation.
+ */
+.prose .table-scroll-wrapper {
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  /*
-   * Vertical breathing room around tables. Tailwind Preflight resets table
-   * margins to 0; we restore them here to match paragraph rhythm.
-   * CSS margin-collapsing prevents doubling with adjacent-element margins.
-   */
   margin: 0.75rem 0;
 }
 
-.prose thead,
-.prose tbody {
-  display: table;
-  width: max-content;
-  min-width: 100%;
-}
-
-.prose tr {
-  display: table-row;
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
 .prose th,
