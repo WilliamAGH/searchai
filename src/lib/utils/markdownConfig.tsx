@@ -68,6 +68,22 @@ export const REHYPE_PLUGINS: PluggableList = [
 ];
 
 /**
+ * Table renderer that wraps <table> in a scrollable container.
+ * Without this, setting `display: block` on <table> forces <thead> and
+ * <tbody> into independent table contexts, breaking column alignment.
+ * The wrapper takes ownership of overflow scrolling so the native
+ * <table> retains `display: table` and columns align correctly.
+ */
+export const TableRenderer: NonNullable<Components["table"]> = ({
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<"table">) => (
+  <div className="table-scroll-wrapper">
+    <table {...props}>{children}</table>
+  </div>
+);
+
+/**
  * Code block renderer that ensures children are stringified.
  * Static component - no need for useCallback wrapper.
  */

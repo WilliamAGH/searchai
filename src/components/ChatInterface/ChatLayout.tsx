@@ -124,7 +124,12 @@ export function ChatLayout({
           - w-full: Ensures alignment within the flex container.
           - min-w-0: Prevents flex items from overflowing their container.
         */}
-        <div className="grow shrink-0 flex flex-col min-w-0 max-w-4xl mx-auto w-full">
+        {/*
+          pb-20: Reserves space so the last message content is never hidden
+          behind the sticky input bar. The input area is ~70px tall; 80px
+          (pb-20) gives comfortable clearance including safe-area insets.
+        */}
+        <div className="grow shrink-0 flex flex-col min-w-0 max-w-4xl mx-auto w-full pb-20">
           <MessageList
             key={String(currentChatId)}
             {...messageListProps}

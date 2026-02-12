@@ -12,6 +12,7 @@ import {
   REMARK_PLUGINS,
   REHYPE_PLUGINS,
   CodeRenderer,
+  TableRenderer,
 } from "@/lib/utils/markdownConfig";
 import { toDomainToUrlMap } from "@/lib/domain/webResearchSources";
 import type { WebResearchSourceClient } from "@/lib/schemas/messageStream";
@@ -76,7 +77,11 @@ export function ContentWithCitations({
         <ReactMarkdown
           remarkPlugins={REMARK_PLUGINS}
           rehypePlugins={REHYPE_PLUGINS}
-          components={{ a: anchorRenderer, code: CodeRenderer }}
+          components={{
+            a: anchorRenderer,
+            code: CodeRenderer,
+            table: TableRenderer,
+          }}
         >
           {processedContent}
         </ReactMarkdown>
