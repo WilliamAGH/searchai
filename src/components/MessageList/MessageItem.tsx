@@ -46,6 +46,14 @@ export function MessageItem({
     onDeleteMessage(message._id);
   }, [message._id, onDeleteMessage]);
 
+  const hasReasoningContent =
+    message.role === "assistant" &&
+    Boolean(message.reasoning?.trim() || message.thinking?.trim());
+  // Visible while actively streaming or thinking; collapses via grid animation when done
+  const isReasoningVisible =
+    hasReasoningContent &&
+    Boolean(message.thinking?.trim() || message.isStreaming);
+
   return (
     <div
       className="flex gap-2 sm:gap-4 max-w-full overflow-hidden"
@@ -105,11 +113,16 @@ export function MessageItem({
             </div>
           )}
 
-        {/* 2) Reasoning / thinking - default collapsed */}
-        {message.role === "assistant" &&
-          ((message.reasoning && message.reasoning.trim()) ||
-            (message.thinking && message.thinking.trim())) && (
-            <div className="mb-4">
+        {/* 2) Reasoning / thinking - collapses smoothly when streaming ends */}
+        {hasReasoningContent && (
+          <div
+            className={`grid transition-[grid-template-rows,margin] duration-300 ease-out ${
+              isReasoningVisible
+                ? "grid-rows-[1fr] mb-4"
+                : "grid-rows-[0fr] mb-0"
+            }`}
+          >
+            <div className="overflow-hidden">
               <ReasoningDisplay
                 id={messageId}
                 reasoning={message.reasoning ?? ""}
@@ -123,7 +136,8 @@ export function MessageItem({
                 onToggle={onToggleCollapsed}
               />
             </div>
-          )}
+          </div>
+        )}
 
         {/* 3) Search progress status when streaming */}
         {message.role === "assistant" &&
