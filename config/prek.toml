@@ -20,7 +20,10 @@ hooks = [
     "pre-commit",
   ], priority = 10 },
   # p20: Convex deployment validation (depends on types being clean)
-  { id = "convex-validate", name = "Convex deployment validation", language = "system", entry = "npx convex dev --once --typecheck=enable", always_run = true, pass_filenames = false, stages = [
+  # --codegen=disable: prevents regenerating convex/_generated/ which conflicts
+  #   with stashed WIP changes when prek restores the stash after the hook
+  # timeout(1m): prevents indefinite hangs on network/server issues
+  { id = "convex-validate", name = "Convex deployment validation", language = "system", entry = "timeout 60 npx convex dev --once --typecheck=enable --codegen=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-commit",
   ], priority = 20 },
   # p30: lint-staged (lint staged files)
@@ -33,18 +36,24 @@ hooks = [
   ], priority = 40 },
 
   # ── Pre-push hooks ────────────────────────────────────────────────
+  # verbose = true on all pre-push hooks so output streams in real time
+  # (prek suppresses output by default until failure, which hides hangs)
+  #
   # p0: npm run validate — covers lint, typecheck, format:check, lint:loc,
   #     lint:convex-imports, lint:convex-types, lint:duplicates,
   #     lint:boundaries, tests, and build in one command
-  { id = "validate", name = "Full validate suite", language = "system", entry = "npm run validate", always_run = true, pass_filenames = false, stages = [
+  { id = "validate", name = "Full validate suite", language = "system", entry = "npm run validate", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-push",
   ], priority = 0, fail_fast = true },
   # p10: Convex deployment dry-run (not in validate)
-  { id = "convex-push", name = "Convex deployment dry-run", language = "system", entry = "npx convex dev --once --typecheck=enable", always_run = true, pass_filenames = false, stages = [
+  # --codegen=disable: prevents regenerating convex/_generated/ which conflicts
+  #   with stashed WIP changes when prek restores the stash after the hook
+  # timeout(1m): prevents indefinite hangs on network/server issues
+  { id = "convex-push", name = "Convex deployment dry-run", language = "system", entry = "timeout 60 npx convex dev --once --typecheck=enable --codegen=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-push",
   ], priority = 10 },
   # p20: Playwright smoke test (not in validate)
-  { id = "smoke-test", name = "Playwright smoke test", language = "system", entry = "npx playwright test --config config/playwright.config.ts -g smoke --reporter=line", always_run = true, pass_filenames = false, stages = [
+  { id = "smoke-test", name = "Playwright smoke test", language = "system", entry = "npx playwright test --config config/playwright.config.ts -g smoke --reporter=line", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-push",
   ], priority = 20 },
 ]
