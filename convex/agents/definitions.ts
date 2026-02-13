@@ -37,6 +37,23 @@ const agentTools = toolsList satisfies ReturnType<typeof Agent.create>["tools"];
 const conversationalAgentTools = conversationalToolsList satisfies ReturnType<
   typeof Agent.create
 >["tools"];
+const conversationalInstructions = buildConversationalAgentPrompt({
+  minSearchQueries: AGENT_LIMITS.MIN_SEARCH_QUERIES,
+  maxSearchQueries: AGENT_LIMITS.MAX_SEARCH_QUERIES,
+  minScrapeUrls: AGENT_LIMITS.MIN_SCRAPE_URLS,
+  maxScrapeUrls: AGENT_LIMITS.MAX_SCRAPE_URLS,
+});
+
+const IMAGE_ANALYSIS_GUIDELINES =
+  "\n\nIMAGE ANALYSIS GUIDELINES:\n" +
+  "- An [IMAGE ANALYSIS] block contains a verified description of attached images.\n" +
+  "- ALWAYS ground your answer in the image analysis and what is actually visible.\n" +
+  "- NEVER fabricate details, text, numbers, or objects not in the image analysis.\n" +
+  "- If something is unclear or unidentifiable, say so — do not guess.\n" +
+  "- For screenshots: describe UI state, visible text, and layout as analyzed.\n" +
+  "- For documents/receipts: only transcribe text confirmed in the analysis.\n" +
+  "- If the image analysis contradicts the user's assumption, clarify based on what is visible.\n" +
+  "- If you need a clearer image, say so.";
 
 /**
  * Phase 1: Query Planning Agent
@@ -254,12 +271,7 @@ export const answerSynthesisAgent = Agent.create({
 export const conversationalAgent = Agent.create({
   name: "Assistant",
   model: defaultModel,
-  instructions: buildConversationalAgentPrompt({
-    minSearchQueries: AGENT_LIMITS.MIN_SEARCH_QUERIES,
-    maxSearchQueries: AGENT_LIMITS.MAX_SEARCH_QUERIES,
-    minScrapeUrls: AGENT_LIMITS.MIN_SCRAPE_URLS,
-    maxScrapeUrls: AGENT_LIMITS.MAX_SCRAPE_URLS,
-  }),
+  instructions: conversationalInstructions,
 
   tools: conversationalAgentTools,
 
@@ -281,27 +293,37 @@ export const conversationalAgent = Agent.create({
 export const conversationalVisionAgent = Agent.create({
   name: "AssistantVision",
   model: visionModel,
-  instructions:
-    buildConversationalAgentPrompt({
-      minSearchQueries: AGENT_LIMITS.MIN_SEARCH_QUERIES,
-      maxSearchQueries: AGENT_LIMITS.MAX_SEARCH_QUERIES,
-      minScrapeUrls: AGENT_LIMITS.MIN_SCRAPE_URLS,
-      maxScrapeUrls: AGENT_LIMITS.MAX_SCRAPE_URLS,
-    }) +
-    "\n\nIMAGE ANALYSIS GUIDELINES:\n" +
-    "- An [IMAGE ANALYSIS] block contains a verified description of attached images.\n" +
-    "- ALWAYS ground your answer in the image analysis and what is actually visible.\n" +
-    "- NEVER fabricate details, text, numbers, or objects not in the image analysis.\n" +
-    "- If something is unclear or unidentifiable, say so — do not guess.\n" +
-    "- For screenshots: describe UI state, visible text, and layout as analyzed.\n" +
-    "- For documents/receipts: only transcribe text confirmed in the analysis.\n" +
-    "- If the image analysis contradicts the user's assumption, clarify based on what is visible.\n" +
-    "- If you need a clearer image, say so.",
+  instructions: conversationalInstructions + IMAGE_ANALYSIS_GUIDELINES,
   tools: conversationalAgentTools,
   outputType: undefined,
   modelSettings: {
     ...env.defaultModelSettings,
     temperature: 0.3, // Reduce hallucinations for vision/OCR tasks
+  },
+});
+
+/**
+ * Conversational Vision Agent (No Tools)
+ *
+ * For image turns, we default to skipping tool-calling entirely so the model
+ * describes what it sees first rather than auto-triggering web research.
+ */
+export const conversationalVisionNoToolsAgent = Agent.create({
+  name: "AssistantVisionNoTools",
+  model: visionModel,
+  instructions:
+    conversationalInstructions +
+    "\n\nIMAGE TURN CONSTRAINTS:\n" +
+    "- Tools are disabled for this message because images are attached.\n" +
+    "- First, describe what is visible based on the [IMAGE ANALYSIS] block.\n" +
+    "- Then answer the user's question.\n" +
+    "- Do NOT include web citations like [domain.com] in this message.\n" +
+    "- If web research is needed, ask the user to confirm and you can research on the next message." +
+    IMAGE_ANALYSIS_GUIDELINES,
+  outputType: undefined,
+  modelSettings: {
+    ...env.defaultModelSettings,
+    temperature: 0.3,
   },
 });
 
@@ -314,10 +336,12 @@ export const agents: {
   answerSynthesis: typeof answerSynthesisAgent;
   conversational: typeof conversationalAgent;
   conversationalVision: typeof conversationalVisionAgent;
+  conversationalVisionNoTools: typeof conversationalVisionNoToolsAgent;
 } = {
   queryPlanner: queryPlannerAgent,
   research: researchAgent,
   answerSynthesis: answerSynthesisAgent,
   conversational: conversationalAgent,
   conversationalVision: conversationalVisionAgent,
+  conversationalVisionNoTools: conversationalVisionNoToolsAgent,
 };

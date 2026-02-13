@@ -95,7 +95,7 @@ export async function* streamConversationalWorkflow(
 
     const selectedAgent =
       imageUrls.length > 0
-        ? agents.conversationalVision
+        ? agents.conversationalVisionNoTools
         : agents.conversational;
 
     const agentResult = await run(selectedAgent, agentInput, {
