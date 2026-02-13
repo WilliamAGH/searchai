@@ -24,15 +24,13 @@ import { useMetaTags } from "@/hooks/useMetaTags";
 import { useAutoCreateFirstChat } from "@/hooks/useAutoCreateFirstChat";
 import { useSidebarTiming } from "@/hooks/useSidebarTiming";
 import { useConvexQueries } from "@/hooks/useConvexQueries";
-import { usePaginatedMessages } from "@/hooks/usePaginatedMessages";
-import { useEffectiveMessages } from "@/hooks/useEffectiveMessages";
+import { useChatPaginatedMessages } from "@/hooks/useChatPaginatedMessages";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { logger } from "@/lib/logger";
 import { DESKTOP_BREAKPOINT } from "@/lib/constants/layout";
 import { ChatLayout } from "@/components/ChatInterface/ChatLayout";
 import type { Chat } from "@/lib/types/chat";
 import { IdUtils } from "@/lib/types/unified";
-import { buildUserHistory } from "@/lib/utils/chatHistory";
 
 function ChatInterfaceComponent({
   isAuthenticated,
@@ -125,54 +123,8 @@ function ChatInterfaceComponent({
     },
     [navigateHome, navHandleSelectChat],
   );
-  const usePagination = isAuthenticated && !!currentChatId;
-  const {
-    messages: paginatedMessages,
-    isLoading: isLoadingMessages,
-    isLoadingMore,
-    hasMore,
-    error: loadError,
-    retryCount,
-    loadMore,
-    clearError,
-  } = usePaginatedMessages({
-    chatId: usePagination ? currentChatId : null,
-    enabled: usePagination,
-  });
-  const handlePaginatedLoadMore = useCallback(async () => {
-    await loadMore();
-  }, [loadMore]);
-  const pagination = useMemo(
-    () => ({
-      isLoadingMore,
-      hasMore,
-      onLoadMore: handlePaginatedLoadMore,
-      isLoadingMessages,
-      loadError,
-      retryCount,
-      onClearError: clearError,
-    }),
-    [
-      isLoadingMore,
-      hasMore,
-      handlePaginatedLoadMore,
-      isLoadingMessages,
-      loadError,
-      retryCount,
-      clearError,
-    ],
-  );
-  const effectiveMessages = useEffectiveMessages({
-    messages,
-    paginatedMessages,
-    currentChatId,
-    preferPaginatedSource: usePagination,
-    isPaginatedLoading: isLoadingMessages,
-  });
-  const userHistory = useMemo(
-    () => buildUserHistory(effectiveMessages),
-    [effectiveMessages],
-  );
+  const { effectiveMessages, pagination, userHistory } =
+    useChatPaginatedMessages({ currentChatId, isAuthenticated, messages });
   const isSharedRoute = !!(propShareId || propPublicId);
   const canCheckWrite =
     isSharedRoute && !!currentChatId && IdUtils.isConvexId(currentChatId);
