@@ -83,15 +83,19 @@ export async function* streamConversationalWorkflow(
 
     let agentInput: string | AgentInputItem[];
     if (imageUrls.length > 0) {
+      const imageContentItems = imageUrls.map(
+        (url): { type: "input_image"; image: string } => ({
+          type: "input_image",
+          image: url,
+        }),
+      );
+
       agentInput = [
         {
-          role: "user" as const,
+          role: "user",
           content: [
-            { type: "input_text" as const, text: textInput },
-            ...imageUrls.map((url) => ({
-              type: "input_image" as const,
-              image: url,
-            })),
+            { type: "input_text", text: textInput },
+            ...imageContentItems,
           ],
         },
       ];
