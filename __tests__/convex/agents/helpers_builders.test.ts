@@ -50,12 +50,9 @@ describe("buildConversationContext", () => {
 
     const out = buildConversationContext(messages);
 
-    const marker = "[Image context: ";
-    const start = out.indexOf(marker);
-    expect(start).toBeGreaterThan(-1);
-    const end = out.indexOf("]", start + marker.length);
-    expect(end).toBeGreaterThan(start);
-    const included = out.slice(start + marker.length, end);
+    const match = out.match(/\[Image context[^\]]*: ([^\]]+)\]/);
+    expect(match).not.toBeNull();
+    const included = match?.[1] ?? "";
 
     expect(included.length).toBeLessThanOrEqual(
       CONTENT_LIMITS.MAX_IMAGE_ANALYSIS_CONTEXT_CHARS + 3,
