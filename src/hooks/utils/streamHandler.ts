@@ -3,7 +3,7 @@ import { ChatState } from "@/hooks/useChatState";
 import type { Message, MessageStreamChunk } from "@/lib/types/message";
 import type { StreamingPersistPayload } from "../../../convex/schemas/agents";
 import { logger } from "@/lib/logger";
-import { updateLastAssistantMessage } from "@/hooks/utils/messageStateUpdaters";
+import { updateMessageById } from "@/hooks/utils/messageStateUpdaters";
 
 /**
  * Handles processing of stream events for the chat UI.
@@ -20,6 +20,7 @@ export class StreamEventHandler {
   constructor(
     private setState: Dispatch<SetStateAction<ChatState>>,
     private chatId: string,
+    private assistantMessageId: string,
   ) {}
 
   public getPersistedConfirmed(): boolean {
@@ -106,7 +107,7 @@ export class StreamEventHandler {
     this.workflowNonce = chunk.nonce;
 
     // Update the last assistant message with workflow tracking info
-    updateLastAssistantMessage(this.setState, {
+    updateMessageById(this.setState, this.assistantMessageId, {
       workflowId: chunk.workflowId,
       workflowNonce: chunk.nonce,
     });
@@ -121,7 +122,7 @@ export class StreamEventHandler {
     chunk: Extract<MessageStreamChunk, { type: "reasoning" }>,
   ) {
     this.accumulatedReasoning += chunk.content;
-    updateLastAssistantMessage(this.setState, {
+    updateMessageById(this.setState, this.assistantMessageId, {
       reasoning: this.accumulatedReasoning,
       thinking: "Thinking...",
     });
@@ -136,8 +137,9 @@ export class StreamEventHandler {
     const delta = chunk.delta || chunk.content;
     if (delta) {
       this.fullContent += delta;
-      updateLastAssistantMessage(
+      updateMessageById(
         this.setState,
+        this.assistantMessageId,
         { content: this.fullContent, isStreaming: true },
         {
           searchProgress: {
@@ -168,13 +170,14 @@ export class StreamEventHandler {
     if (webResearchSources !== undefined) {
       messageUpdates.webResearchSources = webResearchSources;
     }
-    updateLastAssistantMessage(this.setState, messageUpdates);
+    updateMessageById(this.setState, this.assistantMessageId, messageUpdates);
     logger.debug("Metadata received");
   }
 
   private handleComplete() {
-    updateLastAssistantMessage(
+    updateMessageById(
       this.setState,
+      this.assistantMessageId,
       { isStreaming: true, thinking: undefined },
       {
         searchProgress: {
@@ -208,10 +211,9 @@ export class StreamEventHandler {
     if (chunk.signature !== undefined) {
       messageUpdates.workflowSignature = chunk.signature;
     }
-    updateLastAssistantMessage(this.setState, messageUpdates, {
-      isGenerating: false,
-      searchProgress: { stage: "idle" },
-    });
+    // Do not toggle isGenerating here: rapid-send flows can queue additional
+    // messages, and we need a single source of truth for generation/busy state.
+    updateMessageById(this.setState, this.assistantMessageId, messageUpdates);
 
     logger.debug("Persistence confirmed via SSE", {
       chatId: this.chatId,

@@ -66,6 +66,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
   const sendRef = useRef<
     ((message: string, imageStorageIds?: string[]) => Promise<void>) | null
   >(null);
+  const createChatInFlightRef = useRef<Promise<string | null> | null>(null);
 
   /**
    * Main message sending handler
@@ -100,7 +101,13 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
       // Only create new chat if truly needed
       if (!activeChatId) {
         logger.debug("No chat exists, creating new one");
-        const newChatId = await deps.handleNewChat();
+        if (!createChatInFlightRef.current) {
+          // Singleflight: rapid sends from "/" should reuse one created chat.
+          createChatInFlightRef.current = deps.handleNewChat().finally(() => {
+            createChatInFlightRef.current = null;
+          });
+        }
+        const newChatId = await createChatInFlightRef.current;
         if (!newChatId) {
           logger.error("[ERROR] Failed to create chat for message");
           return;
