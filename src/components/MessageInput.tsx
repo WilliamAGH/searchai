@@ -94,22 +94,38 @@ export function MessageInput({
   /** Upload pending images, send message, then clear input. */
   const sendCurrentMessage = React.useCallback(async () => {
     const trimmed = message.trim();
-    if (
-      (!trimmed && !imageUpload?.hasImages) ||
-      disabled ||
-      imageUpload?.isUploading
-    )
+    const hadImages = Boolean(imageUpload?.hasImages);
+    if ((!trimmed && !hadImages) || disabled || imageUpload?.isUploading)
       return;
     setSendError(null);
     try {
-      const storageIds = imageUpload?.hasImages
-        ? await imageUpload.uploadAll()
-        : undefined;
-      await onSendMessage(trimmed, storageIds);
+      const storageIds = hadImages ? await imageUpload?.uploadAll() : undefined;
+      const hasUploadedImages = Boolean(storageIds && storageIds.length > 0);
+
+      // If this was an image-only submit and nothing was uploaded, do not clear input.
+      if (!trimmed && hadImages && !hasUploadedImages) {
+        setSendError("No images were uploaded");
+        return;
+      }
+
+      const sendPromise = onSendMessage(
+        trimmed,
+        hasUploadedImages ? storageIds : undefined,
+      );
+
+      // Clear immediately so we don't block on streaming responses.
       setMessage("");
       onDraftChange?.("");
       resetHistory();
-      imageUpload?.clear();
+      if (!hadImages || hasUploadedImages) {
+        imageUpload?.clear();
+      }
+
+      void Promise.resolve(sendPromise).catch((error) => {
+        const msg =
+          error instanceof Error ? error.message : "Failed to send message";
+        setSendError(msg);
+      });
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Failed to send message";
