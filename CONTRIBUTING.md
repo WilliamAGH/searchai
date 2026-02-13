@@ -1,15 +1,15 @@
-# Contributing to search-ai.io
+# Contributing to researchly.bot
 
 Found a bug or have a feature request? Please open an issue on GitHub:
 
-- https://github.com/WilliamAGH/searchai-io/issues/new
+- https://github.com/WilliamAGH/researchly-bot/issues/new
 
 Contributions and feedback are welcome, and Pull Requests (PRs) are encouraged.
 
 ## Getting started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/searchai-io.git`
+2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/researchly-bot.git`
 3. Create a feature branch: `git checkout -b my-feature`
 4. Install dependencies: `npm install`
 5. Set up env: `cp .env.example .env.local` and configure `VITE_CONVEX_URL` (see `docs/domains/development.md`)

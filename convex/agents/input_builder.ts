@@ -15,21 +15,27 @@ export interface BuildAgentInputParams {
   conversationContext: string;
   imageUrls: string[];
   imageAnalysis?: string;
+  attachImages?: boolean;
 }
 
 /**
  * Build agent input with optional image analysis context.
  *
- * When images are present, returns an AgentInputItem array with multimodal
- * content (text + images). The `detail: "high"` setting on each image ensures
- * maximum fidelity for vision processing.
+ * When images are present, we inject the persisted `[IMAGE ANALYSIS]` text block
+ * into the input. Reattaching the raw images is optional via `attachImages`.
  *
  * When no images are present, returns a plain string.
  */
 export function buildAgentInput(
   params: BuildAgentInputParams,
 ): string | AgentInputItem[] {
-  const { userQuery, conversationContext, imageUrls, imageAnalysis } = params;
+  const {
+    userQuery,
+    conversationContext,
+    imageUrls,
+    imageAnalysis,
+    attachImages = false,
+  } = params;
 
   const imageContext = imageAnalysis
     ? `\n\n[IMAGE ANALYSIS]\n${imageAnalysis}\n[/IMAGE ANALYSIS]`
@@ -40,6 +46,10 @@ export function buildAgentInput(
     : `${imageContext ? imageContext + "\n\n" : ""}${userQuery}`;
 
   if (imageUrls.length === 0) {
+    return textInput;
+  }
+
+  if (!attachImages) {
     return textInput;
   }
 

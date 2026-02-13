@@ -39,7 +39,7 @@ npx convex env set CONVEX_ALLOWED_ORIGINS "http://localhost:5173,http://127.0.0.
 Note: If you include any localhost/127.0.0.1 dev origin, the backend also allows the common Vite dev/preview ports (5173/5174/4173) to reduce friction during local development.
 
 ```bash
-npx convex env set CONVEX_ALLOWED_ORIGINS "https://dev.search-ai.io,https://search-ai.io" --prod
+npx convex env set CONVEX_ALLOWED_ORIGINS "https://dev.researchly.bot,https://researchly.bot" --prod
 ```
 
 ### AI provider

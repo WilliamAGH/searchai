@@ -81,6 +81,9 @@ export async function* streamConversationalWorkflow(
       conversationContext,
       imageUrls,
       imageAnalysis,
+      // Default off: avoid resending pixels to the main agent. Enable later for
+      // premium tiers if we want true multimodal continuity.
+      attachImages: false,
     });
 
     logWorkflowStart("conversational", args.userQuery);

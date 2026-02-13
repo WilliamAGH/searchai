@@ -6,9 +6,9 @@
  * Frontend mirror: src/lib/constants/seo.ts (keep in sync).
  */
 
-export const SHARED_DESCRIPTION = "Shared Research Chat on SearchAI";
-export const PUBLIC_DESCRIPTION = "AI-Powered Research Chat on SearchAI";
-export const DEFAULT_CHAT_TITLE = "Chat on SearchAI";
+export const SHARED_DESCRIPTION = "Shared Research Chat on Researchly";
+export const PUBLIC_DESCRIPTION = "AI-Powered Research Chat on Researchly";
+export const DEFAULT_CHAT_TITLE = "Chat on Researchly";
 
 export const ROBOTS_INDEX = "index, follow";
 export const ROBOTS_NOINDEX = "noindex, nofollow";

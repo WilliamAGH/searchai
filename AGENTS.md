@@ -1,9 +1,9 @@
 ---
-description: "searchai-io agent rules - Convex runtimes, git safety, clean code, and verification workflow"
+description: "researchly-bot agent rules - Convex runtimes, git safety, clean code, and verification workflow"
 alwaysApply: true
 ---
 
-# searchai-io Agent Rules
+# researchly-bot Agent Rules
 
 ## Document Organization [ORG]
 

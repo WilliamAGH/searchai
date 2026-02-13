@@ -1,5 +1,5 @@
 {
-  "name": "searchai-io",
+  "name": "researchly-bot",
   "version": "0.2.1",
   "private": true,
   "description": "AI-powered search application",
@@ -9,15 +9,15 @@
     "react",
     "search"
   ],
-  "homepage": "https://search-ai.io",
+  "homepage": "https://researchly.bot",
   "bugs": {
-    "url": "https://github.com/WilliamAGH/searchai-io/issues"
+    "url": "https://github.com/WilliamAGH/researchly-bot/issues"
   },
   "license": "LICENSE.md",
   "author": "William Callahan",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WilliamAGH/searchai-io.git"
+    "url": "git+https://github.com/WilliamAGH/researchly-bot.git"
   },
   "type": "module",
   "scripts": {

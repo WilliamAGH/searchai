@@ -246,7 +246,10 @@ export async function initializeWorkflowSession(
     console.warn(
       "buildConversationContext returned empty; using args.conversationContext",
     );
-    conversationContext = args.conversationContext;
+    // Keep newest context when falling back to client-provided conversationContext.
+    conversationContext = args.conversationContext.slice(
+      -CONTENT_LIMITS.MAX_CONTEXT_CHARS,
+    );
   }
   if (!conversationContext) {
     conversationContext = "";

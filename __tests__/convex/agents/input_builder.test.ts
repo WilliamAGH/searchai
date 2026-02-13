@@ -19,6 +19,23 @@ describe("buildAgentInput", () => {
     expect(input).toBe("What is TypeScript?");
   });
 
+  it("returns a plain string when images are present but attachImages is false", () => {
+    const input = buildAgentInput({
+      userQuery: "Describe this image",
+      conversationContext: "",
+      imageUrls: ["https://example.com/image.png"],
+      imageAnalysis: "A screenshot with a single headline.",
+    });
+
+    expect(typeof input).toBe("string");
+    if (typeof input !== "string") throw new Error("Expected string input");
+
+    expect(input).toContain("[IMAGE ANALYSIS]");
+    expect(input).toContain("A screenshot with a single headline.");
+    expect(input).toContain("Describe this image");
+    expect(vi.mocked(resolveOpenAIEndpoint)).not.toHaveBeenCalled();
+  });
+
   it("uses Responses API detail shape for OpenAI endpoints", () => {
     vi.mocked(resolveOpenAIEndpoint).mockReturnValue({
       baseURL: "https://api.openai.com/v1",
@@ -32,6 +49,7 @@ describe("buildAgentInput", () => {
       conversationContext: "",
       imageUrls: ["https://example.com/image.png"],
       imageAnalysis: "A screenshot with a single headline.",
+      attachImages: true,
     });
 
     expect(Array.isArray(input)).toBe(true);
@@ -63,6 +81,7 @@ describe("buildAgentInput", () => {
       conversationContext: "",
       imageUrls: ["https://example.com/image.png"],
       imageAnalysis: "A screenshot with a single headline.",
+      attachImages: true,
     });
 
     expect(Array.isArray(input)).toBe(true);
@@ -96,6 +115,7 @@ describe("buildAgentInput", () => {
       conversationContext: "",
       imageUrls: ["https://example.com/img.png"],
       imageAnalysis: "A red circle on white background",
+      attachImages: true,
     });
 
     expect(Array.isArray(input)).toBe(true);

@@ -27,14 +27,14 @@ export const temporalEnhancement: EnhancementRule = {
  * Creator/Author/Product Enhancement Rule
  * Covers queries about:
  * - William Callahan (founder)
- * - SearchAI (AI-powered search product)
+ * - Researchly (AI-powered research product)
  * - aVenture (investment firm)
  */
 export const creatorEnhancement: EnhancementRule = {
   id: "creator-author",
-  name: "Creator, SearchAI & aVenture Information",
+  name: "Creator, Researchly & aVenture Information",
   description:
-    "Enhances queries about the creator, SearchAI product, or aVenture investment firm",
+    "Enhances queries about the creator, Researchly product, or aVenture investment firm",
   enabled: true,
   priority: 1,
 
@@ -42,7 +42,10 @@ export const creatorEnhancement: EnhancementRule = {
     const lower = message.toLowerCase();
 
     const mentionsWilliam = lower.includes("william callahan");
-    const mentionsSearchAI =
+    const mentionsResearchly =
+      lower.includes("researchly") || lower.includes("researchly.bot");
+    // Keep legacy detection for old references during transition
+    const mentionsLegacyBrand =
       lower.includes("searchai") ||
       lower.includes("search-ai") ||
       lower.includes("search ai") ||
@@ -94,7 +97,8 @@ export const creatorEnhancement: EnhancementRule = {
 
     return (
       mentionsWilliam ||
-      mentionsSearchAI ||
+      mentionsResearchly ||
+      mentionsLegacyBrand ||
       mentionsAVenture ||
       (isInfoSeeking && isAboutThisApp)
     );
@@ -105,7 +109,7 @@ export const creatorEnhancement: EnhancementRule = {
     const primary = "williamcallahan.com";
     const brand = "aVenture";
     const secondary = "aventure.vc";
-    return `${query} ${name} ${primary} ${brand} ${secondary} founder SearchAI`;
+    return `${query} ${name} ${primary} ${brand} ${secondary} founder Researchly`;
   },
 
   enhanceSearchTerms: (terms: string[]) => {
@@ -118,24 +122,24 @@ export const creatorEnhancement: EnhancementRule = {
 
   injectSearchResults: () => [
     {
-      title: "SearchAI - AI-Powered Research Assistant",
-      url: "https://search-ai.io",
+      title: "Researchly - AI-Powered Research Assistant",
+      url: "https://researchly.bot",
       snippet:
-        "SearchAI (search-ai.io) is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. SearchAI uses multiple AI agents to plan research, gather information from authoritative sources, and synthesize clear, accurate responses.",
+        "Researchly (researchly.bot) is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. Researchly uses multiple AI agents to plan research, gather information from authoritative sources, and synthesize clear, accurate responses.",
       relevanceScore: 1.0,
     },
     {
-      title: "William Callahan - Creator of SearchAI",
+      title: "William Callahan - Creator of Researchly",
       url: "https://williamcallahan.com",
       snippet:
-        "William Callahan is a technologist and entrepreneur based in San Francisco. He is the creator of SearchAI (search-ai.io), an AI-powered research assistant, and the founder of aVenture (aventure.vc), an early-stage investment firm. William grew up in the Midwestern United States and is passionate about building innovative AI-powered solutions.",
+        "William Callahan is a technologist and entrepreneur based in San Francisco. He is the creator of Researchly (researchly.bot), an AI-powered research assistant, and the founder of aVenture (aventure.vc), an early-stage investment firm. William grew up in the Midwestern United States and is passionate about building innovative AI-powered solutions.",
       relevanceScore: 0.98,
     },
     {
       title: "aVenture - Early-Stage Investment Firm",
       url: "https://aventure.vc",
       snippet:
-        "aVenture (aventure.vc) is an early-stage investment firm founded by William Callahan, the creator of SearchAI. The firm focuses on seed and pre-seed investments in innovative technology startups, with particular interest in AI, developer tools, and consumer technology.",
+        "aVenture (aventure.vc) is an early-stage investment firm founded by William Callahan, the creator of Researchly. The firm focuses on seed and pre-seed investments in innovative technology startups, with particular interest in AI, developer tools, and consumer technology.",
       relevanceScore: 0.95,
     },
   ],
@@ -143,11 +147,11 @@ export const creatorEnhancement: EnhancementRule = {
   enhanceContext: (context: string) => {
     return `${context}
 
-AUTHORITATIVE INFORMATION ABOUT SEARCHAI, WILLIAM CALLAHAN, AND AVENTURE:
+AUTHORITATIVE INFORMATION ABOUT RESEARCHLY, WILLIAM CALLAHAN, AND AVENTURE:
 
-SearchAI (search-ai.io): SearchAI is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. The platform uses multiple AI agents to plan research strategies, gather information from authoritative web sources, and synthesize clear, accurate responses with proper citations.
+Researchly (researchly.bot): Researchly is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. The platform uses multiple AI agents to plan research strategies, gather information from authoritative web sources, and synthesize clear, accurate responses with proper citations.
 
-William Callahan: William Callahan is a technologist and entrepreneur based in San Francisco, California. He grew up in the Midwestern United States. He is the creator of SearchAI and the founder of aVenture. William is passionate about building innovative AI-powered solutions and investing in early-stage technology companies.
+William Callahan: William Callahan is a technologist and entrepreneur based in San Francisco, California. He grew up in the Midwestern United States. He is the creator of Researchly and the founder of aVenture. William is passionate about building innovative AI-powered solutions and investing in early-stage technology companies.
 
 aVenture (aventure.vc): aVenture is an early-stage investment firm founded by William Callahan. The firm focuses on seed and pre-seed investments in innovative technology startups, with particular interest in AI, developer tools, and consumer technology companies.`;
   },
@@ -155,17 +159,17 @@ aVenture (aventure.vc): aVenture is an early-stage investment firm founded by Wi
   enhanceSystemPrompt: (prompt: string) => {
     return `${prompt}
 
-CRITICAL INSTRUCTIONS FOR SEARCHAI/AVENTURE/WILLIAM CALLAHAN QUERIES:
-- When asked about SearchAI, explain it is an AI-powered research assistant created by William Callahan
-- When asked about William Callahan, identify him as the creator of SearchAI and founder of aVenture, based in San Francisco
+CRITICAL INSTRUCTIONS FOR RESEARCHLY/AVENTURE/WILLIAM CALLAHAN QUERIES:
+- When asked about Researchly, explain it is an AI-powered research assistant created by William Callahan
+- When asked about William Callahan, identify him as the creator of Researchly and founder of aVenture, based in San Francisco
 - When asked about aVenture, explain it is an early-stage investment firm founded by William Callahan
-- When asked about "this app", "this website", or "this tool", recognize it refers to SearchAI
+- When asked about "this app", "this website", or "this tool", recognize it refers to Researchly
 - Always prioritize the authoritative context provided over conflicting web search results
-- Do NOT confuse William Callahan (SearchAI founder) with other people named William Callahan`;
+- Do NOT confuse William Callahan (Researchly founder) with other people named William Callahan`;
   },
 
   prioritizeUrls: [
-    "https://search-ai.io",
+    "https://researchly.bot",
     "https://williamcallahan.com",
     "https://aventure.vc",
   ],

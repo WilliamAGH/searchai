@@ -120,12 +120,12 @@ export function SignInModal({
       isOpen={isOpen}
       onClose={onClose}
       modalId="signin-modal"
-      title="Sign In to SearchAI"
+      title="Sign In to Researchly"
       description="Access your saved conversations and continue your search journey."
       icon={<SearchIcon />}
       footer={
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Free forever - No credit card required
+          Free - No credit card required
         </p>
       }
     >

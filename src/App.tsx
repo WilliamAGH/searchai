@@ -185,7 +185,7 @@ export default function App() {
                     </svg>
                   </Link>
                   <span className="text-lg font-semibold !normal-case tracking-normal text-gray-900 dark:text-white truncate max-w-[40vw]">
-                    SearchAI
+                    Researchly
                   </span>
                 </div>
                 <div className="flex items-center gap-2.5 sm:gap-4">
@@ -198,7 +198,7 @@ export default function App() {
                       onClick={openSignUp}
                       className="inline-flex h-9 items-center justify-center px-3 sm:px-4 text-sm sm:text-base font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap dark:font-mono"
                     >
-                      <span className="hidden sm:inline">Sign Up Free</span>
+                      <span className="hidden sm:inline">Sign Up</span>
                       <span className="sm:hidden">Sign Up</span>
                     </button>
                     <button

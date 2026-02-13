@@ -16,7 +16,7 @@ description: "Documents the image upload data flow from clipboard/file picker th
 6. Persisted alongside user message in `messages.imageStorageIds`
 7. Workflow resolves IDs to serving URLs via `ctx.storage.getUrl()`
 8. Workflow runs vision pre-analysis (Chat Completions `image_url`) and persists text as `messages.imageAnalysis`
-9. Agent receives multimodal input: `AgentInputItem[]` with `input_image` plus injected `[IMAGE ANALYSIS]` text block
+9. Agent receives text input with injected `[IMAGE ANALYSIS]` (raw images are not reattached by default; can be enabled later)
 10. UI renders images via `useQuery(api.storage.getFileUrl)` per storage ID
 
 ## File Map

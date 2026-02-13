@@ -21,8 +21,8 @@ async function sendEmailToMailPit(args: {
   try {
     // Build payload per Mailpit Send API schema: TitleCase keys, structured objects
     // https://mailpit.axllent.org/docs/api-v1/#send-message
-    const defaultFromEmail = "team@search-ai.io";
-    const defaultFromName = "SearchAI";
+    const defaultFromEmail = "team@researchly.bot";
+    const defaultFromName = "Researchly";
 
     const rawFrom = args.from || `${defaultFromName} <${defaultFromEmail}>`;
 
@@ -103,24 +103,24 @@ export const sendWelcomeEmail = internalAction({
     _ctx,
     args,
   ): Promise<{ success: boolean; messageId?: string; message?: string }> => {
-    const siteUrl = process.env.SITE_URL || "https://search-ai.io";
+    const siteUrl = process.env.SITE_URL || "https://researchly.bot";
     const welcomeHtml = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
-          <title>Welcome to SearchAI</title>
+          <title>Welcome to Researchly</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to SearchAI!</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Researchly!</h1>
             <p style="color: #e6fffa; margin: 10px 0 0 0; font-size: 16px;">AI-powered web search at your fingertips</p>
           </div>
           
           <div style="padding: 0 20px;">
             <h2 style="color: #1f2937;">Hi ${escapeHtml(args.userName || "there")}!</h2>
             
-            <p>Thank you for joining SearchAI! You now have access to:</p>
+            <p>Thank you for joining Researchly! You now have access to:</p>
             
             <ul style="background: #f9fafb; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
               <li><strong>Unlimited AI-powered searches</strong> - Ask anything and get real-time web results</li>
@@ -137,7 +137,7 @@ export const sendWelcomeEmail = internalAction({
               Questions? Just reply to this email - we're here to help!<br>
               <br>
               Best regards,<br>
-              The SearchAI Team
+              The Researchly Team
             </p>
           </div>
         </body>
@@ -147,7 +147,7 @@ export const sendWelcomeEmail = internalAction({
     // Use helper function to avoid circular dependency
     return await sendEmailToMailPit({
       to: args.userEmail,
-      subject: "Welcome to SearchAI - Start searching with AI!",
+      subject: "Welcome to Researchly - Start searching with AI!",
       html: welcomeHtml,
     });
   },
