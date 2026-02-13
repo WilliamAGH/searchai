@@ -45,6 +45,10 @@ function countLines(text) {
 const trackedFiles = listTrackedFiles();
 const violations = [];
 
+process.stdout.write(
+  `Checking LOC limits (max ${MAX_LINES} lines per non-generated file)...\n`,
+);
+
 for (const repoPath of trackedFiles) {
   if (isGeneratedPath(repoPath)) continue;
 
@@ -64,18 +68,18 @@ for (const repoPath of trackedFiles) {
 if (violations.length > 0) {
   const sorted = [...violations].sort((a, b) => b.lineCount - a.lineCount);
   for (const v of sorted) {
+    const delta = v.lineCount - MAX_LINES;
     process.stdout.write(
-      `${String(v.lineCount).padStart(5, " ")}  ${v.repoPath}\n`,
+      `${String(v.lineCount).padStart(5, " ")}  ${v.repoPath}  (+${delta} over)\n`,
     );
   }
 
   process.stdout.write(
-    `\nLOC limit: ${MAX_LINES} lines (tracked, non-generated files)\n` +
-      `Violations: ${violations.length}\n`,
+    `\n[FAIL] ${violations.length} file${violations.length === 1 ? "" : "s"} exceed${violations.length === 1 ? "s" : ""} ${MAX_LINES}-line limit\n`,
   );
   process.exitCode = 1;
 } else {
   process.stdout.write(
-    `OK: ${trackedFiles.length} tracked files, 0 LOC violations (limit ${MAX_LINES})\n`,
+    `[OK] ${trackedFiles.length} tracked files within ${MAX_LINES}-line limit\n`,
   );
 }

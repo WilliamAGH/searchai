@@ -22,8 +22,12 @@ hooks = [
   # p20: Convex deployment validation (depends on types being clean)
   # --codegen=disable: prevents regenerating convex/_generated/ which conflicts
   #   with stashed WIP changes when prek restores the stash after the hook
-  # timeout(1m): prevents indefinite hangs on network/server issues
-  { id = "convex-validate", name = "Convex deployment validation", language = "system", entry = "timeout 60 npx convex dev --once --typecheck=enable --codegen=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
+  # --tail-logs=disable: prevents WebSocket log connection that keeps the
+  #   Node.js event loop alive after push completes (the CLI's signal-exit
+  #   handlers intercept SIGTERM, so the orphan WebSocket blocks clean exit)
+  # timeout -k 10 60: sends SIGTERM at 60s, then SIGKILL at 70s as fallback
+  #   (signal-exit in the Convex CLI bundle can delay SIGTERM cleanup)
+  { id = "convex-validate", name = "Convex deployment validation", language = "system", entry = "timeout -k 10 60 npx convex dev --once --typecheck=enable --codegen=disable --tail-logs=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-commit",
   ], priority = 20 },
   # p30: lint-staged (lint staged files)
@@ -48,8 +52,12 @@ hooks = [
   # p10: Convex deployment dry-run (not in validate)
   # --codegen=disable: prevents regenerating convex/_generated/ which conflicts
   #   with stashed WIP changes when prek restores the stash after the hook
-  # timeout(1m): prevents indefinite hangs on network/server issues
-  { id = "convex-push", name = "Convex deployment dry-run", language = "system", entry = "timeout 60 npx convex dev --once --typecheck=enable --codegen=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
+  # --tail-logs=disable: prevents WebSocket log connection that keeps the
+  #   Node.js event loop alive after push completes (the CLI's signal-exit
+  #   handlers intercept SIGTERM, so the orphan WebSocket blocks clean exit)
+  # timeout -k 10 60: sends SIGTERM at 60s, then SIGKILL at 70s as fallback
+  #   (signal-exit in the Convex CLI bundle can delay SIGTERM cleanup)
+  { id = "convex-push", name = "Convex deployment dry-run", language = "system", entry = "timeout -k 10 60 npx convex dev --once --typecheck=enable --codegen=disable --tail-logs=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-push",
   ], priority = 10 },
   # p20: Playwright smoke test (not in validate)

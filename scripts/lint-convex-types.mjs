@@ -114,7 +114,9 @@ function walkDir(dir) {
 }
 
 // Run the linter
-console.log("Checking for manual Convex type definitions...\n");
+console.log(
+  "Checking for manual Convex type definitions (lint violation if found)...\n",
+);
 
 checkPaths.forEach((checkPath) => {
   const fullPath = path.join(rootDir, checkPath);
@@ -145,6 +147,6 @@ if (violations.length > 0) {
 
   process.exit(1);
 } else {
-  console.log("[OK] No manual Convex type definitions found!\n");
+  console.log("[OK] No manual Convex type definitions found, proceeding\n");
   process.exit(0);
 }
