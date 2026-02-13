@@ -17,6 +17,7 @@ import { action, internalQuery, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { isValidUuidV7 } from "./lib/uuid";
+import { hasChatWriteAccess } from "./chats/writeAccess";
 
 /**
  * Require authenticated user or valid sessionId. Shared by all storage operations.
@@ -54,11 +55,17 @@ export const generateUploadUrl = mutation({
 export const getFileUrls = query({
   args: {
     storageIds: v.array(v.id("_storage")),
+    chatId: v.id("chats"),
     sessionId: v.optional(v.string()),
   },
   returns: v.array(v.union(v.string(), v.null())),
   handler: async (ctx, args) => {
-    await requireStorageAccess(ctx, args.sessionId);
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) throw new Error("Chat not found");
+    const userId = await getAuthUserId(ctx);
+    if (!hasChatWriteAccess(chat, userId, args.sessionId)) {
+      throw new Error("Unauthorized: no access to chat images");
+    }
     return Promise.all(args.storageIds.map((id) => ctx.storage.getUrl(id)));
   },
 });

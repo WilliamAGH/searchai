@@ -13,9 +13,10 @@ import { useAnonymousSession } from "@/hooks/useAnonymousSession";
 
 interface MessageImagesProps {
   storageIds: string[];
+  chatId: string;
 }
 
-export function MessageImages({ storageIds }: MessageImagesProps) {
+export function MessageImages({ storageIds, chatId }: MessageImagesProps) {
   const sessionId = useAnonymousSession();
 
   // Single boundary cast: plain strings from Message type → branded Convex Ids
@@ -23,12 +24,18 @@ export function MessageImages({ storageIds }: MessageImagesProps) {
   // these as strings, so we re-cast at the query boundary.
   // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- boundary cast at Convex query edge
   const typedIds = storageIds as Id<"_storage">[];
+  // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- boundary cast at Convex query edge
+  const typedChatId = chatId as Id<"chats">;
 
   // Hook must be called unconditionally (rules of hooks); use "skip" for empty arrays
   const urls = useQuery(
     api.storage.getFileUrls,
     storageIds.length > 0
-      ? { storageIds: typedIds, sessionId: sessionId ?? undefined }
+      ? {
+          storageIds: typedIds,
+          chatId: typedChatId,
+          sessionId: sessionId ?? undefined,
+        }
       : "skip",
   );
 

@@ -220,6 +220,11 @@ export async function initializeWorkflowSession(
   if (!conversationContext && args.conversationContext) {
     console.warn(
       "buildConversationContext returned empty; using args.conversationContext",
+      {
+        chatId: args.chatId,
+        recentMessageCount: recentMessages.length,
+        clientContextLength: args.conversationContext.length,
+      },
     );
     // Keep newest context when falling back to client-provided conversationContext.
     conversationContext = args.conversationContext.slice(
@@ -303,6 +308,7 @@ async function resolveImageUrls(
 
   const resolved = await ctx.runQuery(api.storage.getFileUrls, {
     storageIds: args.imageStorageIds,
+    chatId: args.chatId,
     sessionId: args.sessionId,
   });
 
