@@ -32,6 +32,7 @@ alwaysApply: true
 - [HP1a-c] HTTP Endpoints (Convex): validation, clarity, no ambiguous routing
 - [CS1a-c] Code Search Policy (semantic-first; validate Convex code before commit)
 - [CF1a-b] Config Directory (`config/` houses tooling configs; never move them back to root)
+- [PW1a-d] Playwright Local Safety (Chromium-only by default; never auto-open browsers)
 - [VR1a-e] Verification Loops (build/typecheck/lint/tests/e2e)
 - [LG1a] Language (American English only)
 
@@ -212,6 +213,13 @@ alwaysApply: true
 - [VR1c] Tests (full suite): `npm run test:all`
 - [VR1d] E2E (smoke/share flows): run Playwright with the required proxy runtime, e.g. `PLAYWRIGHT_RUNTIME=proxy npx playwright test --config config/playwright.config.ts -g "(smoke|share)"`
 - [VR1e] All checks must pass with no skipped tests and coverage meeting thresholds.
+
+## [PW1] Playwright Local Safety (Mandatory)
+
+- [PW1a] Scripts invoked by Playwright/CI MUST NOT auto-open browsers (no `vite --open`).
+- [PW1b] Local integration tests MUST run Chromium-only by default; Firefox/WebKit are CI-only unless explicitly opted in.
+- [PW1c] Opt in to all-browsers locally via `PLAYWRIGHT_ALL_BROWSERS=1` or `npm run test:integration:all`.
+- [PW1d] Use `npm run test:integration` for local runs and `npm run test:integration:ci` for CI parity.
 
 ## [LG1] Language
 
