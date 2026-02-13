@@ -214,13 +214,16 @@ export const deleteMessage = mutation({
       });
     } catch (schedulerError) {
       // Log but don't propagate - the delete succeeded, cache invalidation is best-effort
-      console.error("Failed to schedule plan cache invalidation", {
-        chatId: message.chatId,
-        error:
-          schedulerError instanceof Error
-            ? schedulerError.message
-            : String(schedulerError),
-      });
+      console.error(
+        "[CACHE_INVALIDATION_FAILED] Failed to schedule plan cache invalidation",
+        {
+          chatId: message.chatId,
+          error:
+            schedulerError instanceof Error
+              ? schedulerError.message
+              : String(schedulerError),
+        },
+      );
     }
 
     // Clear rolling summary - part of the same transaction, errors should propagate

@@ -107,13 +107,26 @@ export async function handleAgentStream(
     });
   }
 
-  // Gate: verify write access before starting the streaming workflow to prevent
-  // resource exhaustion (OpenAI API + Convex runtime) from unauthorized callers.
-  // @ts-ignore - TS2589: Known Convex limitation with complex type inference
-  const writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
-    chatId,
-    sessionId,
-  });
+  // Fail-fast: reject unauthorized callers before allocating streaming resources.
+  // The authoritative check lives in initializeWorkflowSession; this pre-flight
+  // avoids encoder/stream allocation for callers that will be denied anyway.
+  let writeAccess: "allowed" | "denied" | "not_found";
+  try {
+    // @ts-ignore - TS2589: Known Convex limitation with complex type inference
+    writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
+      chatId,
+      sessionId,
+    });
+  } catch (queryError) {
+    console.error("[WRITE_ACCESS_CHECK_FAILED]", serializeError(queryError));
+    return corsResponse({
+      body: JSON.stringify({
+        error: "Unable to verify permissions. Please try again.",
+      }),
+      status: 500,
+      origin,
+    });
+  }
   if (writeAccess !== "allowed") {
     return corsResponse({
       body: JSON.stringify({ error: "Unauthorized" }),

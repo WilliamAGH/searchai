@@ -101,6 +101,12 @@ export class ConvexStreamHandler {
         }
       }
     } catch (error) {
+      const isNetworkError = error instanceof TypeError;
+      logger.error("[STREAM_RESPONSE_ERROR]", {
+        chatId,
+        error: getErrorMessage(error),
+        isNetworkError,
+      });
       yield {
         type: "error",
         error: getErrorMessage(error),
@@ -118,7 +124,13 @@ export class ConvexStreamHandler {
       return this.parseStreamEvent(ReasoningEventSchema, evt);
     }
     if (evt.type === "content") {
-      return this.parseStreamEvent(ContentEventSchema, evt);
+      const parsed = this.parseStreamEvent(ContentEventSchema, evt);
+      if (!parsed) {
+        logger.warn("[STREAM_CONTENT_DROPPED]", {
+          sessionId: this.sessionId,
+        });
+      }
+      return parsed;
     }
     if (evt.type === "metadata") {
       return this.parseStreamEvent(MetadataEventSchema, evt);

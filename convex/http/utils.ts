@@ -23,7 +23,11 @@ export function serializeError(error: unknown) {
       // For non-string, non-Error causes, try JSON or skip
       try {
         causeStr = JSON.stringify(cause);
-      } catch {
+      } catch (jsonError) {
+        console.warn(
+          "[serializeError] Failed to stringify error cause",
+          jsonError,
+        );
         causeStr = "[unserializable cause]";
       }
     }
@@ -49,7 +53,8 @@ export function serializeError(error: unknown) {
   }
   try {
     return { message: JSON.stringify(error) };
-  } catch {
+  } catch (jsonError) {
+    console.warn("[serializeError] Failed to stringify error value", jsonError);
     return { message: "[unserializable error]" };
   }
 }
