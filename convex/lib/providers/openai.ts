@@ -48,6 +48,7 @@ export type {
 export interface OpenAIEnvironment {
   client: OpenAI;
   isOpenAIEndpoint: boolean;
+  apiMode: "chat_completions" | "responses";
   defaultModelSettings: Partial<ModelSettings>;
 }
 
@@ -79,9 +80,15 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
     );
   }
 
-  // Use Chat Completions API for OpenRouter and any endpoint with /chat/completions
-  // OpenAI's Responses API is only supported by api.openai.com
-  const useChatCompletionsAPI = isOpenRouter || isChatCompletionsEndpoint;
+  // Default rules:
+  // - OpenAI (api.openai.com): prefer Responses API.
+  // - OpenAI-compatible endpoints (OpenRouter, xAI, etc.): default to Chat Completions.
+  // - Explicit baseURL overrides (ending in /chat/completions): force Chat Completions.
+  const useChatCompletionsAPI =
+    !isOpenAIEndpoint || isOpenRouter || isChatCompletionsEndpoint;
+  const apiMode: OpenAIEnvironment["apiMode"] = useChatCompletionsAPI
+    ? "chat_completions"
+    : "responses";
   const debugLogging = process.env.LLM_DEBUG_FETCH === "1";
   const configuredModel =
     process.env.LLM_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
@@ -95,7 +102,7 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   // Configure API type based on endpoint
   // CRITICAL: OpenRouter only supports Chat Completions API, NOT Responses API
   // Using the wrong API format causes tool definitions to be ignored/malformed
-  if (useChatCompletionsAPI) {
+  if (apiMode === "chat_completions") {
     setOpenAIAPI("chat_completions");
     console.info(
       "API Mode: chat_completions",
@@ -123,13 +130,13 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   // resulting in the model hallucinating tool outputs instead of actually calling tools
   const modelProvider = new OpenAIProvider({
     openAIClient: client,
-    useResponses: !useChatCompletionsAPI, // Only use Responses API with OpenAI
+    useResponses: apiMode === "responses",
   });
   setDefaultModelProvider(modelProvider);
   console.info(
     "ModelProvider useResponses:",
-    !useChatCompletionsAPI,
-    useChatCompletionsAPI
+    apiMode === "responses",
+    apiMode === "chat_completions"
       ? "(disabled for Chat Completions)"
       : "(enabled for Responses API)",
   );
@@ -187,6 +194,7 @@ export const createOpenAIEnvironment = (): OpenAIEnvironment => {
   return {
     client,
     isOpenAIEndpoint,
+    apiMode,
     defaultModelSettings,
   };
 };

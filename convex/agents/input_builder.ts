@@ -51,7 +51,9 @@ export function buildAgentInput(
   // We pass providerData in the correct shape for the active API mode.
   const endpoint = resolveOpenAIEndpoint();
   const useChatCompletionsAPI =
-    endpoint.isOpenRouter || endpoint.isChatCompletionsEndpoint;
+    !endpoint.isOpenAIEndpoint ||
+    endpoint.isOpenRouter ||
+    endpoint.isChatCompletionsEndpoint;
   const imageProviderData = useChatCompletionsAPI
     ? { image_url: { detail: "high" } }
     : { detail: "high" };
