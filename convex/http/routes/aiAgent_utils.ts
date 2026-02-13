@@ -109,6 +109,12 @@ type ImageIdsResult =
   | { ok: true; ids: Id<"_storage">[] | undefined }
   | { ok: false; error: string };
 
+function isStorageId(value: string): value is Id<"_storage"> {
+  // Convex IDs are opaque strings; for HTTP payloads we can only validate format.
+  // File content validation (magic bytes) is enforced separately before use.
+  return isValidConvexIdFormat(value);
+}
+
 /**
  * Validate imageStorageIds from an HTTP payload.
  * Rejects (rather than silently coerces) malformed input.
@@ -132,13 +138,10 @@ export function validateImageStorageIds(input: unknown): ImageIdsResult {
     if (typeof item !== "string") {
       return { ok: false, error: "imageStorageIds items must be strings" };
     }
-    if (!isValidConvexIdFormat(item)) {
+    if (!isStorageId(item)) {
       return { ok: false, error: "imageStorageIds contains an invalid ID" };
     }
-    // _storage is a system table excluded from user TableNames, so the isConvexId
-    // type guard can't narrow to it. Format is validated by isValidConvexIdFormat above.
-    // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
-    validated.push(item as Id<"_storage">);
+    validated.push(item);
   }
   return { ok: true, ids: validated.length > 0 ? validated : undefined };
 }
