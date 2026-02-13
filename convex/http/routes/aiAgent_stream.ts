@@ -39,7 +39,7 @@ export async function handleAgentStream(
   const payload = payloadResult.payload;
 
   const message = sanitizeTextInput(payload.message, 10000);
-  if (!message) {
+  if (message === undefined) {
     return corsResponse({
       body: JSON.stringify({ error: "Message must be a string" }),
       status: 400,
@@ -95,6 +95,18 @@ export async function handleAgentStream(
   }
   const imageStorageIds = imageIdsResult.ids;
 
+  // Require at least one input modality: non-empty text OR at least one image.
+  // (Empty text is permitted when images are attached.)
+  const hasText = message.trim().length > 0;
+  const hasImages = Boolean(imageStorageIds?.length);
+  if (!hasText && !hasImages) {
+    return corsResponse({
+      body: JSON.stringify({ error: "Message must not be empty" }),
+      status: 400,
+      origin,
+    });
+  }
+
   // Gate: verify write access before starting the streaming workflow to prevent
   // resource exhaustion (OpenAI API + Convex runtime) from unauthorized callers.
   // @ts-ignore - TS2589: Known Convex limitation with complex type inference
@@ -108,6 +120,34 @@ export async function handleAgentStream(
       status: 403,
       origin,
     });
+  }
+
+  // Defense in depth: validate magic bytes server-side so callers cannot bypass
+  // client-side upload validation by submitting arbitrary _storage IDs.
+  if (imageStorageIds && imageStorageIds.length > 0) {
+    try {
+      await Promise.all(
+        imageStorageIds.map((storageId) =>
+          ctx.runAction(api.storage.validateImageUpload, {
+            storageId,
+            sessionId,
+          }),
+        ),
+      );
+    } catch (error) {
+      const errorInfo = serializeError(error);
+      console.error("[ERROR] AGENT STREAM INVALID IMAGE UPLOAD:", errorInfo);
+      return corsResponse({
+        body: JSON.stringify({
+          error: "Invalid image attachment",
+          ...(process.env.NODE_ENV === "development"
+            ? { errorDetails: errorInfo }
+            : {}),
+        }),
+        status: 400,
+        origin,
+      });
+    }
   }
 
   const encoder = new TextEncoder();
