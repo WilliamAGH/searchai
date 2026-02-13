@@ -115,7 +115,11 @@ async function safeDeleteStorage(
   try {
     await ctx.storage.delete(storageId);
   } catch (deleteError) {
-    console.error("Failed to clean up storage blob", storageId, deleteError);
+    // Intentional graceful degradation: this runs inside a validation-failure
+    // path that is about to throw its own descriptive error.  Rethrowing here
+    // would replace that error with a less useful cleanup message.  We log
+    // with a grep-friendly prefix so orphaned blobs can be monitored.
+    console.error("[STORAGE_CLEANUP_FAILED]", storageId, deleteError);
   }
 }
 
