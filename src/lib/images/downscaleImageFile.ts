@@ -6,14 +6,13 @@
  * - Keep "retina" clarity (only downscale when needed; do not upscale)
  *
  * Constraints:
- * - We skip GIFs to avoid dropping animation frames.
- * - We re-encode using the original MIME type (png/jpeg/webp).
+ * - We re-encode using the original MIME type (png/jpeg).
  */
 
 const DEFAULT_JPEG_QUALITY = 0.92;
 
 function isSupportedCanvasEncodeType(type: string): boolean {
-  return type === "image/png" || type === "image/jpeg" || type === "image/webp";
+  return type === "image/png" || type === "image/jpeg";
 }
 
 function loadImageFromFile(file: File): Promise<HTMLImageElement> {
@@ -61,9 +60,6 @@ export async function downscaleImageFile(params: {
 }): Promise<File> {
   const { file, maxDimensionPx } = params;
 
-  // Preserve animations; also avoids surprises with canvas drawImage.
-  if (file.type === "image/gif") return file;
-
   if (!isSupportedCanvasEncodeType(file.type)) {
     throw new Error(`Unsupported image type for downscaling: ${file.type}`);
   }
@@ -97,10 +93,7 @@ export async function downscaleImageFile(params: {
 
   ctx.drawImage(img, 0, 0, dstW, dstH);
 
-  const quality =
-    file.type === "image/jpeg" || file.type === "image/webp"
-      ? DEFAULT_JPEG_QUALITY
-      : undefined;
+  const quality = file.type === "image/jpeg" ? DEFAULT_JPEG_QUALITY : undefined;
 
   const blob = await canvasToBlob({
     canvas,
