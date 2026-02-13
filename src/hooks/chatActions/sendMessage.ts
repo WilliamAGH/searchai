@@ -53,14 +53,126 @@ function enqueueChatSend(
   return existing.tail;
 }
 
-export async function sendMessageWithStreaming({
+/** Append a user message to state immediately so rapid sends are always visible. */
+function appendUserMessage(
+  setState: Dispatch<SetStateAction<ChatState>>,
+  chatId: string,
+  content: string,
+  imageStorageIds?: string[],
+): void {
+  const userMessage = createLocalUIMessage({
+    id: IdUtils.generateLocalId("msg"),
+    chatId,
+    role: "user",
+    content,
+    imageStorageIds,
+  });
+  setState((prev) => ({
+    ...prev,
+    error: null,
+    messages: [...prev.messages, userMessage],
+  }));
+}
+
+/** Flag the chat as generating. Prevents selectChat from replacing optimistic messages. */
+function markGenerating(
+  setState: Dispatch<SetStateAction<ChatState>>,
+  chatId: string,
+): void {
+  setState((prev) =>
+    prev.currentChatId === chatId ? { ...prev, isGenerating: true } : prev,
+  );
+}
+
+/** Clear busy/progress flags only when the per-chat queue has fully drained. */
+function clearGeneratingOnDrain(
+  setState: Dispatch<SetStateAction<ChatState>>,
+  chatId: string,
+): void {
+  const remaining = chatSendQueues.get(chatId)?.pendingCount ?? 0;
+  if (remaining > 0) return;
+  setState((prev) =>
+    prev.currentChatId === chatId
+      ? { ...prev, isGenerating: false, searchProgress: { stage: "idle" } }
+      : prev,
+  );
+}
+
+/** Create an assistant placeholder message and append it with planning status. */
+function appendAssistantPlaceholder(
+  setState: Dispatch<SetStateAction<ChatState>>,
+  chatId: string,
+): string {
+  const placeholderId = IdUtils.generateLocalId("msg");
+  const placeholder = createLocalUIMessage({
+    id: placeholderId,
+    chatId,
+    role: "assistant",
+    content: "",
+    isStreaming: true,
+    reasoning: "",
+    webResearchSources: [],
+  });
+  // NOTE: Do not set currentChatId/currentChat here — URL sync is the
+  // single source of truth for chat selection (see docs/contracts/navigation.md).
+  setState((prev) => ({
+    ...prev,
+    error: null,
+    searchProgress: {
+      stage: "planning",
+      message: "Analyzing your question and planning research...",
+    },
+    messages: [...prev.messages, placeholder],
+  }));
+  return placeholderId;
+}
+
+/** Stream the assistant response and handle errors. */
+async function streamAssistantResponse({
   repository,
   setState,
   chatId,
   content,
   imageStorageIds,
 }: SendMessageParams): Promise<void> {
-  // Validate inputs
+  const placeholderId = appendAssistantPlaceholder(setState, chatId);
+
+  try {
+    const generator = repository.generateResponse(
+      chatId,
+      content,
+      imageStorageIds,
+    );
+    const handler = new StreamEventHandler(setState, chatId, placeholderId);
+
+    for await (const chunk of generator) {
+      handler.handle(chunk);
+    }
+
+    if (!handler.getPersistedConfirmed()) {
+      updateMessageById(setState, placeholderId, {
+        isStreaming: false,
+        thinking: undefined,
+      });
+    }
+  } catch (error) {
+    logger.error("Failed to send message:", error);
+    setState((prev) => ({
+      ...prev,
+      error: getErrorMessage(error, "Failed to send message"),
+    }));
+    updateMessageById(setState, placeholderId, {
+      isStreaming: false,
+      thinking: undefined,
+    });
+  }
+}
+
+export async function sendMessageWithStreaming(
+  params: SendMessageParams,
+): Promise<void> {
+  const { setState, chatId, content, imageStorageIds } = params;
+
   if (!chatId || (!content && !imageStorageIds?.length)) {
     logger.warn("sendMessage called with invalid parameters", {
       hasRepository: true,
@@ -70,105 +182,9 @@ export async function sendMessageWithStreaming({
     return;
   }
 
-  // Create user message with unique ID and append immediately so rapid sends
-  // are always visible in the UI, even if generation is queued.
-  const userMessageId = IdUtils.generateLocalId("msg");
-  const userMessage = createLocalUIMessage({
-    id: userMessageId,
-    chatId,
-    role: "user",
-    content,
-    imageStorageIds,
-  });
+  appendUserMessage(setState, chatId, content, imageStorageIds);
+  markGenerating(setState, chatId);
 
-  setState((prev) => ({
-    ...prev,
-    error: null,
-    messages: [...prev.messages, userMessage],
-  }));
-
-  // Mark generating while anything is queued for this chat, and only clear it
-  // when the queue drains. This prevents URL-driven selectChat from replacing
-  // optimistic messages mid-flight.
-  setState((prev) =>
-    prev.currentChatId === chatId ? { ...prev, isGenerating: true } : prev,
-  );
-
-  const queued = enqueueChatSend(chatId, async () => {
-    // Create assistant placeholder when this message reaches the head of the queue.
-    const assistantPlaceholderId = IdUtils.generateLocalId("msg");
-    const assistantPlaceholder = createLocalUIMessage({
-      id: assistantPlaceholderId,
-      chatId,
-      role: "assistant",
-      content: "",
-      isStreaming: true,
-      reasoning: "",
-      webResearchSources: [],
-    });
-
-    // Update state to show assistant placeholder and planning status.
-    // NOTE: Do not set currentChatId/currentChat here — URL sync is the
-    // single source of truth for chat selection (see docs/contracts/navigation.md).
-    setState((prev) => ({
-      ...prev,
-      error: null,
-      searchProgress: {
-        stage: "planning",
-        message: "Analyzing your question and planning research...",
-      },
-      messages: [...prev.messages, assistantPlaceholder],
-    }));
-
-    try {
-      // Send message and get streaming response.
-      const generator = repository.generateResponse(
-        chatId,
-        content,
-        imageStorageIds,
-      );
-      const streamHandler = new StreamEventHandler(
-        setState,
-        chatId,
-        assistantPlaceholderId,
-      );
-
-      for await (const chunk of generator) {
-        streamHandler.handle(chunk);
-      }
-
-      // If persistence wasn't confirmed via SSE, clean up streaming state.
-      const persistedConfirmed = streamHandler.getPersistedConfirmed();
-      if (!persistedConfirmed) {
-        updateMessageById(setState, assistantPlaceholderId, {
-          isStreaming: false,
-          thinking: undefined,
-        });
-      }
-
-      // Note: We intentionally skip refresh after persist - optimistic state is source of truth.
-      // Refreshing causes UI flickering because DB messages have different IDs.
-    } catch (error) {
-      logger.error("Failed to send message:", error);
-      setState((prev) => ({
-        ...prev,
-        error: getErrorMessage(error, "Failed to send message"),
-      }));
-      updateMessageById(setState, assistantPlaceholderId, {
-        isStreaming: false,
-        thinking: undefined,
-      });
-    }
-  });
-
-  await queued.finally(() => {
-    // Only clear busy/progress when the queue is drained for this chat.
-    const remaining = chatSendQueues.get(chatId)?.pendingCount ?? 0;
-    if (remaining > 0) return;
-    setState((prev) =>
-      prev.currentChatId === chatId
-        ? { ...prev, isGenerating: false, searchProgress: { stage: "idle" } }
-        : prev,
-    );
-  });
+  const queued = enqueueChatSend(chatId, () => streamAssistantResponse(params));
+  await queued.finally(() => clearGeneratingOnDrain(setState, chatId));
 }
