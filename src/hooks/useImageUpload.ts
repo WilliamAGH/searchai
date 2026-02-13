@@ -107,6 +107,10 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
   const validateImageUpload = useAction(api.storage.validateImageUpload);
 
+  // Ref mirror of images state so async callbacks read current values
+  const imagesRef = useRef<PendingImage[]>([]);
+  imagesRef.current = images;
+
   // Track object URLs for cleanup
   const objectUrlsRef = useRef<Set<string>>(new Set());
 
@@ -188,8 +192,22 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
     setRejections((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
+  const appendRejections = useCallback(
+    (failures: ReadonlyArray<{ file: string; reason: string }>) => {
+      setRejections((prev) => [
+        ...prev,
+        ...failures.map((f) => ({
+          id: crypto.randomUUID(),
+          file: f.file,
+          reason: f.reason,
+        })),
+      ]);
+    },
+    [],
+  );
+
   const uploadAll = useCallback(async (): Promise<string[]> => {
-    const current = images;
+    const current = imagesRef.current;
     if (current.length === 0) return [];
     setIsUploading(true);
 
@@ -223,14 +241,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
       }
 
       if (failed.length > 0 && successIds.length === 0) {
-        setRejections((prev) => [
-          ...prev,
-          ...failed.map((f) => ({
-            id: crypto.randomUUID(),
-            file: f.file,
-            reason: f.reason,
-          })),
-        ]);
+        appendRejections(failed);
         throw new Error(
           "Image upload failed. Review the attachment errors above and try again.",
         );
@@ -255,21 +266,19 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
       );
 
       if (failed.length > 0) {
-        setRejections((prev) => [
-          ...prev,
-          ...failed.map((f) => ({
-            id: crypto.randomUUID(),
-            file: f.file,
-            reason: f.reason,
-          })),
-        ]);
+        console.warn("[IMAGE_UPLOAD_PARTIAL_FAILURE]", {
+          failed: failed.length,
+          succeeded: successIds.length,
+          total: settled.length,
+        });
+        appendRejections(failed);
       }
 
       return successIds;
     } finally {
       setIsUploading(false);
     }
-  }, [images, generateUploadUrl, validateImageUpload, sessionId]);
+  }, [generateUploadUrl, validateImageUpload, sessionId, appendRejections]);
 
   const clear = useCallback(() => {
     for (const img of images) {
