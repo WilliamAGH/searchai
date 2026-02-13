@@ -20,7 +20,7 @@ const ROOT_DIR = path.resolve(
 // machines. CI continues to run the full matrix. To opt in locally, set:
 // PLAYWRIGHT_ALL_BROWSERS=1
 const runAllBrowsers =
-  process.env.CI === "1" || process.env.PLAYWRIGHT_ALL_BROWSERS === "1";
+  Boolean(process.env.CI) || process.env.PLAYWRIGHT_ALL_BROWSERS === "1";
 
 export default defineConfig({
   testDir: "../__tests__/integration",
