@@ -176,10 +176,17 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
         }),
       );
 
-      // Immutable state update: attach storageIds to uploaded images
+      // Build previewUrl → storageId map for stable correlation
+      // (previewUrl is unique per PendingImage; immune to index shifts)
+      const uploadMap = new Map<string, string>();
+      current.forEach((img, i) => {
+        uploadMap.set(img.previewUrl, results[i]);
+      });
+
+      // Immutable state update: attach storageIds by stable key
       setImages((prev) =>
-        prev.map((item, i) => {
-          const uploadedId = results[i];
+        prev.map((item) => {
+          const uploadedId = uploadMap.get(item.previewUrl);
           return uploadedId && !item.storageId
             ? { ...item, storageId: uploadedId }
             : item;
