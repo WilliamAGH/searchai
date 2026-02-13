@@ -26,23 +26,23 @@ describe("hasImageMagicBytes", () => {
     expect(hasImageMagicBytes(header)).toBe(true);
   });
 
-  it("detects GIF87a magic bytes", () => {
+  it("rejects GIF87a magic bytes", () => {
     // GIF87a: 47 49 46 38 37 61
     const header = new Uint8Array([
       0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0, 0, 0, 0, 0, 0,
     ]);
-    expect(hasImageMagicBytes(header)).toBe(true);
+    expect(hasImageMagicBytes(header)).toBe(false);
   });
 
-  it("detects GIF89a magic bytes", () => {
+  it("rejects GIF89a magic bytes", () => {
     // GIF89a: 47 49 46 38 39 61
     const header = new Uint8Array([
       0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0, 0, 0, 0, 0, 0,
     ]);
-    expect(hasImageMagicBytes(header)).toBe(true);
+    expect(hasImageMagicBytes(header)).toBe(false);
   });
 
-  it("detects WebP magic bytes (RIFF....WEBP)", () => {
+  it("rejects WebP magic bytes (RIFF....WEBP)", () => {
     // WebP: RIFF [4 bytes size] WEBP
     const header = new Uint8Array([
       0x52,
@@ -58,7 +58,7 @@ describe("hasImageMagicBytes", () => {
       0x42,
       0x50, // WEBP
     ]);
-    expect(hasImageMagicBytes(header)).toBe(true);
+    expect(hasImageMagicBytes(header)).toBe(false);
   });
 
   it("rejects empty buffer", () => {

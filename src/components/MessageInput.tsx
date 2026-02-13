@@ -272,7 +272,7 @@ export function MessageInput({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
+              accept="image/png,image/jpeg"
               multiple
               onChange={handleFileSelect}
               className="hidden"

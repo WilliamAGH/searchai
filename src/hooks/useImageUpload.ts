@@ -15,13 +15,8 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { downscaleImageFile } from "@/lib/images/downscaleImageFile";
 
-const ACCEPTED_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-]);
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const ACCEPTED_TYPES = new Set(["image/png", "image/jpeg"]);
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_IMAGES = 4;
 const MAX_IMAGE_DIMENSION_PX = 2048;
 
@@ -68,7 +63,7 @@ async function uploadSingleImage(
     maxDimensionPx: MAX_IMAGE_DIMENSION_PX,
   });
   if (uploadFile.size > MAX_FILE_SIZE) {
-    throw new Error("Processed image exceeds 20 MB limit");
+    throw new Error("Processed image exceeds 10 MB limit");
   }
 
   const uploadUrl = await params.generateUploadUrl({
@@ -144,7 +139,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
           newRejections.push({
             id: crypto.randomUUID(),
             file: file.name,
-            reason: `Unsupported type: ${file.type}`,
+            reason: "Unsupported format (PNG or JPEG only)",
           });
           continue;
         }
@@ -152,7 +147,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
           newRejections.push({
             id: crypto.randomUUID(),
             file: file.name,
-            reason: "File exceeds 20 MB limit",
+            reason: "File exceeds 10 MB limit",
           });
           continue;
         }
@@ -213,18 +208,32 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
       );
 
       const successIds: string[] = [];
-      const failedNames: string[] = [];
+      const failed: Array<{ file: string; reason: string }> = [];
       for (let i = 0; i < settled.length; i++) {
         const result = settled[i];
         if (result.status === "fulfilled") {
           successIds.push(result.value);
         } else {
-          failedNames.push(current[i].file.name);
+          const errorMessage =
+            result.reason instanceof Error
+              ? result.reason.message
+              : "Upload failed";
+          failed.push({ file: current[i].file.name, reason: errorMessage });
         }
       }
 
-      if (failedNames.length > 0 && successIds.length === 0) {
-        throw new Error(`All image uploads failed: ${failedNames.join(", ")}`);
+      if (failed.length > 0 && successIds.length === 0) {
+        setRejections((prev) => [
+          ...prev,
+          ...failed.map((f) => ({
+            id: crypto.randomUUID(),
+            file: f.file,
+            reason: f.reason,
+          })),
+        ]);
+        throw new Error(
+          "Image upload failed. Review the attachment errors above and try again.",
+        );
       }
 
       // Correlate successful results back to state via stable previewUrl key
@@ -245,13 +254,13 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
         }),
       );
 
-      if (failedNames.length > 0) {
+      if (failed.length > 0) {
         setRejections((prev) => [
           ...prev,
-          ...failedNames.map((name) => ({
+          ...failed.map((f) => ({
             id: crypto.randomUUID(),
-            file: name,
-            reason: "Upload failed",
+            file: f.file,
+            reason: f.reason,
           })),
         ]);
       }

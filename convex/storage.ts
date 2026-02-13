@@ -13,8 +13,9 @@
  */
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { action, mutation, query } from "./_generated/server";
+import { action, internalQuery, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { isValidUuidV7 } from "./lib/uuid";
 
 /**
@@ -62,41 +63,48 @@ export const getFileUrls = query({
   },
 });
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * Read storage metadata from Convex system tables.
+ *
+ * Note: Convex `ctx.storage.getMetadata` exists but is deprecated in favor of
+ * reading the `_storage` system table.
+ */
+export const getStorageFileMetadata = internalQuery({
+  args: { storageId: v.id("_storage"), sessionId: v.optional(v.string()) },
+  returns: v.union(
+    v.object({
+      size: v.float64(),
+      contentType: v.union(v.string(), v.null()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    await requireStorageAccess(ctx, args.sessionId);
+    const doc = await ctx.db.system.get(args.storageId);
+    if (!doc) return null;
+    return { size: doc.size, contentType: doc.contentType ?? null };
+  },
+});
+
 /**
  * Magic-byte signatures for supported image formats.
- * Each entry checks a primary byte sequence at offset 0, plus an optional
- * secondary sequence at a different offset (needed for RIFF-based WebP).
  */
 const IMAGE_SIGNATURES: ReadonlyArray<{
   bytes: readonly number[];
-  secondaryOffset?: number;
-  secondaryBytes?: readonly number[];
 }> = [
   // PNG: \x89PNG
   { bytes: [0x89, 0x50, 0x4e, 0x47] },
   // JPEG: SOI marker + APP marker
   { bytes: [0xff, 0xd8, 0xff] },
-  // GIF: GIF8 (covers GIF87a and GIF89a)
-  { bytes: [0x47, 0x49, 0x46, 0x38] },
-  // WebP: RIFF....WEBP
-  {
-    bytes: [0x52, 0x49, 0x46, 0x46],
-    secondaryOffset: 8,
-    secondaryBytes: [0x57, 0x45, 0x42, 0x50],
-  },
 ];
 
 /** Check whether a byte buffer starts with a known image signature. */
 export function hasImageMagicBytes(header: Uint8Array): boolean {
-  return IMAGE_SIGNATURES.some((sig) => {
-    const primary = sig.bytes.every((b, i) => header[i] === b);
-    if (!primary) return false;
-    if (sig.secondaryOffset !== undefined && sig.secondaryBytes) {
-      const offset = sig.secondaryOffset;
-      return sig.secondaryBytes.every((b, i) => header[offset + i] === b);
-    }
-    return true;
-  });
+  return IMAGE_SIGNATURES.some((sig) =>
+    sig.bytes.every((b, i) => header[i] === b),
+  );
 }
 
 /** Best-effort cleanup: delete a storage blob without masking the caller's error. */
@@ -123,8 +131,26 @@ export const validateImageUpload = action({
   returns: v.id("_storage"),
   handler: async (ctx, args) => {
     await requireStorageAccess(ctx, args.sessionId);
+
+    const metadata = await ctx.runQuery(
+      internal.storage.getStorageFileMetadata,
+      {
+        storageId: args.storageId,
+        sessionId: args.sessionId,
+      },
+    );
+    if (!metadata) {
+      await safeDeleteStorage(ctx, args.storageId);
+      throw new Error("Uploaded file not found in storage");
+    }
+    if (metadata.size > MAX_IMAGE_BYTES) {
+      await safeDeleteStorage(ctx, args.storageId);
+      throw new Error("Image is too large. Max 10 MB per file.");
+    }
+
     const url = await ctx.storage.getUrl(args.storageId);
     if (!url) {
+      await safeDeleteStorage(ctx, args.storageId);
       throw new Error("Uploaded file not found in storage");
     }
 
@@ -144,9 +170,7 @@ export const validateImageUpload = action({
 
     if (buffer.length < 3 || !hasImageMagicBytes(buffer)) {
       await safeDeleteStorage(ctx, args.storageId);
-      throw new Error(
-        "Uploaded file is not a supported image type (PNG, JPEG, GIF, WebP)",
-      );
+      throw new Error("Unsupported image format. Please upload PNG or JPEG.");
     }
 
     return args.storageId;

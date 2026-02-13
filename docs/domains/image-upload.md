@@ -50,9 +50,8 @@ description: "Documents the image upload data flow from clipboard/file picker th
 ## Constraints
 
 - Max 4 images per message
-- Accepted types: PNG, JPEG, GIF, WebP
-  - Note: OpenAI's vision guide documents support for **non-animated** GIFs; we currently do not detect animation at upload time.
-- Max file size: 20 MB per file
+- Accepted types: PNG, JPEG
+- Max file size: 10 MB per file
 - Upload URLs expire in ~1 hour
 
 ## Dependencies (built-in, no additions)
