@@ -46,6 +46,46 @@ export interface ImageUploadState {
   hasImages: boolean;
 }
 
+/** Upload a single image via Convex's 3-step pattern: generateUrl → POST → validate. */
+async function uploadSingleImage(
+  file: File,
+  generateUploadUrl: (args: { sessionId?: string }) => Promise<string>,
+  validateImageUpload: (args: { storageId: Id<"_storage"> }) => Promise<void>,
+  sessionId?: string,
+): Promise<string> {
+  const uploadUrl = await generateUploadUrl({
+    sessionId: sessionId || undefined,
+  });
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed: ${response.statusText}`);
+  }
+
+  const json: unknown = await response.json();
+  if (
+    typeof json !== "object" ||
+    json === null ||
+    !("storageId" in json) ||
+    typeof json.storageId !== "string"
+  ) {
+    throw new Error("Unexpected upload response: missing storageId");
+  }
+  const storageId = json.storageId;
+
+  await validateImageUpload({
+    // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Convex branded Id from validated upload response
+    storageId: storageId as Id<"_storage">,
+  });
+
+  return storageId;
+}
+
 export function useImageUpload(sessionId?: string | null): ImageUploadState {
   const [images, setImages] = useState<PendingImage[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -131,7 +171,6 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
     setRejections((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Fix #4: Parallel uploads via Promise.all instead of sequential for...of
   const uploadAll = useCallback(async (): Promise<string[]> => {
     const current = images;
     if (current.length === 0) return [];
@@ -139,51 +178,22 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
 
     try {
       const results = await Promise.all(
-        current.map(async (img) => {
-          if (img.storageId) return img.storageId;
-
-          const uploadUrl = await generateUploadUrl({
-            sessionId: sessionId || undefined,
-          });
-
-          const response = await fetch(uploadUrl, {
-            method: "POST",
-            headers: { "Content-Type": img.file.type },
-            body: img.file,
-          });
-
-          if (!response.ok) {
-            throw new Error(`Upload failed: ${response.statusText}`);
-          }
-
-          const json: unknown = await response.json();
-          if (
-            typeof json !== "object" ||
-            json === null ||
-            !("storageId" in json) ||
-            typeof json.storageId !== "string"
-          ) {
-            throw new Error("Unexpected upload response: missing storageId");
-          }
-          const storageId = json.storageId;
-
-          await validateImageUpload({
-            // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Convex branded Id from validated upload response
-            storageId: storageId as Id<"_storage">,
-          });
-
-          return storageId;
-        }),
+        current.map((img) =>
+          img.storageId
+            ? Promise.resolve(img.storageId)
+            : uploadSingleImage(
+                img.file,
+                generateUploadUrl,
+                validateImageUpload,
+                sessionId ?? undefined,
+              ),
+        ),
       );
 
-      // Build previewUrl → storageId map for stable correlation
-      // (previewUrl is unique per PendingImage; immune to index shifts)
-      const uploadMap = new Map<string, string>();
-      current.forEach((img, i) => {
-        uploadMap.set(img.previewUrl, results[i]);
-      });
-
-      // Immutable state update: attach storageIds by stable key
+      // Correlate results back to state via stable previewUrl key
+      const uploadMap = new Map(
+        current.map((img, i) => [img.previewUrl, results[i]]),
+      );
       setImages((prev) =>
         prev.map((item) => {
           const uploadedId = uploadMap.get(item.previewUrl);
