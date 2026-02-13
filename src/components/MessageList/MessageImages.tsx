@@ -43,7 +43,18 @@ export function MessageImages({ storageIds }: MessageImagesProps) {
   return (
     <div className="flex flex-wrap gap-2">
       {urls.map((url, i) => {
-        if (!url) return null;
+        if (!url) {
+          return (
+            <div
+              key={storageIds[i]}
+              className="w-48 h-48 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center"
+            >
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                Image unavailable
+              </span>
+            </div>
+          );
+        }
         return (
           <a
             key={storageIds[i]}

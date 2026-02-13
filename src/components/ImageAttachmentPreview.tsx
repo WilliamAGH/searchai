@@ -18,7 +18,7 @@ interface ImageAttachmentPreviewProps {
   onRemove: (index: number) => void;
   isUploading: boolean;
   rejections?: ImageRejection[];
-  onDismissRejection?: (index: number) => void;
+  onDismissRejection?: (id: string) => void;
 }
 
 export function ImageAttachmentPreview({
@@ -36,11 +36,10 @@ export function ImageAttachmentPreview({
       {/* Rejection banners */}
       {rejections && rejections.length > 0 && onDismissRejection && (
         <div className="flex flex-col gap-1 mb-2">
-          {rejections.map((r, index) => (
+          {rejections.map((r) => (
             <RejectionBanner
-              key={`${r.file}-${index}`}
+              key={r.id}
               rejection={r}
-              index={index}
               onDismiss={onDismissRejection}
             />
           ))}
@@ -99,19 +98,20 @@ export function ImageAttachmentPreview({
 
 function RejectionBanner({
   rejection,
-  index,
   onDismiss,
 }: {
   rejection: ImageRejection;
-  index: number;
-  onDismiss: (index: number) => void;
+  onDismiss: (id: string) => void;
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    timerRef.current = setTimeout(() => onDismiss(index), AUTO_DISMISS_MS);
+    timerRef.current = setTimeout(
+      () => onDismiss(rejection.id),
+      AUTO_DISMISS_MS,
+    );
     return () => clearTimeout(timerRef.current);
-  }, [index, onDismiss]);
+  }, [rejection.id, onDismiss]);
 
   return (
     <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 rounded-lg">
@@ -121,7 +121,7 @@ function RejectionBanner({
       </span>
       <button
         type="button"
-        onClick={() => onDismiss(index)}
+        onClick={() => onDismiss(rejection.id)}
         className="flex-shrink-0 text-red-500 hover:text-red-700 dark:hover:text-red-200"
         aria-label="Dismiss"
       >
