@@ -15,10 +15,10 @@ hooks = [
   # p10: typecheck + build in parallel (independent, both fast-fail)
   { id = "typecheck", name = "TypeScript type check", language = "system", entry = "npm run typecheck", always_run = true, pass_filenames = false, stages = [
     "pre-commit",
-  ], priority = 10 },
+  ], priority = 10, verbose = true },
   { id = "build", name = "Vite build validation", language = "system", entry = "npm run build", always_run = true, pass_filenames = false, stages = [
     "pre-commit",
-  ], priority = 10 },
+  ], priority = 10, verbose = true },
   # p20: Convex deployment validation (depends on types being clean)
   # --codegen=disable: prevents regenerating convex/_generated/ which conflicts
   #   with stashed WIP changes when prek restores the stash after the hook
@@ -35,11 +35,11 @@ hooks = [
   # stashing by default which can lead to confusing behavior (nested stash).
   { id = "lint-staged", name = "Lint staged files", language = "system", entry = "npx lint-staged --no-stash", always_run = true, pass_filenames = false, stages = [
     "pre-commit",
-  ], priority = 30 },
+  ], priority = 30, verbose = true },
   # p40: tests (run after lint to avoid wasting time on unformatted code)
   { id = "test", name = "Run tests", language = "system", entry = "npm test", always_run = true, pass_filenames = false, stages = [
     "pre-commit",
-  ], priority = 40 },
+  ], priority = 40, verbose = true },
 
   # ── Pre-push hooks ────────────────────────────────────────────────
   # verbose = true on all pre-push hooks so output streams in real time
