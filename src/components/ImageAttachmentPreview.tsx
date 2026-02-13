@@ -69,7 +69,7 @@ export function ImageAttachmentPreview({
                 <button
                   type="button"
                   onClick={() => onRemove(index)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-800 dark:bg-gray-600 text-white rounded-full flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-xs leading-none"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-800 dark:bg-gray-600 text-white rounded-full flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity text-xs leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900"
                   aria-label={`Remove image ${index + 1}`}
                 >
                   <svg
@@ -103,14 +103,16 @@ function RejectionBanner({
   rejection: ImageRejection;
   onDismiss: (id: string) => void;
 }) {
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     timerRef.current = setTimeout(
       () => onDismiss(rejection.id),
       AUTO_DISMISS_MS,
     );
-    return () => clearTimeout(timerRef.current);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [rejection.id, onDismiss]);
 
   return (
