@@ -139,7 +139,7 @@ export async function handleAgentStream(
       console.error("[ERROR] AGENT STREAM INVALID IMAGE UPLOAD:", errorInfo);
       return corsResponse({
         body: JSON.stringify({
-          error: "Invalid image attachment",
+          error: errorInfo.message || "Invalid image attachment",
           ...(process.env.NODE_ENV === "development"
             ? { errorDetails: errorInfo }
             : {}),
