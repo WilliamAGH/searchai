@@ -59,7 +59,7 @@ export async function analyzeImages(
 
   const response = await env.client.chat.completions.create({
     model,
-    temperature: 0.2,
+    temperature: 0.1,
     max_completion_tokens: 1024,
     messages: [
       { role: "system", content: VISION_ANALYSIS_SYSTEM_PROMPT },

@@ -45,6 +45,8 @@ export interface WorkflowSessionResult {
   conversationContext: string;
   imageUrls: string[];
   imageAnalysis?: string;
+  /** Set when vision pre-analysis was attempted but failed. */
+  imageAnalysisFailed?: boolean;
 }
 
 // ============================================
@@ -257,6 +259,7 @@ export async function initializeWorkflowSession(
 
   // 7. Vision pre-analysis: generate structured description of attached images
   let imageAnalysis: string | undefined;
+  let imageAnalysisFailed = false;
   if (imageUrls.length > 0) {
     try {
       const { analyzeImages } = await import("./vision_analysis");
@@ -270,11 +273,14 @@ export async function initializeWorkflowSession(
         imageAnalysis,
       });
     } catch (analysisError) {
-      console.error(
-        "Vision analysis failed, proceeding without:",
-        analysisError,
+      imageAnalysisFailed = true;
+      console.warn(
+        "[vision_analysis] Failed for chat=%s message=%s imageCount=%d: %s",
+        args.chatId,
+        userMessageId,
+        imageUrls.length,
+        getErrorMessage(analysisError, "Unknown vision analysis error"),
       );
-      // Non-fatal: agent still receives raw images via vision model
     }
   }
 
@@ -284,6 +290,7 @@ export async function initializeWorkflowSession(
     conversationContext,
     imageUrls,
     imageAnalysis,
+    imageAnalysisFailed,
   };
 }
 

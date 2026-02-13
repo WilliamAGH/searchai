@@ -1,7 +1,6 @@
 "use node";
 
 import { run, MaxTurnsExceededError } from "@openai/agents";
-import type { AgentInputItem } from "@openai/agents";
 import type { Id } from "../_generated/dataModel";
 import { generateMessageId } from "../lib/id_generator";
 import { AGENT_LIMITS, AGENT_TIMEOUTS } from "../lib/constants/cache";
@@ -31,6 +30,7 @@ import {
   buildWebResearchSourcesFromHarvested,
   withTimeout,
 } from "./orchestration_helpers";
+import { buildAgentInput } from "./input_builder";
 import {
   updateChatTitleIfNeeded,
   persistAndCompleteWorkflow,
@@ -72,39 +72,29 @@ export async function* streamConversationalWorkflow(
       nonce,
     );
     workflowTokenId = session.workflowTokenId;
-    const { chat, conversationContext, imageUrls, imageAnalysis } = session;
+    const {
+      chat,
+      conversationContext,
+      imageUrls,
+      imageAnalysis,
+      imageAnalysisFailed,
+    } = session;
 
     yield writeEvent("workflow_start", { workflowId, nonce });
 
-    // Build agent input: inject image analysis context when available
-    const imageContext = imageAnalysis
-      ? `\n\n[IMAGE ANALYSIS]\n${imageAnalysis}\n[/IMAGE ANALYSIS]`
-      : "";
-
-    const textInput = conversationContext
-      ? `Previous conversation:\n${conversationContext}${imageContext}\n\nUser: ${args.userQuery}`
-      : `${imageContext ? imageContext + "\n\n" : ""}${args.userQuery}`;
-
-    let agentInput: string | AgentInputItem[];
-    if (imageUrls.length > 0) {
-      const imageContentItems = imageUrls.map((url) => ({
-        type: "input_image" as const,
-        image: url,
-        providerData: { image_url: { detail: "high" } },
-      }));
-
-      agentInput = [
-        {
-          role: "user" as const,
-          content: [
-            { type: "input_text" as const, text: textInput },
-            ...imageContentItems,
-          ],
-        },
-      ];
-    } else {
-      agentInput = textInput;
+    if (imageAnalysisFailed) {
+      console.warn(
+        "[workflow_conversational] Vision pre-analysis failed for chat=%s; agent will rely on raw images only",
+        args.chatId,
+      );
     }
+
+    const agentInput = buildAgentInput({
+      userQuery: args.userQuery,
+      conversationContext,
+      imageUrls,
+      imageAnalysis,
+    });
 
     logWorkflowStart("conversational", args.userQuery);
 
