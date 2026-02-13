@@ -318,7 +318,7 @@ export const conversationalVisionNoToolsAgent = Agent.create({
     "- First, describe what is visible based on the [IMAGE ANALYSIS] block.\n" +
     "- Then answer the user's question.\n" +
     "- Do NOT include web citations like [domain.com] in this message.\n" +
-    "- If web research is needed, ask the user to confirm and you can research on the next message." +
+    "- If web research is needed, ask the user to confirm and you can research on the next message.\n" +
     IMAGE_ANALYSIS_GUIDELINES,
   outputType: undefined,
   modelSettings: {
