@@ -9,20 +9,27 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { useAnonymousSession } from "@/hooks/useAnonymousSession";
 
 interface MessageImagesProps {
   storageIds: string[];
 }
 
 export function MessageImages({ storageIds }: MessageImagesProps) {
+  const sessionId = useAnonymousSession();
+
   // Single boundary cast: plain strings from Message type → branded Convex Ids
-  // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- boundary cast at Convex query edge, same pattern as aiAgent_utils.ts
+  // Note: Convex query arguments expect branded Ids; the client Message type unwraps
+  // these as strings, so we re-cast at the query boundary.
+  // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- boundary cast at Convex query edge
   const typedIds = storageIds as Id<"_storage">[];
 
   // Hook must be called unconditionally (rules of hooks); use "skip" for empty arrays
   const urls = useQuery(
     api.storage.getFileUrls,
-    storageIds.length > 0 ? { storageIds: typedIds } : "skip",
+    storageIds.length > 0
+      ? { storageIds: typedIds, sessionId: sessionId ?? undefined }
+      : "skip",
   );
 
   if (storageIds.length === 0) return null;
