@@ -156,7 +156,7 @@ export function MessageItem({
         {/* 4) Images (user messages with attachments) */}
         {message.role === "user" && message.imageStorageIds?.length ? (
           <div className="mb-2">
-            <MessageImages storageIds={message.imageStorageIds} />
+            <MessageImages storageIds={message.imageStorageIds ?? []} />
           </div>
         ) : null}
 

@@ -14,6 +14,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { action, mutation, query } from "./_generated/server";
+import { isValidUuidV7 } from "./lib/uuid";
 
 /**
  * Generate a short-lived upload URL (POST target). Expires in ~1 hour.
@@ -29,6 +30,9 @@ export const generateUploadUrl = mutation({
         "Unauthorized: authentication or session required to upload files",
       );
     }
+    if (args.sessionId && !isValidUuidV7(args.sessionId)) {
+      throw new Error("Invalid sessionId format");
+    }
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -38,6 +42,14 @@ export const getFileUrl = query({
   args: { storageId: v.id("_storage") },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => await ctx.storage.getUrl(args.storageId),
+});
+
+/** Batch-resolve multiple storage IDs to serving URLs. Eliminates N+1 queries. */
+export const getFileUrls = query({
+  args: { storageIds: v.array(v.id("_storage")) },
+  returns: v.array(v.union(v.string(), v.null())),
+  handler: async (ctx, args) =>
+    Promise.all(args.storageIds.map((id) => ctx.storage.getUrl(id))),
 });
 
 /**

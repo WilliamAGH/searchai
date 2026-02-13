@@ -9,7 +9,7 @@
  * @see {@link ./chatActions/sendMessage.ts} Consumer — passes imageStorageIds to backend
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -29,11 +29,18 @@ export interface PendingImage {
   storageId?: string;
 }
 
+export interface ImageRejection {
+  file: string;
+  reason: string;
+}
+
 export interface ImageUploadState {
   images: PendingImage[];
   isUploading: boolean;
+  rejections: ImageRejection[];
   addImages: (files: File[]) => void;
   removeImage: (index: number) => void;
+  dismissRejection: (index: number) => void;
   uploadAll: () => Promise<string[]>;
   clear: () => void;
   hasImages: boolean;
@@ -42,35 +49,72 @@ export interface ImageUploadState {
 export function useImageUpload(sessionId?: string | null): ImageUploadState {
   const [images, setImages] = useState<PendingImage[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [rejections, setRejections] = useState<ImageRejection[]>([]);
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
   const validateImageUpload = useAction(api.storage.validateImageUpload);
 
   // Track object URLs for cleanup
   const objectUrlsRef = useRef<Set<string>>(new Set());
 
+  // Fix #1: Revoke all tracked URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    const urls = objectUrlsRef.current;
+    return () => {
+      for (const url of urls) {
+        URL.revokeObjectURL(url);
+      }
+      urls.clear();
+    };
+  }, []);
+
   const revokeUrl = useCallback((url: string) => {
     URL.revokeObjectURL(url);
     objectUrlsRef.current.delete(url);
   }, []);
 
-  const addImages = useCallback(
-    (files: File[]) => {
+  // Fix #2: Use setImages updater to avoid stale closure on images.length
+  // Fix #3: Populate rejections for invalid files instead of silently dropping
+  const addImages = useCallback((files: File[]) => {
+    const newRejections: ImageRejection[] = [];
+
+    setImages((prev) => {
       const valid: PendingImage[] = [];
+
       for (const file of files) {
-        if (!ACCEPTED_TYPES.has(file.type)) continue;
-        if (file.size > MAX_FILE_SIZE) continue;
-        if (images.length + valid.length >= MAX_IMAGES) break;
+        if (!ACCEPTED_TYPES.has(file.type)) {
+          newRejections.push({
+            file: file.name,
+            reason: `Unsupported type: ${file.type}`,
+          });
+          continue;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          newRejections.push({
+            file: file.name,
+            reason: "File exceeds 20 MB limit",
+          });
+          continue;
+        }
+        if (prev.length + valid.length >= MAX_IMAGES) {
+          newRejections.push({
+            file: file.name,
+            reason: `Maximum ${MAX_IMAGES} images`,
+          });
+          break;
+        }
 
         const previewUrl = URL.createObjectURL(file);
         objectUrlsRef.current.add(previewUrl);
         valid.push({ file, previewUrl });
       }
-      if (valid.length > 0) {
-        setImages((prev) => [...prev, ...valid].slice(0, MAX_IMAGES));
-      }
-    },
-    [images.length],
-  );
+
+      return valid.length > 0 ? [...prev, ...valid] : prev;
+    });
+
+    if (newRejections.length > 0) {
+      setRejections((prev) => [...prev, ...newRejections]);
+    }
+  }, []); // No dependencies — uses setImages updater + ref
 
   const removeImage = useCallback(
     (index: number) => {
@@ -83,60 +127,57 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
     [revokeUrl],
   );
 
+  const dismissRejection = useCallback((index: number) => {
+    setRejections((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // Fix #4: Parallel uploads via Promise.all instead of sequential for...of
   const uploadAll = useCallback(async (): Promise<string[]> => {
-    if (images.length === 0) return [];
+    const current = images;
+    if (current.length === 0) return [];
     setIsUploading(true);
 
     try {
-      const uploaded: string[] = [];
+      const results = await Promise.all(
+        current.map(async (img) => {
+          if (img.storageId) return img.storageId;
 
-      for (const img of images) {
-        if (img.storageId) {
-          uploaded.push(img.storageId);
-          continue;
-        }
+          const uploadUrl = await generateUploadUrl({
+            sessionId: sessionId || undefined,
+          });
 
-        // 1. Get auth-gated upload URL
-        const uploadUrl = await generateUploadUrl({
-          sessionId: sessionId || undefined,
-        });
+          const response = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": img.file.type },
+            body: img.file,
+          });
 
-        // 2. POST the file to Convex storage
-        const response = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": img.file.type },
-          body: img.file,
-        });
+          if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+          }
 
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`);
-        }
+          const json: unknown = await response.json();
+          if (
+            typeof json !== "object" ||
+            json === null ||
+            !("storageId" in json) ||
+            typeof json.storageId !== "string"
+          ) {
+            throw new Error("Unexpected upload response: missing storageId");
+          }
+          const storageId = json.storageId;
 
-        const json: unknown = await response.json();
-        if (
-          typeof json !== "object" ||
-          json === null ||
-          !("storageId" in json) ||
-          typeof json.storageId !== "string"
-        ) {
-          throw new Error("Unexpected upload response: missing storageId");
-        }
-        const storageId = json.storageId;
+          await validateImageUpload({
+            // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Convex branded Id from validated upload response
+            storageId: storageId as Id<"_storage">,
+          });
 
-        // 3. Server-side magic-byte validation (deletes file if not a real image)
-        await validateImageUpload({
-          // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Convex branded Id from validated upload response
-          storageId: storageId as Id<"_storage">,
-        });
-
-        img.storageId = storageId;
-        uploaded.push(storageId);
-      }
-
-      return uploaded;
+          img.storageId = storageId;
+          return storageId;
+        }),
+      );
+      return results;
     } catch (error) {
-      // Clean up any partially-uploaded images that weren't validated
-      // Re-throw so the caller (MessageInput) can surface the error to the user
       throw error instanceof Error ? error : new Error("Image upload failed");
     } finally {
       setIsUploading(false);
@@ -148,13 +189,16 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
       revokeUrl(img.previewUrl);
     }
     setImages([]);
+    setRejections([]);
   }, [images, revokeUrl]);
 
   return {
     images,
     isUploading,
+    rejections,
     addImages,
     removeImage,
+    dismissRejection,
     uploadAll,
     clear,
     hasImages: images.length > 0,

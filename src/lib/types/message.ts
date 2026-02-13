@@ -62,11 +62,13 @@ export type Message = Omit<
   | "contextReferences"
   | "searchResults"
   | "sources"
+  | "imageStorageIds"
 > & {
   _id: string;
   chatId: string;
   webResearchSources?: WebResearchSourceClient[];
   reasoning?: string;
+  imageStorageIds?: string[];
 } & UIMessageFields;
 
 export type MessageStreamChunk =
