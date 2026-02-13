@@ -229,14 +229,23 @@ export function buildConversationContext(
   messages: Array<{
     role: "user" | "assistant" | "system";
     content?: string;
+    imageAnalysis?: string;
   }>,
 ): string {
   return messages
     .slice(-CONTENT_LIMITS.MAX_CONTEXT_MESSAGES)
-    .map(
-      (m) =>
-        `${m.role === "user" ? "User" : m.role === "assistant" ? "Assistant" : "System"}: ${m.content || ""}`,
-    )
+    .map((m) => {
+      const label =
+        m.role === "user"
+          ? "User"
+          : m.role === "assistant"
+            ? "Assistant"
+            : "System";
+      const analysis = m.imageAnalysis
+        ? `\n[Image context: ${m.imageAnalysis}]`
+        : "";
+      return `${label}: ${m.content || ""}${analysis}`;
+    })
     .join("\n")
     .slice(0, CONTENT_LIMITS.MAX_CONTEXT_CHARS);
 }

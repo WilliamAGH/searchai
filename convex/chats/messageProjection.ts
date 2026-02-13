@@ -35,6 +35,7 @@ export const vMessageProjection = v.object({
   webResearchSources: v.optional(v.array(vWebResearchSource)),
   workflowId: v.optional(v.string()),
   imageStorageIds: v.optional(v.array(v.id("_storage"))),
+  imageAnalysis: v.optional(v.string()),
 });
 
 export interface MessageProjection {
@@ -51,6 +52,7 @@ export interface MessageProjection {
   webResearchSources?: WebResearchSource[];
   workflowId?: string;
   imageStorageIds?: Id<"_storage">[];
+  imageAnalysis?: string;
 }
 
 /** Project a raw message doc into the client-facing shape. */
@@ -72,6 +74,7 @@ export function projectMessage(m: Doc<"messages">): MessageProjection {
       webResearchSources.length > 0 ? webResearchSources : undefined,
     workflowId: m.workflowId,
     imageStorageIds: m.imageStorageIds,
+    imageAnalysis: m.imageAnalysis,
   };
 }
 

@@ -17,7 +17,7 @@ import type { ImageUploadState } from "@/hooks/useImageUpload";
 
 const TEXTAREA_CLASSES = [
   // layout
-  "w-full pl-3 sm:pl-4 pr-36 resize-none overflow-y-auto overflow-x-hidden",
+  "w-full pr-36 resize-none overflow-y-auto overflow-x-hidden",
   // typography
   "text-base tracking-tight font-ui slashed-zero lining-nums tabular-nums",
   "break-words whitespace-pre-wrap",
@@ -266,7 +266,7 @@ export function MessageInput({
               disabled={disabled}
               rows={1}
               autoComplete="off"
-              className={`${TEXTAREA_CLASSES} ${message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"}`}
+              className={`${TEXTAREA_CLASSES} ${imageUpload ? "pl-11" : "pl-3 sm:pl-4"} ${message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"}`}
             />
             {/* Hidden file input for image picker */}
             <input
@@ -278,15 +278,37 @@ export function MessageInput({
               className="hidden"
               tabIndex={-1}
             />
+            {/* Image attach button — left side of input */}
+            {imageUpload && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Attach image"
+                title="Attach image"
+                disabled={disabled}
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors disabled:opacity-60"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </button>
+            )}
             <MessageInputActions
-              onAttach={
-                imageUpload ? () => fileInputRef.current?.click() : undefined
-              }
               onNewChat={onNewChat}
               onShare={onShare}
               message={message}
               disabled={disabled}
-              hasImageUpload={!!imageUpload}
             />
             <button
               type="submit"

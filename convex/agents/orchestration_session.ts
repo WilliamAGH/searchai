@@ -44,6 +44,7 @@ export interface WorkflowSessionResult {
   chat: ChatQueryResult;
   conversationContext: string;
   imageUrls: string[];
+  imageAnalysis?: string;
 }
 
 // ============================================
@@ -211,6 +212,7 @@ export async function initializeWorkflowSession(
   const recentMessages = (recentMessagesResult ?? []) as Array<{
     role: "user" | "assistant" | "system";
     content?: string;
+    imageAnalysis?: string;
   }>;
 
   // 4. Add user message
@@ -224,12 +226,13 @@ export async function initializeWorkflowSession(
       : {}),
   };
 
+  let userMessageId: Id<"messages">;
   if (useAuthVariant) {
-    await withErrorContext("Failed to save user message", () =>
+    userMessageId = await withErrorContext("Failed to save user message", () =>
       ctx.runMutation(internal.messages.addMessage, addMessageArgs),
     );
   } else {
-    await withErrorContext("Failed to save user message", () =>
+    userMessageId = await withErrorContext("Failed to save user message", () =>
       ctx.runMutation(internal.messages.addMessageHttp, {
         ...addMessageArgs,
         workflowTokenId,
@@ -252,7 +255,36 @@ export async function initializeWorkflowSession(
   // 6. Resolve image storage IDs to serving URLs via batch query
   const imageUrls = await resolveImageUrls(ctx, args);
 
-  return { workflowTokenId, chat, conversationContext, imageUrls };
+  // 7. Vision pre-analysis: generate structured description of attached images
+  let imageAnalysis: string | undefined;
+  if (imageUrls.length > 0) {
+    try {
+      const { analyzeImages } = await import("./vision_analysis");
+      const result = await analyzeImages({
+        imageUrls,
+        userQuery: args.userQuery,
+      });
+      imageAnalysis = result.description;
+      await ctx.runMutation(internal.messages.updateMessage, {
+        messageId: userMessageId,
+        imageAnalysis,
+      });
+    } catch (analysisError) {
+      console.error(
+        "Vision analysis failed, proceeding without:",
+        analysisError,
+      );
+      // Non-fatal: agent still receives raw images via vision model
+    }
+  }
+
+  return {
+    workflowTokenId,
+    chat,
+    conversationContext,
+    imageUrls,
+    imageAnalysis,
+  };
 }
 
 /**

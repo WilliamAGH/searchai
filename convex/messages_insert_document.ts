@@ -19,6 +19,7 @@ export interface PersistableMessageArgs {
   webResearchSources?: WebResearchSource[];
   workflowId?: string;
   imageStorageIds?: Id<"_storage">[];
+  imageAnalysis?: string;
 }
 
 export interface MessageInsertDocument<
@@ -84,6 +85,7 @@ const OPTIONAL_FIELDS: readonly OptionalField[] = [
   "webResearchSources",
   "workflowId",
   "imageStorageIds",
+  "imageAnalysis",
 ] as const;
 
 type OptionalFieldsPartial = Partial<Omit<PersistableMessageArgs, "role">>;

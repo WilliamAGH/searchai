@@ -54,6 +54,7 @@ Optional configuration:
 
 - `LLM_BASE_URL` / `OPENAI_BASE_URL` / `OPENROUTER_BASE_URL`
 - `LLM_MODEL` / `OPENAI_MODEL`
+- `LLM_VISION_MODEL` / `OPENAI_VISION_MODEL` (used when image attachments are present; default: `gpt-4o-mini`)
 - `LLM_TEMPERATURE`
 - `LLM_MAX_OUTPUT_TOKENS`
 - `LLM_REASONING` (`minimal`/`low`/`medium`/`high`)

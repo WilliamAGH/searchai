@@ -72,29 +72,32 @@ export async function* streamConversationalWorkflow(
       nonce,
     );
     workflowTokenId = session.workflowTokenId;
-    const { chat, conversationContext, imageUrls } = session;
+    const { chat, conversationContext, imageUrls, imageAnalysis } = session;
 
     yield writeEvent("workflow_start", { workflowId, nonce });
 
-    // Build agent input: multimodal when images present, plain string otherwise
+    // Build agent input: inject image analysis context when available
+    const imageContext = imageAnalysis
+      ? `\n\n[IMAGE ANALYSIS]\n${imageAnalysis}\n[/IMAGE ANALYSIS]`
+      : "";
+
     const textInput = conversationContext
-      ? `Previous conversation:\n${conversationContext}\n\nUser: ${args.userQuery}`
-      : args.userQuery;
+      ? `Previous conversation:\n${conversationContext}${imageContext}\n\nUser: ${args.userQuery}`
+      : `${imageContext ? imageContext + "\n\n" : ""}${args.userQuery}`;
 
     let agentInput: string | AgentInputItem[];
     if (imageUrls.length > 0) {
-      const imageContentItems = imageUrls.map(
-        (url): { type: "input_image"; image: string } => ({
-          type: "input_image",
-          image: url,
-        }),
-      );
+      const imageContentItems = imageUrls.map((url) => ({
+        type: "input_image" as const,
+        image: url,
+        providerData: { image_url: { detail: "high" } },
+      }));
 
       agentInput = [
         {
-          role: "user",
+          role: "user" as const,
           content: [
-            { type: "input_text", text: textInput },
+            { type: "input_text" as const, text: textInput },
             ...imageContentItems,
           ],
         },
@@ -110,7 +113,12 @@ export async function* streamConversationalWorkflow(
       message: "about your question...",
     });
 
-    const agentResult = await run(agents.conversational, agentInput, {
+    const selectedAgent =
+      imageUrls.length > 0
+        ? agents.conversationalVision
+        : agents.conversational;
+
+    const agentResult = await run(selectedAgent, agentInput, {
       stream: true,
       context: { actionCtx: ctx },
       maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,

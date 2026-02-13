@@ -13,6 +13,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { downscaleImageFile } from "@/lib/images/downscaleImageFile";
 
 const ACCEPTED_TYPES = new Set([
   "image/png",
@@ -22,6 +23,7 @@ const ACCEPTED_TYPES = new Set([
 ]);
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 const MAX_IMAGES = 4;
+const MAX_IMAGE_DIMENSION_PX = 2048;
 
 export interface PendingImage {
   file: File;
@@ -61,14 +63,22 @@ interface UploadSingleImageParams {
 async function uploadSingleImage(
   params: UploadSingleImageParams,
 ): Promise<string> {
+  const uploadFile = await downscaleImageFile({
+    file: params.file,
+    maxDimensionPx: MAX_IMAGE_DIMENSION_PX,
+  });
+  if (uploadFile.size > MAX_FILE_SIZE) {
+    throw new Error("Processed image exceeds 20 MB limit");
+  }
+
   const uploadUrl = await params.generateUploadUrl({
     sessionId: params.sessionId || undefined,
   });
 
   const response = await fetch(uploadUrl, {
     method: "POST",
-    headers: { "Content-Type": params.file.type },
-    body: params.file,
+    headers: { "Content-Type": uploadFile.type },
+    body: uploadFile,
   });
 
   if (!response.ok) {
@@ -189,7 +199,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
     setIsUploading(true);
 
     try {
-      const results = await Promise.all(
+      const settled = await Promise.allSettled(
         current.map((img) =>
           img.storageId
             ? Promise.resolve(img.storageId)
@@ -202,10 +212,30 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
         ),
       );
 
-      // Correlate results back to state via stable previewUrl key
-      const uploadMap = new Map(
-        current.map((img, i) => [img.previewUrl, results[i]]),
-      );
+      const successIds: string[] = [];
+      const failedNames: string[] = [];
+      for (let i = 0; i < settled.length; i++) {
+        const result = settled[i];
+        if (result.status === "fulfilled") {
+          successIds.push(result.value);
+        } else {
+          failedNames.push(current[i].file.name);
+        }
+      }
+
+      if (failedNames.length > 0 && successIds.length === 0) {
+        throw new Error(`All image uploads failed: ${failedNames.join(", ")}`);
+      }
+
+      // Correlate successful results back to state via stable previewUrl key
+      const uploadMap = new Map<string, string>();
+      let successIdx = 0;
+      for (let i = 0; i < settled.length; i++) {
+        if (settled[i].status === "fulfilled") {
+          uploadMap.set(current[i].previewUrl, successIds[successIdx]);
+          successIdx++;
+        }
+      }
       setImages((prev) =>
         prev.map((item) => {
           const uploadedId = uploadMap.get(item.previewUrl);
@@ -215,9 +245,18 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
         }),
       );
 
-      return results;
-    } catch (error) {
-      throw error instanceof Error ? error : new Error("Image upload failed");
+      if (failedNames.length > 0) {
+        setRejections((prev) => [
+          ...prev,
+          ...failedNames.map((name) => ({
+            id: crypto.randomUUID(),
+            file: name,
+            reason: "Upload failed",
+          })),
+        ]);
+      }
+
+      return successIds;
     } finally {
       setIsUploading(false);
     }

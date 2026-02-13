@@ -21,6 +21,7 @@ const messageBaseArgs = {
   webResearchSources: v.optional(v.array(vWebResearchSource)),
   workflowId: v.optional(v.string()),
   imageStorageIds: v.optional(v.array(v.id("_storage"))),
+  imageAnalysis: v.optional(v.string()),
   sessionId: v.optional(v.string()),
 };
 
@@ -160,6 +161,7 @@ export const updateMessage = internalMutation({
     hasRealResults: v.optional(v.boolean()),
     webResearchSources: v.optional(v.array(vWebResearchSource)),
     workflowId: v.optional(v.string()),
+    imageAnalysis: v.optional(v.string()),
   },
   handler: async (ctx, { messageId, ...rest }) => {
     await ctx.db.patch(messageId, { ...rest });

@@ -52,10 +52,10 @@ description: "Documents the image upload data flow from clipboard/file picker th
 
 ## Dependencies (built-in, no additions)
 
-| Capability             | Provider                            |
-| ---------------------- | ----------------------------------- |
-| File storage           | Convex `ctx.storage`                |
-| Multimodal agent input | `@openai/agents` `AgentInputItem[]` |
-| Vision model           | GPT-4o-mini (default)               |
-| Clipboard paste        | Browser Clipboard API               |
-| File picker + camera   | `<input type="file" capture>`       |
+| Capability             | Provider                                    |
+| ---------------------- | ------------------------------------------- |
+| File storage           | Convex `ctx.storage`                        |
+| Multimodal agent input | `@openai/agents` `AgentInputItem[]`         |
+| Vision model           | `LLM_VISION_MODEL` (default: `gpt-4o-mini`) |
+| Clipboard paste        | Browser Clipboard API                       |
+| File picker + camera   | `<input type="file" capture>`               |

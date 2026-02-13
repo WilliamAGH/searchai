@@ -16,7 +16,11 @@
 import { z } from "zod";
 import { Agent } from "@openai/agents";
 import { toolsList, conversationalToolsList } from "./tools";
-import { getOpenAIEnvironment, getModelName } from "../lib/providers/openai";
+import {
+  getOpenAIEnvironment,
+  getModelName,
+  getVisionModelName,
+} from "../lib/providers/openai";
 import { AGENT_LIMITS } from "../lib/constants/cache";
 import {
   QUERY_PLANNER_PROMPT,
@@ -28,6 +32,7 @@ import {
 // Initialize OpenAI environment once
 const env = getOpenAIEnvironment();
 const defaultModel = getModelName();
+const visionModel = getVisionModelName();
 const agentTools = toolsList satisfies ReturnType<typeof Agent.create>["tools"];
 const conversationalAgentTools = conversationalToolsList satisfies ReturnType<
   typeof Agent.create
@@ -268,6 +273,39 @@ export const conversationalAgent = Agent.create({
 });
 
 /**
+ * Conversational Vision Agent (Image Attachments)
+ *
+ * Uses a dedicated vision-capable model so image inputs are actually processed.
+ * This avoids "confident hallucinations" when the default model is text-only.
+ */
+export const conversationalVisionAgent = Agent.create({
+  name: "AssistantVision",
+  model: visionModel,
+  instructions:
+    buildConversationalAgentPrompt({
+      minSearchQueries: AGENT_LIMITS.MIN_SEARCH_QUERIES,
+      maxSearchQueries: AGENT_LIMITS.MAX_SEARCH_QUERIES,
+      minScrapeUrls: AGENT_LIMITS.MIN_SCRAPE_URLS,
+      maxScrapeUrls: AGENT_LIMITS.MAX_SCRAPE_URLS,
+    }) +
+    "\n\nIMAGE ANALYSIS GUIDELINES:\n" +
+    "- An [IMAGE ANALYSIS] block contains a verified description of attached images.\n" +
+    "- ALWAYS ground your answer in the image analysis and what is actually visible.\n" +
+    "- NEVER fabricate details, text, numbers, or objects not in the image analysis.\n" +
+    "- If something is unclear or unidentifiable, say so — do not guess.\n" +
+    "- For screenshots: describe UI state, visible text, and layout as analyzed.\n" +
+    "- For documents/receipts: only transcribe text confirmed in the analysis.\n" +
+    "- If the image analysis contradicts the user's assumption, clarify based on what is visible.\n" +
+    "- If you need a clearer image, say so.",
+  tools: conversationalAgentTools,
+  outputType: undefined,
+  modelSettings: {
+    ...env.defaultModelSettings,
+    temperature: 0.3, // Reduce hallucinations for vision/OCR tasks
+  },
+});
+
+/**
  * Agent configuration map for easy access
  */
 export const agents: {
@@ -275,9 +313,11 @@ export const agents: {
   research: typeof researchAgent;
   answerSynthesis: typeof answerSynthesisAgent;
   conversational: typeof conversationalAgent;
+  conversationalVision: typeof conversationalVisionAgent;
 } = {
   queryPlanner: queryPlannerAgent,
   research: researchAgent,
   answerSynthesis: answerSynthesisAgent,
   conversational: conversationalAgent,
+  conversationalVision: conversationalVisionAgent,
 };

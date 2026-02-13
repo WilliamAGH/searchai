@@ -199,6 +199,21 @@ export const getModelName = (): string => {
 };
 
 /**
+ * Get the configured model name for multimodal (vision) requests.
+ *
+ * This MUST be a vision-capable model. Defaulting to LLM_MODEL is unsafe because
+ * many text-first models will accept the request but ignore images (leading to
+ * confident hallucinations).
+ */
+export const getVisionModelName = (): string => {
+  return (
+    process.env.LLM_VISION_MODEL ||
+    process.env.OPENAI_VISION_MODEL ||
+    "gpt-4o-mini"
+  );
+};
+
+/**
  * Check if current configuration is using OpenRouter
  */
 export const isOpenRouterEndpoint = (): boolean => {

@@ -100,6 +100,8 @@ const applicationTables = {
     workflowId: v.optional(v.string()), // Links to agent orchestration workflow
     // Image attachments (Convex File Storage references)
     imageStorageIds: v.optional(v.array(v.id("_storage"))),
+    // Vision pre-analysis: structured description of attached images
+    imageAnalysis: v.optional(v.string()),
   })
     .index("by_chatId", ["chatId"])
     .index("by_messageId", ["messageId"])

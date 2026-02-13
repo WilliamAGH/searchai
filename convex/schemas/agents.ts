@@ -236,5 +236,6 @@ export interface MessageQueryResult {
   _id: Id<"messages">;
   role: "user" | "assistant" | "system";
   content?: string;
+  imageAnalysis?: string;
   createdAt?: number;
 }
