@@ -46,21 +46,25 @@ export interface ImageUploadState {
   hasImages: boolean;
 }
 
+interface UploadSingleImageParams {
+  file: File;
+  generateUploadUrl: (args: { sessionId?: string }) => Promise<string>;
+  validateImageUpload: (args: { storageId: Id<"_storage"> }) => Promise<void>;
+  sessionId?: string;
+}
+
 /** Upload a single image via Convex's 3-step pattern: generateUrl → POST → validate. */
 async function uploadSingleImage(
-  file: File,
-  generateUploadUrl: (args: { sessionId?: string }) => Promise<string>,
-  validateImageUpload: (args: { storageId: Id<"_storage"> }) => Promise<void>,
-  sessionId?: string,
+  params: UploadSingleImageParams,
 ): Promise<string> {
-  const uploadUrl = await generateUploadUrl({
-    sessionId: sessionId || undefined,
+  const uploadUrl = await params.generateUploadUrl({
+    sessionId: params.sessionId || undefined,
   });
 
   const response = await fetch(uploadUrl, {
     method: "POST",
-    headers: { "Content-Type": file.type },
-    body: file,
+    headers: { "Content-Type": params.file.type },
+    body: params.file,
   });
 
   if (!response.ok) {
@@ -78,7 +82,7 @@ async function uploadSingleImage(
   }
   const storageId = json.storageId;
 
-  await validateImageUpload({
+  await params.validateImageUpload({
     // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Convex branded Id from validated upload response
     storageId: storageId as Id<"_storage">,
   });
@@ -181,12 +185,12 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
         current.map((img) =>
           img.storageId
             ? Promise.resolve(img.storageId)
-            : uploadSingleImage(
-                img.file,
+            : uploadSingleImage({
+                file: img.file,
                 generateUploadUrl,
                 validateImageUpload,
-                sessionId ?? undefined,
-              ),
+                sessionId: sessionId ?? undefined,
+              }),
         ),
       );
 
