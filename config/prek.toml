@@ -15,10 +15,10 @@ hooks = [
   # p10: typecheck + build in parallel (independent, both fast-fail)
   { id = "typecheck", name = "TypeScript type check", language = "system", entry = "npm run typecheck", always_run = true, pass_filenames = false, stages = [
     "pre-commit",
-  ], priority = 10, verbose = true },
+  ], priority = 10, verbose = true, fail_fast = true },
   { id = "build", name = "Vite build validation", language = "system", entry = "npm run build", always_run = true, pass_filenames = false, stages = [
     "pre-commit",
-  ], priority = 10, verbose = true },
+  ], priority = 10, verbose = true, fail_fast = true },
   # p20: Convex deployment validation (depends on types being clean)
   # --codegen=disable: prevents regenerating convex/_generated/ which conflicts
   #   with stashed WIP changes when prek restores the stash after the hook
@@ -29,17 +29,17 @@ hooks = [
   #   (signal-exit in the Convex CLI bundle can delay SIGTERM cleanup)
   { id = "convex-validate", name = "Convex deployment validation", language = "system", entry = "timeout -k 10 60 npx convex dev --once --typecheck=enable --codegen=disable --tail-logs=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-commit",
-  ], priority = 20 },
+  ], priority = 20, fail_fast = true },
   # p30: lint-staged (lint staged files)
   # NOTE: prek already stashes/restores unstaged changes; lint-staged does its own
   # stashing by default which can lead to confusing behavior (nested stash).
   { id = "lint-staged", name = "Lint staged files", language = "system", entry = "npx lint-staged --no-stash", always_run = true, pass_filenames = false, stages = [
     "pre-commit",
-  ], priority = 30, verbose = true },
+  ], priority = 30, verbose = true, fail_fast = true },
   # p40: tests (run after lint to avoid wasting time on unformatted code)
   { id = "test", name = "Run tests", language = "system", entry = "npm test", always_run = true, pass_filenames = false, stages = [
     "pre-commit",
-  ], priority = 40, verbose = true },
+  ], priority = 40, verbose = true, fail_fast = true },
 
   # ── Pre-push hooks ────────────────────────────────────────────────
   # verbose = true on all pre-push hooks so output streams in real time
@@ -61,9 +61,9 @@ hooks = [
   #   (signal-exit in the Convex CLI bundle can delay SIGTERM cleanup)
   { id = "convex-push", name = "Convex deployment dry-run", language = "system", entry = "timeout -k 10 60 npx convex dev --once --typecheck=enable --codegen=disable --tail-logs=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-push",
-  ], priority = 10 },
+  ], priority = 10, fail_fast = true },
   # p20: Playwright smoke test (not in validate)
   { id = "smoke-test", name = "Playwright smoke test", language = "system", entry = "npx playwright test --config config/playwright.config.ts -g smoke --reporter=line", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-push",
-  ], priority = 20 },
+  ], priority = 20, fail_fast = true },
 ]

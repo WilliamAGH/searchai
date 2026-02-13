@@ -93,6 +93,10 @@ export const CONTENT_LIMITS = {
   MAX_CONTEXT_CHARS: 4000,
   /** Maximum characters of image analysis to include in conversation context */
   MAX_IMAGE_ANALYSIS_CONTEXT_CHARS: 2500,
+  /** Maximum characters of image analysis persisted to a message */
+  MAX_IMAGE_ANALYSIS_PERSIST_CHARS: 12_000,
+  /** Maximum characters of image analysis injected into the current agent input */
+  MAX_IMAGE_ANALYSIS_INPUT_CHARS: 8_000,
   /** Maximum characters of user query included in vision pre-analysis prompt */
   VISION_USER_QUERY_CONTEXT_CHARS: 500,
   /** Minimum content length to consider valid (filters noise) */

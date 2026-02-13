@@ -26,6 +26,8 @@ import {
   QUERY_PLANNER_PROMPT,
   RESEARCH_AGENT_PROMPT,
   ANSWER_SYNTHESIS_PROMPT,
+  CONVERSATIONAL_IMAGE_ANALYSIS_GUIDELINES,
+  CONVERSATIONAL_IMAGE_TURN_CONSTRAINTS_NO_TOOLS,
   buildConversationalAgentPrompt,
 } from "./prompts";
 
@@ -37,23 +39,20 @@ const agentTools = toolsList satisfies ReturnType<typeof Agent.create>["tools"];
 const conversationalAgentTools = conversationalToolsList satisfies ReturnType<
   typeof Agent.create
 >["tools"];
-const conversationalInstructions = buildConversationalAgentPrompt({
+const conversationalPromptLimits = {
   minSearchQueries: AGENT_LIMITS.MIN_SEARCH_QUERIES,
   maxSearchQueries: AGENT_LIMITS.MAX_SEARCH_QUERIES,
   minScrapeUrls: AGENT_LIMITS.MIN_SCRAPE_URLS,
   maxScrapeUrls: AGENT_LIMITS.MAX_SCRAPE_URLS,
-});
+} as const;
 
-const IMAGE_ANALYSIS_GUIDELINES =
-  "\n\nIMAGE ANALYSIS GUIDELINES:\n" +
-  "- An [IMAGE ANALYSIS] block contains a verified description of attached images.\n" +
-  "- ALWAYS ground your answer in the image analysis and what is actually visible.\n" +
-  "- NEVER fabricate details, text, numbers, or objects not in the image analysis.\n" +
-  "- If something is unclear or unidentifiable, say so — do not guess.\n" +
-  "- For screenshots: describe UI state, visible text, and layout as analyzed.\n" +
-  "- For documents/receipts: only transcribe text confirmed in the analysis.\n" +
-  "- If the image analysis contradicts the user's assumption, clarify based on what is visible.\n" +
-  "- If you need a clearer image, say so.";
+const conversationalToolEnabledInstructions = buildConversationalAgentPrompt(
+  conversationalPromptLimits,
+);
+const conversationalNoToolsInstructions = buildConversationalAgentPrompt(
+  conversationalPromptLimits,
+  { toolPolicy: "disabled", citationPolicy: "no_citations" },
+);
 
 /**
  * Phase 1: Query Planning Agent
@@ -271,7 +270,7 @@ export const answerSynthesisAgent = Agent.create({
 export const conversationalAgent = Agent.create({
   name: "Assistant",
   model: defaultModel,
-  instructions: conversationalInstructions,
+  instructions: conversationalToolEnabledInstructions,
 
   tools: conversationalAgentTools,
 
@@ -293,7 +292,10 @@ export const conversationalAgent = Agent.create({
 export const conversationalVisionAgent = Agent.create({
   name: "AssistantVision",
   model: visionModel,
-  instructions: conversationalInstructions + IMAGE_ANALYSIS_GUIDELINES,
+  instructions:
+    conversationalToolEnabledInstructions +
+    "\n\n" +
+    CONVERSATIONAL_IMAGE_ANALYSIS_GUIDELINES,
   tools: conversationalAgentTools,
   outputType: undefined,
   modelSettings: {
@@ -312,14 +314,11 @@ export const conversationalVisionNoToolsAgent = Agent.create({
   name: "AssistantVisionNoTools",
   model: visionModel,
   instructions:
-    conversationalInstructions +
-    "\n\nIMAGE TURN CONSTRAINTS:\n" +
-    "- Tools are disabled for this message because images are attached.\n" +
-    "- First, describe what is visible based on the [IMAGE ANALYSIS] block.\n" +
-    "- Then answer the user's question.\n" +
-    "- Do NOT include web citations like [domain.com] in this message.\n" +
-    "- If web research is needed, ask the user to confirm and you can research on the next message.\n" +
-    IMAGE_ANALYSIS_GUIDELINES,
+    conversationalNoToolsInstructions +
+    "\n\n" +
+    CONVERSATIONAL_IMAGE_TURN_CONSTRAINTS_NO_TOOLS +
+    "\n\n" +
+    CONVERSATIONAL_IMAGE_ANALYSIS_GUIDELINES,
   outputType: undefined,
   modelSettings: {
     ...env.defaultModelSettings,
