@@ -3,6 +3,8 @@
  * Extracted from MessageInput to keep both files under the 350-line LOC limit.
  */
 
+import { copyToClipboard } from "@/lib/clipboard";
+
 interface MessageInputActionsProps {
   onAttach?: () => void;
   onNewChat?: () => void;
@@ -94,7 +96,7 @@ export function MessageInputActions({
       </button>
       <button
         type="button"
-        onClick={() => navigator.clipboard.writeText(message)}
+        onClick={() => void copyToClipboard(message)}
         aria-label="Copy message"
         disabled={disabled || !message.trim()}
         className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors disabled:opacity-60"
