@@ -37,7 +37,7 @@
     "typecheck": "tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false",
     "format": "oxfmt -c config/oxfmtrc.json --write .",
     "format:check": "oxfmt -c config/oxfmtrc.json --check .",
-    "validate": "npm-run-all --sequential format --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates lint:boundaries --sequential test:single build",
+    "validate": "npm-run-all --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates lint:boundaries --sequential test:single build",
     "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo 'Cleaned build caches'",
     "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo 'Cleaned everything - run npm install'",
     "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo 'Cleaned VSCode caches - restart VSCode'",
@@ -135,7 +135,7 @@
   "overrides": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "hono": "^4.11.7",
-    "qs": "^6.14.1",
+    "qs": "^6.14.2",
     "undici": "^7.19.0"
   },
   "lint-staged": {
