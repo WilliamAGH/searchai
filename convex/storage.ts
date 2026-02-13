@@ -5,7 +5,7 @@
  * Uses ctx.storage.generateUploadUrl() — the idiomatic Convex upload pattern.
  *
  * Security:
- *  - generateUploadUrl requires authenticated user OR valid sessionId
+ *  - All operations require authenticated user OR valid sessionId
  *  - validateImageUpload inspects magic bytes to reject non-image files
  *
  * @see {@link https://docs.convex.dev/file-storage/upload-files} Convex upload docs
@@ -17,6 +17,28 @@ import { action, mutation, query } from "./_generated/server";
 import { isValidUuidV7 } from "./lib/uuid";
 
 /**
+ * Require authenticated user or valid sessionId. Shared by all storage operations.
+ * Throws on unauthorized access.
+ */
+async function requireStorageAccess(
+  ctx: { auth: { getUserIdentity: () => Promise<unknown> } },
+  sessionId?: string,
+): Promise<void> {
+  const userId = await getAuthUserId(
+    // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Convex query ctx satisfies auth ctx shape
+    ctx as Parameters<typeof getAuthUserId>[0],
+  );
+  if (!userId && !sessionId) {
+    throw new Error(
+      "Unauthorized: authentication or session required to access files",
+    );
+  }
+  if (sessionId && !isValidUuidV7(sessionId)) {
+    throw new Error("Invalid sessionId format");
+  }
+}
+
+/**
  * Generate a short-lived upload URL (POST target). Expires in ~1 hour.
  * Requires either an authenticated user or a valid sessionId.
  */
@@ -24,32 +46,32 @@ export const generateUploadUrl = mutation({
   args: { sessionId: v.optional(v.string()) },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId && !args.sessionId) {
-      throw new Error(
-        "Unauthorized: authentication or session required to upload files",
-      );
-    }
-    if (args.sessionId && !isValidUuidV7(args.sessionId)) {
-      throw new Error("Invalid sessionId format");
-    }
+    await requireStorageAccess(ctx, args.sessionId);
     return await ctx.storage.generateUploadUrl();
   },
 });
 
 /** Resolve a storage ID to a serving URL. Returns null if file was deleted. */
 export const getFileUrl = query({
-  args: { storageId: v.id("_storage") },
+  args: { storageId: v.id("_storage"), sessionId: v.optional(v.string()) },
   returns: v.union(v.string(), v.null()),
-  handler: async (ctx, args) => await ctx.storage.getUrl(args.storageId),
+  handler: async (ctx, args) => {
+    await requireStorageAccess(ctx, args.sessionId);
+    return await ctx.storage.getUrl(args.storageId);
+  },
 });
 
 /** Batch-resolve multiple storage IDs to serving URLs. Eliminates N+1 queries. */
 export const getFileUrls = query({
-  args: { storageIds: v.array(v.id("_storage")) },
+  args: {
+    storageIds: v.array(v.id("_storage")),
+    sessionId: v.optional(v.string()),
+  },
   returns: v.array(v.union(v.string(), v.null())),
-  handler: async (ctx, args) =>
-    Promise.all(args.storageIds.map((id) => ctx.storage.getUrl(id))),
+  handler: async (ctx, args) => {
+    await requireStorageAccess(ctx, args.sessionId);
+    return Promise.all(args.storageIds.map((id) => ctx.storage.getUrl(id)));
+  },
 });
 
 /**
@@ -77,7 +99,7 @@ const IMAGE_SIGNATURES: ReadonlyArray<{
 ];
 
 /** Check whether a byte buffer starts with a known image signature. */
-function hasImageMagicBytes(header: Uint8Array): boolean {
+export function hasImageMagicBytes(header: Uint8Array): boolean {
   return IMAGE_SIGNATURES.some((sig) => {
     const primary = sig.bytes.every((b, i) => header[i] === b);
     if (!primary) return false;
@@ -97,9 +119,10 @@ function hasImageMagicBytes(header: Uint8Array): boolean {
  * in a message. Returns the validated storageId on success.
  */
 export const validateImageUpload = action({
-  args: { storageId: v.id("_storage") },
+  args: { storageId: v.id("_storage"), sessionId: v.optional(v.string()) },
   returns: v.id("_storage"),
   handler: async (ctx, args) => {
+    await requireStorageAccess(ctx, args.sessionId);
     const url = await ctx.storage.getUrl(args.storageId);
     if (!url) {
       throw new Error("Uploaded file not found in storage");
