@@ -24,8 +24,8 @@ export function updateMessageById(
   setState((prev) => ({
     ...prev,
     ...stateUpdates,
-    messages: prev.messages.map((m, index) =>
-      index >= 0 && m._id === messageId ? { ...m, ...messageUpdates } : m,
+    messages: prev.messages.map((m) =>
+      m._id === messageId ? { ...m, ...messageUpdates } : m,
     ),
   }));
 }

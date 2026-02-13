@@ -81,9 +81,9 @@ export async function* streamConversationalWorkflow(
       conversationContext,
       imageUrls,
       imageAnalysis,
-      // Default off: avoid resending pixels to the main agent. Enable later for
-      // premium tiers if we want true multimodal continuity.
-      attachImages: false,
+      // Attach images on the current turn so the tool-enabled vision agent can
+      // ground its answer directly. Future turns rely on persisted [IMAGE ANALYSIS].
+      attachImages: imageUrls.length > 0,
     });
 
     logWorkflowStart("conversational", args.userQuery);
@@ -95,7 +95,7 @@ export async function* streamConversationalWorkflow(
 
     const selectedAgent =
       imageUrls.length > 0
-        ? agents.conversationalVisionNoTools
+        ? agents.conversationalVision
         : agents.conversational;
 
     const agentResult = await run(selectedAgent, agentInput, {

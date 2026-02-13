@@ -27,7 +27,6 @@ import {
   RESEARCH_AGENT_PROMPT,
   ANSWER_SYNTHESIS_PROMPT,
   CONVERSATIONAL_IMAGE_ANALYSIS_GUIDELINES,
-  CONVERSATIONAL_IMAGE_TURN_CONSTRAINTS_NO_TOOLS,
   buildConversationalAgentPrompt,
 } from "./prompts";
 
@@ -48,10 +47,6 @@ const conversationalPromptLimits = {
 
 const conversationalToolEnabledInstructions = buildConversationalAgentPrompt(
   conversationalPromptLimits,
-);
-const conversationalNoToolsInstructions = buildConversationalAgentPrompt(
-  conversationalPromptLimits,
-  { toolPolicy: "disabled", citationPolicy: "no_citations" },
 );
 
 /**
@@ -305,28 +300,6 @@ export const conversationalVisionAgent = Agent.create({
 });
 
 /**
- * Conversational Vision Agent (No Tools)
- *
- * For image turns, we default to skipping tool-calling entirely so the model
- * describes what it sees first rather than auto-triggering web research.
- */
-export const conversationalVisionNoToolsAgent = Agent.create({
-  name: "AssistantVisionNoTools",
-  model: visionModel,
-  instructions:
-    conversationalNoToolsInstructions +
-    "\n\n" +
-    CONVERSATIONAL_IMAGE_TURN_CONSTRAINTS_NO_TOOLS +
-    "\n\n" +
-    CONVERSATIONAL_IMAGE_ANALYSIS_GUIDELINES,
-  outputType: undefined,
-  modelSettings: {
-    ...env.defaultModelSettings,
-    temperature: 0.3,
-  },
-});
-
-/**
  * Agent configuration map for easy access
  */
 export const agents: {
@@ -335,12 +308,10 @@ export const agents: {
   answerSynthesis: typeof answerSynthesisAgent;
   conversational: typeof conversationalAgent;
   conversationalVision: typeof conversationalVisionAgent;
-  conversationalVisionNoTools: typeof conversationalVisionNoToolsAgent;
 } = {
   queryPlanner: queryPlannerAgent,
   research: researchAgent,
   answerSynthesis: answerSynthesisAgent,
   conversational: conversationalAgent,
   conversationalVision: conversationalVisionAgent,
-  conversationalVisionNoTools: conversationalVisionNoToolsAgent,
 };
