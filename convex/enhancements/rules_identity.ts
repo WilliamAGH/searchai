@@ -23,6 +23,78 @@ export const temporalEnhancement: EnhancementRule = {
   },
 };
 
+// --- Module-level keyword constants for entity detection ---
+
+const APP_REFERENCE_KEYWORDS: ReadonlyArray<string> = [
+  "this app",
+  "this website",
+  "this site",
+  "this tool",
+  "this service",
+  "this search",
+  "this product",
+];
+
+const INFO_SEEKING_KEYWORDS: ReadonlyArray<string> = [
+  "what is",
+  "what's",
+  "what does",
+  "tell me about",
+  "about",
+  "who is",
+  "who made",
+  "who created",
+  "who built",
+  "who developed",
+  "who founded",
+  "creator",
+  "author",
+  "founder",
+  "behind",
+  "company",
+  "how does",
+  "how do i",
+  "explain",
+  "describe",
+  "features",
+];
+
+// --- Named detection helpers (single responsibility each) ---
+
+function mentionsCreator(lower: string): boolean {
+  return lower.includes("william callahan");
+}
+
+function mentionsProduct(lower: string): boolean {
+  return lower.includes("researchly") || lower.includes("researchly.bot");
+}
+
+/** Legacy brand detection — keep during transition so old references still resolve. */
+function mentionsLegacyBrand(lower: string): boolean {
+  return (
+    lower.includes("searchai") ||
+    lower.includes("search-ai") ||
+    lower.includes("search ai") ||
+    lower.includes("search-ai.io")
+  );
+}
+
+function mentionsAVenture(lower: string): boolean {
+  return (
+    lower.includes("aventure") ||
+    lower.includes("a]venture") ||
+    lower.includes("aventure.vc")
+  );
+}
+
+function isAboutThisApp(lower: string): boolean {
+  return APP_REFERENCE_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+function isInfoSeeking(lower: string): boolean {
+  return INFO_SEEKING_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 /**
  * Creator/Author/Product Enhancement Rule
  * Covers queries about:
@@ -40,67 +112,12 @@ export const creatorEnhancement: EnhancementRule = {
 
   matcher: (message: string) => {
     const lower = message.toLowerCase();
-
-    const mentionsWilliam = lower.includes("william callahan");
-    const mentionsResearchly =
-      lower.includes("researchly") || lower.includes("researchly.bot");
-    // Keep legacy detection for old references during transition
-    const mentionsLegacyBrand =
-      lower.includes("searchai") ||
-      lower.includes("search-ai") ||
-      lower.includes("search ai") ||
-      lower.includes("search-ai.io");
-    const mentionsAVenture =
-      lower.includes("aventure") ||
-      lower.includes("a]venture") ||
-      lower.includes("aventure.vc");
-
-    const appReferenceKeywords = [
-      "this app",
-      "this website",
-      "this site",
-      "this tool",
-      "this service",
-      "this search",
-      "this product",
-    ];
-    const isAboutThisApp = appReferenceKeywords.some((keyword) =>
-      lower.includes(keyword),
-    );
-
-    const infoSeekingKeywords = [
-      "what is",
-      "what's",
-      "what does",
-      "tell me about",
-      "about",
-      "who is",
-      "who made",
-      "who created",
-      "who built",
-      "who developed",
-      "who founded",
-      "creator",
-      "author",
-      "founder",
-      "behind",
-      "company",
-      "how does",
-      "how do i",
-      "explain",
-      "describe",
-      "features",
-    ];
-    const isInfoSeeking = infoSeekingKeywords.some((keyword) =>
-      lower.includes(keyword),
-    );
-
     return (
-      mentionsWilliam ||
-      mentionsResearchly ||
-      mentionsLegacyBrand ||
-      mentionsAVenture ||
-      (isInfoSeeking && isAboutThisApp)
+      mentionsCreator(lower) ||
+      mentionsProduct(lower) ||
+      mentionsLegacyBrand(lower) ||
+      mentionsAVenture(lower) ||
+      (isInfoSeeking(lower) && isAboutThisApp(lower))
     );
   },
 
