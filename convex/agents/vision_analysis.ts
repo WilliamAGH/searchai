@@ -16,6 +16,8 @@ import {
   getOpenAIEnvironment,
   getVisionModelName,
 } from "../lib/providers/openai";
+import { CONTENT_LIMITS } from "../lib/constants/cache";
+import { truncate } from "./helpers_utils";
 
 const VISION_ANALYSIS_SYSTEM_PROMPT = `You are a precise image analyst. Your job is to produce a thorough, factual description of the image(s) provided.
 
@@ -38,6 +40,14 @@ interface AnalyzeImagesParams {
 
 interface AnalyzeImagesResult {
   description: string;
+}
+
+export function buildVisionAnalysisUserPromptText(userQuery: string): string {
+  const userQueryContext = truncate(
+    userQuery.trim(),
+    CONTENT_LIMITS.VISION_USER_QUERY_CONTEXT_CHARS,
+  );
+  return `Describe the image(s) thoroughly. The user's question for context: "${userQueryContext}"`;
 }
 
 /**
@@ -72,7 +82,7 @@ export async function analyzeImages(
         content: [
           {
             type: "text",
-            text: `Describe the image(s) thoroughly. The user's question for context: "${userQuery}"`,
+            text: buildVisionAnalysisUserPromptText(userQuery),
           },
           ...imageContentParts,
         ],

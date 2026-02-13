@@ -232,22 +232,49 @@ export function buildConversationContext(
     imageAnalysis?: string;
   }>,
 ): string {
-  return messages
-    .slice(-CONTENT_LIMITS.MAX_CONTEXT_MESSAGES)
-    .map((m) => {
-      const label =
-        m.role === "user"
-          ? "User"
-          : m.role === "assistant"
-            ? "Assistant"
-            : "System";
-      const analysis = m.imageAnalysis
-        ? `\n[Image context: ${m.imageAnalysis}]`
-        : "";
-      return `${label}: ${m.content || ""}${analysis}`;
-    })
-    .join("\n")
-    .slice(0, CONTENT_LIMITS.MAX_CONTEXT_CHARS);
+  const maxChars = CONTENT_LIMITS.MAX_CONTEXT_CHARS;
+  const recent = messages.slice(-CONTENT_LIMITS.MAX_CONTEXT_MESSAGES);
+
+  const blocks = recent.map((m) => {
+    const label =
+      m.role === "user"
+        ? "User"
+        : m.role === "assistant"
+          ? "Assistant"
+          : "System";
+    const analysisText = m.imageAnalysis
+      ? truncate(
+          m.imageAnalysis,
+          CONTENT_LIMITS.MAX_IMAGE_ANALYSIS_CONTEXT_CHARS,
+        )
+      : "";
+    const analysis = analysisText ? `\n[Image context: ${analysisText}]` : "";
+    return `${label}: ${m.content || ""}${analysis}`;
+  });
+
+  // Preserve the newest turns within the character budget. The previous
+  // implementation sliced from the start, which could drop the most recent
+  // messages (and image context) entirely.
+  const selected: string[] = [];
+  let used = 0;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i] ?? "";
+    const sep = selected.length > 0 ? "\n" : "";
+    const nextUsed = used + sep.length + block.length;
+    if (nextUsed > maxChars) {
+      if (selected.length === 0) {
+        if (maxChars <= 0) return "";
+        if (block.length <= maxChars) return block;
+        if (maxChars <= 3) return block.slice(0, maxChars);
+        return `${block.slice(0, maxChars - 3)}...`;
+      }
+      break;
+    }
+    selected.push(block);
+    used = nextUsed;
+  }
+
+  return selected.reverse().join("\n");
 }
 
 export function buildConversationBlock(
