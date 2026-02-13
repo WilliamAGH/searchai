@@ -14,6 +14,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { action, mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { isValidUuidV7 } from "./lib/uuid";
 
 /**
@@ -21,13 +22,10 @@ import { isValidUuidV7 } from "./lib/uuid";
  * Throws on unauthorized access.
  */
 async function requireStorageAccess(
-  ctx: { auth: { getUserIdentity: () => Promise<unknown> } },
+  ctx: Parameters<typeof getAuthUserId>[0],
   sessionId?: string,
 ): Promise<void> {
-  const userId = await getAuthUserId(
-    // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Convex query ctx satisfies auth ctx shape
-    ctx as Parameters<typeof getAuthUserId>[0],
-  );
+  const userId = await getAuthUserId(ctx);
   if (!userId && !sessionId) {
     throw new Error(
       "Unauthorized: authentication or session required to access files",
@@ -101,6 +99,18 @@ export function hasImageMagicBytes(header: Uint8Array): boolean {
   });
 }
 
+/** Best-effort cleanup: delete a storage blob without masking the caller's error. */
+async function safeDeleteStorage(
+  ctx: { storage: { delete: (id: Id<"_storage">) => Promise<void> } },
+  storageId: Id<"_storage">,
+): Promise<void> {
+  try {
+    await ctx.storage.delete(storageId);
+  } catch (deleteError) {
+    console.error("Failed to clean up storage blob", storageId, deleteError);
+  }
+}
+
 /**
  * Validate an uploaded file is a genuine image by inspecting magic bytes.
  * Deletes the file from storage if validation fails.
@@ -126,14 +136,14 @@ export const validateImageUpload = action({
     // Some CDNs ignore Range and return the full body — that's fine,
     // we only inspect the first 12 bytes regardless.
     if (!response.ok) {
-      await ctx.storage.delete(args.storageId);
+      await safeDeleteStorage(ctx, args.storageId);
       throw new Error("Failed to read uploaded file for validation");
     }
 
     const buffer = new Uint8Array(await response.arrayBuffer());
 
     if (buffer.length < 3 || !hasImageMagicBytes(buffer)) {
-      await ctx.storage.delete(args.storageId);
+      await safeDeleteStorage(ctx, args.storageId);
       throw new Error(
         "Uploaded file is not a supported image type (PNG, JPEG, GIF, WebP)",
       );
