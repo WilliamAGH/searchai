@@ -215,32 +215,7 @@ export async function initializeWorkflowSession(
     imageAnalysis?: string;
   }>;
 
-  // 4. Add user message
-  const addMessageArgs = {
-    chatId: args.chatId,
-    role: "user" as const,
-    content: args.userQuery,
-    sessionId: args.sessionId,
-    ...(args.imageStorageIds?.length
-      ? { imageStorageIds: args.imageStorageIds }
-      : {}),
-  };
-
-  let userMessageId: Id<"messages">;
-  if (useAuthVariant) {
-    userMessageId = await withErrorContext("Failed to save user message", () =>
-      ctx.runMutation(internal.messages.addMessage, addMessageArgs),
-    );
-  } else {
-    userMessageId = await withErrorContext("Failed to save user message", () =>
-      ctx.runMutation(internal.messages.addMessageHttp, {
-        ...addMessageArgs,
-        workflowTokenId,
-      }),
-    );
-  }
-
-  // 5. Build context
+  // 4. Build context
   let conversationContext = buildConversationContext(recentMessages || []);
   if (!conversationContext && args.conversationContext) {
     console.warn(
@@ -255,10 +230,10 @@ export async function initializeWorkflowSession(
     conversationContext = "";
   }
 
-  // 6. Resolve image storage IDs to serving URLs via batch query
+  // 5. Resolve image storage IDs to serving URLs via batch query
   const imageUrls = await resolveImageUrls(ctx, args);
 
-  // 7. Vision pre-analysis: generate structured description of attached images
+  // 6. Vision pre-analysis: generate structured description of attached images
   let imageAnalysis: string | undefined;
   if (imageUrls.length > 0) {
     try {
@@ -268,15 +243,10 @@ export async function initializeWorkflowSession(
         userQuery: args.userQuery,
       });
       imageAnalysis = result.description;
-      await ctx.runMutation(internal.messages.updateMessage, {
-        messageId: userMessageId,
-        imageAnalysis,
-      });
     } catch (analysisError) {
       console.warn(
-        "[vision_analysis] Failed for chat=%s message=%s imageCount=%d: %s",
+        "[vision_analysis] Failed for chat=%s imageCount=%d: %s",
         args.chatId,
-        userMessageId,
         imageUrls.length,
         getErrorMessage(analysisError, "Unknown vision analysis error"),
       );
@@ -285,6 +255,31 @@ export async function initializeWorkflowSession(
         { cause: analysisError },
       );
     }
+  }
+
+  // 7. Add user message (after vision pre-analysis so we don't persist partial state)
+  const addMessageArgs = {
+    chatId: args.chatId,
+    role: "user" as const,
+    content: args.userQuery,
+    sessionId: args.sessionId,
+    ...(args.imageStorageIds?.length
+      ? { imageStorageIds: args.imageStorageIds }
+      : {}),
+    ...(imageAnalysis ? { imageAnalysis } : {}),
+  };
+
+  if (useAuthVariant) {
+    await withErrorContext("Failed to save user message", () =>
+      ctx.runMutation(internal.messages.addMessage, addMessageArgs),
+    );
+  } else {
+    await withErrorContext("Failed to save user message", () =>
+      ctx.runMutation(internal.messages.addMessageHttp, {
+        ...addMessageArgs,
+        workflowTokenId,
+      }),
+    );
   }
 
   return {
