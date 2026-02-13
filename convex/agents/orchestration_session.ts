@@ -249,16 +249,35 @@ export async function initializeWorkflowSession(
     conversationContext = "";
   }
 
-  // 6. Resolve image storage IDs to serving URLs via query
-  const imageUrls: string[] = [];
-  if (args.imageStorageIds?.length) {
-    for (const idStr of args.imageStorageIds) {
-      const url = await ctx.runQuery(api.storage.getFileUrl, {
-        storageId: idStr,
-      });
-      if (url) imageUrls.push(url);
-    }
-  }
+  // 6. Resolve image storage IDs to serving URLs via batch query
+  const imageUrls = await resolveImageUrls(ctx, args);
 
   return { workflowTokenId, chat, conversationContext, imageUrls };
+}
+
+/**
+ * Resolve image storage IDs to serving URLs. Throws if any URL fails to resolve
+ * so the caller is aware of the failure rather than receiving a silently reduced set.
+ */
+async function resolveImageUrls(
+  ctx: WorkflowActionCtx,
+  args: Pick<StreamingWorkflowArgs, "imageStorageIds" | "sessionId" | "chatId">,
+): Promise<string[]> {
+  if (!args.imageStorageIds?.length) return [];
+
+  const resolved = await ctx.runQuery(api.storage.getFileUrls, {
+    storageIds: args.imageStorageIds,
+    sessionId: args.sessionId,
+  });
+
+  const failedCount = resolved.filter((url) => url === null).length;
+  if (failedCount > 0) {
+    throw new Error(
+      `${failedCount}/${args.imageStorageIds.length} image storage IDs ` +
+        `failed to resolve for chat ${args.chatId}`,
+    );
+  }
+
+  // All entries are non-null after the check above
+  return resolved.filter((url): url is string => url !== null);
 }

@@ -30,6 +30,7 @@ export interface PendingImage {
 }
 
 export interface ImageRejection {
+  id: string;
   file: string;
   reason: string;
 }
@@ -40,7 +41,7 @@ export interface ImageUploadState {
   rejections: ImageRejection[];
   addImages: (files: File[]) => void;
   removeImage: (index: number) => void;
-  dismissRejection: (index: number) => void;
+  dismissRejection: (id: string) => void;
   uploadAll: () => Promise<string[]>;
   clear: () => void;
   hasImages: boolean;
@@ -49,7 +50,10 @@ export interface ImageUploadState {
 interface UploadSingleImageParams {
   file: File;
   generateUploadUrl: (args: { sessionId?: string }) => Promise<string>;
-  validateImageUpload: (args: { storageId: Id<"_storage"> }) => Promise<void>;
+  validateImageUpload: (args: {
+    storageId: Id<"_storage">;
+    sessionId?: string;
+  }) => Promise<Id<"_storage">>;
   sessionId?: string;
 }
 
@@ -85,6 +89,7 @@ async function uploadSingleImage(
   await params.validateImageUpload({
     // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Convex branded Id from validated upload response
     storageId: storageId as Id<"_storage">,
+    sessionId: params.sessionId || undefined,
   });
 
   return storageId;
@@ -127,6 +132,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
       for (const file of files) {
         if (!ACCEPTED_TYPES.has(file.type)) {
           newRejections.push({
+            id: crypto.randomUUID(),
             file: file.name,
             reason: `Unsupported type: ${file.type}`,
           });
@@ -134,6 +140,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
         }
         if (file.size > MAX_FILE_SIZE) {
           newRejections.push({
+            id: crypto.randomUUID(),
             file: file.name,
             reason: "File exceeds 20 MB limit",
           });
@@ -141,6 +148,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
         }
         if (prev.length + valid.length >= MAX_IMAGES) {
           newRejections.push({
+            id: crypto.randomUUID(),
             file: file.name,
             reason: `Maximum ${MAX_IMAGES} images`,
           });
@@ -171,8 +179,8 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
     [revokeUrl],
   );
 
-  const dismissRejection = useCallback((index: number) => {
-    setRejections((prev) => prev.filter((_, i) => i !== index));
+  const dismissRejection = useCallback((id: string) => {
+    setRejections((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
   const uploadAll = useCallback(async (): Promise<string[]> => {

@@ -78,6 +78,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const MAX_TEXTAREA_HEIGHT = 200;
   const [message, setMessage] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,14 +100,21 @@ export function MessageInput({
       imageUpload?.isUploading
     )
       return;
-    const storageIds = imageUpload?.hasImages
-      ? await imageUpload.uploadAll()
-      : undefined;
-    await onSendMessage(trimmed, storageIds);
-    setMessage("");
-    onDraftChange?.("");
-    resetHistory();
-    imageUpload?.clear();
+    setSendError(null);
+    try {
+      const storageIds = imageUpload?.hasImages
+        ? await imageUpload.uploadAll()
+        : undefined;
+      await onSendMessage(trimmed, storageIds);
+      setMessage("");
+      onDraftChange?.("");
+      resetHistory();
+      imageUpload?.clear();
+    } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : "Failed to send message";
+      setSendError(msg);
+    }
   }, [
     message,
     disabled,
@@ -123,6 +131,11 @@ export function MessageInput({
     },
     [sendCurrentMessage],
   );
+
+  /** Clear the inline send error when the user starts typing again. */
+  const clearSendError = React.useCallback(() => {
+    if (sendError) setSendError(null);
+  }, [sendError]);
 
   /** Enter to send, Shift+Enter for newline, ArrowUp/Down for history. */
   const handleKeyDown = React.useCallback(
@@ -188,18 +201,27 @@ export function MessageInput({
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const val = e.target.value;
       setMessage(val);
+      clearSendError();
       if (historyIndex !== null) {
         resetHistory();
       }
       onDraftChange?.(val);
     },
-    [historyIndex, onDraftChange, resetHistory],
+    [historyIndex, onDraftChange, resetHistory, clearSendError],
   );
 
   const hasPendingContent = message.trim() || imageUpload?.hasImages;
 
   return (
     <div>
+      {/* Inline send error */}
+      {sendError && (
+        <div className="px-3 sm:px-4 pb-1">
+          <div className="text-sm text-red-600 dark:text-red-400">
+            {sendError}
+          </div>
+        </div>
+      )}
       {/* Image attachment preview strip */}
       {imageUpload &&
         (imageUpload.hasImages || imageUpload.rejections.length > 0) && (
