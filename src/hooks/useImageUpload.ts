@@ -152,7 +152,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
             file: file.name,
             reason: `Maximum ${MAX_IMAGES} images`,
           });
-          break;
+          continue;
         }
 
         const previewUrl = URL.createObjectURL(file);
