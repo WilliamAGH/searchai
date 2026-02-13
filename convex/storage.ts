@@ -51,16 +51,6 @@ export const generateUploadUrl = mutation({
   },
 });
 
-/** Resolve a storage ID to a serving URL. Returns null if file was deleted. */
-export const getFileUrl = query({
-  args: { storageId: v.id("_storage"), sessionId: v.optional(v.string()) },
-  returns: v.union(v.string(), v.null()),
-  handler: async (ctx, args) => {
-    await requireStorageAccess(ctx, args.sessionId);
-    return await ctx.storage.getUrl(args.storageId);
-  },
-});
-
 /** Batch-resolve multiple storage IDs to serving URLs. Eliminates N+1 queries. */
 export const getFileUrls = query({
   args: {
