@@ -5,8 +5,8 @@
 import http from "node:http";
 import { createReadStream, readFileSync, statSync, existsSync } from "node:fs";
 import { extname, resolve } from "node:path";
-import { Readable } from "node:stream";
 import { fetchOgMeta, injectMetaTags, SITE_URL } from "./lib/seoInject.mjs";
+import { forwardTo } from "./lib/proxy.mjs";
 
 const DIST_DIR = resolve("./dist");
 const DIST_PATH_PREFIX = `${DIST_DIR}${DIST_DIR.endsWith("/") ? "" : "/"}`;
@@ -109,45 +109,6 @@ function sendFile(res, filePath) {
     console.error("Failed to serve file", { filePath, error });
     res.writeHead(404);
     res.end("Not found");
-  }
-}
-
-async function forwardTo(target, req, res) {
-  try {
-    const headers = new Headers();
-    for (const [k, v] of Object.entries(req.headers)) {
-      if (v !== undefined)
-        headers.set(k, Array.isArray(v) ? v.join(", ") : String(v));
-    }
-    headers.set("host", new URL(CONVEX_SITE_URL).host);
-
-    const init = {
-      method: req.method,
-      headers,
-      body: undefined,
-      redirect: "manual",
-    };
-    if (req.method !== "GET" && req.method !== "HEAD") {
-      // Collect request body
-      const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
-      init.body = Buffer.concat(chunks);
-    }
-    const resp = await fetch(target, init);
-    const outHeaders = {};
-    resp.headers.forEach((v, k) => {
-      outHeaders[k] = v;
-    });
-    res.writeHead(resp.status, outHeaders);
-    if (resp.body) {
-      const nodeStream = Readable.fromWeb(resp.body);
-      nodeStream.pipe(res);
-    } else {
-      res.end();
-    }
-  } catch (e) {
-    res.writeHead(502, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Bad gateway", details: String(e) }));
   }
 }
 
