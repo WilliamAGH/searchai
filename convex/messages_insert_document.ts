@@ -1,3 +1,4 @@
+import type { Id } from "./_generated/dataModel";
 import type { SearchMethod } from "./lib/constants/search";
 import { normalizeHttpUrl } from "./lib/urlHttp";
 import type { WebResearchSource } from "./lib/validators";
@@ -17,6 +18,7 @@ export interface PersistableMessageArgs {
   hasRealResults?: boolean;
   webResearchSources?: WebResearchSource[];
   workflowId?: string;
+  imageStorageIds?: Id<"_storage">[];
 }
 
 export interface MessageInsertDocument<
@@ -81,6 +83,7 @@ const OPTIONAL_FIELDS: readonly OptionalField[] = [
   "hasRealResults",
   "webResearchSources",
   "workflowId",
+  "imageStorageIds",
 ] as const;
 
 type OptionalFieldsPartial = Partial<Omit<PersistableMessageArgs, "role">>;

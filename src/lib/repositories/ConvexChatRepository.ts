@@ -150,7 +150,12 @@ export class ConvexChatRepository extends BaseRepository {
   generateResponse(
     chatId: string,
     message: string,
+    imageStorageIds?: string[],
   ): AsyncGenerator<MessageStreamChunk> {
-    return this.streamHandler.generateResponse(chatId, message);
+    return this.streamHandler.generateResponse(
+      chatId,
+      message,
+      imageStorageIds,
+    );
   }
 }

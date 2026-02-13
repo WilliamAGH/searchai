@@ -13,6 +13,7 @@ import { ToolProgressIndicator } from "./ToolProgressIndicator";
 import { formatConversationWithWebResearchSources } from "@/lib/clipboard";
 import type { Message, SearchProgress } from "@/lib/types/message";
 import { hasWebResearchSources } from "@/lib/domain/webResearchSources";
+import { MessageImages } from "./MessageImages";
 
 interface MessageItemProps {
   message: Message;
@@ -152,7 +153,14 @@ export function MessageItem({
             />
           )}
 
-        {/* 4) AI/user content last – always appears under sources/thinking */}
+        {/* 4) Images (user messages with attachments) */}
+        {message.role === "user" && message.imageStorageIds?.length ? (
+          <div className="mb-2">
+            <MessageImages storageIds={message.imageStorageIds} />
+          </div>
+        ) : null}
+
+        {/* 5) AI/user content last – always appears under sources/thinking */}
         <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden text-[15px] sm:text-base leading-6">
           {message.role === "assistant" ? (
             <ContentWithCitations

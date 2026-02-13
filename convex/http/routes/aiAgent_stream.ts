@@ -17,6 +17,7 @@ import {
   rateLimitExceededResponse,
   sanitizeWebResearchSources,
   sanitizeTextInput,
+  validateImageStorageIds,
 } from "./aiAgent_utils";
 
 export async function handleAgentStream(
@@ -84,6 +85,16 @@ export async function handleAgentStream(
   );
   const includeDebugSourceContext = payload.includeDebugSourceContext === true;
 
+  const imageIdsResult = validateImageStorageIds(payload.imageStorageIds);
+  if (!imageIdsResult.ok) {
+    return corsResponse({
+      body: JSON.stringify({ error: imageIdsResult.error }),
+      status: 400,
+      origin,
+    });
+  }
+  const imageStorageIds = imageIdsResult.ids;
+
   // Gate: verify write access before starting the streaming workflow to prevent
   // resource exhaustion (OpenAI API + Convex runtime) from unauthorized callers.
   // @ts-ignore - TS2589: Known Convex limitation with complex type inference
@@ -121,6 +132,7 @@ export async function handleAgentStream(
           conversationContext,
           webResearchSources,
           includeDebugSourceContext,
+          imageStorageIds,
         });
 
         for await (const event of eventStream) {

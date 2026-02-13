@@ -147,6 +147,7 @@ import type * as search from "../search.js";
 import type * as sitemap_constants from "../sitemap/constants.js";
 import type * as sitemap_publicChats from "../sitemap/publicChats.js";
 import type * as sitemap from "../sitemap.js";
+import type * as storage from "../storage.js";
 import type * as workflowEvents from "../workflowEvents.js";
 import type * as workflowTokens from "../workflowTokens.js";
 import type * as workflowTokensActions from "../workflowTokensActions.js";
@@ -294,6 +295,7 @@ declare const fullApi: ApiFromModules<{
   "sitemap/constants": typeof sitemap_constants;
   "sitemap/publicChats": typeof sitemap_publicChats;
   sitemap: typeof sitemap;
+  storage: typeof storage;
   workflowEvents: typeof workflowEvents;
   workflowTokens: typeof workflowTokens;
   workflowTokensActions: typeof workflowTokensActions;

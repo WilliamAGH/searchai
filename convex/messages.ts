@@ -20,6 +20,7 @@ const messageBaseArgs = {
   hasRealResults: v.optional(v.boolean()),
   webResearchSources: v.optional(v.array(vWebResearchSource)),
   workflowId: v.optional(v.string()),
+  imageStorageIds: v.optional(v.array(v.id("_storage"))),
   sessionId: v.optional(v.string()),
 };
 

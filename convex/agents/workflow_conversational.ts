@@ -1,6 +1,7 @@
 "use node";
 
 import { run, MaxTurnsExceededError } from "@openai/agents";
+import type { AgentInputItem } from "@openai/agents";
 import type { Id } from "../_generated/dataModel";
 import { generateMessageId } from "../lib/id_generator";
 import { AGENT_LIMITS, AGENT_TIMEOUTS } from "../lib/constants/cache";
@@ -71,13 +72,32 @@ export async function* streamConversationalWorkflow(
       nonce,
     );
     workflowTokenId = session.workflowTokenId;
-    const { chat, conversationContext } = session;
+    const { chat, conversationContext, imageUrls } = session;
 
     yield writeEvent("workflow_start", { workflowId, nonce });
 
-    const agentInput = conversationContext
+    // Build agent input: multimodal when images present, plain string otherwise
+    const textInput = conversationContext
       ? `Previous conversation:\n${conversationContext}\n\nUser: ${args.userQuery}`
       : args.userQuery;
+
+    let agentInput: string | AgentInputItem[];
+    if (imageUrls.length > 0) {
+      agentInput = [
+        {
+          role: "user" as const,
+          content: [
+            { type: "input_text" as const, text: textInput },
+            ...imageUrls.map((url) => ({
+              type: "input_image" as const,
+              image: url,
+            })),
+          ],
+        },
+      ];
+    } else {
+      agentInput = textInput;
+    }
 
     logWorkflowStart("conversational", args.userQuery);
 

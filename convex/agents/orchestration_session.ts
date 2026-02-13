@@ -33,6 +33,7 @@ export interface StreamingWorkflowArgs {
   conversationContext?: string;
   webResearchSources?: WebResearchSource[];
   includeDebugSourceContext?: boolean;
+  imageStorageIds?: Id<"_storage">[];
 }
 
 /**
@@ -42,6 +43,7 @@ export interface WorkflowSessionResult {
   workflowTokenId: Id<"workflowTokens">;
   chat: ChatQueryResult;
   conversationContext: string;
+  imageUrls: string[];
 }
 
 // ============================================
@@ -217,6 +219,9 @@ export async function initializeWorkflowSession(
     role: "user" as const,
     content: args.userQuery,
     sessionId: args.sessionId,
+    ...(args.imageStorageIds?.length
+      ? { imageStorageIds: args.imageStorageIds }
+      : {}),
   };
 
   if (useAuthVariant) {
@@ -244,5 +249,16 @@ export async function initializeWorkflowSession(
     conversationContext = "";
   }
 
-  return { workflowTokenId, chat, conversationContext };
+  // 6. Resolve image storage IDs to serving URLs via query
+  const imageUrls: string[] = [];
+  if (args.imageStorageIds?.length) {
+    for (const idStr of args.imageStorageIds) {
+      const url = await ctx.runQuery(api.storage.getFileUrl, {
+        storageId: idStr,
+      });
+      if (url) imageUrls.push(url);
+    }
+  }
+
+  return { workflowTokenId, chat, conversationContext, imageUrls };
 }

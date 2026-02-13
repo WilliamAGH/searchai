@@ -12,6 +12,7 @@ type SendMessageParams = {
   setState: Dispatch<SetStateAction<ChatState>>;
   chatId: string;
   content: string;
+  imageStorageIds?: string[];
 };
 
 export async function sendMessageWithStreaming({
@@ -19,9 +20,10 @@ export async function sendMessageWithStreaming({
   setState,
   chatId,
   content,
+  imageStorageIds,
 }: SendMessageParams): Promise<void> {
   // Validate inputs
-  if (!chatId || !content) {
+  if (!chatId || (!content && !imageStorageIds?.length)) {
     logger.warn("sendMessage called with invalid parameters", {
       hasRepository: true,
       chatId,
@@ -37,6 +39,7 @@ export async function sendMessageWithStreaming({
     chatId,
     role: "user",
     content,
+    imageStorageIds,
   });
 
   // Create assistant placeholder
@@ -68,7 +71,11 @@ export async function sendMessageWithStreaming({
 
   try {
     // Send message and get streaming response
-    const generator = repository.generateResponse(chatId, content);
+    const generator = repository.generateResponse(
+      chatId,
+      content,
+      imageStorageIds,
+    );
     const streamHandler = new StreamEventHandler(setState, chatId);
 
     for await (const chunk of generator) {

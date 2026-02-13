@@ -26,6 +26,7 @@ import { useSidebarTiming } from "@/hooks/useSidebarTiming";
 import { useConvexQueries } from "@/hooks/useConvexQueries";
 import { usePaginatedMessages } from "@/hooks/usePaginatedMessages";
 import { useEffectiveMessages } from "@/hooks/useEffectiveMessages";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { logger } from "@/lib/logger";
 import { DESKTOP_BREAKPOINT } from "@/lib/constants/layout";
 import { ChatLayout } from "@/components/ChatInterface/ChatLayout";
@@ -293,6 +294,7 @@ function ChatInterfaceComponent({
       },
       onShare: openShareModal,
     });
+  const imageUpload = useImageUpload(sessionId);
   const {
     chatSidebarProps,
     mobileSidebarProps,
@@ -319,6 +321,7 @@ function ChatInterfaceComponent({
     isReadOnly,
     userHistory,
     pagination,
+    imageUpload: isReadOnly ? undefined : imageUpload,
   });
 
   return (

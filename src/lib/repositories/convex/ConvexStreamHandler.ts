@@ -38,6 +38,7 @@ export class ConvexStreamHandler {
   async *generateResponse(
     chatId: string,
     message: string,
+    imageStorageIds?: string[],
   ): AsyncGenerator<MessageStreamChunk> {
     try {
       const host = window.location.hostname;
@@ -67,6 +68,7 @@ export class ConvexStreamHandler {
             .join("\n")
             .slice(0, 4000),
           includeDebugSourceContext,
+          imageStorageIds,
         }),
       });
 

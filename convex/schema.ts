@@ -98,6 +98,8 @@ const applicationTables = {
     contextReferences: v.optional(v.array(vWebResearchSource)),
     // Agent workflow tracking
     workflowId: v.optional(v.string()), // Links to agent orchestration workflow
+    // Image attachments (Convex File Storage references)
+    imageStorageIds: v.optional(v.array(v.id("_storage"))),
   })
     .index("by_chatId", ["chatId"])
     .index("by_messageId", ["messageId"])

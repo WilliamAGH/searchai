@@ -63,7 +63,9 @@ interface UseMessageHandlerDeps {
  * @returns {Object} Message handler functions and refs
  */
 export function useMessageHandler(deps: UseMessageHandlerDeps) {
-  const sendRef = useRef<((message: string) => Promise<void>) | null>(null);
+  const sendRef = useRef<
+    ((message: string, imageStorageIds?: string[]) => Promise<void>) | null
+  >(null);
 
   /**
    * Main message sending handler
@@ -72,8 +74,8 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
    * @param {string} messageInput - The message to send
    */
   const handleSendMessage = useCallback(
-    async (messageInput: string) => {
-      if (!messageInput.trim()) return;
+    async (messageInput: string, imageStorageIds?: string[]) => {
+      if (!messageInput.trim() && !imageStorageIds?.length) return;
 
       let activeChatId: string | null = deps.currentChatId;
 
@@ -118,7 +120,11 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
           throw new Error("Message sending is currently unavailable.");
         }
 
-        await deps.chatActions.sendMessage(activeChatId, messageInput.trim());
+        await deps.chatActions.sendMessage(
+          activeChatId,
+          messageInput.trim(),
+          imageStorageIds,
+        );
 
         // Title updates handled server-side during streaming persistence
         // This ensures titles persist to Convex and survive page refresh
@@ -139,7 +145,8 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
     [deps],
   );
 
-  sendRef.current = async (msg: string) => handleSendMessage(msg);
+  sendRef.current = async (msg: string, ids?: string[]) =>
+    handleSendMessage(msg, ids);
 
   return {
     handleSendMessage,

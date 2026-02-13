@@ -1,7 +1,12 @@
 import { serializeError } from "../utils";
 import { corsResponse } from "../cors";
 import { normalizeHttpUrl } from "../../lib/urlHttp";
-import { isRecord, type WebResearchSource } from "../../lib/validators";
+import type { Id } from "../../_generated/dataModel";
+import {
+  isRecord,
+  isValidConvexIdFormat,
+  type WebResearchSource,
+} from "../../lib/validators";
 
 /**
  * Regex pattern to match ASCII control characters (except tab, newline, carriage return)
@@ -96,6 +101,46 @@ export function sanitizeTextInput(
 ): string | undefined {
   if (typeof value !== "string") return undefined;
   return value.replace(CONTROL_CHARS_PATTERN, "").slice(0, maxLength);
+}
+
+const MAX_IMAGE_ATTACHMENTS = 4;
+
+type ImageIdsResult =
+  | { ok: true; ids: Id<"_storage">[] | undefined }
+  | { ok: false; error: string };
+
+/**
+ * Validate imageStorageIds from an HTTP payload.
+ * Rejects (rather than silently coerces) malformed input.
+ * Returns branded `Id<"_storage">[]` so downstream code needs no casts.
+ */
+export function validateImageStorageIds(input: unknown): ImageIdsResult {
+  if (input === undefined || input === null) {
+    return { ok: true, ids: undefined };
+  }
+  if (!Array.isArray(input)) {
+    return { ok: false, error: "imageStorageIds must be an array" };
+  }
+  if (input.length > MAX_IMAGE_ATTACHMENTS) {
+    return {
+      ok: false,
+      error: `imageStorageIds exceeds maximum of ${MAX_IMAGE_ATTACHMENTS}`,
+    };
+  }
+  const validated: Id<"_storage">[] = [];
+  for (const item of input) {
+    if (typeof item !== "string") {
+      return { ok: false, error: "imageStorageIds items must be strings" };
+    }
+    if (!isValidConvexIdFormat(item)) {
+      return { ok: false, error: "imageStorageIds contains an invalid ID" };
+    }
+    // _storage is a system table excluded from user TableNames, so the isConvexId
+    // type guard can't narrow to it. Format is validated by isValidConvexIdFormat above.
+    // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
+    validated.push(item as Id<"_storage">);
+  }
+  return { ok: true, ids: validated.length > 0 ? validated : undefined };
 }
 
 export function sanitizeWebResearchSources(

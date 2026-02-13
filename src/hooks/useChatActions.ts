@@ -21,7 +21,11 @@ export interface ChatActions {
   updateChatTitle: (id: string, title: string) => Promise<void>;
 
   // Message operations
-  sendMessage: (chatId: string, content: string) => Promise<void>;
+  sendMessage: (
+    chatId: string,
+    content: string,
+    imageStorageIds?: string[],
+  ) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   addMessage: (message: Message) => void;
   removeMessage: (id: string) => void;
@@ -194,12 +198,22 @@ export function createChatActions(
     },
 
     // Message operations
-    async sendMessage(chatId: string, content: string) {
+    async sendMessage(
+      chatId: string,
+      content: string,
+      imageStorageIds?: string[],
+    ) {
       if (!repository) {
         logger.warn("sendMessage called without repository", { chatId });
         return;
       }
-      await sendMessageWithStreaming({ repository, setState, chatId, content });
+      await sendMessageWithStreaming({
+        repository,
+        setState,
+        chatId,
+        content,
+        imageStorageIds,
+      });
     },
 
     async deleteMessage(id: string) {

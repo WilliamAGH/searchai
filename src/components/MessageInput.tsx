@@ -4,12 +4,15 @@
  * - Enter to send, Shift+Enter for newline
  * - Mobile-optimized with proper font sizing
  * - Disabled state during generation
+ * - Image attachments via paste or file picker
  */
 
 import React, { useState, useRef } from "react";
 import { useAutoResizeTextarea } from "@/hooks/useAutoResizeTextarea";
 import { useMessageInputFocus } from "@/hooks/useMessageInputFocus";
 import { useInputHistory } from "@/hooks/useInputHistory";
+import { ImageAttachmentPreview } from "@/components/ImageAttachmentPreview";
+import type { ImageUploadState } from "@/hooks/useImageUpload";
 
 const TEXTAREA_CLASSES = [
   // layout
@@ -35,8 +38,11 @@ const TEXTAREA_CLASSES = [
 ].join(" ");
 
 interface MessageInputProps {
-  /** Callback when message is sent */
-  onSendMessage: (message: string) => void | Promise<void>;
+  /** Callback when message is sent (with optional image storage IDs) */
+  onSendMessage: (
+    message: string,
+    imageStorageIds?: string[],
+  ) => void | Promise<void>;
   /** Open share modal */
   onShare?: () => void;
   /** Start a new chat */
@@ -49,6 +55,8 @@ interface MessageInputProps {
   onDraftChange?: (draft: string) => void;
   /** Optional history of previous user messages (oldest -> newest) */
   history?: Array<string>;
+  /** Image upload state from useImageUpload hook */
+  imageUpload?: ImageUploadState;
 }
 
 /**
@@ -65,10 +73,12 @@ export function MessageInput({
   placeholder = "Ask me anything...",
   onDraftChange,
   history = [],
+  imageUpload,
 }: MessageInputProps) {
   const MAX_TEXTAREA_HEIGHT = 200;
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { historyIndex, handleHistoryNavigation, resetHistory } =
     useInputHistory({
@@ -79,42 +89,48 @@ export function MessageInput({
       textareaRef,
     });
 
-  /**
-   * Handle form submission
-   * - Trims whitespace
-   * - Clears input after send
-   */
-  const sendCurrentMessage = React.useCallback(() => {
+  /** Upload pending images, send message, then clear input. */
+  const sendCurrentMessage = React.useCallback(async () => {
     const trimmed = message.trim();
-    if (trimmed && !disabled) {
-      void onSendMessage(trimmed);
-      setMessage("");
-      onDraftChange?.("");
-      resetHistory();
-    }
-  }, [message, disabled, onSendMessage, onDraftChange, resetHistory]);
+    if (
+      (!trimmed && !imageUpload?.hasImages) ||
+      disabled ||
+      imageUpload?.isUploading
+    )
+      return;
+    const storageIds = imageUpload?.hasImages
+      ? await imageUpload.uploadAll()
+      : undefined;
+    await onSendMessage(trimmed, storageIds);
+    setMessage("");
+    onDraftChange?.("");
+    resetHistory();
+    imageUpload?.clear();
+  }, [
+    message,
+    disabled,
+    onSendMessage,
+    onDraftChange,
+    resetHistory,
+    imageUpload,
+  ]);
 
   const handleSubmit = React.useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      sendCurrentMessage();
+      void sendCurrentMessage();
     },
     [sendCurrentMessage],
   );
 
-  /**
-   * Handle keyboard shortcuts
-   * - Enter: send message
-   * - Shift+Enter: newline
-   * - ArrowUp/Down: history navigation (handled by useInputHistory hook)
-   */
+  /** Enter to send, Shift+Enter for newline, ArrowUp/Down for history. */
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const isComposing = e.nativeEvent.isComposing ?? false;
       if (isComposing) return; // avoid sending mid-IME composition
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        sendCurrentMessage();
+        void sendCurrentMessage();
         return;
       }
 
@@ -136,6 +152,30 @@ export function MessageInput({
     [sendCurrentMessage, message, handleHistoryNavigation],
   );
 
+  /** Intercept paste events to capture image data from clipboard. */
+  const handlePaste = React.useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      if (!imageUpload) return;
+      const files = Array.from(e.clipboardData.files).filter((f) =>
+        f.type.startsWith("image/"),
+      );
+      if (files.length > 0) {
+        e.preventDefault();
+        imageUpload.addImages(files);
+      }
+    },
+    [imageUpload],
+  );
+
+  const handleFileSelect = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!imageUpload || !e.target.files) return;
+      imageUpload.addImages(Array.from(e.target.files));
+      e.target.value = "";
+    },
+    [imageUpload],
+  );
+
   useAutoResizeTextarea({
     textareaRef,
     maxHeight: MAX_TEXTAREA_HEIGHT,
@@ -155,8 +195,18 @@ export function MessageInput({
     [historyIndex, onDraftChange, resetHistory],
   );
 
+  const hasPendingContent = message.trim() || imageUpload?.hasImages;
+
   return (
     <div>
+      {/* Image attachment preview strip */}
+      {imageUpload && imageUpload.hasImages && (
+        <ImageAttachmentPreview
+          images={imageUpload.images}
+          onRemove={imageUpload.removeImage}
+          isUploading={imageUpload.isUploading}
+        />
+      )}
       <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-1">
         <form onSubmit={handleSubmit}>
           <div className="relative flex items-center">
@@ -167,6 +217,7 @@ export function MessageInput({
               value={message}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder={placeholder}
               aria-label="Message input"
               data-testid="message-input"
@@ -175,12 +226,48 @@ export function MessageInput({
               autoComplete="off"
               className={`${TEXTAREA_CLASSES} ${message ? "pt-3 pb-3" : "pt-[0.625rem] pb-[0.875rem]"}`}
             />
+            {/* Hidden file input for image picker */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              tabIndex={-1}
+            />
             <div className="absolute right-11 sm:right-10 top-1/2 -translate-y-1/2 h-8 flex items-center gap-1">
+              {/* Image attach button */}
+              {imageUpload && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="Attach image"
+                  title="Attach image"
+                  disabled={disabled}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors disabled:opacity-60"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onNewChat?.()}
                 aria-label="New chat"
-                title="New chat (⌘K)"
+                title="New chat"
                 className="p-2 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
               >
                 <svg
@@ -247,7 +334,7 @@ export function MessageInput({
               type="submit"
               aria-label="Send message"
               title="Send message"
-              disabled={!message.trim() || disabled}
+              disabled={!hasPendingContent || disabled}
               className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 sm:w-7 sm:h-7 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-colors"
             >
               <svg
