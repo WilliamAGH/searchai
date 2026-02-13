@@ -84,18 +84,24 @@ function markGenerating(
   );
 }
 
-/** Clear busy/progress flags only when the per-chat queue has fully drained. */
+/** Clear busy/progress flags only when the per-chat queue has fully drained.
+ *
+ * By the time this runs the current chat's queue entry has already been deleted
+ * inside enqueueChatSend's finally block. If *other* chats still have active
+ * queues we must not reset the global isGenerating flag because those streams
+ * are still in progress.
+ */
 function clearGeneratingOnDrain(
   setState: Dispatch<SetStateAction<ChatState>>,
-  chatId: string,
+  _chatId: string,
 ): void {
-  const remaining = chatSendQueues.get(chatId)?.pendingCount ?? 0;
-  if (remaining > 0) return;
-  setState((prev) =>
-    prev.currentChatId === chatId
-      ? { ...prev, isGenerating: false, searchProgress: { stage: "idle" } }
-      : prev,
-  );
+  // Another chat is still streaming — keep isGenerating true.
+  if (chatSendQueues.size > 0) return;
+  setState((prev) => ({
+    ...prev,
+    isGenerating: false,
+    searchProgress: { stage: "idle" },
+  }));
 }
 
 /** Create an assistant placeholder message and append it with planning status. */
