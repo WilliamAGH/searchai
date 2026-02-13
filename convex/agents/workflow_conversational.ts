@@ -72,22 +72,9 @@ export async function* streamConversationalWorkflow(
       nonce,
     );
     workflowTokenId = session.workflowTokenId;
-    const {
-      chat,
-      conversationContext,
-      imageUrls,
-      imageAnalysis,
-      imageAnalysisFailed,
-    } = session;
+    const { chat, conversationContext, imageUrls, imageAnalysis } = session;
 
     yield writeEvent("workflow_start", { workflowId, nonce });
-
-    if (imageAnalysisFailed) {
-      console.warn(
-        "[workflow_conversational] Vision pre-analysis failed for chat=%s; agent will rely on raw images only",
-        args.chatId,
-      );
-    }
 
     const agentInput = buildAgentInput({
       userQuery: args.userQuery,

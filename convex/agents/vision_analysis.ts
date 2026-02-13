@@ -43,7 +43,7 @@ interface AnalyzeImagesResult {
 /**
  * Analyze images via a single-turn vision completion.
  *
- * @throws if the API call fails (caller handles gracefully)
+ * @throws if the API call fails (caller treats this as fatal for image turns)
  */
 export async function analyzeImages(
   params: AnalyzeImagesParams,
@@ -60,7 +60,11 @@ export async function analyzeImages(
   const response = await env.client.chat.completions.create({
     model,
     temperature: 0.1,
-    max_completion_tokens: 1024,
+    // OpenAI supports `max_completion_tokens`; many OpenAI-compatible endpoints only
+    // support `max_tokens` for Chat Completions.
+    ...(env.isOpenAIEndpoint
+      ? { max_completion_tokens: 1024 }
+      : { max_tokens: 1024 }),
     messages: [
       { role: "system", content: VISION_ANALYSIS_SYSTEM_PROMPT },
       {
