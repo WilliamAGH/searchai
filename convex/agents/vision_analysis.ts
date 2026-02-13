@@ -95,5 +95,10 @@ export async function analyzeImages(
     throw new Error("Vision analysis returned empty content");
   }
 
-  return { description };
+  return {
+    description: truncate(
+      description.trim(),
+      CONTENT_LIMITS.MAX_IMAGE_ANALYSIS_CONTEXT_CHARS,
+    ),
+  };
 }

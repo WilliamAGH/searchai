@@ -8,7 +8,9 @@
  */
 
 import type { AgentInputItem } from "@openai/agents";
+import { CONTENT_LIMITS } from "../lib/constants/cache";
 import { resolveOpenAIEndpoint } from "../lib/providers/openai_resolver";
+import { truncate } from "./helpers_utils";
 
 export interface BuildAgentInputParams {
   userQuery: string;
@@ -37,8 +39,15 @@ export function buildAgentInput(
     attachImages = false,
   } = params;
 
-  const imageContext = imageAnalysis
-    ? `\n\n[IMAGE ANALYSIS]\n${imageAnalysis}\n[/IMAGE ANALYSIS]`
+  const imageAnalysisContext = imageAnalysis
+    ? truncate(
+        imageAnalysis.trim(),
+        CONTENT_LIMITS.MAX_IMAGE_ANALYSIS_CONTEXT_CHARS,
+      )
+    : undefined;
+
+  const imageContext = imageAnalysisContext
+    ? `\n\n[IMAGE ANALYSIS]\n${imageAnalysisContext}\n[/IMAGE ANALYSIS]`
     : "";
 
   const textInput = conversationContext

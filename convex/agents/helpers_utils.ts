@@ -24,8 +24,13 @@ export function relevanceScoreToLabel(
 
 export const normalizeUrl = normalizeUrlUtil;
 
-export const truncate = (text: string, maxChars: number): string =>
-  text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
+export const truncate = (text: string, maxChars: number): string => {
+  if (maxChars <= 0) return "";
+  if (text.length <= maxChars) return text;
+  // Keep a strict max length contract; ellipsis counts toward the limit.
+  if (maxChars <= 3) return text.slice(0, maxChars);
+  return `${text.slice(0, maxChars - 3)}...`;
+};
 
 // ============================================
 // Instant Response Detection
