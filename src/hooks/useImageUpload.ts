@@ -172,10 +172,20 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
             storageId: storageId as Id<"_storage">,
           });
 
-          img.storageId = storageId;
           return storageId;
         }),
       );
+
+      // Immutable state update: attach storageIds to uploaded images
+      setImages((prev) =>
+        prev.map((item, i) => {
+          const uploadedId = results[i];
+          return uploadedId && !item.storageId
+            ? { ...item, storageId: uploadedId }
+            : item;
+        }),
+      );
+
       return results;
     } catch (error) {
       throw error instanceof Error ? error : new Error("Image upload failed");
