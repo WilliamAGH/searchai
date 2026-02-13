@@ -105,4 +105,43 @@ describe("buildAgentInput", () => {
     expect(textItem.text).toContain("[IMAGE ANALYSIS]");
     expect(textItem.text).toContain("A red circle on white background");
   });
+
+  it("truncates image analysis exceeding 8000 chars and appends truncation note", () => {
+    const longAnalysis = "x".repeat(9000);
+    const input = buildAgentInput({
+      userQuery: "Describe this",
+      conversationContext: "",
+      imageUrls: ["https://example.com/img.png"],
+      imageAnalysis: longAnalysis,
+    });
+
+    expect(typeof input).toBe("string");
+    if (typeof input !== "string") throw new Error("Expected string input");
+
+    expect(input).toContain(
+      "[NOTE] Image analysis truncated for context limits.",
+    );
+    // The truncated analysis + surrounding markup must be bounded
+    expect(input.length).toBeLessThan(longAnalysis.length);
+  });
+
+  it("orders sections correctly: conversation context, image analysis, user query", () => {
+    const input = buildAgentInput({
+      userQuery: "What do you see?",
+      conversationContext: "User: Hello\nAssistant: Hi there",
+      imageUrls: ["https://example.com/img.png"],
+      imageAnalysis: "A blue square",
+    });
+
+    expect(typeof input).toBe("string");
+    if (typeof input !== "string") throw new Error("Expected string input");
+
+    const contextIdx = input.indexOf("Previous conversation:");
+    const analysisIdx = input.indexOf("[IMAGE ANALYSIS]");
+    const queryIdx = input.lastIndexOf("User: What do you see?");
+
+    expect(contextIdx).toBeGreaterThanOrEqual(0);
+    expect(analysisIdx).toBeGreaterThan(contextIdx);
+    expect(queryIdx).toBeGreaterThan(analysisIdx);
+  });
 });
