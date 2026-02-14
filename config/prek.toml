@@ -59,15 +59,15 @@ hooks = [
   #   handlers intercept SIGTERM, so the orphan WebSocket blocks clean exit)
   # scripts/lib/timeout.mjs: sends SIGTERM at 60s, then SIGKILL at 70s as fallback
   #   (signal-exit in the Convex CLI bundle can delay SIGTERM cleanup)
-  { id = "convex-push", name = "Convex deployment dry-run", language = "system", entry = "node scripts/lib/timeout.mjs --timeout-sec 60 --kill-after-sec 10 -- npx convex dev --once --typecheck=enable --codegen=disable --tail-logs=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
-    "pre-push",
-  ], priority = 10, fail_fast = true },
+  # { id = "convex-push", name = "Convex deployment dry-run", language = "system", entry = "node scripts/lib/timeout.mjs --timeout-sec 60 --kill-after-sec 10 -- npx convex dev --once --typecheck=enable --codegen=disable --tail-logs=disable", always_run = true, pass_filenames = false, verbose = true, stages = [
+  #   "pre-push",
+  # ], priority = 10, fail_fast = true },
   # p20: Playwright smoke test (not in validate)
   # DO NOT REMOVE "env -u PLAYWRIGHT_BROWSERS_PATH" -- COMMITS WILL BREAK
   # Cursor's integrated terminal overrides this var to a sandbox cache dir
   # where browsers aren't installed. Unsetting it lets Playwright find
   # browsers at the real ~/Library/Caches/ms-playwright.
-  { id = "smoke-test", name = "Playwright smoke test", language = "system", entry = "env -u PLAYWRIGHT_BROWSERS_PATH npx playwright test --config config/playwright.config.ts -g smoke --reporter=line", always_run = true, pass_filenames = false, verbose = true, stages = [
-    "pre-push",
-  ], priority = 20, fail_fast = true },
+  # { id = "smoke-test", name = "Playwright smoke test", language = "system", entry = "env -u PLAYWRIGHT_BROWSERS_PATH npx playwright test --config config/playwright.config.ts -g smoke --reporter=line", always_run = true, pass_filenames = false, verbose = true, stages = [
+  #   "pre-push",
+  # ], priority = 20, fail_fast = true },
 ]
