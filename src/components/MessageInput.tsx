@@ -13,7 +13,10 @@ import { useMessageInputFocus } from "@/hooks/useMessageInputFocus";
 import { useInputHistory } from "@/hooks/useInputHistory";
 import { ImageAttachmentPreview } from "@/components/ImageAttachmentPreview";
 import { MessageInputActions } from "@/components/MessageInputActions";
-import type { ImageUploadState } from "@/hooks/useImageUpload";
+import {
+  ACCEPTED_IMAGE_TYPES,
+  type ImageUploadState,
+} from "@/hooks/useImageUpload";
 
 const TEXTAREA_CLASSES = [
   // layout
@@ -186,13 +189,18 @@ export function MessageInput({
   const handlePaste = React.useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       if (!imageUpload) return;
-      const files = Array.from(e.clipboardData.files).filter((f) =>
+      const imageFiles = Array.from(e.clipboardData.files).filter((f) =>
         f.type.startsWith("image/"),
       );
-      if (files.length > 0) {
+      if (imageFiles.length === 0) return;
+
+      // Only block default paste when at least one image is an accepted type.
+      // Unsupported types (GIF, WebP, BMP) still produce rejection banners via
+      // addImages, but text content in the clipboard won't be silently dropped.
+      if (imageFiles.some((f) => ACCEPTED_IMAGE_TYPES.has(f.type))) {
         e.preventDefault();
-        imageUpload.addImages(files);
       }
+      imageUpload.addImages(imageFiles);
     },
     [imageUpload],
   );

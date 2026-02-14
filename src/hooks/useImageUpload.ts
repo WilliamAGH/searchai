@@ -15,7 +15,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { downscaleImageFile } from "@/lib/images/downscaleImageFile";
 
-const ACCEPTED_TYPES = new Set(["image/png", "image/jpeg"]);
+export const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg"]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_IMAGES = 4;
 const MAX_IMAGE_DIMENSION_PX = 2048;
@@ -139,7 +139,7 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
       const valid: PendingImage[] = [];
 
       for (const file of files) {
-        if (!ACCEPTED_TYPES.has(file.type)) {
+        if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
           newRejections.push({
             id: crypto.randomUUID(),
             file: file.name,
