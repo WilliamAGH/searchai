@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Canvas / Image Mocks
 // ---------------------------------------------------------------------------
 
-let onloadCallback: (() => void) | null = null;
 let mockImageWidth = 100;
 let mockImageHeight = 100;
 
@@ -27,7 +26,6 @@ class MockImage {
   constructor() {
     // Auto-fire onload on next microtask so the Promise resolves
     queueMicrotask(() => {
-      onloadCallback = this.onload;
       this.onload?.();
     });
   }
