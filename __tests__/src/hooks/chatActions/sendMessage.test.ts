@@ -77,19 +77,6 @@ import type { MessageStreamChunk } from "../../../../src/lib/types/message";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createMockState(): ChatState {
-  return {
-    chats: [],
-    currentChatId: null,
-    currentChat: null,
-    messages: [],
-    isLoading: false,
-    isGenerating: false,
-    error: null,
-    searchProgress: { stage: "idle" },
-  } as ChatState;
-}
-
 /** Build a repository whose generateResponse yields given chunks with optional delay. */
 function repoWithChunks(
   chunks: MessageStreamChunk[],
@@ -106,6 +93,27 @@ function repoWithChunks(
   return {
     generateResponse: vi.fn(() => gen()),
   } as unknown as IChatRepository;
+}
+
+function throwingGenerator(
+  error: Error,
+): AsyncGenerator<MessageStreamChunk, void, unknown> {
+  return {
+    async next(): Promise<IteratorResult<MessageStreamChunk, void>> {
+      throw error;
+    },
+    async return(): Promise<IteratorResult<MessageStreamChunk, void>> {
+      return { done: true, value: undefined };
+    },
+    async throw(
+      thrown?: unknown,
+    ): Promise<IteratorResult<MessageStreamChunk, void>> {
+      throw thrown ?? error;
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -215,9 +223,9 @@ describe("sendMessageWithStreaming", () => {
     const order: string[] = [];
 
     const failRepo = {
-      generateResponse: vi.fn(async function* () {
+      generateResponse: vi.fn(() => {
         order.push("fail-start");
-        throw new Error("Stream failed");
+        return throwingGenerator(new Error("Stream failed"));
       }),
     } as unknown as IChatRepository;
 
