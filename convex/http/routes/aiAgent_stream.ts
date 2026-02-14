@@ -1,6 +1,6 @@
 "use node";
 
-import { api } from "../../_generated/api";
+import { api, internal } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { streamConversationalWorkflow } from "../../agents/orchestration";
 import { checkIpRateLimit } from "../../lib/rateLimit";
@@ -19,6 +19,7 @@ import {
   sanitizeTextInput,
   validateImageStorageIds,
 } from "./aiAgent_utils";
+import { validateImageBlobContent } from "../../storage";
 
 export async function handleAgentStream(
   ctx: ActionCtx,
@@ -137,15 +138,24 @@ export async function handleAgentStream(
 
   // Defense in depth: validate magic bytes server-side so callers cannot bypass
   // client-side upload validation by submitting arbitrary _storage IDs.
+  // Runs inline instead of via ctx.runAction to avoid spawning child actions.
   if (imageStorageIds && imageStorageIds.length > 0) {
     try {
       await Promise.all(
-        imageStorageIds.map((storageId) =>
-          ctx.runAction(api.storage.validateImageUpload, {
-            storageId,
-            sessionId,
-          }),
-        ),
+        imageStorageIds.map(async (storageId) => {
+          const metadata = await ctx.runQuery(
+            internal.storage.getStorageFileMetadata,
+            { storageId },
+          );
+          if (!metadata) {
+            throw new Error("Uploaded file not found in storage");
+          }
+          const url = await ctx.storage.getUrl(storageId);
+          if (!url) {
+            throw new Error("Uploaded file not found in storage");
+          }
+          await validateImageBlobContent(ctx, storageId, url, metadata.size);
+        }),
       );
     } catch (error) {
       const errorInfo = serializeError(error);
