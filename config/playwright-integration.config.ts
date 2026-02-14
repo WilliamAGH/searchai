@@ -19,7 +19,7 @@ const ROOT_DIR = path.resolve(
 // Local safety: default to Chromium-only to avoid spawning extra browsers on dev
 // machines. CI continues to run the full matrix. To opt in locally, set:
 // PLAYWRIGHT_ALL_BROWSERS=1
-const isCI = Boolean(process.env.CI);
+const isCI = process.env.CI === "true";
 const allBrowsersEnv = process.env.PLAYWRIGHT_ALL_BROWSERS;
 const runAllBrowsers =
   isCI || allBrowsersEnv === "1" || allBrowsersEnv === "true";
