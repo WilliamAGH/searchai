@@ -25,4 +25,3 @@ export const includeFirefox =
   (process.env.CI === "true" &&
     includeFirefoxEnv !== "0" &&
     includeFirefoxEnv !== "false");
-// test

@@ -63,7 +63,10 @@ hooks = [
     "pre-push",
   ], priority = 10, fail_fast = true },
   # p20: Playwright smoke test (not in validate)
-  { id = "smoke-test", name = "Playwright smoke test", language = "system", entry = "npx playwright test --config config/playwright.config.ts -g smoke --reporter=line", always_run = true, pass_filenames = false, verbose = true, stages = [
+  # env -u PLAYWRIGHT_BROWSERS_PATH: Cursor's integrated terminal overrides
+  # this var to a sandbox cache dir where browsers aren't installed. Unsetting
+  # it lets Playwright find browsers at the real ~/Library/Caches/ms-playwright.
+  { id = "smoke-test", name = "Playwright smoke test", language = "system", entry = "env -u PLAYWRIGHT_BROWSERS_PATH npx playwright test --config config/playwright.config.ts -g smoke --reporter=line", always_run = true, pass_filenames = false, verbose = true, stages = [
     "pre-push",
   ], priority = 20, fail_fast = true },
 ]
