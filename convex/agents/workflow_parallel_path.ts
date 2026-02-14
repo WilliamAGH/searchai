@@ -6,8 +6,11 @@ import {
 } from "./workflow_logger";
 import { executeParallelResearch } from "./parallel_research";
 import { executeSynthesis } from "./synthesis_executor";
-import { RELEVANCE_SCORES, CONTENT_LIMITS } from "../lib/constants/cache";
-import { convertToWebResearchSources } from "./orchestration_helpers";
+import { CONTENT_LIMITS } from "../lib/constants/cache";
+import {
+  convertToWebResearchSources,
+  relevanceScoreToLabel,
+} from "./orchestration_helpers";
 import {
   buildCompleteEvent,
   buildMetadataEvent,
@@ -30,13 +33,6 @@ import {
   mapSynthesisEvent,
   mapResearchEvent,
 } from "./workflow_utils";
-
-/** Map a relevance score (0–1) to a confidence label. */
-function relevanceToConfidence(score: number): "high" | "medium" | "low" {
-  if (score >= RELEVANCE_SCORES.HIGH_THRESHOLD) return "high";
-  if (score >= RELEVANCE_SCORES.MEDIUM_THRESHOLD) return "medium";
-  return "low";
-}
 
 /** Map scraped page count to a research quality label. */
 function scrapedCountToQuality(
@@ -91,7 +87,7 @@ export async function* executeParallelPath({
             "..."
           : scraped.summary,
       sources: [scraped.url],
-      confidence: relevanceToConfidence(scraped.relevanceScore ?? 0),
+      confidence: relevanceScoreToLabel(scraped.relevanceScore),
     }));
   const researchOutput: ResearchOutput = {
     researchSummary:
