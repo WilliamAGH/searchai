@@ -29,7 +29,8 @@ async function sendEmailToMailPit(args: {
     // Parse "Name <email>" or plain email
     let fromEmail = defaultFromEmail;
     let fromName: string | undefined = defaultFromName;
-    const angleMatch = rawFrom.match(/^(.*)<\s*([^>]+)\s*>\s*$/);
+    const angleRegex = /^(.*)<\s*([^>]+)\s*>\s*$/;
+    const angleMatch = angleRegex.exec(rawFrom);
     if (angleMatch) {
       fromName = angleMatch[1].trim() || undefined;
       fromEmail = angleMatch[2].trim();
