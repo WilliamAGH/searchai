@@ -58,28 +58,15 @@ describe("buildAgentInput", () => {
     });
   });
 
-  it("includes unavailable-analysis note when images lack pre-analysis", () => {
-    const input = buildAgentInput({
-      userQuery: "What is in this image?",
-      conversationContext: "",
-      imageUrls: ["https://example.com/image.png"],
-      attachImages: true,
-    });
-
-    expect(Array.isArray(input)).toBe(true);
-    if (!Array.isArray(input)) throw new Error("Expected AgentInputItem[]");
-
-    const content = input[0]?.content;
-    if (!Array.isArray(content)) throw new Error("Expected content array");
-
-    const textItem = content.find((c) => c.type === "input_text");
-    if (!textItem || textItem.type !== "input_text") {
-      throw new Error("Expected input_text item");
-    }
-
-    expect(textItem.text).toContain(
-      "[ERROR] Image pre-analysis was unavailable",
-    );
+  it("throws when images present without pre-analysis", () => {
+    expect(() =>
+      buildAgentInput({
+        userQuery: "What is in this image?",
+        conversationContext: "",
+        imageUrls: ["https://example.com/image.png"],
+        attachImages: true,
+      }),
+    ).toThrow("imageAnalysis is empty");
   });
 
   it("injects image analysis context into text input", () => {

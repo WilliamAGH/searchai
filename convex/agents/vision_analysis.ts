@@ -101,15 +101,12 @@ export async function analyzeImages(
   const rawContent = response.choices[0]?.message?.content;
   const description = rawContent?.trim();
   if (!description) {
-    const finishReason = response.choices[0]?.finish_reason;
+    const finishReason = response.choices[0]?.finish_reason ?? "unknown";
     const refusal = response.choices[0]?.message?.refusal;
-    console.warn("[vision_analysis] Empty content from API", {
-      model,
-      finishReason,
-      refusal,
-      choicesCount: response.choices?.length ?? 0,
-    });
-    throw new Error("Vision analysis returned empty content");
+    const detail = refusal
+      ? `model=${model} finish_reason=${finishReason} refusal="${refusal}"`
+      : `model=${model} finish_reason=${finishReason} choices=${response.choices?.length ?? 0}`;
+    throw new Error(`Vision analysis returned empty content (${detail})`);
   }
 
   const maxChars = CONTENT_LIMITS.MAX_IMAGE_ANALYSIS_PERSIST_CHARS;
