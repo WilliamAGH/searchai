@@ -272,6 +272,9 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
           total: settled.length,
         });
         appendRejections(failed);
+        throw new Error(
+          `${failed.length} image${failed.length > 1 ? "s" : ""} failed to upload. Remove failed images and try again.`,
+        );
       }
 
       return successIds;
@@ -281,12 +284,13 @@ export function useImageUpload(sessionId?: string | null): ImageUploadState {
   }, [generateUploadUrl, validateImageUpload, sessionId, appendRejections]);
 
   const clear = useCallback(() => {
-    for (const img of images) {
-      revokeUrl(img.previewUrl);
+    for (const url of objectUrlsRef.current) {
+      URL.revokeObjectURL(url);
     }
+    objectUrlsRef.current.clear();
     setImages([]);
     setRejections([]);
-  }, [images, revokeUrl]);
+  }, []);
 
   return {
     images,

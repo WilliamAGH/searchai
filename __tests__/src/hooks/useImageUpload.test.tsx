@@ -139,7 +139,7 @@ describe("useImageUpload", () => {
   // -----------------------------------------------------------------------
 
   describe("uploadAll", () => {
-    it("returns success IDs and populates rejections on partial failure", async () => {
+    it("throws on partial failure, caches successful uploads, and populates rejections", async () => {
       // First upload succeeds, second fails
       mockGenerateUploadUrl
         .mockResolvedValueOnce("https://upload.test/1")
@@ -166,14 +166,25 @@ describe("useImageUpload", () => {
         ]);
       });
 
-      let ids: string[] = [];
+      let thrownError: Error | undefined;
       await act(async () => {
-        ids = await result.current.uploadAll();
+        try {
+          await result.current.uploadAll();
+        } catch (err) {
+          thrownError = err as Error;
+        }
       });
 
-      expect(ids).toEqual(["storage_ok"]);
+      // Partial failure throws instead of silently sending with fewer images
+      expect(thrownError?.message).toContain("failed to upload");
       expect(result.current.rejections).toHaveLength(1);
       expect(result.current.rejections[0].file).toBe("bad.png");
+
+      // Successful upload is cached — the good image has a storageId
+      const goodImage = result.current.images.find(
+        (img) => img.file.name === "good.png",
+      );
+      expect(goodImage?.storageId).toBe("storage_ok");
 
       fetchSpy.mockRestore();
     });
