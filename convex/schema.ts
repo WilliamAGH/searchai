@@ -78,7 +78,7 @@ const applicationTables = {
      * Kept temporarily for migration/cutover.
      */
     sources: v.optional(v.array(v.string())),
-    reasoning: v.optional(v.any()),
+    reasoning: v.optional(v.string()),
     searchMethod: v.optional(vSearchMethod),
     hasRealResults: v.optional(v.boolean()),
     isStreaming: v.optional(v.boolean()),
@@ -138,7 +138,12 @@ const applicationTables = {
     workflowId: v.string(),
     sequence: v.number(), // Event order
     type: v.string(), // "progress", "reasoning", "tool_call", "complete", "error"
-    data: v.any(), // Event payload
+    // Justified v.any(): workflow events are deeply polymorphic (progress,
+    // reasoning, tool_call, complete, error) with nested, shape-varying payloads.
+    // Convex validators cannot express discriminated unions keyed on a sibling
+    // field, and the data is ephemeral (auto-cleaned after workflow completion).
+    // See convex/agents/workflow_event_types.ts for the TypeScript payload shapes.
+    data: v.any(),
     timestamp: v.number(),
   })
     .index("by_workflow_sequence", ["workflowId", "sequence"])
