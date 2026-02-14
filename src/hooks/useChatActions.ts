@@ -204,8 +204,9 @@ export function createChatActions(
       imageStorageIds?: string[],
     ) {
       if (!repository) {
-        logger.warn("sendMessage called without repository", { chatId });
-        return;
+        throw new Error(
+          "Message sending is currently unavailable. Please reload the page.",
+        );
       }
       await sendMessageWithStreaming({
         repository,

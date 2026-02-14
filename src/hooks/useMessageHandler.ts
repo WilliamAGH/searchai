@@ -46,7 +46,7 @@ interface UseMessageHandlerDeps {
    */
   navigateToChat: (chatId: string) => void;
   /** Surface user-visible errors when message sending fails */
-  setErrorMessage?: (message: string) => void;
+  setErrorMessage: (message: string) => void;
 }
 
 /**
@@ -123,6 +123,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         const newChatId = await createChatInFlightRef.current;
         if (!newChatId) {
           logger.error("[ERROR] Failed to create chat for message");
+          setErrorMessage("Unable to create a new chat. Please try again.");
           return;
         }
         // Frontend uses string chat IDs; avoid unsafe casts
@@ -153,9 +154,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
       } catch (error) {
         logger.error("Failed to send message", error);
         // Surface error to user via UI feedback
-        if (setErrorMessage) {
-          setErrorMessage(getErrorMessage(error, "Failed to send message"));
-        }
+        setErrorMessage(getErrorMessage(error, "Failed to send message"));
       } finally {
         setIsGenerating(false);
       }

@@ -10,6 +10,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useAnonymousSession } from "@/hooks/useAnonymousSession";
+import { logger } from "@/lib/logger";
 
 interface MessageImagesProps {
   storageIds: string[];
@@ -51,6 +52,23 @@ export function MessageImages({ storageIds, chatId }: MessageImagesProps) {
           />
         ))}
       </div>
+    );
+  }
+
+  // Batch-level diagnostic: log once when resolved URLs contain permanent nulls.
+  // Null = unauthorized or deleted (permanent); undefined = still loading (transient).
+  const unavailableIds = urls
+    .map((url, i) => (url === null ? storageIds[i] : null))
+    .filter((id): id is string => id !== null);
+  if (unavailableIds.length > 0) {
+    logger.warn(
+      "[MessageImages] Images permanently unavailable (unauthorized or deleted)",
+      {
+        chatId,
+        unavailableCount: unavailableIds.length,
+        totalCount: urls.length,
+        storageIds: unavailableIds,
+      },
     );
   }
 
