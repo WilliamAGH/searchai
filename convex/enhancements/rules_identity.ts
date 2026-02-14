@@ -82,7 +82,7 @@ function mentionsLegacyBrand(lower: string): boolean {
 function mentionsAVenture(lower: string): boolean {
   return (
     lower.includes("aventure") ||
-    lower.includes("a]venture") ||
+    lower.includes("a[venture") ||
     lower.includes("aventure.vc")
   );
 }
