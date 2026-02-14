@@ -5,7 +5,7 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import type { IChatRepository } from "@/lib/repositories/ChatRepository";
-import type { ChatState } from "./useChatState";
+import type { ChatState } from "@/hooks/useChatState";
 import type { Message } from "@/lib/types/message";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { TitleUtils } from "@/lib/types/unified";
