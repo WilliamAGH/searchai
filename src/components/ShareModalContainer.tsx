@@ -9,7 +9,7 @@
  * - Intentionally keeps props minimal to avoid leaking unrelated UI state.
  * - Uses optional `chatActions.shareChat` to persist/upgrade sharing mode.
  * - Export URLs use the branded origin (window.location.origin) so that
- *   shared links point to researchly.bot, not the raw Convex deployment.
+ *   shared links point to researchly.fyi, not the raw Convex deployment.
  *   The production server and Vite dev proxy both forward /api/* to Convex.
  */
 import { ShareModal } from "@/components/ShareModal";
@@ -56,7 +56,7 @@ export function ShareModalContainer(props: Readonly<ShareModalContainerProps>) {
   const shareId = props.currentChat?.shareId || undefined;
   const publicId = props.currentChat?.publicId || undefined;
 
-  // Use branded origin so export URLs point to researchly.bot, not the raw
+  // Use branded origin so export URLs point to researchly.fyi, not the raw
   // Convex deployment. The /api/* proxy (server.mjs + Vite dev) forwards
   // requests to the Convex HTTP layer transparently.
   const origin = typeof window !== "undefined" ? window.location.origin : "";

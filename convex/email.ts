@@ -21,7 +21,7 @@ async function sendEmailToMailPit(args: {
   try {
     // Build payload per Mailpit Send API schema: TitleCase keys, structured objects
     // https://mailpit.axllent.org/docs/api-v1/#send-message
-    const defaultFromEmail = "team@researchly.bot";
+    const defaultFromEmail = "team@researchly.fyi";
     const defaultFromName = "Researchly";
 
     const rawFrom = args.from || `${defaultFromName} <${defaultFromEmail}>`;
@@ -103,7 +103,7 @@ export const sendWelcomeEmail = internalAction({
     _ctx,
     args,
   ): Promise<{ success: boolean; messageId?: string; message?: string }> => {
-    const siteUrl = process.env.SITE_URL || "https://researchly.bot";
+    const siteUrl = process.env.SITE_URL || "https://researchly.fyi";
     const welcomeHtml = `
       <!DOCTYPE html>
       <html>

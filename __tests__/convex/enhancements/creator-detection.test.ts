@@ -18,7 +18,7 @@ describe("creator detection", () => {
     const creatorQueries = [
       "Who is the creator of Researchly?",
       "Who made this app?",
-      "Who built researchly.bot?",
+      "Who built researchly.fyi?",
       "Tell me about the author of this website",
       "Who is behind Researchly?",
       "Who founded this service?",
@@ -27,7 +27,7 @@ describe("creator detection", () => {
       "Who is William Callahan?",
       "Tell me about the founder of this site",
       "Who created this search tool?",
-      "Who is the author behind researchly.bot?",
+      "Who is the author behind researchly.fyi?",
       "Who's the creator of this search service?",
       "Tell me about william callahan",
       "Company behind Researchly",
@@ -46,7 +46,7 @@ describe("creator detection", () => {
       "What is Researchly?",
       "Tell me about Researchly",
       "How does Researchly work?",
-      "Explain researchly.bot",
+      "Explain researchly.fyi",
       "What does this app do?",
       "Describe this website",
       "What is researchly?",
@@ -64,7 +64,7 @@ describe("creator detection", () => {
     const legacyQueries = [
       "What is SearchAI?",
       "Who created SearchAI?",
-      "Explain search-ai.io",
+      "Explain researchly.fyi",
     ];
 
     for (const query of legacyQueries) {
@@ -139,7 +139,7 @@ describe("creator detection", () => {
       expect(result.enhancedContext).toContain("aVenture");
       expect(result.injectedResults.length).toBeGreaterThan(0);
       expect(
-        result.injectedResults.some((r) => r.url.includes("researchly.bot")),
+        result.injectedResults.some((r) => r.url.includes("researchly.fyi")),
       ).toBe(true);
     }
   });

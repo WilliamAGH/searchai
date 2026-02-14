@@ -1,4 +1,4 @@
-# Contributing to researchly.bot
+# Contributing to researchly.fyi
 
 Found a bug or have a feature request? Please open an issue on GitHub:
 
