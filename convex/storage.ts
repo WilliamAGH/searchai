@@ -208,9 +208,9 @@ async function deleteStorageBlob(
     await ctx.storage.delete(storageId);
     return undefined;
   } catch (deleteError) {
-    return deleteError instanceof Error
-      ? deleteError
-      : new Error(String(deleteError));
+    const msg =
+      deleteError instanceof Error ? deleteError.message : String(deleteError);
+    return new Error(`[STORAGE_CLEANUP_FAILED] storageId=${storageId}: ${msg}`);
   }
 }
 
