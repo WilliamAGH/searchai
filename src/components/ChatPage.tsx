@@ -23,8 +23,10 @@ export function ChatPage({ isSidebarOpen, onToggleSidebar }: ChatPageProps) {
   useEffect(() => {
     if (typeof document === "undefined") return;
     if (typeof window === "undefined") return;
+    // Strip trailing slash so the homepage canonical is "https://…" not "https://…/"
+    const path = location.pathname.replace(/\/+$/, "");
     const canonicalHref =
-      window.location.origin + location.pathname + (location.search || "");
+      window.location.origin + path + (location.search || "");
     let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!link) {
       link = document.createElement("link");
