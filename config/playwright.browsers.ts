@@ -22,6 +22,6 @@ const includeFirefoxEnv = process.env.PLAYWRIGHT_INCLUDE_FIREFOX;
 export const includeFirefox =
   includeFirefoxEnv === "1" ||
   includeFirefoxEnv === "true" ||
-  (process.env.CI === "true" &&
+  (Boolean(process.env.CI) &&
     includeFirefoxEnv !== "0" &&
     includeFirefoxEnv !== "false");
