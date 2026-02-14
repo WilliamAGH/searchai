@@ -68,6 +68,21 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
   >(null);
   const createChatInFlightRef = useRef<Promise<string | null> | null>(null);
 
+  // Destructure deps for stable useCallback dependency tracking.
+  // An inline object literal as a single dep defeats memoization (new ref each render).
+  const {
+    currentChatId,
+    chatState,
+    messageCount,
+    setIsGenerating,
+    setMessageCount,
+    handleNewChat,
+    maybeShowFollowUpPrompt,
+    chatActions,
+    navigateToChat,
+    setErrorMessage,
+  } = deps;
+
   /**
    * Main message sending handler
    * Manages chat selection/creation and message dispatch
@@ -78,11 +93,11 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
     async (messageInput: string, imageStorageIds?: string[]) => {
       if (!messageInput.trim() && !imageStorageIds?.length) return;
 
-      let activeChatId: string | null = deps.currentChatId;
+      let activeChatId: string | null = currentChatId;
 
       // FIX: Check for existing messages first to prevent new chat creation
-      if (!activeChatId && deps.chatState.messages.length > 0) {
-        const firstMsg = deps.chatState.messages[0];
+      if (!activeChatId && chatState.messages.length > 0) {
+        const firstMsg = chatState.messages[0];
         const existingChatId =
           firstMsg && typeof firstMsg.chatId === "string"
             ? firstMsg.chatId
@@ -94,7 +109,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
           activeChatId = existingChatId;
           // Navigate via URL so useUrlStateSync drives the state update.
           // Do NOT call selectChat directly — see docs/contracts/navigation.md.
-          deps.navigateToChat(existingChatId);
+          navigateToChat(existingChatId);
         }
       }
 
@@ -103,7 +118,7 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         logger.debug("No chat exists, creating new one");
         if (!createChatInFlightRef.current) {
           // Singleflight: rapid sends from "/" should reuse one created chat.
-          createChatInFlightRef.current = deps.handleNewChat().finally(() => {
+          createChatInFlightRef.current = handleNewChat().finally(() => {
             createChatInFlightRef.current = null;
           });
         }
@@ -118,16 +133,16 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
       // Send the message
       try {
-        deps.setIsGenerating(true);
-        deps.setMessageCount(deps.messageCount + 1);
+        setIsGenerating(true);
+        setMessageCount(messageCount + 1);
 
         // Use unified chat action for ALL users (authenticated and anonymous)
         // This ensures messages are always persisted to Convex
-        if (!deps.chatActions.sendMessage) {
+        if (!chatActions.sendMessage) {
           throw new Error("Message sending is currently unavailable.");
         }
 
-        await deps.chatActions.sendMessage(
+        await chatActions.sendMessage(
           activeChatId,
           messageInput.trim(),
           imageStorageIds,
@@ -136,20 +151,29 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
         // Title updates handled server-side during streaming persistence
         // This ensures titles persist to Convex and survive page refresh
 
-        deps.maybeShowFollowUpPrompt();
+        maybeShowFollowUpPrompt();
       } catch (error) {
         logger.error("Failed to send message", error);
         // Surface error to user via UI feedback
-        if (deps.setErrorMessage) {
-          deps.setErrorMessage(
-            getErrorMessage(error, "Failed to send message"),
-          );
+        if (setErrorMessage) {
+          setErrorMessage(getErrorMessage(error, "Failed to send message"));
         }
       } finally {
-        deps.setIsGenerating(false);
+        setIsGenerating(false);
       }
     },
-    [deps],
+    [
+      currentChatId,
+      chatState,
+      messageCount,
+      setIsGenerating,
+      setMessageCount,
+      handleNewChat,
+      maybeShowFollowUpPrompt,
+      chatActions,
+      navigateToChat,
+      setErrorMessage,
+    ],
   );
 
   sendRef.current = async (msg: string, ids?: string[]) =>
