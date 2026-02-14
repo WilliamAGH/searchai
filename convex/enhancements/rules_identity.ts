@@ -66,7 +66,14 @@ function mentionsCreator(lower: string): boolean {
 }
 
 function mentionsProduct(lower: string): boolean {
-  return lower.includes("researchly") || lower.includes("researchly.fyi");
+  return (
+    lower.includes("researchly") ||
+    lower.includes("researchly.fyi") ||
+    lower.includes("searchai") ||
+    lower.includes("search-ai") ||
+    lower.includes("search ai") ||
+    lower.includes("search-ai.io")
+  );
 }
 
 function mentionsAVenture(lower: string): boolean {
