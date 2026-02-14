@@ -196,25 +196,21 @@ export function hasImageMagicBytes(header: Uint8Array): boolean {
   );
 }
 
-/** Best-effort cleanup: delete a storage blob without masking the caller's error. */
-async function safeDeleteStorage(
+/**
+ * Delete a storage blob, returning the error (if any) so the caller can
+ * attach it as `cause` on its own descriptive error.
+ */
+async function deleteStorageBlob(
   ctx: { storage: { delete: (id: Id<"_storage">) => Promise<void> } },
   storageId: Id<"_storage">,
-): Promise<void> {
+): Promise<Error | undefined> {
   try {
     await ctx.storage.delete(storageId);
+    return undefined;
   } catch (deleteError) {
-    // Intentional graceful degradation: this runs inside a validation-failure
-    // path that is about to throw its own descriptive error.  Rethrowing here
-    // would replace that error with a less useful cleanup message.  We log
-    // with a grep-friendly prefix so orphaned blobs can be monitored.
-    console.error("[STORAGE_CLEANUP_FAILED]", {
-      storageId,
-      error:
-        deleteError instanceof Error
-          ? deleteError.message
-          : String(deleteError),
-    });
+    return deleteError instanceof Error
+      ? deleteError
+      : new Error(String(deleteError));
   }
 }
 
@@ -229,8 +225,10 @@ export async function validateImageBlobContent(
   fileSize: number,
 ): Promise<void> {
   if (fileSize > MAX_IMAGE_BYTES) {
-    await safeDeleteStorage(ctx, storageId);
-    throw new Error("Image is too large. Max 10 MB per file.");
+    const cleanupError = await deleteStorageBlob(ctx, storageId);
+    throw new Error("Image is too large. Max 10 MB per file.", {
+      cause: cleanupError,
+    });
   }
 
   // Fetch only the first 12 bytes (enough for all supported signatures).
@@ -239,14 +237,18 @@ export async function validateImageBlobContent(
     headers: { Range: "bytes=0-11" },
   });
   if (!response.ok) {
-    await safeDeleteStorage(ctx, storageId);
-    throw new Error("Failed to read uploaded file for validation");
+    const cleanupError = await deleteStorageBlob(ctx, storageId);
+    throw new Error("Failed to read uploaded file for validation", {
+      cause: cleanupError,
+    });
   }
 
   const buffer = new Uint8Array(await response.arrayBuffer());
   if (buffer.length < 3 || !hasImageMagicBytes(buffer)) {
-    await safeDeleteStorage(ctx, storageId);
-    throw new Error("Unsupported image format. Please upload PNG or JPEG.");
+    const cleanupError = await deleteStorageBlob(ctx, storageId);
+    throw new Error("Unsupported image format. Please upload PNG or JPEG.", {
+      cause: cleanupError,
+    });
   }
 }
 
@@ -268,14 +270,18 @@ export const validateImageUpload = action({
       { storageId: args.storageId },
     );
     if (!metadata) {
-      await safeDeleteStorage(ctx, args.storageId);
-      throw new Error("Uploaded file not found in storage");
+      const cleanupError = await deleteStorageBlob(ctx, args.storageId);
+      throw new Error("Uploaded file not found in storage", {
+        cause: cleanupError,
+      });
     }
 
     const url = await ctx.storage.getUrl(args.storageId);
     if (!url) {
-      await safeDeleteStorage(ctx, args.storageId);
-      throw new Error("Uploaded file not found in storage");
+      const cleanupError = await deleteStorageBlob(ctx, args.storageId);
+      throw new Error("Uploaded file not found in storage", {
+        cause: cleanupError,
+      });
     }
 
     await validateImageBlobContent(ctx, args.storageId, url, metadata.size);
