@@ -98,20 +98,20 @@ export async function analyzeImages(
     ],
   });
 
-  const description = response.choices[0]?.message?.content;
+  const rawContent = response.choices[0]?.message?.content;
+  const description = rawContent?.trim();
   if (!description) {
     throw new Error("Vision analysis returned empty content");
   }
 
-  const trimmed = description.trim();
   const maxChars = CONTENT_LIMITS.MAX_IMAGE_ANALYSIS_PERSIST_CHARS;
-  if (trimmed.length <= maxChars) {
-    return { description: trimmed };
+  if (description.length <= maxChars) {
+    return { description };
   }
 
   const notice = "\n\n[NOTE] Image analysis truncated to fit size limits.";
   const available = Math.max(0, maxChars - notice.length);
   return {
-    description: `${truncate(trimmed, available)}${notice}`,
+    description: `${truncate(description, available)}${notice}`,
   };
 }

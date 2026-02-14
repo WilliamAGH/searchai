@@ -55,7 +55,7 @@ describe("buildConversationContext", () => {
     const included = match?.[1] ?? "";
 
     expect(included.length).toBeLessThanOrEqual(
-      CONTENT_LIMITS.MAX_IMAGE_ANALYSIS_CONTEXT_CHARS + 3,
+      CONTENT_LIMITS.MAX_IMAGE_ANALYSIS_CONTEXT_CHARS,
     );
     expect(included.endsWith("...")).toBe(true);
   });
