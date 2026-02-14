@@ -3,13 +3,13 @@ import { api } from "../../../../convex/_generated/api";
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { IdUtils, TitleUtils } from "@/lib/types/unified";
 import { logger } from "@/lib/logger";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../../../convex/lib/errors";
 import { MAX_LOOKUP_RETRIES, computeFastBackoff } from "@/lib/constants/retry";
 
 export class ChatOperations {
   constructor(
-    private client: ConvexReactClient,
-    private getSessionId: () => string | undefined,
+    private readonly client: ConvexReactClient,
+    private readonly getSessionId: () => string | undefined,
   ) {}
 
   async getChats(): Promise<Doc<"chats">[]> {

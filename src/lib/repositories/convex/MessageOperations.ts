@@ -3,13 +3,13 @@ import { api } from "../../../../convex/_generated/api";
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { IdUtils } from "@/lib/types/unified";
 import { logger } from "@/lib/logger";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../../../convex/lib/errors";
 import type { SearchWebResponse } from "@/lib/repositories/ChatRepository";
 
 export class MessageOperations {
   constructor(
-    private client: ConvexReactClient,
-    private getSessionId: () => string | undefined,
+    private readonly client: ConvexReactClient,
+    private readonly getSessionId: () => string | undefined,
   ) {}
 
   async getMessages(chatId: string): Promise<Doc<"messages">[]> {
@@ -19,10 +19,14 @@ export class MessageOperations {
       hasSessionId: !!this.getSessionId(),
     });
 
-    const messages = await this.client.query(api.chats.getChatMessages, {
-      chatId: IdUtils.toConvexChatId(chatId),
-      sessionId: this.getSessionId(),
-    });
+    // @ts-ignore - Convex api type instantiation is excessively deep, requires this type assertion
+    const messages = await this.client.query<typeof api.chats.getChatMessages>(
+      api.chats.getChatMessages,
+      {
+        chatId: IdUtils.toConvexChatId(chatId),
+        sessionId: this.getSessionId(),
+      },
+    );
 
     const result = messages ?? [];
 
@@ -43,10 +47,9 @@ export class MessageOperations {
     nextCursor?: Id<"messages">;
     hasMore: boolean;
   }> {
-    const cursorId =
-      cursor !== undefined
-        ? IdUtils.toConvexMessageId(String(cursor))
-        : undefined;
+    const cursorId = cursor
+      ? IdUtils.toConvexMessageId(String(cursor))
+      : undefined;
     const result = await this.client.query(
       api.chats.messagesPaginated.getChatMessagesPaginated,
       {

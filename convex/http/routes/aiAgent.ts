@@ -10,9 +10,6 @@ import type { HttpRouter } from "convex/server";
 import { corsPreflightResponse } from "../cors";
 import { handleAgentStream } from "./aiAgent_stream";
 
-// Re-export for HTTP route tests
-export { sanitizeWebResearchSources } from "./aiAgent_utils";
-
 /**
  * Register agent-based AI routes on the HTTP router
  */

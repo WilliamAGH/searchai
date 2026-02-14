@@ -20,6 +20,8 @@ const messageBaseArgs = {
   hasRealResults: v.optional(v.boolean()),
   webResearchSources: v.optional(v.array(vWebResearchSource)),
   workflowId: v.optional(v.string()),
+  imageStorageIds: v.optional(v.array(v.id("_storage"))),
+  imageAnalysis: v.optional(v.string()),
   sessionId: v.optional(v.string()),
 };
 
@@ -159,6 +161,7 @@ export const updateMessage = internalMutation({
     hasRealResults: v.optional(v.boolean()),
     webResearchSources: v.optional(v.array(vWebResearchSource)),
     workflowId: v.optional(v.string()),
+    imageAnalysis: v.optional(v.string()),
   },
   handler: async (ctx, { messageId, ...rest }) => {
     await ctx.db.patch(messageId, { ...rest });
@@ -203,21 +206,24 @@ export const deleteMessage = mutation({
 
     // Schedule cache invalidation; scheduling failures should not fail delete.
     try {
-      // @ts-ignore - Known Convex TS2589 type instantiation issue
-      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Convex TS2589 workaround; type instantiation too deep
-      const invalidatePlan: any = internal.search.invalidatePlanCacheForChat;
-      await ctx.scheduler.runAfter(0, invalidatePlan, {
-        chatId: message.chatId,
-      });
+      // @ts-ignore - Known Convex TS2589: type instantiation too deep for scheduler generic
+      await ctx.scheduler.runAfter(
+        0,
+        internal.search.invalidatePlanCacheForChat,
+        { chatId: message.chatId },
+      );
     } catch (schedulerError) {
       // Log but don't propagate - the delete succeeded, cache invalidation is best-effort
-      console.error("Failed to schedule plan cache invalidation", {
-        chatId: message.chatId,
-        error:
-          schedulerError instanceof Error
-            ? schedulerError.message
-            : String(schedulerError),
-      });
+      console.error(
+        "[CACHE_INVALIDATION_FAILED] Failed to schedule plan cache invalidation",
+        {
+          chatId: message.chatId,
+          error:
+            schedulerError instanceof Error
+              ? schedulerError.message
+              : String(schedulerError),
+        },
+      );
     }
 
     // Clear rolling summary - part of the same transaction, errors should propagate

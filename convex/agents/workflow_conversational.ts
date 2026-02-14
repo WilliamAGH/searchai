@@ -30,6 +30,7 @@ import {
   buildWebResearchSourcesFromHarvested,
   withTimeout,
 } from "./orchestration_helpers";
+import { buildAgentInput } from "./input_builder";
 import {
   updateChatTitleIfNeeded,
   persistAndCompleteWorkflow,
@@ -71,13 +72,19 @@ export async function* streamConversationalWorkflow(
       nonce,
     );
     workflowTokenId = session.workflowTokenId;
-    const { chat, conversationContext } = session;
+    const { chat, conversationContext, imageUrls, imageAnalysis } = session;
 
     yield writeEvent("workflow_start", { workflowId, nonce });
 
-    const agentInput = conversationContext
-      ? `Previous conversation:\n${conversationContext}\n\nUser: ${args.userQuery}`
-      : args.userQuery;
+    const agentInput = buildAgentInput({
+      userQuery: args.userQuery,
+      conversationContext,
+      imageUrls,
+      imageAnalysis,
+      // Attach images on the current turn so the tool-enabled vision agent can
+      // ground its answer directly. Future turns rely on persisted [IMAGE ANALYSIS].
+      attachImages: imageUrls.length > 0,
+    });
 
     logWorkflowStart("conversational", args.userQuery);
 
@@ -86,7 +93,12 @@ export async function* streamConversationalWorkflow(
       message: "about your question...",
     });
 
-    const agentResult = await run(agents.conversational, agentInput, {
+    const selectedAgent =
+      imageUrls.length > 0
+        ? agents.conversationalVision
+        : agents.conversational;
+
+    const agentResult = await run(selectedAgent, agentInput, {
       stream: true,
       context: { actionCtx: ctx },
       maxTurns: AGENT_LIMITS.MAX_AGENT_TURNS,

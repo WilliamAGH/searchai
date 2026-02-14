@@ -1,7 +1,7 @@
 // Minimal HTTP utilities for frontend operations
 // These do NOT duplicate Convex functionality - they're for non-Convex HTTP operations
 
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../../convex/lib/errors";
 
 export type HttpErrorDetails = {
   status: number;

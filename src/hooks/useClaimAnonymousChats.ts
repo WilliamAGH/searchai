@@ -8,7 +8,7 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { logger } from "@/lib/logger";
 
-const SESSION_KEY = "searchai:anonymousSessionId";
+const SESSION_KEY = "researchly:anonymousSessionId";
 
 export function useClaimAnonymousChats() {
   const { isAuthenticated } = useConvexAuth();
@@ -35,7 +35,9 @@ export function useClaimAnonymousChats() {
                 : sessionId;
             if (nextSessionId && nextSessionId !== sessionId) {
               localStorage.setItem(SESSION_KEY, nextSessionId);
-              window.dispatchEvent(new Event("searchai:session-id-updated"));
+              globalThis.dispatchEvent(
+                new Event("researchly:session-id-updated"),
+              );
             }
 
             hasClaimedRef.current = true;

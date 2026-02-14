@@ -17,10 +17,10 @@ import type { Dispatch, SetStateAction } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { IChatRepository } from "@/lib/repositories/ChatRepository";
-import type { ChatState } from "./useChatState";
+import type { ChatState } from "@/hooks/useChatState";
 import { logger } from "@/lib/logger";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
-import { useAnonymousSession } from "./useAnonymousSession";
+import { getErrorMessage } from "../../convex/lib/errors";
+import { useAnonymousSession } from "@/hooks/useAnonymousSession";
 
 export function useChatDataLoader(
   repository: IChatRepository | null,

@@ -1,5 +1,5 @@
 {
-  "name": "searchai-io",
+  "name": "researchly-bot",
   "version": "0.2.1",
   "private": true,
   "description": "AI-powered search application",
@@ -9,21 +9,23 @@
     "react",
     "search"
   ],
-  "homepage": "https://search-ai.io",
+  "homepage": "https://researchly.fyi",
   "bugs": {
-    "url": "https://github.com/WilliamAGH/searchai-io/issues"
+    "url": "https://github.com/WilliamAGH/researchly-bot/issues"
   },
   "license": "LICENSE.md",
   "author": "William Callahan",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WilliamAGH/searchai-io.git"
+    "url": "git+https://github.com/WilliamAGH/researchly-bot.git"
   },
   "type": "module",
   "scripts": {
     "validate:quick": "npm run -s lint:ox && tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false && npm run -s test",
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
-    "dev:frontend": "vite --open",
+    "dev:frontend": "vite",
+    "dev:frontend:test": "vite --strictPort --port 5173 --host 127.0.0.1",
+    "dev:frontend:open": "vite --open",
     "dev:backend": "convex dev",
     "build": "vite build",
     "preview": "vite preview --strictPort --port 4173",
@@ -35,7 +37,7 @@
     "typecheck": "tsc -p . --noEmit --pretty false && tsc -p convex --noEmit --pretty false",
     "format": "oxfmt -c config/oxfmtrc.json --write .",
     "format:check": "oxfmt -c config/oxfmtrc.json --check .",
-    "validate": "npm-run-all --sequential format --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates lint:boundaries --sequential test:single build",
+    "validate": "npm-run-all --print-label --aggregate-output --parallel lint typecheck format:check lint:loc lint:convex-imports lint:convex-types lint:duplicates lint:boundaries --sequential test:single build",
     "clean": "rm -rf node_modules/.cache node_modules/.tmp dist .turbo && echo 'Cleaned build caches'",
     "clean:all": "npm run clean && rm -rf node_modules package-lock.json && echo 'Cleaned everything - run npm install'",
     "clean:vscode": "rm -rf ~/Library/Caches/typescript/* ~/Library/Application\\ Support/Code/Cache/* ~/Library/Application\\ Support/Code/CachedData/* 2>/dev/null || true && echo 'Cleaned VSCode caches - restart VSCode'",
@@ -51,15 +53,17 @@
     "test:playwright": "playwright test --config config/playwright.config.ts",
     "test:all": "npm-run-all --sequential test:vitest test:playwright",
     "test:chat": "vitest --config config/vitest.config.ts __tests__/src/lib/utils/chatValidation.test.ts",
-    "test:integration:chat": "playwright test --config config/playwright.config.ts __tests__/integration/chat-message-chaining.test.ts",
+    "test:integration:chat": "playwright test --config config/playwright-integration.config.ts --project=chromium __tests__/integration/chat-message-chaining.test.ts",
     "test:integration": "playwright test --config config/playwright-integration.config.ts",
+    "test:integration:all": "PLAYWRIGHT_ALL_BROWSERS=1 playwright test --config config/playwright-integration.config.ts",
+    "test:integration:ci": "CI=true playwright test --config config/playwright-integration.config.ts",
     "test:smoke": "playwright test --config config/playwright.config.ts -g smoke --reporter=line",
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test --config config/playwright.config.ts -g smoke --reporter=line",
     "prepare": "prek -c config/prek.toml install && node scripts/patch-hooks-verbose.mjs",
     "lint:convex-imports": "node scripts/check-convex-imports.cjs",
     "lint:loc": "node scripts/check-loc.mjs",
     "lint:convex-types": "node scripts/lint-convex-types.mjs",
-    "lint:duplicates": "DRY_T=$(node -p \"require('./config/drylintrc.json').threshold\") && dry --no-cache --threshold $DRY_T --ignore 'node_modules/**' && dry --no-cache --threshold $DRY_T --ignore 'node_modules/**' --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const groups = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (groups.length > 0) { process.exit(1); }\"",
+    "lint:duplicates": "DRY_T=$(node -p \"require('./config/drylintrc.json').threshold\") && dry --no-cache --threshold $DRY_T --ignore 'node_modules/**' && dry --no-cache --threshold $DRY_T --ignore 'node_modules/**' --json --out /tmp/dry-lint.json --no-progress && node -e \"const fs = require('node:fs'); const g = JSON.parse(fs.readFileSync('/tmp/dry-lint.json', 'utf8')); if (g.length > 0) { console.error('[FAIL] ' + g.length + ' duplicate code group(s) exceed similarity threshold. See dry-lint output above.'); process.exit(1); } else { console.log('[OK] No code duplication above threshold'); }\"",
     "lint:duplicates:near": "dry --no-cache --threshold $(node -p \"require('./config/drylintrc.json').threshold\") --ignore 'node_modules/**'",
     "lint:boundaries": "ast-grep scan -c config/sgconfig.yml && echo 'No boundary violations found'",
     "playwright:install:firefox": "npx playwright install --with-deps firefox",
@@ -131,7 +135,7 @@
   "overrides": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "hono": "^4.11.7",
-    "qs": "^6.14.1",
+    "qs": "^6.14.2",
     "undici": "^7.19.0"
   },
   "lint-staged": {

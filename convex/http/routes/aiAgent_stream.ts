@@ -1,6 +1,6 @@
 "use node";
 
-import { api } from "../../_generated/api";
+import { api, internal } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { streamConversationalWorkflow } from "../../agents/orchestration";
 import { checkIpRateLimit } from "../../lib/rateLimit";
@@ -17,7 +17,9 @@ import {
   rateLimitExceededResponse,
   sanitizeWebResearchSources,
   sanitizeTextInput,
+  validateImageStorageIds,
 } from "./aiAgent_utils";
+import { validateImageBlobContent } from "../../storage";
 
 export async function handleAgentStream(
   ctx: ActionCtx,
@@ -38,7 +40,7 @@ export async function handleAgentStream(
   const payload = payloadResult.payload;
 
   const message = sanitizeTextInput(payload.message, 10000);
-  if (!message) {
+  if (message === undefined) {
     return corsResponse({
       body: JSON.stringify({ error: "Message must be a string" }),
       status: 400,
@@ -74,29 +76,96 @@ export async function handleAgentStream(
   }
   const sessionId = sessionIdRaw;
 
-  const conversationContext = sanitizeTextInput(
-    payload.conversationContext,
-    5000,
-  );
-
   const webResearchSources = sanitizeWebResearchSources(
     payload.webResearchSources,
   );
   const includeDebugSourceContext = payload.includeDebugSourceContext === true;
 
-  // Gate: verify write access before starting the streaming workflow to prevent
-  // resource exhaustion (OpenAI API + Convex runtime) from unauthorized callers.
-  // @ts-ignore - TS2589: Known Convex limitation with complex type inference
-  const writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
-    chatId,
-    sessionId,
-  });
+  const imageIdsResult = validateImageStorageIds(payload.imageStorageIds);
+  if (!imageIdsResult.ok) {
+    return corsResponse({
+      body: JSON.stringify({ error: imageIdsResult.error }),
+      status: 400,
+      origin,
+    });
+  }
+  const imageStorageIds = imageIdsResult.ids;
+
+  // Require at least one input modality: non-empty text OR at least one image.
+  // (Empty text is permitted when images are attached.)
+  const hasText = message.trim().length > 0;
+  const hasImages = Boolean(imageStorageIds?.length);
+  if (!hasText && !hasImages) {
+    return corsResponse({
+      body: JSON.stringify({ error: "Message must not be empty" }),
+      status: 400,
+      origin,
+    });
+  }
+
+  // Fail-fast: reject unauthorized callers before allocating streaming resources.
+  // The authoritative check lives in initializeWorkflowSession; this pre-flight
+  // avoids encoder/stream allocation for callers that will be denied anyway.
+  let writeAccess: "allowed" | "denied" | "not_found";
+  try {
+    // @ts-ignore - TS2589: Known Convex limitation with complex type inference
+    writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
+      chatId,
+      sessionId,
+    });
+  } catch (queryError) {
+    console.error("[WRITE_ACCESS_CHECK_FAILED]", serializeError(queryError));
+    return corsResponse({
+      body: JSON.stringify({
+        error: "Unable to verify permissions. Please try again.",
+      }),
+      status: 500,
+      origin,
+    });
+  }
   if (writeAccess !== "allowed") {
     return corsResponse({
       body: JSON.stringify({ error: "Unauthorized" }),
       status: 403,
       origin,
     });
+  }
+
+  // Defense in depth: validate magic bytes server-side so callers cannot bypass
+  // client-side upload validation by submitting arbitrary _storage IDs.
+  // Runs inline instead of via ctx.runAction to avoid spawning child actions.
+  if (imageStorageIds && imageStorageIds.length > 0) {
+    try {
+      await Promise.all(
+        imageStorageIds.map(async (storageId) => {
+          const metadata = await ctx.runQuery(
+            internal.storage.getStorageFileMetadata,
+            { storageId },
+          );
+          if (!metadata) {
+            throw new Error("Uploaded file not found in storage");
+          }
+          const url = await ctx.storage.getUrl(storageId);
+          if (!url) {
+            throw new Error("Uploaded file not found in storage");
+          }
+          await validateImageBlobContent(ctx, storageId, url, metadata.size);
+        }),
+      );
+    } catch (error) {
+      const errorInfo = serializeError(error);
+      console.error("[ERROR] AGENT STREAM INVALID IMAGE UPLOAD:", errorInfo);
+      return corsResponse({
+        body: JSON.stringify({
+          error: errorInfo.message || "Invalid image attachment",
+          ...(process.env.NODE_ENV === "development"
+            ? { errorDetails: errorInfo }
+            : {}),
+        }),
+        status: 400,
+        origin,
+      });
+    }
   }
 
   const encoder = new TextEncoder();
@@ -108,7 +177,16 @@ export async function handleAgentStream(
         try {
           controller.enqueue(encoder.encode(formatSseEvent(data)));
         } catch (error) {
-          console.error("Failed to send SSE event:", serializeError(error));
+          const eventType =
+            typeof data === "object" &&
+            data !== null &&
+            "type" in data &&
+            typeof (data as Record<string, unknown>).type === "string"
+              ? (data as Record<string, unknown>).type
+              : "unknown";
+          console.error("Failed to send SSE event:", serializeError(error), {
+            eventType,
+          });
           streamBroken = true;
         }
       };
@@ -118,9 +196,9 @@ export async function handleAgentStream(
           chatId,
           sessionId,
           userQuery: message,
-          conversationContext,
           webResearchSources,
           includeDebugSourceContext,
+          imageStorageIds,
         });
 
         for await (const event of eventStream) {

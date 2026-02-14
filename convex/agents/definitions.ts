@@ -16,22 +16,38 @@
 import { z } from "zod";
 import { Agent } from "@openai/agents";
 import { toolsList, conversationalToolsList } from "./tools";
-import { getOpenAIEnvironment, getModelName } from "../lib/providers/openai";
+import {
+  getOpenAIEnvironment,
+  getModelName,
+  getVisionModelName,
+} from "../lib/providers/openai";
 import { AGENT_LIMITS } from "../lib/constants/cache";
 import {
   QUERY_PLANNER_PROMPT,
   RESEARCH_AGENT_PROMPT,
   ANSWER_SYNTHESIS_PROMPT,
+  CONVERSATIONAL_IMAGE_ANALYSIS_GUIDELINES,
   buildConversationalAgentPrompt,
 } from "./prompts";
 
 // Initialize OpenAI environment once
 const env = getOpenAIEnvironment();
 const defaultModel = getModelName();
+const visionModel = getVisionModelName();
 const agentTools = toolsList satisfies ReturnType<typeof Agent.create>["tools"];
 const conversationalAgentTools = conversationalToolsList satisfies ReturnType<
   typeof Agent.create
 >["tools"];
+const conversationalPromptLimits = {
+  minSearchQueries: AGENT_LIMITS.MIN_SEARCH_QUERIES,
+  maxSearchQueries: AGENT_LIMITS.MAX_SEARCH_QUERIES,
+  minScrapeUrls: AGENT_LIMITS.MIN_SCRAPE_URLS,
+  maxScrapeUrls: AGENT_LIMITS.MAX_SCRAPE_URLS,
+} as const;
+
+const conversationalToolEnabledInstructions = buildConversationalAgentPrompt(
+  conversationalPromptLimits,
+);
 
 /**
  * Phase 1: Query Planning Agent
@@ -249,12 +265,7 @@ export const answerSynthesisAgent = Agent.create({
 export const conversationalAgent = Agent.create({
   name: "Assistant",
   model: defaultModel,
-  instructions: buildConversationalAgentPrompt({
-    minSearchQueries: AGENT_LIMITS.MIN_SEARCH_QUERIES,
-    maxSearchQueries: AGENT_LIMITS.MAX_SEARCH_QUERIES,
-    minScrapeUrls: AGENT_LIMITS.MIN_SCRAPE_URLS,
-    maxScrapeUrls: AGENT_LIMITS.MAX_SCRAPE_URLS,
-  }),
+  instructions: conversationalToolEnabledInstructions,
 
   tools: conversationalAgentTools,
 
@@ -268,6 +279,27 @@ export const conversationalAgent = Agent.create({
 });
 
 /**
+ * Conversational Vision Agent (Image Attachments)
+ *
+ * Uses a dedicated vision-capable model so image inputs are actually processed.
+ * This avoids "confident hallucinations" when the default model is text-only.
+ */
+export const conversationalVisionAgent = Agent.create({
+  name: "AssistantVision",
+  model: visionModel,
+  instructions:
+    conversationalToolEnabledInstructions +
+    "\n\n" +
+    CONVERSATIONAL_IMAGE_ANALYSIS_GUIDELINES,
+  tools: conversationalAgentTools,
+  outputType: undefined,
+  modelSettings: {
+    ...env.defaultModelSettings,
+    temperature: 0.3, // Reduce hallucinations for vision/OCR tasks
+  },
+});
+
+/**
  * Agent configuration map for easy access
  */
 export const agents: {
@@ -275,9 +307,11 @@ export const agents: {
   research: typeof researchAgent;
   answerSynthesis: typeof answerSynthesisAgent;
   conversational: typeof conversationalAgent;
+  conversationalVision: typeof conversationalVisionAgent;
 } = {
   queryPlanner: queryPlannerAgent,
   research: researchAgent,
   answerSynthesis: answerSynthesisAgent,
   conversational: conversationalAgent,
+  conversationalVision: conversationalVisionAgent,
 };

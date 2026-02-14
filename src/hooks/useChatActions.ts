@@ -5,11 +5,11 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import type { IChatRepository } from "@/lib/repositories/ChatRepository";
-import type { ChatState } from "./useChatState";
+import type { ChatState } from "@/hooks/useChatState";
 import type { Message } from "@/lib/types/message";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { TitleUtils } from "@/lib/types/unified";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../convex/lib/errors";
 import { logger } from "@/lib/logger";
 import { sendMessageWithStreaming } from "@/hooks/chatActions/sendMessage";
 
@@ -21,7 +21,11 @@ export interface ChatActions {
   updateChatTitle: (id: string, title: string) => Promise<void>;
 
   // Message operations
-  sendMessage: (chatId: string, content: string) => Promise<void>;
+  sendMessage: (
+    chatId: string,
+    content: string,
+    imageStorageIds?: string[],
+  ) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   addMessage: (message: Message) => void;
   removeMessage: (id: string) => void;
@@ -194,12 +198,23 @@ export function createChatActions(
     },
 
     // Message operations
-    async sendMessage(chatId: string, content: string) {
+    async sendMessage(
+      chatId: string,
+      content: string,
+      imageStorageIds?: string[],
+    ) {
       if (!repository) {
-        logger.warn("sendMessage called without repository", { chatId });
-        return;
+        throw new Error(
+          "Message sending is currently unavailable. Please reload the page.",
+        );
       }
-      await sendMessageWithStreaming({ repository, setState, chatId, content });
+      await sendMessageWithStreaming({
+        repository,
+        setState,
+        chatId,
+        content,
+        imageStorageIds,
+      });
     },
 
     async deleteMessage(id: string) {

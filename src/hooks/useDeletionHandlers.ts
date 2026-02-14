@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { logger } from "@/lib/logger";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../convex/lib/errors";
 import { toConvexId } from "@/lib/utils/idValidation";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Message } from "@/lib/types/message";
@@ -40,7 +40,7 @@ export function useDeletionHandlers({
   sessionId,
 }: UseDeletionHandlersProps) {
   const [undoBanner, setUndoBanner] = useState<UndoBannerState | null>(null);
-  const timeoutsRef = useRef<number[]>([]);
+  const timeoutsRef = useRef<ReturnType<typeof globalThis.setTimeout>[]>([]);
 
   const clearAllTimeouts = useCallback(() => {
     for (const id of timeoutsRef.current) {
@@ -72,7 +72,7 @@ export function useDeletionHandlers({
 
         // Auto-hide after 2 seconds (with cleanup)
         clearAllTimeouts();
-        const timeoutId = window.setTimeout(() => {
+        const timeoutId = globalThis.setTimeout(() => {
           setUndoBanner(null);
         }, 2000);
         timeoutsRef.current.push(timeoutId);
@@ -110,7 +110,7 @@ export function useDeletionHandlers({
       });
 
       clearAllTimeouts();
-      const timeoutId = window.setTimeout(() => {
+      const timeoutId = globalThis.setTimeout(() => {
         setUndoBanner((prev) =>
           prev?.message === "Message deleted" ? null : prev,
         );
@@ -140,7 +140,7 @@ export function useDeletionHandlers({
 
         // Auto-hide after 2 seconds (with cleanup)
         clearAllTimeouts();
-        const timeoutId = window.setTimeout(() => {
+        const timeoutId = globalThis.setTimeout(() => {
           setUndoBanner(null);
         }, 2000);
         timeoutsRef.current.push(timeoutId);

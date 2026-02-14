@@ -9,17 +9,6 @@ import { z } from "zod/v4";
 import { SEARCH_METHODS, SOURCE_KINDS } from "../lib/constants/search";
 
 // ============================================
-// Shared Constants (Re-exported from constants)
-// ============================================
-
-export {
-  SEARCH_METHODS,
-  SOURCE_KINDS,
-  type SearchMethod,
-  type SourceKind,
-} from "../lib/constants/search";
-
-// ============================================
 // Search Method
 // ============================================
 

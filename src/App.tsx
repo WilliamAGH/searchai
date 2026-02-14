@@ -31,8 +31,8 @@ export default function App() {
   // This prevents the "gap under composer" where 100dvh can desync from the visible area.
   useEffect(() => {
     const setAppDvh = () => {
-      const vv = window.visualViewport;
-      const height = vv?.height ?? window.innerHeight;
+      const vv = globalThis.visualViewport;
+      const height = vv?.height ?? globalThis.innerHeight;
       document.documentElement.style.setProperty("--app-dvh", `${height}px`);
     };
 
@@ -44,26 +44,26 @@ export default function App() {
     let rafId: number | null = null;
     const scheduleSetAppDvh = () => {
       if (rafId !== null) return;
-      rafId = window.requestAnimationFrame(() => {
+      rafId = globalThis.requestAnimationFrame(() => {
         rafId = null;
         setAppDvh();
       });
     };
 
-    const vv = window.visualViewport;
+    const vv = globalThis.visualViewport;
     vv?.addEventListener("resize", setAppDvh);
     vv?.addEventListener("scroll", setAppDvh);
-    window.addEventListener("resize", setAppDvh);
-    window.addEventListener("orientationchange", setAppDvh);
-    window.addEventListener("scroll", scheduleSetAppDvh, true);
+    globalThis.addEventListener("resize", setAppDvh);
+    globalThis.addEventListener("orientationchange", setAppDvh);
+    globalThis.addEventListener("scroll", scheduleSetAppDvh, true);
 
     return () => {
       vv?.removeEventListener("resize", setAppDvh);
       vv?.removeEventListener("scroll", setAppDvh);
-      window.removeEventListener("resize", setAppDvh);
-      window.removeEventListener("orientationchange", setAppDvh);
-      window.removeEventListener("scroll", scheduleSetAppDvh, true);
-      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      globalThis.removeEventListener("resize", setAppDvh);
+      globalThis.removeEventListener("orientationchange", setAppDvh);
+      globalThis.removeEventListener("scroll", scheduleSetAppDvh, true);
+      if (rafId !== null) globalThis.cancelAnimationFrame(rafId);
     };
   }, []);
 
@@ -81,10 +81,10 @@ export default function App() {
       });
     };
 
-    let lastIsDesktop = window.innerWidth >= DESKTOP_BREAKPOINT;
+    let lastIsDesktop = globalThis.innerWidth >= DESKTOP_BREAKPOINT;
 
     const handleResize = () => {
-      const isDesktop = window.innerWidth >= DESKTOP_BREAKPOINT;
+      const isDesktop = globalThis.innerWidth >= DESKTOP_BREAKPOINT;
 
       if (hasManuallyToggled) {
         if (isDesktop !== lastIsDesktop) {
@@ -102,8 +102,8 @@ export default function App() {
       handleResize();
     }
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    globalThis.addEventListener("resize", handleResize);
+    return () => globalThis.removeEventListener("resize", handleResize);
   }, [hasManuallyToggled]);
 
   const openSignUp = useCallback(() => {
@@ -185,7 +185,7 @@ export default function App() {
                     </svg>
                   </Link>
                   <span className="text-lg font-semibold !normal-case tracking-normal text-gray-900 dark:text-white truncate max-w-[40vw]">
-                    SearchAI
+                    Researchly
                   </span>
                 </div>
                 <div className="flex items-center gap-2.5 sm:gap-4">
@@ -196,15 +196,15 @@ export default function App() {
                     <button
                       type="button"
                       onClick={openSignUp}
-                      className="inline-flex h-9 items-center justify-center px-3 sm:px-4 text-sm sm:text-base font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap dark:font-mono"
+                      className="inline-flex h-9 items-center justify-center px-3 sm:px-4 text-xs sm:text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors rounded-md whitespace-nowrap dark:font-mono"
                     >
-                      <span className="hidden sm:inline">Sign Up Free</span>
+                      <span className="hidden sm:inline">Sign Up</span>
                       <span className="sm:hidden">Sign Up</span>
                     </button>
                     <button
                       type="button"
                       onClick={openSignIn}
-                      className="hidden sm:inline-flex h-9 items-center justify-center px-3 sm:px-4 text-sm sm:text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap dark:font-mono"
+                      className="hidden sm:inline-flex h-9 items-center justify-center px-3 sm:px-4 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap dark:font-mono"
                     >
                       Sign In
                     </button>

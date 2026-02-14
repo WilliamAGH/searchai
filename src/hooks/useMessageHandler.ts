@@ -7,7 +7,7 @@
 
 import { useCallback, useRef } from "react";
 import { logger } from "@/lib/logger";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../convex/lib/errors";
 import type { ChatActions, ChatState } from "@/hooks/types";
 
 /**
@@ -46,7 +46,7 @@ interface UseMessageHandlerDeps {
    */
   navigateToChat: (chatId: string) => void;
   /** Surface user-visible errors when message sending fails */
-  setErrorMessage?: (message: string) => void;
+  setErrorMessage: (message: string) => void;
 }
 
 /**
@@ -63,7 +63,25 @@ interface UseMessageHandlerDeps {
  * @returns {Object} Message handler functions and refs
  */
 export function useMessageHandler(deps: UseMessageHandlerDeps) {
-  const sendRef = useRef<((message: string) => Promise<void>) | null>(null);
+  const sendRef = useRef<
+    ((message: string, imageStorageIds?: string[]) => Promise<void>) | null
+  >(null);
+  const createChatInFlightRef = useRef<Promise<string | null> | null>(null);
+
+  // Destructure deps for stable useCallback dependency tracking.
+  // An inline object literal as a single dep defeats memoization (new ref each render).
+  const {
+    currentChatId,
+    chatState,
+    messageCount,
+    setIsGenerating,
+    setMessageCount,
+    handleNewChat,
+    maybeShowFollowUpPrompt,
+    chatActions,
+    navigateToChat,
+    setErrorMessage,
+  } = deps;
 
   /**
    * Main message sending handler
@@ -72,14 +90,14 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
    * @param {string} messageInput - The message to send
    */
   const handleSendMessage = useCallback(
-    async (messageInput: string) => {
-      if (!messageInput.trim()) return;
+    async (messageInput: string, imageStorageIds?: string[]) => {
+      if (!messageInput.trim() && !imageStorageIds?.length) return;
 
-      let activeChatId: string | null = deps.currentChatId;
+      let activeChatId: string | null = currentChatId;
 
       // FIX: Check for existing messages first to prevent new chat creation
-      if (!activeChatId && deps.chatState.messages.length > 0) {
-        const firstMsg = deps.chatState.messages[0];
+      if (!activeChatId && chatState.messages.length > 0) {
+        const firstMsg = chatState.messages[0];
         const existingChatId =
           firstMsg && typeof firstMsg.chatId === "string"
             ? firstMsg.chatId
@@ -91,16 +109,21 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
           activeChatId = existingChatId;
           // Navigate via URL so useUrlStateSync drives the state update.
           // Do NOT call selectChat directly — see docs/contracts/navigation.md.
-          deps.navigateToChat(existingChatId);
+          navigateToChat(existingChatId);
         }
       }
 
       // Only create new chat if truly needed
       if (!activeChatId) {
         logger.debug("No chat exists, creating new one");
-        const newChatId = await deps.handleNewChat();
+        // Singleflight: rapid sends from "/" should reuse one created chat.
+        createChatInFlightRef.current ??= handleNewChat().finally(() => {
+          createChatInFlightRef.current = null;
+        });
+        const newChatId = await createChatInFlightRef.current;
         if (!newChatId) {
           logger.error("[ERROR] Failed to create chat for message");
+          setErrorMessage("Unable to create a new chat. Please try again.");
           return;
         }
         // Frontend uses string chat IDs; avoid unsafe casts
@@ -109,37 +132,49 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
 
       // Send the message
       try {
-        deps.setIsGenerating(true);
-        deps.setMessageCount(deps.messageCount + 1);
+        setIsGenerating(true);
+        setMessageCount(messageCount + 1);
 
         // Use unified chat action for ALL users (authenticated and anonymous)
         // This ensures messages are always persisted to Convex
-        if (!deps.chatActions.sendMessage) {
+        if (!chatActions.sendMessage) {
           throw new Error("Message sending is currently unavailable.");
         }
 
-        await deps.chatActions.sendMessage(activeChatId, messageInput.trim());
+        await chatActions.sendMessage(
+          activeChatId,
+          messageInput.trim(),
+          imageStorageIds,
+        );
 
         // Title updates handled server-side during streaming persistence
         // This ensures titles persist to Convex and survive page refresh
 
-        deps.maybeShowFollowUpPrompt();
+        maybeShowFollowUpPrompt();
       } catch (error) {
         logger.error("Failed to send message", error);
         // Surface error to user via UI feedback
-        if (deps.setErrorMessage) {
-          deps.setErrorMessage(
-            getErrorMessage(error, "Failed to send message"),
-          );
-        }
+        setErrorMessage(getErrorMessage(error, "Failed to send message"));
       } finally {
-        deps.setIsGenerating(false);
+        setIsGenerating(false);
       }
     },
-    [deps],
+    [
+      currentChatId,
+      chatState,
+      messageCount,
+      setIsGenerating,
+      setMessageCount,
+      handleNewChat,
+      maybeShowFollowUpPrompt,
+      chatActions,
+      navigateToChat,
+      setErrorMessage,
+    ],
   );
 
-  sendRef.current = async (msg: string) => handleSendMessage(msg);
+  sendRef.current = async (msg: string, ids?: string[]) =>
+    handleSendMessage(msg, ids);
 
   return {
     handleSendMessage,

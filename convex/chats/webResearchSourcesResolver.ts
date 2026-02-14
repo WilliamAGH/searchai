@@ -9,7 +9,11 @@
 import { RELEVANCE_SCORES } from "../lib/constants/cache";
 import { normalizeUrlForKey, safeParseUrl } from "../lib/url";
 import { normalizeHttpUrl } from "../lib/urlHttp";
-import { isRecord, type WebResearchSource } from "../lib/validators";
+import {
+  isRecord,
+  toMetadataRecord,
+  type WebResearchSource,
+} from "../lib/validators";
 
 const UNKNOWN_MESSAGE_ID = "unknown" as const;
 
@@ -91,7 +95,9 @@ function fromStructuredSource(
     title,
     timestamp,
     relevanceScore,
-    metadata: isRecord(input.metadata) ? input.metadata : undefined,
+    metadata: isRecord(input.metadata)
+      ? toMetadataRecord(input.metadata)
+      : undefined,
   };
 }
 

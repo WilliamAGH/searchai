@@ -5,20 +5,20 @@
  */
 
 export const SEO = {
-  siteName: "SearchAI",
-  siteUrl: "https://search-ai.io",
-  defaultTitle: "SearchAI - AI-Powered Web Search",
+  siteName: "Researchly",
+  siteUrl: "https://researchly.fyi",
+  defaultTitle: "Researchly - AI-Powered Web Research",
   defaultDescription:
-    "Search the web with AI. Get accurate, up-to-date information with sources powered by real-time web search.",
-  ogImagePath: "/images/opengraph/searchai-og-card.png",
+    "Research the web with AI. Get accurate, up-to-date information with sources powered by real-time web search.",
+  ogImagePath: "/images/opengraph/researchly-og-card.png",
   ogImageWidth: 1200,
   ogImageHeight: 630,
   twitterCard: "summary_large_image" as const,
   twitterSite: "@williamcallahan",
   twitterCreator: "@williamcallahan",
   locale: "en_US",
-  sharedDescription: "Shared Research Chat on SearchAI",
-  publicDescription: "AI-Powered Research Chat on SearchAI",
+  sharedDescription: "Shared Research Chat on Researchly",
+  publicDescription: "AI-Powered Research Chat on Researchly",
   selectors: {
     ogTitle: 'meta[property="og:title"]',
     ogDescription: 'meta[property="og:description"]',

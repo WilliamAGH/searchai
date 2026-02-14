@@ -30,9 +30,9 @@ export interface StreamingWorkflowArgs {
   chatId: Id<"chats">;
   sessionId?: string;
   userQuery: string;
-  conversationContext?: string;
   webResearchSources?: WebResearchSource[];
   includeDebugSourceContext?: boolean;
+  imageStorageIds?: Id<"_storage">[];
 }
 
 /**
@@ -42,6 +42,8 @@ export interface WorkflowSessionResult {
   workflowTokenId: Id<"workflowTokens">;
   chat: ChatQueryResult;
   conversationContext: string;
+  imageUrls: string[];
+  imageAnalysis?: string;
 }
 
 // ============================================
@@ -97,6 +99,7 @@ export async function initializeWorkflowSession(
   // from auth denial and not-found — keep the three failure modes distinct.
   let writeAccess: "allowed" | "denied" | "not_found";
   try {
+    // @ts-ignore - Convex api type instantiation is too deep here
     writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
       chatId: args.chatId,
       sessionId: args.sessionId,
@@ -206,17 +209,48 @@ export async function initializeWorkflowSession(
     );
   }
 
-  const recentMessages = (recentMessagesResult ?? []) as Array<{
-    role: "user" | "assistant" | "system";
-    content?: string;
-  }>;
+  const recentMessages: MessageQueryResult[] = recentMessagesResult ?? [];
 
-  // 4. Add user message
+  // 4. Build context — single path per [RC1a]; empty context is correct for new chats
+  const conversationContext = buildConversationContext(recentMessages);
+
+  // 5. Resolve image storage IDs to serving URLs via batch query
+  const imageUrls = await resolveImageUrls(ctx, args);
+
+  // 6. Vision pre-analysis: generate structured description of attached images
+  let imageAnalysis: string | undefined;
+  if (imageUrls.length > 0) {
+    try {
+      const { analyzeImages } = await import("./vision_analysis");
+      const result = await analyzeImages({
+        imageUrls,
+        userQuery: args.userQuery,
+      });
+      imageAnalysis = result.description;
+    } catch (analysisError) {
+      console.warn(
+        "[vision_analysis] Failed for chat=%s imageCount=%d: %s",
+        args.chatId,
+        imageUrls.length,
+        getErrorMessage(analysisError, "Unknown vision analysis error"),
+      );
+      throw new Error(
+        "Unable to analyze the attached image(s). Ensure the configured model/endpoint supports image inputs and try again.",
+        { cause: analysisError },
+      );
+    }
+  }
+
+  // 7. Add user message (after vision pre-analysis so we don't persist partial state)
   const addMessageArgs = {
     chatId: args.chatId,
     role: "user" as const,
     content: args.userQuery,
     sessionId: args.sessionId,
+    ...(args.imageStorageIds?.length
+      ? { imageStorageIds: args.imageStorageIds }
+      : {}),
+    ...(imageAnalysis ? { imageAnalysis } : {}),
   };
 
   if (useAuthVariant) {
@@ -232,17 +266,37 @@ export async function initializeWorkflowSession(
     );
   }
 
-  // 5. Build context
-  let conversationContext = buildConversationContext(recentMessages || []);
-  if (!conversationContext && args.conversationContext) {
-    console.warn(
-      "buildConversationContext returned empty; using args.conversationContext",
+  return {
+    workflowTokenId,
+    chat,
+    conversationContext,
+    imageUrls,
+    imageAnalysis,
+  };
+}
+
+/**
+ * Resolve image storage IDs to serving URLs. Throws if any URL fails to resolve
+ * so the caller is aware of the failure rather than receiving a silently reduced set.
+ */
+async function resolveImageUrls(
+  ctx: WorkflowActionCtx,
+  args: Pick<StreamingWorkflowArgs, "imageStorageIds" | "chatId">,
+): Promise<string[]> {
+  if (!args.imageStorageIds?.length) return [];
+
+  const resolved = await Promise.all(
+    args.imageStorageIds.map((storageId) => ctx.storage.getUrl(storageId)),
+  );
+
+  const failedCount = resolved.filter((url) => url === null).length;
+  if (failedCount > 0) {
+    throw new Error(
+      `${failedCount}/${args.imageStorageIds.length} image storage IDs ` +
+        `failed to resolve for chat ${args.chatId}`,
     );
-    conversationContext = args.conversationContext;
-  }
-  if (!conversationContext) {
-    conversationContext = "";
   }
 
-  return { workflowTokenId, chat, conversationContext };
+  // All entries are non-null after the check above
+  return resolved.filter((url): url is string => url !== null);
 }

@@ -60,7 +60,7 @@ test("smoke: no console errors on home", async ({ page, baseURL }) => {
   await page.goto(target, { waitUntil: "domcontentloaded" });
 
   // Basic sanity: page renders something meaningful
-  await expect(page).toHaveTitle(/search|ai|SearchAI|flex|template/i, {
+  await expect(page).toHaveTitle(/researchly|search|ai|flex|template/i, {
     timeout: 15000,
   });
 

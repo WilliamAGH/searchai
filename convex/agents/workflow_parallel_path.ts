@@ -6,8 +6,11 @@ import {
 } from "./workflow_logger";
 import { executeParallelResearch } from "./parallel_research";
 import { executeSynthesis } from "./synthesis_executor";
-import { RELEVANCE_SCORES, CONTENT_LIMITS } from "../lib/constants/cache";
-import { convertToWebResearchSources } from "./orchestration_helpers";
+import { CONTENT_LIMITS } from "../lib/constants/cache";
+import {
+  convertToWebResearchSources,
+  relevanceScoreToLabel,
+} from "./orchestration_helpers";
 import {
   buildCompleteEvent,
   buildMetadataEvent,
@@ -23,15 +26,22 @@ import {
   completeWorkflowWithSignature,
 } from "./orchestration_persistence";
 import { generateMessageId } from "../lib/id_generator";
-import type {
-  ResearchOutput,
-  StreamingPersistPayload,
-} from "../schemas/agents";
+import type { StreamingPersistPayload } from "../schemas/agents";
+import type { ResearchOutput } from "../schemas/agentOutput";
 import {
   mapAsyncGenerator,
   mapSynthesisEvent,
   mapResearchEvent,
 } from "./workflow_utils";
+
+/** Map scraped page count to a research quality label. */
+function scrapedCountToQuality(
+  count: number,
+): "comprehensive" | "adequate" | "limited" {
+  if (count >= 2) return "comprehensive";
+  if (count >= 1) return "adequate";
+  return "limited";
+}
 
 export async function* executeParallelPath({
   ctx,
@@ -77,12 +87,7 @@ export async function* executeParallelPath({
             "..."
           : scraped.summary,
       sources: [scraped.url],
-      confidence: ((scraped.relevanceScore ?? 0) >=
-      RELEVANCE_SCORES.HIGH_THRESHOLD
-        ? "high"
-        : (scraped.relevanceScore ?? 0) >= RELEVANCE_SCORES.MEDIUM_THRESHOLD
-          ? "medium"
-          : "low") as "high" | "medium" | "low",
+      confidence: relevanceScoreToLabel(scraped.relevanceScore),
     }));
   const researchOutput: ResearchOutput = {
     researchSummary:
@@ -105,12 +110,7 @@ export async function* executeParallelPath({
       Object.keys(harvested.serpEnrichment).length > 0
         ? harvested.serpEnrichment
         : null,
-    researchQuality:
-      harvested.scrapedContent.length >= 2
-        ? "comprehensive"
-        : harvested.scrapedContent.length >= 1
-          ? "adequate"
-          : "limited",
+    researchQuality: scrapedCountToQuality(harvested.scrapedContent.length),
   };
   const scrapedUrlMap = new Map(
     harvested.scrapedContent.map((s) => [s.url, s]),
@@ -149,11 +149,12 @@ export async function* executeParallelPath({
     Object.keys(researchOutput.serpEnrichment).length > 0;
   const hasHarvestedEnrichment =
     Object.keys(harvested.serpEnrichment).length > 0;
-  const mergedSerpEnrichment = hasAgentEnrichment
-    ? (researchOutput.serpEnrichment ?? undefined)
-    : hasHarvestedEnrichment
-      ? harvested.serpEnrichment
-      : undefined;
+  let mergedSerpEnrichment = undefined;
+  if (hasAgentEnrichment) {
+    mergedSerpEnrichment = researchOutput.serpEnrichment ?? undefined;
+  } else if (hasHarvestedEnrichment) {
+    mergedSerpEnrichment = harvested.serpEnrichment;
+  }
 
   logContextPipeline({
     agentScrapedCount: researchOutput.scrapedContent?.length || 0,

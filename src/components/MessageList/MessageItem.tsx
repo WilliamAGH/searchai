@@ -13,6 +13,7 @@ import { ToolProgressIndicator } from "./ToolProgressIndicator";
 import { formatConversationWithWebResearchSources } from "@/lib/clipboard";
 import type { Message, SearchProgress } from "@/lib/types/message";
 import { hasWebResearchSources } from "@/lib/domain/webResearchSources";
+import { MessageImages } from "./MessageImages";
 
 interface MessageItemProps {
   message: Message;
@@ -45,6 +46,10 @@ export function MessageItem({
   const handleDeleteClick = React.useCallback(() => {
     onDeleteMessage(message._id);
   }, [message._id, onDeleteMessage]);
+
+  const hasReasoningContent =
+    message.role === "assistant" &&
+    Boolean(message.reasoning?.trim() || message.thinking?.trim());
 
   return (
     <div
@@ -105,25 +110,23 @@ export function MessageItem({
             </div>
           )}
 
-        {/* 2) Reasoning / thinking - default collapsed */}
-        {message.role === "assistant" &&
-          ((message.reasoning && message.reasoning.trim()) ||
-            (message.thinking && message.thinking.trim())) && (
-            <div className="mb-4">
-              <ReasoningDisplay
-                id={messageId}
-                reasoning={message.reasoning ?? ""}
-                thinkingText={message.thinking?.trim()}
-                isThinkingActive={Boolean(message.thinking?.trim())}
-                isStreaming={message.isStreaming}
-                hasStartedContent={Boolean(
-                  message.content && message.content.trim(),
-                )}
-                collapsed={collapsedById[`reasoning-${messageId}`] ?? true}
-                onToggle={onToggleCollapsed}
-              />
-            </div>
-          )}
+        {/* 2) Reasoning / thinking - ReasoningDisplay owns its own collapse toggle */}
+        {hasReasoningContent && (
+          <div className="mb-4">
+            <ReasoningDisplay
+              id={messageId}
+              reasoning={message.reasoning ?? ""}
+              thinkingText={message.thinking?.trim()}
+              isThinkingActive={Boolean(message.thinking?.trim())}
+              isStreaming={message.isStreaming}
+              hasStartedContent={Boolean(
+                message.content && message.content.trim(),
+              )}
+              collapsed={collapsedById[`reasoning-${messageId}`] ?? true}
+              onToggle={onToggleCollapsed}
+            />
+          </div>
+        )}
 
         {/* 3) Search progress status when streaming */}
         {message.role === "assistant" &&
@@ -150,7 +153,17 @@ export function MessageItem({
             />
           )}
 
-        {/* 4) AI/user content last – always appears under sources/thinking */}
+        {/* 4) Images (user messages with attachments) */}
+        {message.role === "user" && message.imageStorageIds?.length ? (
+          <div className="mb-2">
+            <MessageImages
+              storageIds={message.imageStorageIds ?? []}
+              chatId={message.chatId}
+            />
+          </div>
+        ) : null}
+
+        {/* 5) AI/user content last – always appears under sources/thinking */}
         <div className="prose prose-gray max-w-none dark:prose-invert prose-sm mt-2 overflow-x-hidden text-[15px] sm:text-base leading-6">
           {message.role === "assistant" ? (
             <ContentWithCitations

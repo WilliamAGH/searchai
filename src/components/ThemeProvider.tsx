@@ -19,7 +19,7 @@ import { logger } from "@/lib/logger";
 /**
  * Storage keys for theme persistence
  */
-const THEME_STORAGE_KEY = "searchai_theme";
+const THEME_STORAGE_KEY = "researchly_theme";
 
 /**
  * Minimal storage service for theme persistence
@@ -93,16 +93,18 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Child components
  */
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
+export function ThemeProvider({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  const [theme, setTheme] = useState<Theme>(() => {
     // Initialize based on system preference or localStorage
-    if (typeof window !== "undefined") {
+    if (globalThis.window !== undefined) {
       const stored = storageService.getTheme();
       if (stored === "light" || stored === "dark") {
         return stored;
       }
       // Default to system preference
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
+      return globalThis.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light";
     }
@@ -110,6 +112,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   });
 
   const { isAuthenticated } = useConvexAuth();
+  // deep for useQuery<typeof api.preferences.getUserPreferences>. Known Convex
+  // limitation; the query accepts no args and returns { theme?: string } | null.
+  // @ts-ignore TS2589: Convex generic type instantiation is excessively
   const userPrefs = useQuery(api.preferences.getUserPreferences);
   const updatePrefs = useMutation(api.preferences.updateUserPreferences);
 
@@ -120,7 +125,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       userPrefs.theme !== "system" &&
       !storageService.hasTheme()
     ) {
-      setThemeState(userPrefs.theme);
+      setTheme(userPrefs.theme);
     }
   }, [userPrefs]);
 
@@ -130,10 +135,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.add(theme);
   }, [theme]);
 
-  const setTheme = React.useCallback(
+  const updateTheme = React.useCallback(
     async (newTheme: Theme) => {
       // Update state immediately for instant UI response
-      setThemeState(newTheme);
+      setTheme(newTheme);
       storageService.setTheme(newTheme);
 
       // Only update user preferences if authenticated
@@ -146,12 +151,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [isAuthenticated, updatePrefs],
+    [isAuthenticated, updatePrefs, setTheme],
   );
 
   const contextValue = useMemo(
-    () => ({ theme, setTheme, actualTheme: theme }),
-    [theme, setTheme],
+    () => ({ theme, setTheme: updateTheme, actualTheme: theme }),
+    [theme, updateTheme],
   );
 
   return (

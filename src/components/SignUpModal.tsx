@@ -85,7 +85,7 @@ export function SignUpModal({
       onClose={onClose}
       modalId="signup-modal"
       title="Create your account"
-      description="Join SearchAI to start exploring"
+      description="Join Researchly to start exploring"
       icon={<UserAddIcon />}
       enableFocusTrap
     >

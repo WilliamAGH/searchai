@@ -70,7 +70,7 @@ test.describe("smoke: pagination", () => {
     await page.goto(target, { waitUntil: "domcontentloaded" });
 
     // Wait for page to be ready
-    await expect(page).toHaveTitle(/search|ai|SearchAI/i, {
+    await expect(page).toHaveTitle(/researchly|search|ai/i, {
       timeout: 15000,
     });
 
@@ -186,7 +186,7 @@ test.describe("smoke: pagination", () => {
     await page.goto(target, { waitUntil: "domcontentloaded" });
 
     // Wait for page to be ready
-    await expect(page).toHaveTitle(/search|ai|SearchAI/i, {
+    await expect(page).toHaveTitle(/researchly|search|ai/i, {
       timeout: 15000,
     });
 

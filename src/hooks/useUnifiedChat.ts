@@ -6,14 +6,10 @@
 
 import { useMemo } from "react";
 import { useConvexAuth } from "convex/react";
-import { useChatState } from "./useChatState";
-import { useChatRepository } from "./useChatRepository";
-import { useChatDataLoader } from "./useChatDataLoader";
-import { createChatActions } from "./useChatActions";
-import type { ChatState, ChatActions } from "./types";
-
-// Re-export types for backward compatibility
-export type { ChatState, ChatActions } from "./types";
+import { useChatState } from "@/hooks/useChatState";
+import { useChatRepository } from "@/hooks/useChatRepository";
+import { useChatDataLoader } from "@/hooks/useChatDataLoader";
+import { createChatActions } from "@/hooks/useChatActions";
 
 export function useUnifiedChat() {
   const { isAuthenticated } = useConvexAuth();

@@ -32,12 +32,12 @@ The Docker image serves the built frontend and proxies `/api/*` to your Convex `
 ```bash
 docker build \
   --build-arg VITE_CONVEX_URL=https://<deployment>.convex.cloud \
-  -t searchai-io .
+  -t researchly-bot .
 
 docker run \
   -e CONVEX_SITE_URL=https://<deployment>.convex.site \
   -p 3000:3000 \
-  searchai-io
+  researchly-bot
 ```
 
 Optional:

@@ -16,6 +16,15 @@ const ROOT_DIR = path.resolve(
   "..",
 );
 
+// Local safety: default to Chromium-only to avoid spawning extra browsers on dev
+// machines. CI continues to run the full matrix. To opt in locally, set:
+// PLAYWRIGHT_ALL_BROWSERS=1
+const ciEnv = process.env.CI?.trim().toLowerCase();
+const isCI = !!ciEnv && ciEnv !== "0" && ciEnv !== "false";
+const allBrowsersEnv = process.env.PLAYWRIGHT_ALL_BROWSERS;
+const runAllBrowsers =
+  isCI || allBrowsersEnv === "1" || allBrowsersEnv === "true";
+
 export default defineConfig({
   testDir: "../__tests__/integration",
   testIgnore: ["**/integration/pagination.test.ts"],
@@ -33,6 +42,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: "http://127.0.0.1:5173",
+    headless: true,
     trace: "on",
     screenshot: "on",
     video: "retain-on-failure",
@@ -44,11 +54,15 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"], viewport: desktopViewport },
     },
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"], viewport: desktopViewport },
-    },
-    ...(includeWebkit
+    ...(runAllBrowsers
+      ? [
+          {
+            name: "firefox",
+            use: { ...devices["Desktop Firefox"], viewport: desktopViewport },
+          },
+        ]
+      : []),
+    ...(runAllBrowsers && includeWebkit
       ? [
           {
             name: "webkit",
@@ -60,12 +74,12 @@ export default defineConfig({
   webServer: [
     {
       cwd: ROOT_DIR,
-      command: process.env.CI
+      command: isCI
         ? "npx vite preview --strictPort --port 5173 --host 127.0.0.1"
-        : "npm run dev:frontend",
+        : "npm run dev:frontend:test",
       url: "http://127.0.0.1:5173",
       timeout: 180_000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !isCI,
       stdout: "pipe",
       stderr: "pipe",
       env: {

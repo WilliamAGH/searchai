@@ -62,11 +62,13 @@ export type Message = Omit<
   | "contextReferences"
   | "searchResults"
   | "sources"
+  | "imageStorageIds"
 > & {
   _id: string;
   chatId: string;
   webResearchSources?: WebResearchSourceClient[];
   reasoning?: string;
+  imageStorageIds?: string[];
 } & UIMessageFields;
 
 export type MessageStreamChunk =
@@ -133,6 +135,7 @@ export function createLocalUIMessage(params: {
   isStreaming?: boolean;
   reasoning?: string;
   webResearchSources?: WebResearchSourceClient[];
+  imageStorageIds?: string[];
 }): Message {
   const now = Date.now();
   return {
@@ -146,6 +149,7 @@ export function createLocalUIMessage(params: {
     isStreaming: params.isStreaming,
     reasoning: params.reasoning,
     webResearchSources: params.webResearchSources ?? [],
+    imageStorageIds: params.imageStorageIds,
   };
 }
 

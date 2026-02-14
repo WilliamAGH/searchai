@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { applyEnhancements } from "../../../convex/enhancements";
 
 /**
- * Test the creator/SearchAI/aVenture detection logic
+ * Test the creator/Researchly/aVenture detection logic
  * Uses the actual applyEnhancements function to avoid logic duplication
  */
 function detectCreatorQuery(userMessage: string): boolean {
@@ -16,22 +16,22 @@ function detectCreatorQuery(userMessage: string): boolean {
 describe("creator detection", () => {
   describe("should match creator/founder queries", () => {
     const creatorQueries = [
-      "Who is the creator of SearchAI?",
+      "Who is the creator of Researchly?",
       "Who made this app?",
-      "Who built search-ai.io?",
+      "Who built researchly.fyi?",
       "Tell me about the author of this website",
-      "Who is behind SearchAI?",
+      "Who is behind Researchly?",
       "Who founded this service?",
-      "Who developed search-ai?",
+      "Who developed researchly?",
       "What company is behind this tool?",
       "Who is William Callahan?",
       "Tell me about the founder of this site",
       "Who created this search tool?",
-      "Who is the author behind search-ai.io?",
+      "Who is the author behind researchly.fyi?",
       "Who's the creator of this search service?",
       "Tell me about william callahan",
-      "Company behind SearchAI",
-      "Founder of search-ai",
+      "Company behind Researchly",
+      "Founder of researchly",
     ];
 
     for (const query of creatorQueries) {
@@ -41,19 +41,19 @@ describe("creator detection", () => {
     }
   });
 
-  describe("should match SearchAI product queries", () => {
-    const searchAIQueries = [
-      "What is SearchAI?",
-      "Tell me about SearchAI",
-      "How does SearchAI work?",
-      "Explain search-ai.io",
+  describe("should match Researchly product queries", () => {
+    const researchlyQueries = [
+      "What is Researchly?",
+      "Tell me about Researchly",
+      "How does Researchly work?",
+      "Explain researchly.fyi",
       "What does this app do?",
       "Describe this website",
-      "What is search-ai?",
-      "SearchAI features",
+      "What is researchly?",
+      "Researchly features",
     ];
 
-    for (const query of searchAIQueries) {
+    for (const query of researchlyQueries) {
       it(`matches: "${query}"`, () => {
         expect(detectCreatorQuery(query)).toBe(true);
       });
@@ -102,8 +102,8 @@ describe("creator detection", () => {
 
   it("enhances matched queries with correct info", () => {
     const testQueries = [
-      "Who created SearchAI?",
-      "What is SearchAI?",
+      "Who created Researchly?",
+      "What is Researchly?",
       "Tell me about aVenture",
       "Who is William Callahan?",
     ];
@@ -121,11 +121,11 @@ describe("creator detection", () => {
       expect(result.enhancedQuery).toContain("williamcallahan.com");
       expect(result.enhancedQuery).toContain("aventure.vc");
       expect(result.enhancedContext).toContain("William Callahan");
-      expect(result.enhancedContext).toContain("SearchAI");
+      expect(result.enhancedContext).toContain("Researchly");
       expect(result.enhancedContext).toContain("aVenture");
       expect(result.injectedResults.length).toBeGreaterThan(0);
       expect(
-        result.injectedResults.some((r) => r.url.includes("search-ai.io")),
+        result.injectedResults.some((r) => r.url.includes("researchly.fyi")),
       ).toBe(true);
     }
   });

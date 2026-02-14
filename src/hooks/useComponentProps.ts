@@ -6,6 +6,7 @@ import type {
   SearchProgress,
   PaginationState,
 } from "@/lib/types/message";
+import type { ImageUploadState } from "@/hooks/useImageUpload";
 
 interface UseComponentPropsArgs {
   allChats: Chat[];
@@ -22,12 +23,16 @@ interface UseComponentPropsArgs {
   handleRequestDeleteChat: (chatId: Id<"chats"> | string) => void;
   handleRequestDeleteMessage: (messageId: Id<"messages"> | string) => void;
   handleMobileSidebarClose: () => void;
-  handleSendMessage: (message: string) => Promise<void>;
+  handleSendMessage: (
+    message: string,
+    imageStorageIds?: string[],
+  ) => Promise<void>;
   handleDraftChange: (draft: string) => void;
   setShowShareModal: (show: boolean) => void;
   isReadOnly?: boolean;
   userHistory: string[];
   pagination?: Partial<PaginationState>;
+  imageUpload?: ImageUploadState;
 }
 
 /**
@@ -54,6 +59,7 @@ export function useComponentProps({
   isReadOnly = false,
   userHistory,
   pagination,
+  imageUpload,
 }: UseComponentPropsArgs) {
   const chatSidebarProps = useMemo(
     () => ({
@@ -142,6 +148,7 @@ export function useComponentProps({
       history: userHistory,
       onShare: () => setShowShareModal(true),
       onNewChat: handleNewChatButton,
+      imageUpload,
     }),
     [
       currentChatId,
@@ -151,6 +158,7 @@ export function useComponentProps({
       userHistory,
       setShowShareModal,
       handleNewChatButton,
+      imageUpload,
     ],
   );
 

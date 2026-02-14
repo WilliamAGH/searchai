@@ -1,10 +1,10 @@
-# [searchAI](https://search-ai.io)
+# [Researchly](https://researchly.fyi)
 
-AI-powered search chat built with Convex, Vite, & React.
+AI-powered research chat built with Convex, Vite, & React.
 
-![search-ai.io](public/images/opengraph/searchai-io-og.png)
+![researchly.fyi](public/images/opengraph/researchly-screenshot-og.png)
 
-- Use It Now: [search-ai.io](https://search-ai.io)
+- Use It Now: [researchly.fyi](https://researchly.fyi)
 - Docs: [docs/README.md](docs/README.md)
 
 ## Features

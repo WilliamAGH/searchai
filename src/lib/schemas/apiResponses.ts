@@ -1,33 +1,14 @@
 /**
  * API Response Schemas
  *
- * Re-exports search schemas from canonical location and defines API-specific schemas.
- * Per [VL1]: Canonical Zod schemas live in convex/schemas/.
+ * Defines API-specific schemas for AI and share responses.
+ * Search schemas live in convex/schemas/search.ts — import directly from there.
  *
  * @see {@link ../../../convex/schemas/search.ts} - canonical search schemas
  * @see {@link ../validation/apiResponses.ts} - validation functions
  */
 
 import { z } from "zod/v4";
-
-// ============================================
-// Re-export from canonical location (no aliasing)
-// ============================================
-
-export {
-  // Schemas
-  SearchMethodSchema,
-  SearchResultSchema,
-  SerpEnrichmentSchema,
-  SearchResponseSchema,
-  // Types (same names as schemas, no Zod suffix)
-  type SearchMethod,
-  type SearchResult,
-  type SerpEnrichment,
-  type SearchResponse,
-  // Constants
-  DEFAULT_SEARCH_RESPONSE,
-} from "../../../convex/schemas/search";
 
 // ============================================
 // AI Response Schema (API-specific)

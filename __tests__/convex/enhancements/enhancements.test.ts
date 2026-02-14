@@ -4,7 +4,7 @@ import { applyEnhancements } from "../../../convex/enhancements.ts";
 describe("message enhancement system", () => {
   const cases = [
     {
-      query: "Who created SearchAI?",
+      query: "Who created Researchly?",
       expectedRules: ["creator-author"],
       expectEnhancedQuery: true,
       expectInjectedResults: true,
@@ -186,7 +186,7 @@ describe("message enhancement system", () => {
   });
 
   it("prioritizes expected URLs for creator queries", () => {
-    const result = applyEnhancements("Who is the founder of SearchAI?", {
+    const result = applyEnhancements("Who is the founder of Researchly?", {
       enhanceQuery: true,
       enhanceSearchTerms: true,
       injectSearchResults: true,

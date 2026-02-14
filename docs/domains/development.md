@@ -103,3 +103,4 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 - **404 on `/api/*` endpoints**: Deploy Convex HTTP routes (`npx convex dev --once` for dev, `npx convex deploy` for prod).
 - **AI errors / missing tools**: Ensure an API key is configured (`LLM_API_KEY`, `OPENAI_API_KEY`, or `OPENROUTER_API_KEY`) and that `LLM_BASE_URL` matches the provider you intend to use.
 - **VS Code TS weirdness**: Run `npm run clean:vscode` and restart the TypeScript server.
+- **`git push` failures with unclear output**: Follow [Git Push Debugging](push-debugging.md) to isolate hook failures vs remote rejection.

@@ -1,7 +1,13 @@
 import { serializeError } from "../utils";
 import { corsResponse } from "../cors";
 import { normalizeHttpUrl } from "../../lib/urlHttp";
-import { isRecord, type WebResearchSource } from "../../lib/validators";
+import type { Id } from "../../_generated/dataModel";
+import {
+  isRecord,
+  isValidConvexIdFormat,
+  toMetadataRecord,
+  type WebResearchSource,
+} from "../../lib/validators";
 
 /**
  * Regex pattern to match ASCII control characters (except tab, newline, carriage return)
@@ -98,6 +104,49 @@ export function sanitizeTextInput(
   return value.replace(CONTROL_CHARS_PATTERN, "").slice(0, maxLength);
 }
 
+const MAX_IMAGE_ATTACHMENTS = 4;
+
+type ImageIdsResult =
+  | { ok: true; ids: Id<"_storage">[] | undefined }
+  | { ok: false; error: string };
+
+function isStorageId(value: string): value is Id<"_storage"> {
+  // Convex IDs are opaque strings; for HTTP payloads we can only validate format.
+  // File content validation (magic bytes) is enforced separately before use.
+  return isValidConvexIdFormat(value);
+}
+
+/**
+ * Validate imageStorageIds from an HTTP payload.
+ * Rejects (rather than silently coerces) malformed input.
+ * Returns branded `Id<"_storage">[]` so downstream code needs no casts.
+ */
+export function validateImageStorageIds(input: unknown): ImageIdsResult {
+  if (input === undefined || input === null) {
+    return { ok: true, ids: undefined };
+  }
+  if (!Array.isArray(input)) {
+    return { ok: false, error: "imageStorageIds must be an array" };
+  }
+  if (input.length > MAX_IMAGE_ATTACHMENTS) {
+    return {
+      ok: false,
+      error: `imageStorageIds exceeds maximum of ${MAX_IMAGE_ATTACHMENTS}`,
+    };
+  }
+  const validated: Id<"_storage">[] = [];
+  for (const item of input) {
+    if (typeof item !== "string") {
+      return { ok: false, error: "imageStorageIds items must be strings" };
+    }
+    if (!isStorageId(item)) {
+      return { ok: false, error: "imageStorageIds contains an invalid ID" };
+    }
+    validated.push(item);
+  }
+  return { ok: true, ids: validated.length > 0 ? validated : undefined };
+}
+
 export function sanitizeWebResearchSources(
   input: unknown,
 ): WebResearchSource[] | undefined {
@@ -153,7 +202,7 @@ export function sanitizeWebResearchSources(
         isRecord(refRaw.metadata) &&
         Object.keys(refRaw.metadata).length > 0
       ) {
-        sanitized.metadata = refRaw.metadata;
+        sanitized.metadata = toMetadataRecord(refRaw.metadata);
       }
 
       return sanitized;

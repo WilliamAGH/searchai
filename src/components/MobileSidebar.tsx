@@ -194,7 +194,7 @@ export function MobileSidebar({
                         />
                       </svg>
                     </div>
-                    <span className="text-lg font-semibold">SearchAI</span>
+                    <span className="text-lg font-semibold">Researchly</span>
                   </div>
                 </div>
 

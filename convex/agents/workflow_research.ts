@@ -21,7 +21,7 @@ import {
   buildPlanningInput,
   withTimeout,
 } from "./orchestration_helpers";
-import { safeParsePlanningOutput } from "../schemas/agents";
+import { safeParsePlanningOutput } from "../schemas/agentOutput";
 import { createWorkflowErrorHandler } from "./workflow_utils";
 import { executeInstantPath } from "./workflow_instant";
 import { executeFastPath } from "./workflow_fast_path";

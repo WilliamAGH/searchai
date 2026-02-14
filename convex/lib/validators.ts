@@ -12,6 +12,29 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Allowed metadata value types for WebResearchSource. */
+export type MetadataValue = string | number | boolean;
+
+/**
+ * Narrow a Record<string, unknown> to only entries whose values are
+ * string, number, or boolean. Non-primitive values are silently dropped.
+ */
+export function toMetadataRecord(
+  record: Record<string, unknown>,
+): Record<string, MetadataValue> {
+  const result: Record<string, MetadataValue> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 /**
  * Search method validator.
  * Values must match SEARCH_METHODS const in constants/search.ts (source of truth).
@@ -101,7 +124,9 @@ export const vWebResearchSource = v.object({
   title: v.optional(v.string()),
   timestamp: v.number(),
   relevanceScore: v.optional(v.number()),
-  metadata: v.optional(v.any()),
+  metadata: v.optional(
+    v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+  ),
 });
 
 /**
@@ -116,7 +141,7 @@ export interface WebResearchSource {
   title?: string;
   timestamp: number;
   relevanceScore?: number;
-  metadata?: unknown;
+  metadata?: Record<string, string | number | boolean>;
 }
 
 const LOCAL_ID_PREFIXES = ["local_", "chat_", "msg_"];

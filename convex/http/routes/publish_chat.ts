@@ -77,7 +77,7 @@ function buildShareUrls(
   const baseUrl =
     allowOrigin !== "*" && allowOrigin !== "null" ? allowOrigin : siteUrl;
   // Use the branded base URL for export links so they point to
-  // search-ai.io/api/exportChat instead of the raw Convex deployment.
+  // researchly.fyi/api/exportChat instead of the raw Convex deployment.
   // The /api/* proxy (server.mjs) forwards to Convex transparently.
   const exportBase = baseUrl
     ? `${baseUrl.replace(/\/+$/, "")}/api/exportChat`

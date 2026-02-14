@@ -52,6 +52,20 @@ export const technicalDocsEnhancement: EnhancementRule = {
 /**
  * Academic Research Enhancement
  */
+const ACADEMIC_KEYWORD_PATTERNS: ReadonlyArray<RegExp> = [
+  /\bresearch\b/i,
+  /\bpapers?\b/i,
+  /\bstud(y|ies)\b/i,
+  /\bacademic\b/i,
+  /\bjournals?\b/i,
+  /\bpeer review(ed)?\b/i,
+  /\bcitations?\b/i,
+  /\bscholarly\b/i,
+  /\bthes(is|es)\b/i,
+  /\bdissertations?\b/i,
+  /\bpublications?\b/i,
+];
+
 export const academicEnhancement: EnhancementRule = {
   id: "academic",
   name: "Academic & Research Enhancement",
@@ -60,22 +74,8 @@ export const academicEnhancement: EnhancementRule = {
   priority: 4,
 
   matcher: (message: string) => {
-    const lower = message.toLowerCase();
-    const academicKeywords = [
-      "research",
-      "paper",
-      "study",
-      "academic",
-      "journal",
-      "peer review",
-      "citation",
-      "scholarly",
-      "thesis",
-      "dissertation",
-      "publication",
-    ];
-
-    return academicKeywords.some((keyword) => lower.includes(keyword));
+    // Use word boundaries to avoid false positives like "Researchly" (product name).
+    return ACADEMIC_KEYWORD_PATTERNS.some((p) => p.test(message));
   },
 
   enhanceQuery: (query: string) => {

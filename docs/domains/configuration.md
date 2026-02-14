@@ -39,7 +39,7 @@ npx convex env set CONVEX_ALLOWED_ORIGINS "http://localhost:5173,http://127.0.0.
 Note: If you include any localhost/127.0.0.1 dev origin, the backend also allows the common Vite dev/preview ports (5173/5174/4173) to reduce friction during local development.
 
 ```bash
-npx convex env set CONVEX_ALLOWED_ORIGINS "https://dev.search-ai.io,https://search-ai.io" --prod
+npx convex env set CONVEX_ALLOWED_ORIGINS "https://dev.researchly.fyi,https://researchly.fyi" --prod
 ```
 
 ### AI provider
@@ -54,6 +54,7 @@ Optional configuration:
 
 - `LLM_BASE_URL` / `OPENAI_BASE_URL` / `OPENROUTER_BASE_URL`
 - `LLM_MODEL` / `OPENAI_MODEL`
+- `LLM_VISION_MODEL` / `OPENAI_VISION_MODEL` (used when image attachments are present; default: `gpt-4o-mini`)
 - `LLM_TEMPERATURE`
 - `LLM_MAX_OUTPUT_TOKENS`
 - `LLM_REASONING` (`minimal`/`low`/`medium`/`high`)

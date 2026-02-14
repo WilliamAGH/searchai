@@ -14,14 +14,7 @@ import {
   SerpEnrichmentSchema,
 } from "./search";
 import { safeParseOrNull } from "../lib/validation/zodUtils";
-import {
-  WebResearchSourceSchema,
-  WebResearchSourcesSchema,
-} from "./webResearchSources";
-
-// Re-export canonical types for consumers (no aliasing)
-export { SerpEnrichmentSchema, type SerpEnrichment } from "./search";
-export { WebResearchSourceSchema, WebResearchSourcesSchema };
+import { WebResearchSourceSchema } from "./webResearchSources";
 
 // ============================================
 // Web Research Sources (Canonical)
@@ -192,24 +185,6 @@ export const safeParsePlanResearchToolOutput = (
 };
 
 // ============================================
-// Agent Output Schemas (re-export from canonical location)
-// ============================================
-// Per [TY1d]: This is the canonical location (convex/schemas/)
-// Per [VL1d]: No duplication - import from canonical location
-
-export {
-  PlanningOutputSchema,
-  ResearchOutputSchema,
-  safeParsePlanningOutput,
-  safeParseResearchOutput,
-  type PlanningOutput,
-  type ResearchOutput,
-  type PlannedSearchQuery,
-  type KeyFinding,
-  type SourceUsed,
-} from "./agentOutput";
-
-// ============================================
 // Convex Query Result Types
 // ============================================
 // These types match the return values of Convex queries used in orchestration.
@@ -236,5 +211,6 @@ export interface MessageQueryResult {
   _id: Id<"messages">;
   role: "user" | "assistant" | "system";
   content?: string;
+  imageAnalysis?: string;
   createdAt?: number;
 }

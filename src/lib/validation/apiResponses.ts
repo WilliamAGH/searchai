@@ -12,22 +12,24 @@
  * @see {@link ../../../convex/lib/validation/zodUtils.ts} - Validation utilities
  */
 
-import type { SearchResult } from "@/lib/types/message";
 import {
   SearchResultSchema,
   SearchMethodSchema,
+  SerpEnrichmentSchema,
+  type SerpEnrichment,
+  type SearchResult,
+} from "../../../convex/schemas/search";
+import type { SearchMethod } from "../../../convex/lib/constants/search";
+import {
   AIResponseSchema,
   ShareResponseSchema,
   DEFAULT_AI_RESPONSE,
-  type SearchMethod,
-  SerpEnrichmentSchema,
-  type SerpEnrichment,
 } from "@/lib/schemas/apiResponses";
 import {
   logZodFailure,
-  isRecord,
   parseArrayWithLogging,
 } from "../../../convex/lib/validation/zodUtils";
+import { isRecord } from "../../../convex/lib/validators";
 
 /**
  * Default search response when validation fails.
@@ -162,7 +164,3 @@ export function validateShareResponse(data: unknown): {
   logZodFailure("validateShareResponse", result.error, data);
   return {};
 }
-
-// Re-export types and defaults for consumers
-export type { SearchMethod };
-export { DEFAULT_AI_RESPONSE };

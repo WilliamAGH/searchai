@@ -146,9 +146,9 @@ function main() {
 try {
   main();
 } catch (e) {
-  console.warn(
-    "Convex import check encountered an error but will not block:",
+  console.error(
+    "[FAIL] Convex import check crashed unexpectedly:",
     e && e.message ? e.message : e,
   );
-  process.exit(0);
+  process.exit(1);
 }
