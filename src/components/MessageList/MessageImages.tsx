@@ -6,6 +6,7 @@
  * @see {@link ../../../convex/storage.ts} getFileUrls batch query
  */
 
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -18,6 +19,7 @@ interface MessageImagesProps {
 }
 
 export function MessageImages({ storageIds, chatId }: MessageImagesProps) {
+  const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
   const sessionId = useAnonymousSession();
 
   // Single boundary cast: plain strings from Message type → branded Convex Ids
@@ -87,6 +89,18 @@ export function MessageImages({ storageIds, chatId }: MessageImagesProps) {
             </div>
           );
         }
+        if (brokenImages.has(i)) {
+          return (
+            <div
+              key={storageIds[i]}
+              className="w-48 h-48 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center"
+            >
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                Failed to load image
+              </span>
+            </div>
+          );
+        }
         return (
           <a
             key={storageIds[i]}
@@ -100,6 +114,14 @@ export function MessageImages({ storageIds, chatId }: MessageImagesProps) {
               alt="Attachment"
               className="max-w-[300px] max-h-[300px] rounded-lg border border-gray-200 dark:border-gray-700 object-contain cursor-pointer hover:opacity-90 transition-opacity"
               loading="lazy"
+              onError={() => {
+                logger.warn("[MessageImages] Image failed to load", {
+                  chatId,
+                  storageId: storageIds[i],
+                  url,
+                });
+                setBrokenImages((prev) => new Set(prev).add(i));
+              }}
             />
           </a>
         );

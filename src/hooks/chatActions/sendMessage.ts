@@ -171,6 +171,9 @@ async function streamAssistantResponse({
       isStreaming: false,
       thinking: undefined,
     });
+    // Re-throw so the caller (useMessageHandler) knows streaming failed and
+    // skips post-success logic like maybeShowFollowUpPrompt().
+    throw error;
   }
 }
 

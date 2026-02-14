@@ -251,7 +251,12 @@ describe("sendMessageWithStreaming", () => {
       content: "should-run",
     });
 
-    await Promise.all([p1, p2]);
+    const results = await Promise.allSettled([p1, p2]);
+
+    // p1 should reject (error now propagates to caller)
+    expect(results[0]?.status).toBe("rejected");
+    // p2 should still succeed (queue continues despite earlier failure)
+    expect(results[1]?.status).toBe("fulfilled");
 
     expect(order).toContain("fail-start");
     expect(order).toContain("success-start");
