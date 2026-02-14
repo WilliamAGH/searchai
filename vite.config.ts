@@ -7,9 +7,15 @@ const CHEF_WORKER_URL = "https://chef.convex.dev/scripts/worker.bundled.mjs";
 const SA_SCRIPT_BASE = "https://scripts.simpleanalyticscdn.com";
 const SA_NOSCRIPT_IMG =
   "https://queue.simpleanalyticscdn.com/noscript.gif?collect-dnt=true";
+// Clicky Analytics — https://clicky.com/help/faq/setup
+const CLICKY_SITE_ID = "101501245";
+const CLICKY_SCRIPT_URL = "https://static.getclicky.com/js";
+const CLICKY_NOSCRIPT_URL = `https://in.getclicky.com/${CLICKY_SITE_ID}ns.gif`;
 const ENTRY_FILE = "main.tsx";
 
-function buildAnalyticsScriptTag(scriptFile: string): HtmlTagDescriptor {
+/* ── Simple Analytics tag builders ────────────────────────────── */
+
+function buildSAScriptTag(scriptFile: string): HtmlTagDescriptor {
   return {
     tag: "script",
     attrs: {
@@ -21,10 +27,32 @@ function buildAnalyticsScriptTag(scriptFile: string): HtmlTagDescriptor {
   };
 }
 
-function buildAnalyticsNoscriptTag(): HtmlTagDescriptor {
+function buildSANoscriptTag(): HtmlTagDescriptor {
   return {
     tag: "noscript",
     children: `<img src="${SA_NOSCRIPT_IMG}" alt="" referrerpolicy="no-referrer-when-downgrade" />`,
+    injectTo: "body",
+  };
+}
+
+/* ── Clicky Analytics tag builders ────────────────────────────── */
+
+function buildClickyScriptTag(): HtmlTagDescriptor {
+  return {
+    tag: "script",
+    attrs: {
+      async: true,
+      "data-id": CLICKY_SITE_ID,
+      src: CLICKY_SCRIPT_URL,
+    },
+    injectTo: "head",
+  };
+}
+
+function buildClickyNoscriptTag(): HtmlTagDescriptor {
+  return {
+    tag: "noscript",
+    children: `<p><img alt="Clicky" width="1" height="1" src="${CLICKY_NOSCRIPT_URL}" /></p>`,
     injectTo: "body",
   };
 }
@@ -74,12 +102,19 @@ window.addEventListener('message', async (message) => {
         name: "simple-analytics",
         transformIndexHtml(): HtmlTagDescriptor[] {
           const scriptFile = isDev ? "latest.dev.js" : "latest.js";
-          return [
-            buildAnalyticsScriptTag(scriptFile),
-            buildAnalyticsNoscriptTag(),
-          ];
+          return [buildSAScriptTag(scriptFile), buildSANoscriptTag()];
         },
       },
+      // Clicky Analytics: real-time web analytics (https://clicky.com)
+      // Production only — skip in dev to avoid polluting stats
+      isDev
+        ? null
+        : {
+            name: "clicky-analytics",
+            transformIndexHtml(): HtmlTagDescriptor[] {
+              return [buildClickyScriptTag(), buildClickyNoscriptTag()];
+            },
+          },
     ].filter(Boolean),
     resolve: {
       alias: {
