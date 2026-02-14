@@ -27,9 +27,9 @@ function getEventType(data: unknown): string {
     typeof data === "object" &&
     data !== null &&
     "type" in data &&
-    typeof (data as Record<string, unknown>).type === "string"
+    typeof data.type === "string"
   ) {
-    return (data as Record<string, unknown>).type as string;
+    return data.type;
   }
   return "unknown";
 }
