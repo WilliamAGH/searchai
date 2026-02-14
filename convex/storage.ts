@@ -14,6 +14,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { action, internalQuery, mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { isValidUuidV7 } from "./lib/uuid";
@@ -55,6 +56,43 @@ export const generateUploadUrl = mutation({
   },
 });
 
+/**
+ * Paginate through chat messages to collect the subset of requestedIds
+ * that are actually linked to messages in the given chat.
+ */
+async function filterAuthorizedStorageIds(
+  db: QueryCtx["db"],
+  chatId: Id<"chats">,
+  requestedIds: readonly Id<"_storage">[],
+): Promise<Set<Id<"_storage">>> {
+  const remaining = new Set(requestedIds);
+  const authorized = new Set<Id<"_storage">>();
+  let cursor: string | null = null;
+
+  while (remaining.size > 0) {
+    const page = await db
+      .query("messages")
+      .withIndex("by_chatId", (q) => q.eq("chatId", chatId))
+      .order("desc")
+      .paginate({ numItems: 200, cursor });
+
+    for (const message of page.page) {
+      if (!message.imageStorageIds?.length) continue;
+      for (const storageId of message.imageStorageIds) {
+        if (!remaining.has(storageId)) continue;
+        remaining.delete(storageId);
+        authorized.add(storageId);
+      }
+      if (remaining.size === 0) break;
+    }
+
+    if (page.isDone) break;
+    cursor = page.continueCursor;
+  }
+
+  return authorized;
+}
+
 /** Batch-resolve multiple storage IDs to serving URLs. Eliminates N+1 queries. */
 export const getFileUrls = query({
   args: {
@@ -64,6 +102,8 @@ export const getFileUrls = query({
   },
   returns: v.array(v.union(v.string(), v.null())),
   handler: async (ctx, args) => {
+    if (args.storageIds.length === 0) return [];
+
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
     const userId = await getAuthUserId(ctx);
@@ -76,7 +116,23 @@ export const getFileUrls = query({
     if (!isReadable) {
       throw new Error("Unauthorized: no access to chat images");
     }
-    return Promise.all(args.storageIds.map((id) => ctx.storage.getUrl(id)));
+
+    // Ensure storage IDs belong to this chat. Without this, callers with access
+    // to chatA could resolve URLs for storage IDs belonging to chatB.
+    const authorized = await filterAuthorizedStorageIds(
+      ctx.db,
+      args.chatId,
+      args.storageIds,
+    );
+
+    // Return null for unauthorized/unlinked IDs to avoid disclosing whether the
+    // storage blob exists outside the caller's chat access.
+    return Promise.all(
+      args.storageIds.map(async (storageId) => {
+        if (!authorized.has(storageId)) return null;
+        return await ctx.storage.getUrl(storageId);
+      }),
+    );
   },
 });
 

@@ -40,7 +40,7 @@ import type { WebResearchSource } from "../lib/validators";
  */
 export type WorkflowActionCtx = Pick<
   ActionCtx,
-  "runMutation" | "runQuery" | "runAction"
+  "runMutation" | "runQuery" | "runAction" | "storage"
 >;
 
 /** Parameters for chat title update */

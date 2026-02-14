@@ -302,15 +302,13 @@ export async function initializeWorkflowSession(
  */
 async function resolveImageUrls(
   ctx: WorkflowActionCtx,
-  args: Pick<StreamingWorkflowArgs, "imageStorageIds" | "sessionId" | "chatId">,
+  args: Pick<StreamingWorkflowArgs, "imageStorageIds" | "chatId">,
 ): Promise<string[]> {
   if (!args.imageStorageIds?.length) return [];
 
-  const resolved = await ctx.runQuery(api.storage.getFileUrls, {
-    storageIds: args.imageStorageIds,
-    chatId: args.chatId,
-    sessionId: args.sessionId,
-  });
+  const resolved = await Promise.all(
+    args.imageStorageIds.map((storageId) => ctx.storage.getUrl(storageId)),
+  );
 
   const failedCount = resolved.filter((url) => url === null).length;
   if (failedCount > 0) {
