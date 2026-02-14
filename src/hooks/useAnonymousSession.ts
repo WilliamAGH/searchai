@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { useConvexAuth } from "convex/react";
 import { uuidv7 } from "uuidv7";
 
-const SESSION_KEY = "searchai:anonymousSessionId";
+const SESSION_KEY = "researchly:anonymousSessionId";
 
 function generateSessionId(): string {
   return uuidv7();
@@ -20,7 +20,7 @@ export function useAnonymousSession(): string | null {
   const [sessionId, setSessionId] = useState<string | null>(() => {
     // Initialize immediately for unauthenticated users
     // This ensures sessionId is available on first render
-    if (typeof window === "undefined") return null;
+    if (globalThis.window === undefined) return null;
 
     // CRITICAL FIX: Always provide sessionId immediately, even during auth loading
     // This prevents repository creation with undefined sessionId
@@ -56,16 +56,19 @@ export function useAnonymousSession(): string | null {
   }, [isAuthenticated, isLoading]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (globalThis.window === undefined) return;
     const handleSessionUpdate = () => {
       const currentId = localStorage.getItem(SESSION_KEY);
       setSessionId(currentId);
     };
 
-    window.addEventListener("searchai:session-id-updated", handleSessionUpdate);
+    globalThis.addEventListener(
+      "researchly:session-id-updated",
+      handleSessionUpdate,
+    );
     return () => {
-      window.removeEventListener(
-        "searchai:session-id-updated",
+      globalThis.removeEventListener(
+        "researchly:session-id-updated",
         handleSessionUpdate,
       );
     };
