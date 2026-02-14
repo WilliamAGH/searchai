@@ -12,12 +12,12 @@
  * @see {@link ../../../convex/lib/validation/zodUtils.ts} - Validation utilities
  */
 
-import type { SearchResult } from "@/lib/types/message";
 import {
   SearchResultSchema,
   SearchMethodSchema,
   SerpEnrichmentSchema,
   type SerpEnrichment,
+  type SearchResult,
 } from "../../../convex/schemas/search";
 import type { SearchMethod } from "../../../convex/lib/constants/search";
 import {
@@ -27,9 +27,9 @@ import {
 } from "@/lib/schemas/apiResponses";
 import {
   logZodFailure,
-  isRecord,
   parseArrayWithLogging,
 } from "../../../convex/lib/validation/zodUtils";
+import { isRecord } from "../../../convex/lib/validators";
 
 /**
  * Default search response when validation fails.
