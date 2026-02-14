@@ -28,7 +28,7 @@ export async function forwardTo(target, req, res) {
     for (const [k, v] of Object.entries(req.headers)) {
       if (v === undefined) continue;
       const key = k.toLowerCase();
-      if (key === "connection" || key === "host") continue;
+      if (HOP_BY_HOP_HEADERS.has(key) || key === "host") continue;
       headers.set(k, Array.isArray(v) ? v.join(", ") : String(v));
     }
     headers.set("host", targetUrl.host);
