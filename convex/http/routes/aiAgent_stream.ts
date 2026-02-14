@@ -76,11 +76,6 @@ export async function handleAgentStream(
   }
   const sessionId = sessionIdRaw;
 
-  const conversationContext = sanitizeTextInput(
-    payload.conversationContext,
-    5000,
-  );
-
   const webResearchSources = sanitizeWebResearchSources(
     payload.webResearchSources,
   );
@@ -182,7 +177,16 @@ export async function handleAgentStream(
         try {
           controller.enqueue(encoder.encode(formatSseEvent(data)));
         } catch (error) {
-          console.error("Failed to send SSE event:", serializeError(error));
+          const eventType =
+            typeof data === "object" &&
+            data !== null &&
+            "type" in data &&
+            typeof (data as Record<string, unknown>).type === "string"
+              ? (data as Record<string, unknown>).type
+              : "unknown";
+          console.error("Failed to send SSE event:", serializeError(error), {
+            eventType,
+          });
           streamBroken = true;
         }
       };
@@ -192,7 +196,6 @@ export async function handleAgentStream(
           chatId,
           sessionId,
           userQuery: message,
-          conversationContext,
           webResearchSources,
           includeDebugSourceContext,
           imageStorageIds,

@@ -30,7 +30,6 @@ export interface StreamingWorkflowArgs {
   chatId: Id<"chats">;
   sessionId?: string;
   userQuery: string;
-  conversationContext?: string;
   webResearchSources?: WebResearchSource[];
   includeDebugSourceContext?: boolean;
   imageStorageIds?: Id<"_storage">[];
