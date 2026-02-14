@@ -252,32 +252,17 @@ export const CONVERSATIONAL_IMAGE_ANALYSIS_GUIDELINES = `IMAGE ANALYSIS GUIDELIN
 - If the image analysis contradicts the user's assumption, clarify based on what is visible.
 - If you need a clearer image, say so.`;
 
-type BuildConversationalAgentPromptOptions = {
-  toolPolicy: "enabled" | "disabled";
-  citationPolicy: "cite_when_sources_available" | "no_citations";
-};
-
 /**
  * Build the conversational agent prompt with dynamic limits.
  * This is a function because it interpolates AGENT_LIMITS values.
  */
-export function buildConversationalAgentPrompt(
-  limits: {
-    minSearchQueries: number;
-    maxSearchQueries: number;
-    minScrapeUrls: number;
-    maxScrapeUrls: number;
-  },
-  options?: Partial<BuildConversationalAgentPromptOptions>,
-): string {
-  const resolved: BuildConversationalAgentPromptOptions = {
-    toolPolicy: options?.toolPolicy ?? "enabled",
-    citationPolicy: options?.citationPolicy ?? "cite_when_sources_available",
-  };
-
-  const researchSection =
-    resolved.toolPolicy === "enabled"
-      ? `WHEN TO RESEARCH:
+export function buildConversationalAgentPrompt(limits: {
+  minSearchQueries: number;
+  maxSearchQueries: number;
+  minScrapeUrls: number;
+  maxScrapeUrls: number;
+}): string {
+  const researchSection = `WHEN TO RESEARCH:
 Use the research tools for recent events, current prices, specific company/product details, statistics, or any information you are not confident about.
 If the user explicitly asks you to research, look up, verify, or find sources, you MUST use the research tools.
 
@@ -287,14 +272,9 @@ RESEARCH STEPS:
 3. Scrape ${limits.minScrapeUrls}-${limits.maxScrapeUrls} relevant URLs using scrape_webpage
 4. Synthesize findings into your answer
 
-IMPORTANT: Never scrape the same URL twice in a single conversation. Track which URLs you have already scraped and skip duplicates.`
-      : `TOOLS:
-Tool calling is disabled for this message. Answer using your existing knowledge and the provided context. If the user requests up-to-date or web-verified information, explain that web research is unavailable in this message.`;
+IMPORTANT: Never scrape the same URL twice in a single conversation. Track which URLs you have already scraped and skip duplicates.`;
 
-  const citationGuidelines =
-    resolved.citationPolicy === "no_citations"
-      ? `- Do NOT include web citations like [domain.com].`
-      : `- If (and only if) you used web tools OR the system provides sources, cite them inline: [domain.com]
+  const citationGuidelines = `- If (and only if) you used web tools OR the system provides sources, cite them inline: [domain.com]
 - NEVER fabricate citations or sources. If you did not use tools and have no sources, do not include citations.`;
 
   return `You are a helpful research assistant. Provide accurate, well-sourced answers.
