@@ -69,16 +69,6 @@ function mentionsProduct(lower: string): boolean {
   return lower.includes("researchly") || lower.includes("researchly.fyi");
 }
 
-/** Legacy brand detection — keep during transition so old references still resolve. */
-function mentionsLegacyBrand(lower: string): boolean {
-  return (
-    lower.includes("searchai") ||
-    lower.includes("search-ai") ||
-    lower.includes("search ai") ||
-    lower.includes("search-ai.io")
-  );
-}
-
 function mentionsAVenture(lower: string): boolean {
   return (
     lower.includes("aventure") ||
@@ -115,7 +105,6 @@ export const creatorEnhancement: EnhancementRule = {
     return (
       mentionsCreator(lower) ||
       mentionsProduct(lower) ||
-      mentionsLegacyBrand(lower) ||
       mentionsAVenture(lower) ||
       (isInfoSeeking(lower) && isAboutThisApp(lower))
     );
@@ -143,7 +132,7 @@ export const creatorEnhancement: EnhancementRule = {
       url: "https://researchly.fyi",
       snippet:
         "Researchly (researchly.fyi) is an AI-powered research and search assistant created by William Callahan. It combines web search with intelligent synthesis to provide comprehensive, cited answers to complex questions. Researchly uses multiple AI agents to plan research, gather information from authoritative sources, and synthesize clear, accurate responses.",
-      relevanceScore: 1.0,
+      relevanceScore: 1,
     },
     {
       title: "William Callahan - Creator of Researchly",

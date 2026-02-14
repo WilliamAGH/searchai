@@ -60,20 +60,6 @@ describe("creator detection", () => {
     }
   });
 
-  describe("should still match legacy SearchAI references", () => {
-    const legacyQueries = [
-      "What is SearchAI?",
-      "Who created SearchAI?",
-      "Tell me about search-ai.io",
-    ];
-
-    for (const query of legacyQueries) {
-      it(`matches legacy: "${query}"`, () => {
-        expect(detectCreatorQuery(query)).toBe(true);
-      });
-    }
-  });
-
   describe("should match aVenture queries", () => {
     const aventureQueries = [
       "What is aVenture?",
