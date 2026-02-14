@@ -64,7 +64,7 @@ describe("creator detection", () => {
     const legacyQueries = [
       "What is SearchAI?",
       "Who created SearchAI?",
-      "Explain researchly.fyi",
+      "Tell me about search-ai.io",
     ];
 
     for (const query of legacyQueries) {

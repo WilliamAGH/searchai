@@ -74,8 +74,7 @@ function mentionsLegacyBrand(lower: string): boolean {
   return (
     lower.includes("searchai") ||
     lower.includes("search-ai") ||
-    lower.includes("search ai") ||
-    lower.includes("researchly.fyi")
+    lower.includes("search ai")
   );
 }
 
