@@ -10,7 +10,7 @@ export const SEO = {
   defaultTitle: "Researchly - AI-Powered Web Research",
   defaultDescription:
     "Research the web with AI. Get accurate, up-to-date information with sources powered by real-time web search.",
-  ogImagePath: "/images/opengraph/searchai-og-card.png",
+  ogImagePath: "/images/opengraph/researchly-og-card.png",
   ogImageWidth: 1200,
   ogImageHeight: 630,
   twitterCard: "summary_large_image" as const,
