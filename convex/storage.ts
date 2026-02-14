@@ -17,7 +17,6 @@ import { action, internalQuery, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { isValidUuidV7 } from "./lib/uuid";
-import { hasChatWriteAccess } from "./chats/writeAccess";
 import {
   hasOwnerAccess,
   isSharedOrPublicChat,
@@ -90,7 +89,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
  * reading the `_storage` system table.
  */
 export const getStorageFileMetadata = internalQuery({
-  args: { storageId: v.id("_storage"), sessionId: v.optional(v.string()) },
+  args: { storageId: v.id("_storage") },
   returns: v.union(
     v.object({
       size: v.float64(),
@@ -99,7 +98,7 @@ export const getStorageFileMetadata = internalQuery({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    await requireStorageAccess(ctx, args.sessionId);
+    // Internal-only: auth is enforced by the calling action, not here.
     const doc = await ctx.db.system.get(args.storageId);
     if (!doc) return null;
     return { size: doc.size, contentType: doc.contentType ?? null };
@@ -142,6 +141,38 @@ async function safeDeleteStorage(
 }
 
 /**
+ * Validate file content (size + magic bytes). Caller resolves metadata and URL beforehand.
+ * Exported so the HTTP streaming handler can call it directly without spawning a child action.
+ */
+export async function validateImageBlobContent(
+  ctx: { storage: { delete: (id: Id<"_storage">) => Promise<void> } },
+  storageId: Id<"_storage">,
+  fileUrl: string,
+  fileSize: number,
+): Promise<void> {
+  if (fileSize > MAX_IMAGE_BYTES) {
+    await safeDeleteStorage(ctx, storageId);
+    throw new Error("Image is too large. Max 10 MB per file.");
+  }
+
+  // Fetch only the first 12 bytes (enough for all supported signatures).
+  // Some CDNs ignore Range and return the full body — we only inspect 12 bytes.
+  const response = await fetch(fileUrl, {
+    headers: { Range: "bytes=0-11" },
+  });
+  if (!response.ok) {
+    await safeDeleteStorage(ctx, storageId);
+    throw new Error("Failed to read uploaded file for validation");
+  }
+
+  const buffer = new Uint8Array(await response.arrayBuffer());
+  if (buffer.length < 3 || !hasImageMagicBytes(buffer)) {
+    await safeDeleteStorage(ctx, storageId);
+    throw new Error("Unsupported image format. Please upload PNG or JPEG.");
+  }
+}
+
+/**
  * Validate an uploaded file is a genuine image by inspecting magic bytes.
  * Deletes the file from storage if validation fails.
  *
@@ -156,18 +187,11 @@ export const validateImageUpload = action({
 
     const metadata = await ctx.runQuery(
       internal.storage.getStorageFileMetadata,
-      {
-        storageId: args.storageId,
-        sessionId: args.sessionId,
-      },
+      { storageId: args.storageId },
     );
     if (!metadata) {
       await safeDeleteStorage(ctx, args.storageId);
       throw new Error("Uploaded file not found in storage");
-    }
-    if (metadata.size > MAX_IMAGE_BYTES) {
-      await safeDeleteStorage(ctx, args.storageId);
-      throw new Error("Image is too large. Max 10 MB per file.");
     }
 
     const url = await ctx.storage.getUrl(args.storageId);
@@ -176,25 +200,7 @@ export const validateImageUpload = action({
       throw new Error("Uploaded file not found in storage");
     }
 
-    // Fetch only the first 12 bytes (enough for all supported signatures)
-    const response = await fetch(url, {
-      headers: { Range: "bytes=0-11" },
-    });
-
-    // Some CDNs ignore Range and return the full body — that's fine,
-    // we only inspect the first 12 bytes regardless.
-    if (!response.ok) {
-      await safeDeleteStorage(ctx, args.storageId);
-      throw new Error("Failed to read uploaded file for validation");
-    }
-
-    const buffer = new Uint8Array(await response.arrayBuffer());
-
-    if (buffer.length < 3 || !hasImageMagicBytes(buffer)) {
-      await safeDeleteStorage(ctx, args.storageId);
-      throw new Error("Unsupported image format. Please upload PNG or JPEG.");
-    }
-
+    await validateImageBlobContent(ctx, args.storageId, url, metadata.size);
     return args.storageId;
   },
 });
