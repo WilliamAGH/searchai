@@ -21,6 +21,19 @@ import {
 } from "./aiAgent_utils";
 import { validateImageBlobContent } from "../../storage";
 
+/** Extract the `type` field from an SSE event payload for diagnostic logging. */
+function getEventType(data: unknown): string {
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "type" in data &&
+    typeof (data as Record<string, unknown>).type === "string"
+  ) {
+    return (data as Record<string, unknown>).type as string;
+  }
+  return "unknown";
+}
+
 export async function handleAgentStream(
   ctx: ActionCtx,
   request: Request,
@@ -177,15 +190,8 @@ export async function handleAgentStream(
         try {
           controller.enqueue(encoder.encode(formatSseEvent(data)));
         } catch (error) {
-          const eventType =
-            typeof data === "object" &&
-            data !== null &&
-            "type" in data &&
-            typeof (data as Record<string, unknown>).type === "string"
-              ? (data as Record<string, unknown>).type
-              : "unknown";
           console.error("Failed to send SSE event:", serializeError(error), {
-            eventType,
+            eventType: getEventType(data),
           });
           streamBroken = true;
         }
