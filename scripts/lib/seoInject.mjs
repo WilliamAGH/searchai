@@ -5,7 +5,7 @@
  */
 
 export const SITE_NAME = "Researchly";
-export const SITE_URL = "https://researchly.bot";
+export const SITE_URL = "https://researchly.fyi";
 
 // Social bots (Twitterbot, Slackbot) must receive HTML within ~5s or they
 // abandon the preview. 3s gives Convex time to respond while leaving headroom

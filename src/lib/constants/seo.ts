@@ -6,7 +6,7 @@
 
 export const SEO = {
   siteName: "Researchly",
-  siteUrl: "https://researchly.bot",
+  siteUrl: "https://researchly.fyi",
   defaultTitle: "Researchly - AI-Powered Web Research",
   defaultDescription:
     "Research the web with AI. Get accurate, up-to-date information with sources powered by real-time web search.",
