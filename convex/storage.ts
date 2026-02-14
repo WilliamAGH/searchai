@@ -18,6 +18,11 @@ import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { isValidUuidV7 } from "./lib/uuid";
 import { hasChatWriteAccess } from "./chats/writeAccess";
+import {
+  hasOwnerAccess,
+  isSharedOrPublicChat,
+  isUnownedChat,
+} from "./lib/auth";
 
 /**
  * Require authenticated user or valid sessionId. Shared by all storage operations.
@@ -63,7 +68,13 @@ export const getFileUrls = query({
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
     const userId = await getAuthUserId(ctx);
-    if (!hasChatWriteAccess(chat, userId, args.sessionId)) {
+
+    // Read access: owner, session-holder, or shared/public chat viewer.
+    // Write access is NOT required — viewers of shared chats need image URLs.
+    const isOwner = hasOwnerAccess(chat, userId, args.sessionId);
+    const canClaimUnowned = isUnownedChat(chat) && !!args.sessionId;
+    const isReadable = isOwner || canClaimUnowned || isSharedOrPublicChat(chat);
+    if (!isReadable) {
       throw new Error("Unauthorized: no access to chat images");
     }
     return Promise.all(args.storageIds.map((id) => ctx.storage.getUrl(id)));
