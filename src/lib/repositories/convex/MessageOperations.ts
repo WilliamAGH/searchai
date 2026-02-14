@@ -19,7 +19,7 @@ export class MessageOperations {
       hasSessionId: !!this.getSessionId(),
     });
 
-    // @ts-ignore - Convex api type instantiation is excessively deep
+    // @ts-ignore - Convex api type instantiation is excessively deep, requires this type assertion
     const messages = await this.client.query<typeof api.chats.getChatMessages>(
       api.chats.getChatMessages,
       {
