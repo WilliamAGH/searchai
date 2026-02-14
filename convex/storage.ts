@@ -103,14 +103,18 @@ export const getFileUrls = query({
   returns: v.array(v.union(v.string(), v.null())),
   handler: async (ctx, args) => {
     if (args.storageIds.length === 0) return [];
-    await requireStorageAccess(ctx, args.sessionId);
+
+    // Validate sessionId format if provided (cheap check before any DB reads).
+    if (args.sessionId && !isValidUuidV7(args.sessionId)) {
+      throw new Error("Invalid sessionId format");
+    }
 
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
     const userId = await getAuthUserId(ctx);
 
     // Read access: owner, session-holder, or shared/public chat viewer.
-    // Write access is NOT required — viewers of shared chats need image URLs.
+    // Matches getChatMessages access pattern — no auth required for shared/public.
     const isOwner = hasOwnerAccess(chat, userId, args.sessionId);
     const canClaimUnowned = isUnownedChat(chat) && !!args.sessionId;
     const isReadable = isOwner || canClaimUnowned || isSharedOrPublicChat(chat);
@@ -128,6 +132,17 @@ export const getFileUrls = query({
 
     // Return null for unauthorized/unlinked IDs to avoid disclosing whether the
     // storage blob exists outside the caller's chat access.
+    const filteredCount = args.storageIds.filter(
+      (id) => !authorized.has(id),
+    ).length;
+    if (filteredCount > 0) {
+      console.warn("[STORAGE_ACCESS_FILTERED]", {
+        chatId: args.chatId,
+        filteredCount,
+        totalRequested: args.storageIds.length,
+      });
+    }
+
     return Promise.all(
       args.storageIds.map(async (storageId) => {
         if (!authorized.has(storageId)) return null;
@@ -193,7 +208,13 @@ async function safeDeleteStorage(
     // path that is about to throw its own descriptive error.  Rethrowing here
     // would replace that error with a less useful cleanup message.  We log
     // with a grep-friendly prefix so orphaned blobs can be monitored.
-    console.error("[STORAGE_CLEANUP_FAILED]", storageId, deleteError);
+    console.error("[STORAGE_CLEANUP_FAILED]", {
+      storageId,
+      error:
+        deleteError instanceof Error
+          ? deleteError.message
+          : String(deleteError),
+    });
   }
 }
 
