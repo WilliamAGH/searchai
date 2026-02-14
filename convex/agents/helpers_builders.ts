@@ -267,12 +267,7 @@ export function buildConversationContext(
     const sep = selected.length > 0 ? "\n" : "";
     const nextUsed = used + sep.length + block.length;
     if (nextUsed > maxChars) {
-      if (selected.length === 0) {
-        if (maxChars <= 0) return "";
-        if (block.length <= maxChars) return block;
-        if (maxChars <= 3) return block.slice(0, maxChars);
-        return `${block.slice(0, maxChars - 3)}...`;
-      }
+      if (selected.length === 0) return truncate(block, maxChars);
       break;
     }
     selected.push(block);
