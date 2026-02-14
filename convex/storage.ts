@@ -103,6 +103,7 @@ export const getFileUrls = query({
   returns: v.array(v.union(v.string(), v.null())),
   handler: async (ctx, args) => {
     if (args.storageIds.length === 0) return [];
+    await requireStorageAccess(ctx, args.sessionId);
 
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
