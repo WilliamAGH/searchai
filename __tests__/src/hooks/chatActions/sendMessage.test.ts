@@ -90,17 +90,6 @@ function createMockState(): ChatState {
   } as ChatState;
 }
 
-function createMockRepository(
-  chunks: MessageStreamChunk[] = [],
-  delay = 0,
-): IChatRepository {
-  return {
-    generateResponse: vi.fn(function* () {
-      // Synchronous generator is fine because allSettled/for-await handles it
-    }) as unknown as IChatRepository["generateResponse"],
-  } as unknown as IChatRepository;
-}
-
 /** Build a repository whose generateResponse yields given chunks with optional delay. */
 function repoWithChunks(
   chunks: MessageStreamChunk[],
