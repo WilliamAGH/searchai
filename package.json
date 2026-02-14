@@ -56,7 +56,7 @@
     "test:integration:chat": "playwright test --config config/playwright-integration.config.ts --project=chromium __tests__/integration/chat-message-chaining.test.ts",
     "test:integration": "playwright test --config config/playwright-integration.config.ts",
     "test:integration:all": "PLAYWRIGHT_ALL_BROWSERS=1 playwright test --config config/playwright-integration.config.ts",
-    "test:integration:ci": "CI=1 playwright test --config config/playwright-integration.config.ts",
+    "test:integration:ci": "CI=true playwright test --config config/playwright-integration.config.ts",
     "test:smoke": "playwright test --config config/playwright.config.ts -g smoke --reporter=line",
     "test:smoke:proxy": "PLAYWRIGHT_RUNTIME=proxy playwright test --config config/playwright.config.ts -g smoke --reporter=line",
     "prepare": "prek -c config/prek.toml install && node scripts/patch-hooks-verbose.mjs",
