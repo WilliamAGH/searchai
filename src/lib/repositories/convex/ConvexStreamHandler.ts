@@ -28,11 +28,20 @@ import {
   PersistedEventSchema,
 } from "@/lib/schemas/chatEvents";
 
+/** Map message role to human-readable label for conversation context. */
+function roleLabel(role: string): string {
+  if (role === "user") return "User";
+  if (role === "assistant") return "Assistant";
+  return "System";
+}
+
 export class ConvexStreamHandler {
   constructor(
-    private client: ConvexReactClient,
-    private sessionId: string | undefined,
-    private fetchMessages: (chatId: string) => Promise<Doc<"messages">[]>,
+    private readonly client: ConvexReactClient,
+    private readonly sessionId: string | undefined,
+    private readonly fetchMessages: (
+      chatId: string,
+    ) => Promise<Doc<"messages">[]>,
   ) {}
 
   async *generateResponse(
@@ -41,16 +50,19 @@ export class ConvexStreamHandler {
     imageStorageIds?: string[],
   ): AsyncGenerator<MessageStreamChunk> {
     try {
-      const host = window.location.hostname;
+      const host = globalThis.location.hostname;
       const isDev = host === "localhost" || host === "127.0.0.1";
       const includeDebugSourceContext = isDev || env.isDev;
       const apiUrl = isDev
         ? "/api/ai/agent/stream"
         : `${env.convexUrl.replace(".convex.cloud", ".convex.site")}/api/ai/agent/stream`;
 
+      const MAX_CONTEXT_MESSAGES = 20;
+      const MAX_CONTEXT_CHARS = 4000;
+
       const recent = await this.fetchMessages(chatId);
       const chatHistory = recent
-        .slice(-20)
+        .slice(-MAX_CONTEXT_MESSAGES)
         .map((m) => ({ role: m.role, content: m.content }));
 
       const response = await fetch(apiUrl, {
@@ -61,12 +73,9 @@ export class ConvexStreamHandler {
           chatId: IdUtils.toConvexChatId(chatId),
           sessionId: this.sessionId,
           conversationContext: chatHistory
-            .map(
-              (m) =>
-                `${m.role === "user" ? "User" : m.role === "assistant" ? "Assistant" : "System"}: ${m.content}`,
-            )
+            .map((m) => `${roleLabel(m.role)}: ${m.content}`)
             .join("\n")
-            .slice(0, 4000),
+            .slice(0, MAX_CONTEXT_CHARS),
           includeDebugSourceContext,
           imageStorageIds,
         }),
@@ -199,21 +208,7 @@ export class ConvexStreamHandler {
 
     // If event has signature fields, attempt verification
     if (parsed.data.signature && parsed.data.nonce) {
-      if (!signingKey) {
-        // Security warning: Backend signs all persisted events, but frontend key is missing
-        // This means we cannot verify the event wasn't tampered with in transit
-        logger.warn(
-          "[WARN] Accepting unverified persisted event: VITE_AGENT_SIGNING_KEY not configured",
-          { workflowId: parsed.data.payload.workflowId },
-        );
-      } else if (!isSignatureVerificationAvailable()) {
-        logger.warn(
-          "[WARN] Accepting unverified persisted event: Web Crypto API unavailable",
-          {
-            workflowId: parsed.data.payload.workflowId,
-          },
-        );
-      } else {
+      if (signingKey && isSignatureVerificationAvailable()) {
         const isValid = await verifyPersistedPayload(
           parsed.data.payload,
           parsed.data.nonce,
@@ -238,6 +233,20 @@ export class ConvexStreamHandler {
         logger.debug("[OK] Signature verified for persisted event", {
           workflowId: parsed.data.payload.workflowId,
         });
+      } else if (signingKey) {
+        logger.warn(
+          "[WARN] Accepting unverified persisted event: Web Crypto API unavailable",
+          {
+            workflowId: parsed.data.payload.workflowId,
+          },
+        );
+      } else {
+        // Security warning: Backend signs all persisted events, but frontend key is missing
+        // This means we cannot verify the event wasn't tampered with in transit
+        logger.warn(
+          "[WARN] Accepting unverified persisted event: VITE_AGENT_SIGNING_KEY not configured",
+          { workflowId: parsed.data.payload.workflowId },
+        );
       }
     }
 
