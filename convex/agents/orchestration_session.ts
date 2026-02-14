@@ -100,6 +100,7 @@ export async function initializeWorkflowSession(
   // from auth denial and not-found — keep the three failure modes distinct.
   let writeAccess: "allowed" | "denied" | "not_found";
   try {
+    // @ts-ignore - Convex api type instantiation is too deep here
     writeAccess = await ctx.runQuery(api.chats.canWriteChat, {
       chatId: args.chatId,
       sessionId: args.sessionId,
@@ -209,31 +210,10 @@ export async function initializeWorkflowSession(
     );
   }
 
-  const recentMessages = (recentMessagesResult ?? []) as Array<{
-    role: "user" | "assistant" | "system";
-    content?: string;
-    imageAnalysis?: string;
-  }>;
+  const recentMessages: MessageQueryResult[] = recentMessagesResult ?? [];
 
-  // 4. Build context
-  let conversationContext = buildConversationContext(recentMessages || []);
-  if (!conversationContext && args.conversationContext) {
-    console.warn(
-      "buildConversationContext returned empty; using args.conversationContext",
-      {
-        chatId: args.chatId,
-        recentMessageCount: recentMessages.length,
-        clientContextLength: args.conversationContext.length,
-      },
-    );
-    // Keep newest context when falling back to client-provided conversationContext.
-    conversationContext = args.conversationContext.slice(
-      -CONTENT_LIMITS.MAX_CONTEXT_CHARS,
-    );
-  }
-  if (!conversationContext) {
-    conversationContext = "";
-  }
+  // 4. Build context — single path per [RC1a]; empty context is correct for new chats
+  const conversationContext = buildConversationContext(recentMessages);
 
   // 5. Resolve image storage IDs to serving URLs via batch query
   const imageUrls = await resolveImageUrls(ctx, args);
