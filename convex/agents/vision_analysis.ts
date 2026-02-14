@@ -101,6 +101,14 @@ export async function analyzeImages(
   const rawContent = response.choices[0]?.message?.content;
   const description = rawContent?.trim();
   if (!description) {
+    const finishReason = response.choices[0]?.finish_reason;
+    const refusal = response.choices[0]?.message?.refusal;
+    console.warn("[vision_analysis] Empty content from API", {
+      model,
+      finishReason,
+      refusal,
+      choicesCount: response.choices?.length ?? 0,
+    });
     throw new Error("Vision analysis returned empty content");
   }
 
