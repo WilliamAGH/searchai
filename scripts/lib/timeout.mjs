@@ -101,14 +101,28 @@ if (!parsed.ok) {
   process.exit(2);
 }
 
+let didTimeout = false;
+let timeoutTimer;
+let killTimer;
+
+const clearTimers = () => {
+  if (timeoutTimer) clearTimeout(timeoutTimer);
+  if (killTimer) clearTimeout(killTimer);
+};
+
 const child = spawn(parsed.cmd, parsed.cmdArgs, {
   stdio: "inherit",
   detached: true,
 });
 
-let didTimeout = false;
-let timeoutTimer;
-let killTimer;
+child.on("error", (error) => {
+  clearTimers();
+  console.error("[timeout] Failed to spawn child process", {
+    cmd: parsed.cmd,
+    error,
+  });
+  process.exit(1);
+});
 
 timeoutTimer = setTimeout(() => {
   didTimeout = true;
@@ -120,11 +134,6 @@ timeoutTimer = setTimeout(() => {
     }, parsed.killAfterMs);
   }
 }, parsed.timeoutMs);
-
-const clearTimers = () => {
-  if (timeoutTimer) clearTimeout(timeoutTimer);
-  if (killTimer) clearTimeout(killTimer);
-};
 
 const forwardSignal = (signal) => {
   clearTimers();

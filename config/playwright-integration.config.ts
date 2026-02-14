@@ -19,8 +19,10 @@ const ROOT_DIR = path.resolve(
 // Local safety: default to Chromium-only to avoid spawning extra browsers on dev
 // machines. CI continues to run the full matrix. To opt in locally, set:
 // PLAYWRIGHT_ALL_BROWSERS=1
+const isCI = process.env.CI === "true";
+const allBrowsersEnv = process.env.PLAYWRIGHT_ALL_BROWSERS;
 const runAllBrowsers =
-  Boolean(process.env.CI) || process.env.PLAYWRIGHT_ALL_BROWSERS === "1";
+  isCI || allBrowsersEnv === "1" || allBrowsersEnv === "true";
 
 export default defineConfig({
   testDir: "../__tests__/integration",
@@ -71,12 +73,12 @@ export default defineConfig({
   webServer: [
     {
       cwd: ROOT_DIR,
-      command: process.env.CI
+      command: isCI
         ? "npx vite preview --strictPort --port 5173 --host 127.0.0.1"
         : "npm run dev:frontend:test",
       url: "http://127.0.0.1:5173",
       timeout: 180_000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !isCI,
       stdout: "pipe",
       stderr: "pipe",
       env: {
