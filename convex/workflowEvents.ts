@@ -9,6 +9,7 @@ export const writeEvent = internalMutation({
     workflowId: v.string(),
     sequence: v.number(),
     type: v.string(),
+    // Justified v.any(): polymorphic event payloads; see schema.ts workflowEvents comment
     data: v.any(),
   },
   handler: async (ctx, args) => {

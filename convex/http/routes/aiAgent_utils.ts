@@ -5,6 +5,7 @@ import type { Id } from "../../_generated/dataModel";
 import {
   isRecord,
   isValidConvexIdFormat,
+  toMetadataRecord,
   type WebResearchSource,
 } from "../../lib/validators";
 
@@ -201,7 +202,7 @@ export function sanitizeWebResearchSources(
         isRecord(refRaw.metadata) &&
         Object.keys(refRaw.metadata).length > 0
       ) {
-        sanitized.metadata = refRaw.metadata;
+        sanitized.metadata = toMetadataRecord(refRaw.metadata);
       }
 
       return sanitized;

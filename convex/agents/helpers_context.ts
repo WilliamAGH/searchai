@@ -196,7 +196,7 @@ export function buildWebResearchSourcesFromHarvested(
     );
     if (!normalizedUrl) continue;
 
-    const metadata: Record<string, unknown> = {
+    const metadata: Record<string, string | number | boolean> = {
       crawlAttempted: true,
       crawlSucceeded: true,
       // Persist the cleaned body captured by scrape_webpage for downstream UI/debug copy.
@@ -258,7 +258,7 @@ export function buildWebResearchSourcesFromHarvested(
       const markedLowRelevance =
         !wasFailedScrape && relevanceScore < RELEVANCE_SCORES.MEDIUM_THRESHOLD;
 
-      const metadata: Record<string, unknown> = {};
+      const metadata: Record<string, string | number | boolean> = {};
       if (wasFailedScrape) {
         metadata.crawlAttempted = true;
         metadata.crawlSucceeded = false;
