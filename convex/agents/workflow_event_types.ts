@@ -1,7 +1,5 @@
-import type {
-  StreamingPersistPayload,
-  PlanningOutput,
-} from "../schemas/agents";
+import type { StreamingPersistPayload } from "../schemas/agents";
+import type { PlanningOutput } from "../schemas/agentOutput";
 import type { Id } from "../_generated/dataModel";
 import type { WorkflowActionCtx } from "./orchestration_persistence";
 import type { StreamingWorkflowArgs } from "./orchestration_session";

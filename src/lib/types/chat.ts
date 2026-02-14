@@ -6,9 +6,6 @@
 
 import type { Doc } from "../../../convex/_generated/dataModel";
 
-// Re-export ShareChatResponse from schema (single source of truth)
-export type { ShareChatResponse } from "@/lib/schemas/apiResponses";
-
 /**
  * Result of creating a new chat
  */

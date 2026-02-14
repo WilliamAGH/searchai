@@ -5,7 +5,7 @@
  * @see ConvexChatRepository.generateResponse - Authenticated streaming
  */
 
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../../convex/lib/errors";
 
 /** SSE protocol constants */
 export const SSE_DATA_PREFIX = "data: ";

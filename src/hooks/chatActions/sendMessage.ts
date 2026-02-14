@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { IChatRepository } from "@/lib/repositories/ChatRepository";
 import { createLocalUIMessage } from "@/lib/types/message";
 import { IdUtils } from "@/lib/types/unified";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../../convex/lib/errors";
 import { logger } from "@/lib/logger";
 import type { ChatState } from "@/hooks/useChatState";
 import { StreamEventHandler } from "@/hooks/utils/streamHandler";

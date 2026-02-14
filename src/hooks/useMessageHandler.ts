@@ -7,7 +7,7 @@
 
 import { useCallback, useRef } from "react";
 import { logger } from "@/lib/logger";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../convex/lib/errors";
 import type { ChatActions, ChatState } from "@/hooks/types";
 
 /**
@@ -116,12 +116,10 @@ export function useMessageHandler(deps: UseMessageHandlerDeps) {
       // Only create new chat if truly needed
       if (!activeChatId) {
         logger.debug("No chat exists, creating new one");
-        if (!createChatInFlightRef.current) {
-          // Singleflight: rapid sends from "/" should reuse one created chat.
-          createChatInFlightRef.current = handleNewChat().finally(() => {
-            createChatInFlightRef.current = null;
-          });
-        }
+        // Singleflight: rapid sends from "/" should reuse one created chat.
+        createChatInFlightRef.current ??= handleNewChat().finally(() => {
+          createChatInFlightRef.current = null;
+        });
         const newChatId = await createChatInFlightRef.current;
         if (!newChatId) {
           logger.error("[ERROR] Failed to create chat for message");

@@ -112,9 +112,9 @@ export function ThemeProvider({
   });
 
   const { isAuthenticated } = useConvexAuth();
-  // @ts-expect-error — TS2589: Convex generic type instantiation is excessively
   // deep for useQuery<typeof api.preferences.getUserPreferences>. Known Convex
   // limitation; the query accepts no args and returns { theme?: string } | null.
+  // @ts-ignore TS2589: Convex generic type instantiation is excessively
   const userPrefs = useQuery(api.preferences.getUserPreferences);
   const updatePrefs = useMutation(api.preferences.updateUserPreferences);
 

@@ -16,12 +16,14 @@ import type { SearchResult } from "@/lib/types/message";
 import {
   SearchResultSchema,
   SearchMethodSchema,
+  SerpEnrichmentSchema,
+  type SerpEnrichment,
+} from "../../../convex/schemas/search";
+import type { SearchMethod } from "../../../convex/lib/constants/search";
+import {
   AIResponseSchema,
   ShareResponseSchema,
   DEFAULT_AI_RESPONSE,
-  type SearchMethod,
-  SerpEnrichmentSchema,
-  type SerpEnrichment,
 } from "@/lib/schemas/apiResponses";
 import {
   logZodFailure,
@@ -162,7 +164,3 @@ export function validateShareResponse(data: unknown): {
   logZodFailure("validateShareResponse", result.error, data);
   return {};
 }
-
-// Re-export types and defaults for consumers
-export type { SearchMethod };
-export { DEFAULT_AI_RESPONSE };

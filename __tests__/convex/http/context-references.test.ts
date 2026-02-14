@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sanitizeWebResearchSources } from "../../../convex/http/routes/aiAgent";
+import { sanitizeWebResearchSources } from "../../../convex/http/routes/aiAgent_utils";
 
 describe("sanitizeWebResearchSources", () => {
   it("filters and normalizes valid web research sources", () => {

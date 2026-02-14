@@ -4,7 +4,7 @@ import { IdUtils } from "@/lib/types/unified";
 import type { MessageStreamChunk } from "@/lib/types/message";
 import { logger } from "@/lib/logger";
 import { buildHttpError, readResponseBody } from "@/lib/utils/httpUtils";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../../../convex/lib/errors";
 import {
   parseSSEStream,
   isSSEParseError,

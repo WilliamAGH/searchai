@@ -9,7 +9,7 @@ import type { ChatState } from "@/hooks/useChatState";
 import type { Message } from "@/lib/types/message";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { TitleUtils } from "@/lib/types/unified";
-import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getErrorMessage } from "../../convex/lib/errors";
 import { logger } from "@/lib/logger";
 import { sendMessageWithStreaming } from "@/hooks/chatActions/sendMessage";
 

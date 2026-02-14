@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeWebResearchSources } from "../../../convex/http/routes/aiAgent";
+import { sanitizeWebResearchSources } from "../../../convex/http/routes/aiAgent_utils";
 
 const baseSource = {
   contextId: "019a122e-c507-7851-99f7-b8f5d7345b40",
@@ -18,7 +18,7 @@ describe("sanitizeWebResearchSources relevanceScore handling", () => {
 
   it("clamps relevanceScore > 1 to 1", () => {
     const result = sanitizeWebResearchSources([
-      { ...baseSource, relevanceScore: 5.0 },
+      { ...baseSource, relevanceScore: 5 },
     ]);
     expect(result?.[0]?.relevanceScore).toBe(1);
   });

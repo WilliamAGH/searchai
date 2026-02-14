@@ -17,9 +17,6 @@ import { runPlanSearch } from "./search/plan_search_handler";
 import { runSearchWeb } from "./search/search_web_handler";
 import { invalidatePlanCacheForChat as invalidateCacheForChat } from "./search/cache";
 
-// Re-export test utilities for backward compatibility
-export { extractKeywordsForTest, augmentQueryForTest } from "./search/utils";
-
 /**
  * Perform web search using available providers
  * Tries: SERP API -> OpenRouter -> DuckDuckGo -> Fallback
